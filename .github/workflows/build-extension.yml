@@ -1,0 +1,91 @@
+name: Build SciGraphs Extension
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+    paths:
+      - 'blender_manifest.toml'
+      - 'SciGraphs/**'
+      - 'constraints/**'
+      - 'scripts/**'
+      - '.github/workflows/build-extension.yml'
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-all-platforms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Fetch platform wheels
+        run: |
+          set -euo pipefail
+          chmod +x scripts/fetch_wheels.sh
+          ./scripts/fetch_wheels.sh
+          
+          echo "Downloaded wheels:"
+          ls -lh wheels/*.whl | wc -l
+          echo "Sample wheels:"
+          ls wheels/*.whl | head -10
+
+      - name: Download Blender
+        run: |
+          set -euo pipefail
+          BLENDER_VERSION=4.3.2
+          BASE_URL=https://download.blender.org/release/Blender${BLENDER_VERSION%.*}
+          FILE=blender-${BLENDER_VERSION}-linux-x64.tar.xz
+          curl -L -o "$RUNNER_TEMP/$FILE" "$BASE_URL/$FILE"
+          tar -C "$RUNNER_TEMP" -xf "$RUNNER_TEMP/$FILE"
+          echo "BLENDER_BIN=$(find "$RUNNER_TEMP" -type f -name blender -path '*linux-x64/*' | head -n1)" >> "$GITHUB_ENV"
+
+      - name: Clean workspace before Blender build
+        run: |
+          rm -rf constraints scripts .github README.md .gitignore || true
+
+      - name: Build extension (split-platforms)
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          "$BLENDER_BIN" --command extension build --source-dir . --output-dir dist --split-platforms
+          ls -lh dist
+
+      - name: Upload artifact (linux-x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: scigraphs-linux-x64
+          path: dist/*linux*.zip
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload artifact (windows-x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: scigraphs-windows-x64
+          path: dist/*windows*.zip
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload artifact (macos-x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: scigraphs-macos-x64
+          path: dist/*macos_x64*.zip
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload artifact (macos-arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: scigraphs-macos-arm64
+          path: dist/*macos_arm64*.zip
+          compression-level: 0
+          if-no-files-found: ignore
+

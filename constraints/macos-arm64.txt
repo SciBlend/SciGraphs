@@ -1,0 +1,68 @@
+# Platform-specific constraints for macOS ARM64
+# These packages require platform-specific wheels
+
+# Core dependencies (universal)
+certifi==2025.11.12
+click==8.3.1
+packaging==25.0
+python-dateutil==2.9.0.post0
+pytz==2025.2
+six==1.17.0
+texttable==1.7.0
+tzdata==2025.2
+
+# Scientific computing (universal)
+networkx==3.6
+
+# Fast graph layout algorithms (universal)
+python-igraph==0.11.9
+
+# Native Graphviz/Yifan Hu layout backend (platform-specific)
+scigraphs-utils==0.1.1
+
+# Geospatial data support (universal)
+geopy==2.4.1
+geographiclib==2.1
+geopandas==1.1.3
+
+# OpenStreetMap network data (universal)
+osmnx==2.0.7
+requests==2.32.5
+urllib3==2.6.0
+idna==3.11
+
+# City2Graph for urban analytics (universal)
+city2graph==0.1.7
+overturemaps==0.18.0
+
+# Note: numpy is NOT included - Blender already bundles it
+
+# Scientific computing (platform-specific)
+scipy==1.15.2
+pandas==3.0.2
+
+# Graph analysis (platform-specific)
+igraph==0.11.9
+
+# Community detection and Surprise metric (platform-specific)
+pysurprise==1.1.1
+
+# Image processing (platform-specific)
+# Used in georaster.py and terrain.py for GeoTIFF and terrain image processing
+pillow==12.0.0
+
+# Geospatial (platform-specific)
+shapely==2.1.2
+pyproj==3.7.1
+pyogrio==0.12.1
+pyarrow==20.0.0
+
+# Machine learning for city2graph (platform-specific)
+scikit-learn==1.8.0
+
+# Text encoding (platform-specific)
+charset-normalizer==3.4.4
+
+# Database drivers for SQL import (universal, pure Python)
+psycopg==3.2.4
+mysql-connector-python==9.2.0

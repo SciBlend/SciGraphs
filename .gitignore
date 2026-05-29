@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+tests/sitecustomize.py
+
+# Blender
+*.blend1
+*.blend2
+
+# Wheels
+wheels/**/*.whl
+
+# Build
+dist/
+build/
+build_temp/
+*.zip
+
+# Geospatial cache
+.geocode_cache.json
+.naturalearth_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cursor
+.cursor/
+papers/
+venv_benchmark/
+cache/
+maps/
+# city2graph/
+
+# Test databases (local testing only)
+test_databases/
+paper_scigraphs/*

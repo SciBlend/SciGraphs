@@ -1,0 +1,79 @@
+# Universal dependencies (platform-independent wheels)
+# These packages have py3-none-any wheels that work on all platforms
+
+# Core dependencies
+certifi>=2023.0.0
+click>=8.0.0
+packaging>=20.0
+python-dateutil>=2.7
+pytz>=2020.1
+six>=1.5
+texttable>=1.6.0
+tzdata>=2022.0
+
+# Scientific computing (universal)
+networkx>=3.0,<4.0
+
+# Fast graph layout algorithms (universal)
+python-igraph>=0.11.0,<1.0.0
+
+# Native Graphviz/Yifan Hu layout backend
+# Platform-specific wheels are pinned in the platform constraint files.
+
+# Community detection and Surprise metric (platform-specific, C++ extension)
+pysurprise>=1.0.0,<2.0.0
+
+# Geospatial data support (universal)
+geopy>=2.4.0,<3.0.0
+geographiclib>=2.0
+
+# OpenStreetMap network data (universal)
+osmnx>=2.0.0,<3.0.0
+requests>=2.31.0
+urllib3>=2.0.0
+charset-normalizer>=3.0.0
+idna>=3.0
+
+# City2Graph for urban analytics (universal)
+city2graph>=0.3.1
+overturemaps>=0.18.0
+
+# Rustworkx for city2graph graph operations (platform-specific)
+rustworkx>=0.17.1
+
+# DuckDB for GTFS/transportation analysis (platform-specific)
+duckdb>=1.1.0
+
+# Database drivers for SQL import (universal, pure Python)
+# PostgreSQL - psycopg3 pure Python version
+psycopg>=3.1.0,<4.0.0
+
+# MySQL/MariaDB - pure Python connector
+mysql-connector-python>=8.0.0,<10.0.0
+
+# Note: SQLite is included in Python standard library (sqlite3)
+# Note: SQL Server (pymssql) requires FreeTDS and has limited platform support
+#       Users who need SQL Server should install pymssql manually
+
+# Note: Platform-specific dependencies (numpy, scipy, pandas,
+# igraph, pillow, shapely, pyproj, pyogrio, pyarrow, scikit-learn)
+# are defined in platform-specific constraint files:
+# - constraints/linux-x64.txt
+# - constraints/windows-x64.txt
+# - constraints/macos-x64.txt
+# - constraints/macos-arm64.txt
+
+# Note: ForceAtlas2 implementations in Python:
+# - Most implementations are outdated or don't have wheels
+# - We use igraph's DrL and FR algorithms instead, which are faster
+# - If needed, users can manually install: pip install fa2l
+
+# Note: Community detection is provided by pySurprise (Aldecoa & Marín)
+# which bundles 7 algorithms from SurpriseMe plus the Surprise quality metric.
+# Since v1.1.1 the compiled SurpriseMe binaries are included in the wheel.
+# No macOS x86_64 wheel is published; that platform falls back to networkx.
+
+# Note: scigraphs-utils provides bundled Graphviz layouts, including native
+# Yifan Hu 3D since v0.1.1. Wheels are published for Linux x64, Windows x64,
+# and macOS arm64.
+

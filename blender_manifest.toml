@@ -1,0 +1,169 @@
+schema_version = "1.0.0"
+
+id = "scigraphs"
+version = "1.0.0"
+name = "SciGraphs"
+tagline = "Graph Visualization and Analysis within Blender"
+maintainer = "José Marín <jose.marin-farina@uv.es>"
+type = "add-on"
+website = "https://github.com/SciBlend/SciGraphs"
+platforms = [
+	"windows-x64",
+	"linux-x64",
+	"macos-arm64",
+	"macos-x64",
+]
+tags = [
+  	"Import-Export",
+    "3D View",
+    "Node"
+]
+blender_version_min = "5.1.0"
+license = [
+  "SPDX:GPL-3.0-or-later"
+]
+copyright =[
+	"2024-2025 José Marín"
+]
+
+wheels = [
+  # Core dependencies (universal)
+  "./wheels/certifi-2025.11.12-py3-none-any.whl",
+  "./wheels/click-8.3.1-py3-none-any.whl",
+  "./wheels/geographiclib-2.1-py3-none-any.whl",
+  "./wheels/geopy-2.4.1-py3-none-any.whl",
+  "./wheels/networkx-3.6-py3-none-any.whl",
+  "./wheels/packaging-25.0-py3-none-any.whl",
+  "./wheels/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+  "./wheels/python_igraph-0.11.9-py3-none-any.whl",
+  "./wheels/pytz-2025.2-py2.py3-none-any.whl",
+  "./wheels/six-1.17.0-py2.py3-none-any.whl",
+  "./wheels/texttable-1.7.0-py2.py3-none-any.whl",
+  "./wheels/tzdata-2025.2-py2.py3-none-any.whl",
+
+  # SciGraphs native Graphviz layout utilities (platform-specific)
+  "./wheels/scigraphs_utils-0.1.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+  "./wheels/scigraphs_utils-0.1.1-cp313-cp313-win_amd64.whl",
+  "./wheels/scigraphs_utils-0.1.1-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # OSMnx and HTTP dependencies (universal)
+  "./wheels/osmnx-2.0.7-py3-none-any.whl",
+  "./wheels/requests-2.32.5-py3-none-any.whl",
+  "./wheels/urllib3-2.6.0-py3-none-any.whl",
+  "./wheels/idna-3.11-py3-none-any.whl",
+  
+  # City2Graph and dependencies (universal)
+  "./wheels/city2graph-0.3.1-py3-none-any.whl",
+  "./wheels/overturemaps-0.18.0-py3-none-any.whl",
+  "./wheels/geopandas-1.1.3-py3-none-any.whl",
+  "./wheels/momepy-0.11.0-py3-none-any.whl",
+  "./wheels/libpysal-4.14.1-py3-none-any.whl",
+  "./wheels/beautifulsoup4-4.14.3-py3-none-any.whl",
+  "./wheels/soupsieve-2.8.3-py3-none-any.whl",
+  "./wheels/platformdirs-4.9.6-py3-none-any.whl",
+  "./wheels/tqdm-4.67.3-py3-none-any.whl",
+  "./wheels/joblib-1.5.3-py3-none-any.whl",
+  "./wheels/threadpoolctl-3.6.0-py3-none-any.whl",
+  "./wheels/typing_extensions-4.15.0-py3-none-any.whl",
+  
+  # Text encoding (platform-specific)
+  "./wheels/charset_normalizer-3.4.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+  "./wheels/charset_normalizer-3.4.4-cp313-cp313-win_amd64.whl",
+  "./wheels/charset_normalizer-3.4.4-cp313-cp313-macosx_10_13_universal2.whl",
+  
+  # pySurprise - community detection and Surprise metric (platform-specific)
+  "./wheels/pysurprise-1.1.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/pysurprise-1.1.1-cp313-cp313-win_amd64.whl",
+  "./wheels/pysurprise-1.1.1-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # Igraph (platform-specific, uses stable ABI cp39-abi3)
+  "./wheels/igraph-0.11.9-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/igraph-0.11.9-cp39-abi3-win_amd64.whl",
+  "./wheels/igraph-0.11.9-cp39-abi3-macosx_10_9_x86_64.whl",
+  "./wheels/igraph-0.11.9-cp39-abi3-macosx_11_0_arm64.whl",
+  
+  # Pandas (platform-specific)
+  "./wheels/pandas-3.0.2-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl",
+  "./wheels/pandas-3.0.2-cp313-cp313-win_amd64.whl",
+  "./wheels/pandas-3.0.2-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/pandas-3.0.2-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # Pillow (platform-specific)
+  "./wheels/pillow-12.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+  "./wheels/pillow-12.0.0-cp313-cp313-win_amd64.whl",
+  "./wheels/pillow-12.0.0-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/pillow-12.0.0-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # Pyogrio (platform-specific)
+  "./wheels/pyogrio-0.12.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+  "./wheels/pyogrio-0.12.1-cp313-cp313-win_amd64.whl",
+  "./wheels/pyogrio-0.12.1-cp313-cp313-macosx_12_0_x86_64.whl",
+  "./wheels/pyogrio-0.12.1-cp313-cp313-macosx_12_0_arm64.whl",
+  
+  # Pyproj (platform-specific)
+  "./wheels/pyproj-3.7.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/pyproj-3.7.1-cp313-cp313-win_amd64.whl",
+  "./wheels/pyproj-3.7.1-cp313-cp313-macosx_13_0_x86_64.whl",
+  "./wheels/pyproj-3.7.1-cp313-cp313-macosx_14_0_arm64.whl",
+  
+  # Scipy (platform-specific)
+  "./wheels/scipy-1.15.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/scipy-1.15.2-cp313-cp313-win_amd64.whl",
+  "./wheels/scipy-1.15.2-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/scipy-1.15.2-cp313-cp313-macosx_14_0_arm64.whl",
+  
+  # Shapely (platform-specific)
+  "./wheels/shapely-2.1.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+  "./wheels/shapely-2.1.2-cp313-cp313-win_amd64.whl",
+  "./wheels/shapely-2.1.2-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/shapely-2.1.2-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # PyArrow for Overture Maps (platform-specific)
+  "./wheels/pyarrow-20.0.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/pyarrow-20.0.0-cp313-cp313-win_amd64.whl",
+  "./wheels/pyarrow-20.0.0-cp313-cp313-macosx_12_0_x86_64.whl",
+  "./wheels/pyarrow-20.0.0-cp313-cp313-macosx_12_0_arm64.whl",
+  
+  # Scikit-learn for city2graph (platform-specific)
+  "./wheels/scikit_learn-1.8.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+  "./wheels/scikit_learn-1.8.0-cp313-cp313-win_amd64.whl",
+  "./wheels/scikit_learn-1.8.0-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/scikit_learn-1.8.0-cp313-cp313-macosx_12_0_arm64.whl",
+  
+  # Database drivers for SQL import
+  # PostgreSQL - psycopg3 pure Python version (universal)
+  "./wheels/psycopg-3.2.4-py3-none-any.whl",
+  
+  # MySQL/MariaDB connector (platform-specific + universal fallback)
+  "./wheels/mysql_connector_python-9.2.0-py2.py3-none-any.whl",
+  "./wheels/mysql_connector_python-9.2.0-cp313-cp313-win_amd64.whl",
+  "./wheels/mysql_connector_python-9.2.0-cp313-cp313-macosx_14_0_arm64.whl",
+  
+  # Rustworkx for city2graph graph operations (platform-specific, uses stable ABI cp39-abi3)
+  "./wheels/rustworkx-0.17.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/rustworkx-0.17.1-cp39-abi3-win_amd64.whl",
+  "./wheels/rustworkx-0.17.1-cp39-abi3-macosx_10_12_x86_64.whl",
+  "./wheels/rustworkx-0.17.1-cp39-abi3-macosx_11_0_arm64.whl",
+  
+  # DuckDB for GTFS and transportation analysis (platform-specific)
+  "./wheels/duckdb-1.2.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/duckdb-1.5.2-cp313-cp313-win_amd64.whl",
+  "./wheels/duckdb-1.5.2-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/duckdb-1.5.2-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # Jinja2 + MarkupSafe (scikit-learn dependency)
+  "./wheels/jinja2-3.1.6-py3-none-any.whl",
+  "./wheels/markupsafe-3.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+  "./wheels/markupsafe-3.0.3-cp313-cp313-win_amd64.whl",
+  "./wheels/markupsafe-3.0.3-cp313-cp313-macosx_10_13_x86_64.whl",
+  "./wheels/markupsafe-3.0.3-cp313-cp313-macosx_11_0_arm64.whl",
+  
+  # Note: SQLite is included in Python standard library
+  # Note: SQL Server (pymssql) requires manual installation due to FreeTDS dependency
+  
+]
+
+# Network permission required for geospatial features and database connections
+# Geocoding via Nominatim API, Natural Earth data downloads, and SQL database access
+[permissions]
+network = "Geocoding, maps, OSM networks, SQL databases"
