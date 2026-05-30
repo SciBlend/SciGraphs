@@ -52,3 +52,5 @@ maps/
 # Test databases (local testing only)
 test_databases/
 paper_scigraphs/*
+images_ignore/*
+examples/*
