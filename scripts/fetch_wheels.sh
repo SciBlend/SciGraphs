@@ -36,10 +36,6 @@ _download constraints/linux-x64.txt ./wheels \
 echo "Downloading Windows x64 wheels..."
 _download constraints/windows-x64.txt ./wheels win_amd64
 
-echo "Downloading macOS x64 wheels..."
-_download constraints/macos-x64.txt ./wheels \
-	macosx_13_0_x86_64 macosx_12_0_x86_64 macosx_11_0_x86_64 macosx_10_13_x86_64
-
 echo "Downloading macOS ARM64 wheels..."
 _download constraints/macos-arm64.txt ./wheels \
 	macosx_14_0_arm64 macosx_12_0_arm64 macosx_11_0_arm64

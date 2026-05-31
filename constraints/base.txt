@@ -60,8 +60,7 @@ mysql-connector-python>=8.0.0,<10.0.0
 # are defined in platform-specific constraint files:
 # - constraints/linux-x64.txt
 # - constraints/windows-x64.txt
-# - constraints/macos-x64.txt
-# - constraints/macos-arm64.txt
+# - constraints/macos-arm64.txt (Apple Silicon only; macOS Intel is unsupported)
 
 # Note: ForceAtlas2 implementations in Python:
 # - Most implementations are outdated or don't have wheels

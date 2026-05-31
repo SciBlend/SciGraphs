@@ -38,12 +38,12 @@ rm -rf "$BUILD_DIR" dist
 mkdir -p "$BUILD_DIR"
 
 if [ ! -f "blender_manifest.toml" ]; then
-    echo "  ❌ blender_manifest.toml not found"; exit 1
+    echo "  blender_manifest.toml not found"; exit 1
 fi
 cp blender_manifest.toml "$BUILD_DIR/"
 
 if [ ! -d "SciGraphs" ]; then
-    echo "  ❌ SciGraphs/ directory not found"; exit 1
+    echo "  SciGraphs/ directory not found"; exit 1
 fi
 cp -r SciGraphs/* "$BUILD_DIR/"
 
@@ -51,7 +51,7 @@ if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
     echo "  Copying wheels..."
     cp -r wheels "$BUILD_DIR/"
 else
-    echo "  ⚠️  No wheels found. Run scripts/fetch_wheels.sh first."
+    echo "  No wheels found. Run scripts/fetch_wheels.sh first."
     mkdir -p "$BUILD_DIR/wheels"
 fi
 
@@ -64,11 +64,11 @@ if [ -n "$BLENDER_BIN" ]; then
         BLENDER_CMD="$BLENDER_BIN"
     fi
     if [ ! -f "$BLENDER_CMD" ]; then
-        echo "  ⚠️  BLENDER_BIN not found: $BLENDER_CMD"
+        echo "  BLENDER_BIN not found: $BLENDER_CMD"
         if command -v blender &> /dev/null; then
             BLENDER_CMD="blender"
         else
-            echo "  ❌ Blender not found"; exit 1
+            echo "  Blender not found"; exit 1
         fi
     fi
     echo "  Using: $BLENDER_CMD"
@@ -76,7 +76,7 @@ elif command -v blender &> /dev/null; then
     BLENDER_CMD="blender"
     echo "  Using: blender (from PATH)"
 else
-    echo "  ❌ Blender not found. Set BLENDER_BIN or add blender to PATH."
+    echo "  Blender not found. Set BLENDER_BIN or add blender to PATH."
     exit 1
 fi
 
@@ -115,7 +115,7 @@ if [ -z "$BLENDER_VERSION" ]; then
 fi
 
 if [ -z "$BLENDER_VERSION" ]; then
-    echo "  ⚠️  Could not detect Blender version from manifest."
+    echo "  Could not detect Blender version from manifest."
     echo "  Set BLENDER_TARGET_VERSION=X.Y to specify manually."
     echo "  Skipping auto-install."
     echo "=== Done (build only) ==="
@@ -131,14 +131,16 @@ PLATFORM="$(uname -s)-$(uname -m)"
 case "$PLATFORM" in
     Linux-x86_64)  ZIP_SUFFIX="linux_x64" ;;
     Darwin-arm64)  ZIP_SUFFIX="macos_arm64" ;;
-    Darwin-x86_64) ZIP_SUFFIX="macos_x64" ;;
+    Darwin-x86_64) echo "  macOS Intel (x86_64) is no longer supported (no native wheels for scigraphs-utils / pysurprise)."
+                   echo "  SciGraphs requires Apple Silicon (arm64) on macOS."
+                   exit 1 ;;
     *)             ZIP_SUFFIX="linux_x64"
-                   echo "  ⚠️  Unknown platform '$PLATFORM', defaulting to linux_x64" ;;
+                   echo "  Unknown platform '$PLATFORM', defaulting to linux_x64" ;;
 esac
 
 ZIP_FILE="dist/${EXTENSION_ID}-1.0.0-${ZIP_SUFFIX}.zip"
 if [ ! -f "$ZIP_FILE" ]; then
-    echo "  ❌ Expected zip not found: $ZIP_FILE"
+    echo "  Expected zip not found: $ZIP_FILE"
     echo "  Skipping auto-install."
     echo "=== Done (build only) ==="
     exit 0

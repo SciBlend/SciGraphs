@@ -6,7 +6,6 @@
 
 [![Linux x64](https://img.shields.io/badge/download-linux--x64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-linux_x64.zip)
 [![Windows x64](https://img.shields.io/badge/download-windows--x64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-windows_x64.zip)
-[![macOS x64](https://img.shields.io/badge/download-macos--x64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-macos_x64.zip)
 [![macOS ARM64](https://img.shields.io/badge/download-macos--arm64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-macos_arm64.zip)
 
 <picture>
@@ -75,7 +74,7 @@ After enabling, open **View3D > Sidebar > SciGraphs**.
 
 - **Blender 5.1.0+**
 - Bundled Python wheels target **Python 3.13** (the interpreter shipped with Blender 5.1.x)
-- Platforms: Linux x64, Windows x64, macOS x64, macOS ARM64
+- Platforms: Linux x64, Windows x64, macOS ARM64 (Apple Silicon)
 - Internet access is required for geospatial features (geocoding, OSM networks, maps, DEM) and SQL database connections
 
 All third-party dependencies are bundled as wheels — no manual `pip install` is needed. Key dependencies include `networkx`, `igraph`, `rustworkx`, `osmnx`, `city2graph`, `overturemaps`, `geopandas`, `shapely`, `pyproj`, `momepy`, `libpysal`, `scikit-learn`, `scipy`, `pandas`, `pyarrow`, `duckdb`, `pillow` and `requests`.
