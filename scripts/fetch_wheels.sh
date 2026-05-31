@@ -10,28 +10,39 @@ mkdir -p wheels
 PYVER=3.13
 PIP="python3 -m pip"
 
+# Download wheels for a constraints file. Accepts one or more platform tags;
+# all of them are passed to a SINGLE `pip download` invocation so the resolver
+# can satisfy each package from whichever tag matches. This is required because
+# pip does NOT expand an explicit `--platform manylinux_2_28` to also accept
+# `manylinux_2_17` wheels, so packages tagged at different manylinux levels
+# (e.g. scigraphs-utils @ 2_28 vs scipy @ 2_17) must be resolved together.
 _download() {
-	local_constraints="$1"
-	platform_tag="$2"
-	dest_dir="$3"
-	${PIP} download -r "${local_constraints}" --dest "${dest_dir}" --only-binary=:all: \
-		--python-version=${PYVER} --platform="${platform_tag}" || true
+	local constraints="$1"
+	local dest_dir="$2"
+	shift 2
+	local platform_args=()
+	local tag
+	for tag in "$@"; do
+		platform_args+=(--platform "${tag}")
+	done
+	${PIP} download -r "${constraints}" --dest "${dest_dir}" --only-binary=:all: \
+		--python-version=${PYVER} "${platform_args[@]}" || true
 }
 
-echo "Downloading Linux x64 wheels (manylinux_2_28)..."
-_download constraints/linux-x64.txt manylinux_2_28_x86_64 ./wheels
-
-echo "Downloading Linux x64 wheels (manylinux_2_17)..."
-_download constraints/linux-x64.txt manylinux_2_17_x86_64 ./wheels
+echo "Downloading Linux x64 wheels (manylinux_2_28 + manylinux_2_17)..."
+_download constraints/linux-x64.txt ./wheels \
+	manylinux_2_28_x86_64 manylinux_2_17_x86_64 manylinux2014_x86_64
 
 echo "Downloading Windows x64 wheels..."
-_download constraints/windows-x64.txt win_amd64 ./wheels
+_download constraints/windows-x64.txt ./wheels win_amd64
 
 echo "Downloading macOS x64 wheels..."
-_download constraints/macos-x64.txt macosx_13_0_x86_64 ./wheels
+_download constraints/macos-x64.txt ./wheels \
+	macosx_13_0_x86_64 macosx_12_0_x86_64 macosx_11_0_x86_64 macosx_10_13_x86_64
 
 echo "Downloading macOS ARM64 wheels..."
-_download constraints/macos-arm64.txt macosx_14_0_arm64 ./wheels
+_download constraints/macos-arm64.txt ./wheels \
+	macosx_14_0_arm64 macosx_12_0_arm64 macosx_11_0_arm64
 
 echo "Cleaning up unwanted wheels..."
 find ./wheels -type f -name 'numpy-*.whl' -print -delete || true
