@@ -32,7 +32,7 @@ charset-normalizer==3.4.4
 idna==3.11
 
 # City2Graph for urban analytics (universal)
-city2graph==0.1.7
+city2graph==0.3.1
 overturemaps==0.18.0
 
 # Scientific computing (platform-specific)
@@ -63,3 +63,21 @@ scikit-learn==1.8.0
 # Database drivers for SQL import (universal, pure Python)
 psycopg==3.2.4
 mysql-connector-python==9.2.0
+
+# Pinned transitive dependencies — must match the wheel versions listed in
+# blender_manifest.toml so that `fetch_wheels.sh` produces exactly the set the
+# extension build expects (otherwise pip may resolve newer versions and the
+# build fails with "file not found").
+momepy==0.11.0
+libpysal==4.14.1
+rustworkx==0.17.1
+joblib==1.5.3
+threadpoolctl==3.6.0
+tqdm==4.67.3
+beautifulsoup4==4.14.3
+soupsieve==2.8.3
+platformdirs==4.9.6
+typing-extensions==4.15.0
+jinja2==3.1.6
+markupsafe==3.0.3
+duckdb==1.2.2
