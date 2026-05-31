@@ -57,6 +57,8 @@ class PipelineExecutor:
         self.verbose = verbose
         self.logger = logging.getLogger("scigraphs.repro")
         self._bpy = None
+        # Friendly metric name -> actual mesh attribute produced by analysis.
+        self._metric_attributes: Dict[str, str] = {}
 
     def _get_bpy(self):
         """Lazy import of bpy."""
@@ -110,6 +112,8 @@ class PipelineExecutor:
             ExecutionResult with status and artifacts
         """
         bpy = self._get_bpy()
+
+        self._metric_attributes = {}
 
         result = ExecutionResult(
             success=False,
@@ -310,37 +314,51 @@ class PipelineExecutor:
         error = None
 
         try:
-            # Compute metrics
+            # Compute metrics. The real operator is ``scigraphs.calculate_centrality``
+            # which takes a ``method`` enum and stores the result on a mesh
+            # attribute named ``centrality_<method>``. We remember that mapping so
+            # the visual stage can resolve friendly names like "betweenness" to the
+            # attribute that was actually produced.
             if spec.metrics:
+                method_map = {
+                    "degree": "degree",
+                    "in_degree": "degree",
+                    "out_degree": "degree",
+                    "betweenness": "betweenness",
+                    "betweenness_centrality": "betweenness",
+                    "closeness": "closeness",
+                    "closeness_centrality": "closeness",
+                    "eigenvector": "eigenvector",
+                    "eigenvector_centrality": "eigenvector",
+                }
                 for metric in spec.metrics:
                     metric_lower = metric.lower()
-                    if metric_lower in ("degree", "in_degree", "out_degree"):
-                        res = call_operator("scigraphs.compute_degree")
-                    elif metric_lower in ("betweenness", "betweenness_centrality"):
-                        res = call_operator("scigraphs.compute_betweenness")
-                    elif metric_lower in ("closeness", "closeness_centrality"):
-                        res = call_operator("scigraphs.compute_closeness")
-                    elif metric_lower in ("pagerank", "page_rank"):
-                        res = call_operator("scigraphs.compute_pagerank")
-                    elif metric_lower in ("eigenvector", "eigenvector_centrality"):
-                        res = call_operator("scigraphs.compute_eigenvector")
-                    else:
-                        self._log(f"Unknown metric: {metric}", "warning")
-                        result.warnings.append(f"Unknown metric: {metric}")
+                    method = method_map.get(metric_lower)
+                    if method is None:
+                        self._log(
+                            f"Unsupported metric: {metric} (supported: "
+                            f"{', '.join(sorted(set(method_map.values())))})",
+                            "warning",
+                        )
+                        result.warnings.append(f"Unsupported metric: {metric}")
                         continue
 
+                    res = call_operator("scigraphs.calculate_centrality", {"method": method})
                     if res.get("status") == "error":
                         result.warnings.append(f"Metric {metric} failed: {res.get('error')}")
+                    else:
+                        attr_name = f"centrality_{method}"
+                        self._metric_attributes[metric_lower] = attr_name
+                        self._metric_attributes[method] = attr_name
 
-            # Clustering
+            # Clustering (community detection)
             if spec.clustering:
-                props = {
-                    "algorithm": spec.clustering.algorithm.upper(),
-                    "resolution": spec.clustering.resolution,
-                }
-                res = call_operator("scigraphs.detect_communities", props)
+                props = {"algorithm": spec.clustering.algorithm.lower()}
+                res = call_operator("scigraphs.apply_clustering", props)
                 if res.get("status") == "error":
                     result.warnings.append(f"Clustering failed: {res.get('error')}")
+                else:
+                    self._metric_attributes["community"] = "community"
 
         except Exception as e:
             status = "error"
@@ -391,6 +409,70 @@ class PipelineExecutor:
         end_time = datetime.datetime.now(datetime.timezone.utc)
         add_step(manifest, "layout", f"apply_{spec.algorithm}", start_time, end_time, status, error)
 
+    def _resolve_visual_attribute(self, name: str) -> Optional[str]:
+        """Resolve a friendly attribute name to a real mesh attribute.
+
+        Handles the centrality naming convention (``betweenness`` ->
+        ``centrality_betweenness``) and verifies the attribute exists on the
+        active graph object.
+        """
+        bpy = self._get_bpy()
+        obj = bpy.context.active_object
+        if obj is None or obj.type != 'MESH':
+            return None
+
+        attrs = obj.data.attributes
+        name_lower = name.lower()
+
+        candidates = [name]
+        mapped = self._metric_attributes.get(name_lower)
+        if mapped:
+            candidates.append(mapped)
+        candidates.append(f"centrality_{name_lower}")
+
+        for cand in candidates:
+            if cand in attrs:
+                return cand
+        return None
+
+    def _apply_node_size_attribute(self, attr: str, result: ExecutionResult) -> None:
+        """Drive node size from a mesh attribute via the interactive GN tree."""
+        bpy = self._get_bpy()
+        obj = bpy.context.active_object
+        viz = getattr(bpy.context.scene, "scigraphs_viz", None)
+        if viz is None or obj is None:
+            result.warnings.append("Node sizing unavailable (no viz settings)")
+            return
+
+        try:
+            from ..mesh import geometry
+        except Exception:  # pragma: no cover - import guard
+            result.warnings.append("Node sizing unavailable (geometry module)")
+            return
+
+        mod = obj.modifiers.get("SciGraphs_Viz")
+        node_group = mod.node_group if mod else None
+        is_interactive = bool(node_group and node_group.name.startswith("SciGraphs_Interactive"))
+        if not is_interactive and hasattr(geometry, "setup_interactive_geometry_nodes"):
+            try:
+                geometry.setup_interactive_geometry_nodes(obj)
+            except Exception as e:  # pragma: no cover - Blender runtime
+                result.warnings.append(f"Could not build interactive tree: {e}")
+
+        try:
+            viz.node_scale_attribute = attr
+        except (TypeError, ValueError):
+            result.warnings.append(
+                f"Node size attribute '{attr}' not selectable; skipping sizing"
+            )
+            return
+
+        if hasattr(geometry, "update_geometry_nodes_parameters"):
+            try:
+                geometry.update_geometry_nodes_parameters(obj)
+            except Exception as e:  # pragma: no cover - Blender runtime
+                result.warnings.append(f"Node sizing update failed: {e}")
+
     def _execute_visual(
         self,
         spec: VisualSpec,
@@ -410,26 +492,40 @@ class PipelineExecutor:
                 if res.get("status") == "error":
                     result.warnings.append(f"Geometry nodes setup failed: {res.get('error')}")
 
-            # Node coloring
+            # Node coloring (driven through the coloring toolbar settings +
+            # the real ``scigraphs.color_apply`` operator).
             if spec.node_color:
-                props = {
-                    "attribute": spec.node_color,
-                    "colormap": spec.colormap,
-                }
-                res = call_operator("scigraphs.apply_node_colors", props)
-                if res.get("status") == "error":
-                    result.warnings.append(f"Node coloring failed: {res.get('error')}")
+                attr = self._resolve_visual_attribute(spec.node_color)
+                if attr is None:
+                    result.warnings.append(
+                        f"Node color attribute '{spec.node_color}' not found on graph"
+                    )
+                else:
+                    coloring = getattr(bpy.context.scene, "scigraphs_coloring", None)
+                    if coloring is not None:
+                        coloring.attribute_name = attr
+                        try:
+                            coloring.attribute_enum = attr
+                        except (TypeError, ValueError):
+                            pass
+                        try:
+                            coloring.colormap = spec.colormap
+                        except (TypeError, ValueError):
+                            result.warnings.append(f"Unknown colormap: {spec.colormap}")
+                        coloring.auto_range = True
+                    res = call_operator("scigraphs.color_apply")
+                    if res.get("status") == "error":
+                        result.warnings.append(f"Node coloring failed: {res.get('error')}")
 
-            # Node sizing
+            # Node sizing by attribute (interactive geometry-nodes tree).
             if spec.node_size:
-                props = {
-                    "attribute": spec.node_size,
-                    "min_size": spec.node_min_size,
-                    "max_size": spec.node_max_size,
-                }
-                res = call_operator("scigraphs.apply_node_sizes", props)
-                if res.get("status") == "error":
-                    result.warnings.append(f"Node sizing failed: {res.get('error')}")
+                attr = self._resolve_visual_attribute(spec.node_size)
+                if attr is None:
+                    result.warnings.append(
+                        f"Node size attribute '{spec.node_size}' not found on graph"
+                    )
+                else:
+                    self._apply_node_size_attribute(attr, result)
 
             # Edge style
             if spec.edge_style:
