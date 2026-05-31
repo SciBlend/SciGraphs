@@ -33,7 +33,7 @@ idna==3.11
 
 # City2Graph for urban analytics (universal)
 city2graph==0.3.1
-overturemaps==0.18.0
+overturemaps==0.19.0
 
 # Note: numpy is NOT included - Blender already bundles it
 
