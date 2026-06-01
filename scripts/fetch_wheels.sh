@@ -40,8 +40,20 @@ echo "Downloading macOS ARM64 wheels..."
 _download constraints/macos-arm64.txt ./wheels \
 	macosx_14_0_arm64 macosx_12_0_arm64 macosx_11_0_arm64
 
+# mysql-connector-python ships both a heavy compiled wheel (16-34 MB) and a
+# lightweight pure-python wheel (~400 kB). The platform passes above prefer the
+# compiled one, so we explicitly fetch the universal py2.py3-none-any wheel and
+# drop the compiled variants, since the C extension is not required. The version
+# itself stays pinned in the constraints files (single source of truth); we just
+# read it back here so the wheel variant we force matches that pin.
+MYSQL_REQ=$(grep -iE '^mysql-connector-python==' constraints/linux-x64.txt | head -n1)
+echo "Downloading pure-python mysql-connector-python wheel (${MYSQL_REQ})..."
+${PIP} download "${MYSQL_REQ}" --dest ./wheels --only-binary=:all: \
+	--no-deps --implementation py --python-version=${PYVER} --abi none --platform any || true
+
 echo "Cleaning up unwanted wheels..."
 find ./wheels -type f -name 'numpy-*.whl' -print -delete || true
+find ./wheels -type f -name 'mysql_connector_python-*' ! -name '*py2.py3-none-any.whl' -print -delete || true
 
 TOTAL_WHEELS=$(find ./wheels -type f -name '*.whl' | wc -l)
 echo ""

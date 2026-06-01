@@ -124,10 +124,10 @@ wheels = [
   # PostgreSQL - psycopg3 pure Python version (universal)
   "./wheels/psycopg-3.2.4-py3-none-any.whl",
   
-  # MySQL/MariaDB connector (platform-specific)
-  "./wheels/mysql_connector_python-9.2.0-cp313-cp313-manylinux_2_28_x86_64.whl",
-  "./wheels/mysql_connector_python-9.2.0-cp313-cp313-win_amd64.whl",
-  "./wheels/mysql_connector_python-9.2.0-cp313-cp313-macosx_14_0_arm64.whl",
+  # MySQL/MariaDB connector (pure-python universal wheel ~400 kB; the compiled
+  # cp313 wheels are 16-34 MB and the C extension is not required, so we use the
+  # lightweight py2.py3-none-any wheel on every platform)
+  "./wheels/mysql_connector_python-9.2.0-py2.py3-none-any.whl",
   
   # Rustworkx for city2graph graph operations (platform-specific, uses stable ABI cp39-abi3)
   "./wheels/rustworkx-0.17.1-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
