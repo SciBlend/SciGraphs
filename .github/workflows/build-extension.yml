@@ -46,15 +46,15 @@ jobs:
           tar -C "$RUNNER_TEMP" -xf "$RUNNER_TEMP/$FILE"
           echo "BLENDER_BIN=$(find "$RUNNER_TEMP" -type f -name blender -path '*linux-x64/*' | head -n1)" >> "$GITHUB_ENV"
 
-      - name: Clean workspace before Blender build
-        run: |
-          rm -rf constraints scripts .github README.md .gitignore || true
-
       - name: Build extension (split-platforms)
         run: |
           set -euo pipefail
-          mkdir -p dist
-          "$BLENDER_BIN" --command extension build --source-dir . --output-dir dist --split-platforms
+          chmod +x build_extension.sh
+          # build_extension.sh assembles a clean build dir with the add-on code
+          # (SciGraphs/* contents) next to the manifest, so the __init__.py ends
+          # up at the extension root. --no-install just builds the per-platform
+          # zips into dist/ without trying to install into a local Blender.
+          ./build_extension.sh --no-install
           ls -lh dist
 
       - name: Upload artifact (linux-x64)
