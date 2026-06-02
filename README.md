@@ -9,12 +9,14 @@
 [![macOS ARM64](https://img.shields.io/badge/download-macos--arm64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-macos_arm64.zip)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./images/scigraphs-favicon.png">
-  <source media="(prefers-color-scheme: light)" srcset="./images/scigraphs-favicon-dark.png">
-  <img src="./images/scigraphs-favicon.png" align="right" width="100" style="margin-top: -20px">
+  <source media="(prefers-color-scheme: dark)" srcset="./images/sciblend-favicon.png">
+  <source media="(prefers-color-scheme: light)" srcset="./images/sciblend-favicon-dark.png">
+  <img src="./images/sciblend-favicon-dark.png" align="right" width="100" style="margin-top: -20px">
 </picture>
 
 **SciGraphs** is an open-source extension that embeds scientific graph processing directly within the modern 3D graphics environment of Blender. It turns abstract networks and real-world spatial graphs into native Blender objects driven by Geometry Nodes, mapping analytical results (centralities, communities, topological invariants) to named attributes that procedurally drive color, scale, and animation — combining the analytical power of NetworkX, igraph and Graphviz with Blender's Cycles & EEVEE path-traced rendering.
+
+
 
 SciGraphs supports two complementary domains:
 
@@ -23,9 +25,8 @@ SciGraphs supports two complementary domains:
 
 By unifying network analysis and visualization within Blender, SciGraphs enables reproducible 3D visualizations that extend network-geometry communication beyond the constraints of traditional 2D canvases (Gephi, Cytoscape, Graphia...).
 
-![SciGraphs teaser](./images/Inferno1.png)
-
-> *A 3D finite-element-mesh graph (5,425 nodes / 5,872 edges) from the SuiteSparse Matrix Collection, laid out with Yifan Hu (SFDP) and colored by betweenness centrality (Inferno colormap), rendered in Cycles with depth-of-field and adaptive labels.*
+![Granada terrain network](./images/GRANADA13.png)
+> ***Granada, Spain.** A 37,814-intersection street network plus a 20-NN amenity proximity graph (city2graph) draped onto SRTM 30 m terrain.*
 
 ## Install
 
@@ -59,7 +60,7 @@ The bundled dependency wheels are **not** tracked in git, so `scripts/fetch_whee
 
 After enabling, open **View3D > Sidebar > SciGraphs**.
 
-## 🧩 Components included
+## Components included
 
 - **Data Import**: GEXF, SuiteSparse Matrix Collection (`.mtx`), CSV edge lists and node-attribute tables, and live SQL databases (PostgreSQL, MySQL/MariaDB, SQLite; SQL Server optional). Supports temporal graph sequences with playback controls.
 - **OSMnx Street Networks**: download by place, address, bounding box, point + radius, polygon or local `.osm` XML; routing and shortest paths, accessibility, edge speeds & travel times, centrality, bearings and orientation (rose diagrams), plus elevation/terrain (DEM) and basemap texturing.
@@ -70,7 +71,7 @@ After enabling, open **View3D > Sidebar > SciGraphs**.
 - **Reproducible Pipelines**: declarative JSON/YAML workflow specifications with deterministic seeding and provenance manifests.
 - **Export**: GEXF, GraphML, JSON, CSV edge lists, Pajek `.net`, node positions and statistics reports, plus a conversion script for PyTorch Geometric structures.
 
-## ⚙️ Requirements
+## Requirements
 
 - **Blender 5.1.0+**
 - Bundled Python wheels target **Python 3.13** (the interpreter shipped with Blender 5.1.x)
@@ -79,7 +80,7 @@ After enabling, open **View3D > Sidebar > SciGraphs**.
 
 All third-party dependencies are bundled as wheels — no manual `pip install` is needed. Key dependencies include `networkx`, `igraph`, `rustworkx`, `osmnx`, `city2graph`, `overturemaps`, `geopandas`, `shapely`, `pyproj`, `momepy`, `libpysal`, `scikit-learn`, `scipy`, `pandas`, `pyarrow`, `duckdb`, `pillow` and `requests`.
 
-## 🌐 External Data Sources & APIs
+## External Data Sources & APIs
 
 SciGraphs integrates several open and commercial data services:
 
@@ -97,7 +98,7 @@ SciGraphs integrates several open and commercial data services:
 
 The native bindings that power the Graphviz layouts (`scigraphs-utils`) and the Surprise community-detection metric (`pysurprise`) are **built and maintained by the project author**, José Marín.
 
-## 🔁 Reproducible Workflows
+## Reproducible Workflows
 
 SciGraphs can replay an entire pipeline — dataset, analysis, layout, visualization, render and export — from a short declarative JSON or YAML file:
 
@@ -113,7 +114,7 @@ SciGraphs can replay an entire pipeline — dataset, analysis, layout, visualiza
 
 Each run emits a canonical specification, a provenance manifest (with input/output hashes and timing) and an execution log, so the same seed and inputs reproduce the same result. See [`examples/pipelines/`](./examples/pipelines) for ready-to-run pipelines and the full schema reference.
 
-## 🔄 Workflow Overview
+## Workflow Overview
 
 ![SciGraphs pipeline](./images/graphical_abstract3.png)
 
@@ -125,57 +126,50 @@ The pipeline transforms raw data into high-fidelity 3D visualizations. Data-inge
 4. **Visualize**: set up Geometry Nodes, then drive node/edge color and size from attributes using scientific colormaps and edge-style presets.
 5. **Render & Export**: render with Cycles or EEVEE, and export the graph (GEXF, GraphML, JSON, CSV, Pajek), positions, or statistics reports.
 
-## 🖼️ Gallery
+## Gallery
 
 | | |
 | --- | --- |
-| ![Global migration flows](./images/REFUGEES3.png) | ![Granada terrain network](./images/GRANADA13.png) |
-| **Global migration flows (2000–2016).** UNHCR displacement data (188 country nodes, 3,614 weighted edges) projected onto a 3D globe with geodesic arcs and NASA imagery, rendered in Cycles. | **Granada, Spain.** A 37,814-intersection street network plus a 20-NN amenity proximity graph (city2graph) draped onto SRTM 30 m terrain. |
-
-![SuiteSparse gallery](./images/GRAPH_MULTI.png)
-
-> *Gallery of six SuiteSparse matrices laid out with Yifan Hu's multilevel algorithm; node color encodes eigenvector centrality (Black-Body Radiation colormap).*
+| ![Global migration flows](./images/REFUGEES3.png) | ![SciGraphs teaser](./images/Inferno1.png) |
+| **Global migration flows (2000–2016).** UNHCR displacement data (188 country nodes, 3,614 weighted edges) projected onto a 3D globe with geodesic arcs and NASA imagery, rendered in Cycles. | **SuiteSparse** A 3D finite-element-mesh graph (5,425 nodes / 5,872 edges) from the SuiteSparse Matrix Collection, laid out with Yifan Hu (SFDP) and colored by betweenness centrality (Inferno colormap), rendered in Cycles with depth-of-field and adaptive labels. |
 
 
 
-## 📜 Citing SciGraphs
+
+## Citing SciGraphs
 
 SciGraphs is described in:
 
-> **SciGraphs: Graph Visualization and Analysis within Blender.**
+> **Visualization and Analysis of Graphs with SciGraphs.**
 > José Marín, Ignacio Marín, Ignacio García-Fernández.
-> CoMMLab, Universitat de València; Instituto de Biomedicina de Valencia (IBV-CSIC).
+> The Eurographics Association, 2026.
 
 If SciGraphs is used in research or publications, please cite it:
 
 ```
-@software{scigraphs,
-  author    = {José Marín and Ignacio Marín and Ignacio García-Fernández},
-  title     = {SciGraphs: Graph Visualization and Analysis within Blender},
-  publisher = {GitHub},
-  url       = {https://github.com/SciBlend/SciGraphs},
-  note      = {Open-source add-on for Blender 5.1+},
-  year      = {2025}
+@article{marin2026visualization,
+  title={Visualization and Analysis of Graphs with SciGraphs},
+  author={Mar{\'\i}n, Jos{\'e} and Mar{\'\i}n, Ignacio and Garc{\'\i}a-Fern{\'a}ndez, Ignacio},
+  year={2026},
+  publisher={The Eurographics Association}
 }
 ```
 
-**Keywords:** scientific visualization, Blender, data rendering, graph theory.
-
 (Source code: https://github.com/SciBlend/SciGraphs)
 
-## 🤝 Contributions
+## Contributions
 
 Contributions to SciGraphs are welcome, including issue reporting, feature suggestions and pull requests. Please use the [issue tracker](https://github.com/SciBlend/SciGraphs/issues) in this repository.
 
-## 💬 Support & Contact
+## Support & Contact
 
 For inquiries or support:
 
 - Maintainer: José Marín — `jose.marin-farina@uv.es`
 - Issues: https://github.com/SciBlend/SciGraphs/issues
 
-## 📄 License
+## License
 
 SciGraphs is released under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**.
 
----
+
