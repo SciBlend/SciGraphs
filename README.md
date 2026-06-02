@@ -4,9 +4,9 @@
 [![Blender Extension](https://img.shields.io/badge/Blender-Extension-orange?logo=blender)](https://extensions.blender.org/)
 [![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-[![Linux x64](https://img.shields.io/badge/download-linux--x64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-linux_x64.zip)
-[![Windows x64](https://img.shields.io/badge/download-windows--x64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-windows_x64.zip)
-[![macOS ARM64](https://img.shields.io/badge/download-macos--arm64-blue)](https://github.com/SciBlend/SciGraphs/releases/download/v1.0.0/scigraphs-1.0.0-macos_arm64.zip)
+[![Linux x64](https://img.shields.io/badge/download-linux--x64-blue)](https://github.com/SciBlend/SciGraphs/actions/runs/26736494851/artifacts/7323866319)
+[![Windows x64](https://img.shields.io/badge/download-windows--x64-blue)](https://github.com/SciBlend/SciGraphs/actions/runs/26736494851/artifacts/7323866601)
+[![macOS ARM64](https://img.shields.io/badge/download-macos--arm64-blue)](https://github.com/SciBlend/SciGraphs/actions/runs/26736494851/artifacts/7323866870)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./images/sciblend-favicon.png">
