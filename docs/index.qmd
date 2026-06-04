@@ -11,10 +11,10 @@ about:
       href: https://github.com/SciBlend/SciGraphs
     - icon: book
       text: Read the guide
-      href: guide/introduction.qmd
+      href: https://sciblend.github.io/SciGraphs/guide/introduction.html
     - icon: mortarboard
       text: Tutorials
-      href: tutorials/index.qmd
+      href: https://sciblend.github.io/SciGraphs/tutorials/index.html
 ---
 
 **SciGraphs** is an open-source Blender extension that brings graph ingestion,
