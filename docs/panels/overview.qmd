@@ -25,11 +25,31 @@ The core combinatorial workflow.
 
 ## OSMnx tab
 
-[Street-network download and analysis](osmnx/index.qmd) — download, graph
-operations, attributes, routing, accessibility, statistics, features, elevation,
-and IO.
+[Street-network download and analysis](osmnx/index.qmd) from OpenStreetMap.
+
+| Panel | What it covers |
+| --- | --- |
+| [Download](osmnx/download.qmd) | Import a network by place, point, bbox, polygon, or XML. |
+| [Graph Operations](osmnx/graph-operations.qmd) | Projection, conversion, simplification, consolidation, truncation. |
+| [Network Attributes](osmnx/attributes.qmd) | Edge lengths, bearings, speeds, and travel times. |
+| [Routing & Paths](osmnx/routing.qmd) | Shortest path, K alternatives, and batch routing. |
+| [Accessibility](osmnx/accessibility.qmd) | Isochrones, ego subgraphs, network DBSCAN. |
+| [Statistics & Centrality](osmnx/statistics.qmd) | Basic stats, circuity, centrality, orientation, node-pair distances. |
+| [Features & POIs](osmnx/features.qmd) | OSM feature downloads, POI snapping, geocoding/geometry helpers. |
+| [Elevation & Terrain](osmnx/elevation.qmd) | DEM sourcing, 3D positions, grades, terrain mesh, basemaps. |
+| [IO / Export](osmnx/io.qmd) | GraphML round-trip, GIS export formats, graph cache. |
 
 ## City2Graph tab
 
-[Heterogeneous urban graphs](city2graph/index.qmd) — data import, morphology,
-transportation, mobility, proximity graphs, metapaths, and GeoAI export.
+[Heterogeneous urban graphs](city2graph/index.qmd) for urban analytics and GeoAI.
+
+| Panel | What it covers |
+| --- | --- |
+| [Data Import](city2graph/data.qmd) | Overture/OSMnx features, local files, segment processing, and GTFS feeds. |
+| [Urban Morphology](city2graph/morphology.qmd) | Segment graphs, tessellations, and morphological building/street graphs. |
+| [Transportation](city2graph/transportation.qmd) | Travel-summary and OD graphs from a loaded GTFS feed. |
+| [Mobility (OD Matrix)](city2graph/mobility.qmd) | Graphs from an external origin–destination matrix. |
+| [Graph Tools](city2graph/graph-tools.qmd) | Largest-component, distance filter, clip, and isochrone utilities. |
+| [Proximity Graphs](city2graph/proximity.qmd) | Single-layer, multi-layer, and group-node spatial networks. |
+| [Metapath Analysis](city2graph/metapaths.qmd) | Connect amenities through the street network. |
+| [GeoAI Export](city2graph/export.qmd) | Export graphs for GNN training and a PyG loader script. |

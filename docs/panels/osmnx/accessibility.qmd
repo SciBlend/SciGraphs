@@ -1,0 +1,42 @@
+---
+title: "Accessibility"
+---
+
+::: {.lead}
+The Accessibility panel measures reachability across the network: isochrones from
+a center, ego subgraphs around a node, and network-constrained clustering.
+:::
+
+::: {.callout-note}
+Requires an active OSMnx graph.
+:::
+
+## Isochrones
+
+| Control | Description |
+| --- | --- |
+| **Center Node** | Node the isochrones radiate from. |
+| **Times (min)** | One or more trip-time thresholds. |
+| **Speed (km/h)** | Travel speed used to convert distance to time. |
+| **Mode** | Isochrone construction mode. |
+| **Buffer (m)** | Buffer distance (shown only for the buffer-union mode). |
+| **Generate Isochrones** | Builds the reachable-area polygons. |
+
+## Ego Subgraph
+
+| Control | Description |
+| --- | --- |
+| **Extract Ego Subgraph** | Extract the neighbourhood subgraph around a node. |
+
+## Network-Constrained DBSCAN
+
+| Control | Description |
+| --- | --- |
+| **Cluster by Network Distance** | Cluster nodes by network (not Euclidean) distance. |
+
+## Typical workflow
+
+1. Choose a **Center Node** and trip **Times**, set a **Speed** and **Mode**,
+   then **Generate Isochrones**.
+2. Use **Ego Subgraph** to isolate a local neighbourhood, or **DBSCAN** to find
+   network-distance clusters.

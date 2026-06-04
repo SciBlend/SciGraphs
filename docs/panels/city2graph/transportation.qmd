@@ -1,0 +1,46 @@
+---
+title: "Transportation"
+---
+
+::: {.lead}
+The Transportation panel turns a loaded GTFS transit feed into graphs: a
+travel-summary graph for a chosen service window, and an origin–destination
+graph aggregated from trip legs.
+:::
+
+::: {.callout-note}
+**Requires GTFS data.** Import a feed first with **Import GTFS** in the
+[Data Import](data.qmd) panel. Until then this panel only shows a reminder.
+:::
+
+## Travel Summary Graph
+
+Builds a transit travel-summary graph over an optional service-date window.
+
+| Control | Description |
+| --- | --- |
+| **Calendar Start / Calendar End** | First and last service day to include. The choices are populated from the dates discovered in the feed; pick **All** to use the full calendar range. |
+| **Travel Summary Graph** | Builds the graph (leave the dates empty/All to use all data). |
+
+## GTFS OD Graph
+
+Aggregates individual trip legs into an origin–destination graph.
+
+| Control | Description |
+| --- | --- |
+| **Directed OD** | Preserve trip direction. When disabled, `(A, B)` and `(B, A)` merge into a single undirected edge. |
+| **Top N Pairs** | Maximum number of OD pairs to materialize. `0` means no limit. |
+| **Get OD Pairs** | Builds the OD graph. |
+
+::: {.callout-important}
+Big feeds can produce millions of OD pairs. Setting **Top N Pairs** to `0`
+(no limit) can exhaust memory — a warning appears when it is unset.
+:::
+
+## Typical workflow
+
+1. In [Data Import](data.qmd), set the **GTFS File** and **Import GTFS**.
+2. Choose a **calendar window** (or All) and build the **Travel Summary Graph**.
+3. Optionally aggregate trips into a **GTFS OD Graph**, capping **Top N Pairs**.
+4. Refine and export with [Graph Tools](graph-tools.qmd) and
+   [GeoAI Export](export.qmd).

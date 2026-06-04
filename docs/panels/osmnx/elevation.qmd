@@ -1,0 +1,73 @@
+---
+title: "Elevation & Terrain"
+---
+
+::: {.lead}
+The Elevation & Terrain panel is a staged pipeline for 3D terrain integration: it
+sources a DEM, applies elevation to the network, computes grades, builds a
+terrain mesh, and drapes a basemap onto it.
+:::
+
+::: {.callout-note}
+Requires an active OSMnx graph. Later stages appear only once the relevant data
+exists (elevation applied, terrain created, etc.).
+:::
+
+## Step 1 — Get Elevation Data
+
+| Control | Description |
+| --- | --- |
+| **Source** | DEM provider: **OpenTopography** (API key + dataset), **Open-Elevation** (provider, resolution, parallel workers), or **Local GeoTIFF**. |
+| **Padding** | Extra margin around the area (OpenTopography). |
+| **Apply to: Nodes / Terrain** | Whether to elevate node positions and/or create a terrain mesh. |
+| **Method** | Terrain build method: **Displace** (with **Subdivisions**) or a subsampled **grid** (with **Subsample**). |
+| **Vertical Scale / Base Offset (m)** | Vertical exaggeration and base height for nodes and terrain. |
+| **Get Elevation Data** | Runs the sourcing/build (enabled when Nodes or Terrain is selected). |
+| **Export AOI** | Export the area bbox to fetch a DEM externally (Copernicus, EarthData…) and re-enter it as a **Local GeoTIFF**. |
+
+::: {.callout-important}
+OpenTopography requires an API key set in add-on preferences; Mapbox/MapTiler
+basemaps (below) require their own keys.
+:::
+
+## Step 2 — 3D Positions
+
+| Control | Description |
+| --- | --- |
+| **Apply 3D Positions** | Move node positions to their elevations. |
+| **Flatten to 2D** | Return the network to a flat layout. |
+
+## Step 3 — Slope / Grade
+
+| Control | Description |
+| --- | --- |
+| **Calculate Grades** | Compute edge grades; reports mean/max grade and the percentage of steep edges (>5%). |
+
+## Step 4 — Terrain Object
+
+| Control | Description |
+| --- | --- |
+| **Show / Hide** | Toggle the terrain mesh visibility. |
+| **Remove** | Delete the generated terrain mesh. |
+
+## Step 5 — Basemap Texture
+
+| Control | Description |
+| --- | --- |
+| **Source** | Imagery source (OSM/ESRI tiles, **WMS**, Mapbox, MapTiler). |
+| **WMS URL / Layer** | Endpoint and layer (WMS source). |
+| **Zoom** | Tile zoom level (tile sources). A live estimate warns before large downloads. |
+| **Bbox Padding** | Extra margin (legacy fallback when no DEM bbox is recorded). |
+| **Fetch & Apply** | Download and drape the basemap onto the terrain. |
+| **Clear** | Remove the applied basemap. |
+
+This panel powers the
+[urban-terrain tutorial](../../tutorials/03-urban-terrain.qmd).
+
+## Typical workflow
+
+1. Pick a **Source**, choose **Apply to Nodes/Terrain**, set scale/offset, and
+   **Get Elevation Data**.
+2. **Apply 3D Positions** and **Calculate Grades**.
+3. Manage the **Terrain Object**, then **Fetch & Apply** a **Basemap**, and
+   render via the [Visualization panel](../scigraphs/visualization.qmd).

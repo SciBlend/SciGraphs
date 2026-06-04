@@ -1,0 +1,51 @@
+---
+title: "Download"
+---
+
+::: {.lead}
+The Download panel imports a street network from OpenStreetMap into Blender. It
+is the entry point of the OSMnx tab — every other panel operates on the graph it
+creates.
+:::
+
+## Step 1 — Download method
+
+Pick how the area is defined; the inputs change with the method.
+
+| Method | Inputs |
+| --- | --- |
+| **Place** | A place name geocoded by Nominatim (e.g. `Madrid, Spain`); the **Geocoder Result #** disambiguates multiple matches. |
+| **Multi-Place** | Several place names, one per line, unioned into a single graph. |
+| **Point** | A **Latitude/Longitude** center plus a **Radius (m)**. |
+| **Address** | A postal address plus a **Radius (m)**. |
+| **BBox** | Manual **North / South / East / West** bounds. |
+| **Polygon** | A mesh object whose vertices are treated as `(lon, lat)`. |
+| **XML** | A local `.osm` XML file. |
+
+## Step 2 — Network Type & Filter
+
+| Control | Description |
+| --- | --- |
+| **Custom Filter Preset** | A predefined filter. When set to anything but `None`, the network type is ignored. |
+| **Network Type** | `drive`, `walk`, `bike`, etc. (only used when no preset is active). |
+| **Advanced Filter** | A raw Overpass filter string for full control. |
+
+## Step 3 — Options
+
+| Control | Description |
+| --- | --- |
+| **Simplify** | Collapse interstitial nodes into clean edges. |
+| **Keep Curved Geometry** | Retain the true edge geometry instead of straight lines. |
+| **Truncate by Edge** | Keep edges that cross the boundary rather than cutting them. |
+| **Retain All** | Keep all components, not just the largest connected one. |
+| **Scale Factor** | Scale applied to the imported coordinates in Blender. |
+
+**Import from OSM** runs the download and creates the network object.
+
+## Typical workflow
+
+1. Pick a **method** and fill in its inputs.
+2. Choose a **Network Type** (or a preset/advanced filter).
+3. Set the **options** (Simplify is recommended for most analyses).
+4. **Import from OSM**, then continue to
+   [Graph Operations](graph-operations.qmd) to project the graph.

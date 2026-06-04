@@ -1,0 +1,45 @@
+---
+title: "Mobility (OD Matrix)"
+---
+
+::: {.lead}
+The Mobility panel builds a graph from an external origin–destination (OD)
+matrix, mapping flows between zones onto zone geometries.
+:::
+
+## Load OD Matrix
+
+| Control | Description |
+| --- | --- |
+| **OD Matrix File** | Path to the OD matrix file (CSV). |
+| **Load OD Matrix** | Loads the file; a badge confirms the loaded file name. |
+
+## OD to Graph
+
+Maps the loaded matrix onto zones and builds the flow graph.
+
+| Control | Description |
+| --- | --- |
+| **Zones** | Object holding the zone polygons. |
+| **Zone ID Column** | Column name identifying each zone. |
+| **Matrix Type** | **Edge List** (rows of source/target/weight) or **Adjacency Matrix** (square zone×zone). |
+| **Source Column** | Origin-zone column (edge-list format). |
+| **Target Column** | Destination-zone column (edge-list format). |
+| **Weight Column** | Flow magnitude column. |
+| **Flow Threshold** | Minimum flow to include an edge. |
+| **Directed Graph** | Preserve flow direction. |
+| **OD to Graph** | Builds the graph. |
+
+::: {.callout-tip}
+The default column names (`zone_id`, `source`, `target`, `flow`) match the test
+files produced by the OD-matrix example notebook, so those load without extra
+configuration.
+:::
+
+## Typical workflow
+
+1. Prepare a **zones** object (polygons with a unique id column) and an OD file.
+2. **Load OD Matrix**.
+3. Map the **zones**, the **id column**, the **matrix type**, and the
+   source/target/weight columns.
+4. Set a **threshold** and directedness, then **OD to Graph**.

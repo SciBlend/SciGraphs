@@ -54,9 +54,26 @@ website:
           - section: "OSMnx tab"
             contents:
               - panels/osmnx/index.qmd
+              - panels/osmnx/download.qmd
+              - panels/osmnx/graph-operations.qmd
+              - panels/osmnx/attributes.qmd
+              - panels/osmnx/routing.qmd
+              - panels/osmnx/accessibility.qmd
+              - panels/osmnx/statistics.qmd
+              - panels/osmnx/features.qmd
+              - panels/osmnx/elevation.qmd
+              - panels/osmnx/io.qmd
           - section: "City2Graph tab"
             contents:
               - panels/city2graph/index.qmd
+              - panels/city2graph/data.qmd
+              - panels/city2graph/morphology.qmd
+              - panels/city2graph/transportation.qmd
+              - panels/city2graph/mobility.qmd
+              - panels/city2graph/graph-tools.qmd
+              - panels/city2graph/proximity.qmd
+              - panels/city2graph/metapaths.qmd
+              - panels/city2graph/export.qmd
       - section: "Tutorials"
         contents:
           - tutorials/index.qmd

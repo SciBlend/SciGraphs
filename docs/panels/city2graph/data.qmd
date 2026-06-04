@@ -1,0 +1,98 @@
+---
+title: "Data Import"
+---
+
+::: {.lead}
+The Data Import panel is the entry point of the City2Graph pipeline. It acquires
+the raw urban layers — buildings, street segments, places, water, land — plus
+GTFS transit feeds, and materializes them as Blender objects every other panel
+can consume.
+:::
+
+At the very top, an **Overture API Key** badge shows whether a production key is
+configured (`Set`) or the bundled `DEMO` key is in use. With the demo key the
+Overture endpoints are rate-limited and may cap results; the gear icon opens the
+add-on preferences to paste your own key.
+
+## Step 1 — Define Area
+
+Choose how to bound the data download. The methods mirror the OSMnx tab so the
+same workflow works with or without an imported graph.
+
+| Method | Description |
+| --- | --- |
+| **From OSMnx Graph** | Use the active OSMnx graph's bounding box and projection. A badge confirms which graph is used, or warns if none is active. |
+| **By Place Name** | Geocode a place (e.g. `Burjassot, Valencia, Spain`); set the **Geocoder Result #** to disambiguate. |
+| **By Coordinates** | A bounding box around a **Latitude/Longitude** plus a **Radius (m)**. |
+| **By Address** | Geocode a postal address plus a **Radius (m)**. |
+| **By Bounding Box** | Manual **North / South / East / West** bounds. |
+| **From Object Polygon** | Use the bounds of a selected Blender mesh object. |
+
+::: {.callout-note}
+If you pick a non-OSMnx method while an OSMnx graph is active, a hint confirms
+that the **outputs will still be aligned** with that graph's coordinate space.
+:::
+
+## Step 2 — Feature Types
+
+Toggle which layers to fetch, then set a per-type cap.
+
+| Control | Description |
+| --- | --- |
+| **Buildings** | Building footprints (Overture Maps). |
+| **Road Segments** | Street segments (OSMnx / Overpass). |
+| **Places (POIs)** | Points of interest (Overture Maps). |
+| **Water** | Water features (OSMnx / Overpass). |
+| **Land Use** | Land-use polygons (OSMnx / Overpass). |
+| **Max Features / Type** | Upper bound per feature type. Values above ~15 000 may be slow or capped server-side (a warning appears). |
+
+Sources, as recommended by the city2graph notebooks:
+
+- **Buildings, Places** → Overture Maps (richest schema).
+- **Segments, Water, Land** → OSMnx (Overpass), which covers these reliably.
+
+## Step 3 — Download
+
+| Control | Description |
+| --- | --- |
+| **Get as Polygons** | Download features keeping their native polygon/line geometry. |
+| **Get as Points** | Download as points: *Places* arrive natively as points; other types are reduced to representative centroids. |
+| **Convert Selected to Centroids** | Create a point-only sibling object from the active polygon/line mesh (the original is kept). |
+
+::: {.callout-tip}
+For point-based analyses (proximity graphs, metapaths) either use **Get as
+Points** or convert an existing polygon object to centroids.
+:::
+
+## Local File (GeoJSON / Shapefile)
+
+**Load from File** imports a GeoJSON or Shapefile directly, aligning it with the
+active OSMnx graph when present. Use this when you already have local data.
+
+## Process Segments
+
+Prepares a raw segment object for graph construction (splitting by connectors and
+extracting barriers). Select the segment object — and optionally also a
+connectors object — then run **Process Segments**.
+
+## GTFS Transit Data
+
+| Control | Description |
+| --- | --- |
+| **GTFS File** | Path to a GTFS `.zip` feed. |
+| **Import GTFS** | Loads the feed; a badge then reports how many tables were parsed. |
+| **Create Stops / Create Routes** | Once loaded, choose what to visualize. |
+| **Stop Size** | Size of the stop sphere visualizations. |
+| **Visualize GTFS** | Builds the stop/route objects in the viewport. |
+
+A loaded feed unlocks the [Transportation](transportation.qmd) panel.
+
+## Typical workflow
+
+1. Confirm the **Overture API Key** status (use a production key for large areas).
+2. **Define an area** (Step 1) — the simplest path is to activate an OSMnx graph
+   and use *From OSMnx Graph*.
+3. Tick the **feature types** you need and set a sensible limit (Step 2).
+4. **Download** as polygons or points (Step 3), or load a local file.
+5. Optionally **Process Segments** and **Import GTFS** for morphology and transit
+   workflows.

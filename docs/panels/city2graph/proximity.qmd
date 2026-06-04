@@ -1,0 +1,100 @@
+---
+title: "Proximity Graphs"
+---
+
+::: {.lead}
+The Proximity Graphs panel builds spatial networks from feature objects:
+single-layer graphs (KNN, radius, Delaunay…), multi-layer graphs that connect
+different feature types, and group-node graphs that link polygons to the points
+they contain. It is split into five subpanels.
+:::
+
+The header subpanel only describes the capability. Generation parameters live in
+the **Single-Layer**, **Multi-Layer**, and **Group Nodes** subpanels, while
+**Advanced Settings** and **Visualization** apply across them.
+
+::: {.callout-note}
+Feature inputs must be City2Graph/OSM feature objects (a green checkmark with the
+feature count confirms a valid object). Use **Get as Points** or *Convert to
+Centroids* in [Data Import](data.qmd) to prepare point inputs.
+:::
+
+## Subpanel — Single-Layer Graphs {#single}
+
+Builds one graph over a single set of features.
+
+| Control | Description |
+| --- | --- |
+| **Features** | The feature object to build the graph from. |
+| **Graph Type** | Topology rule (see table below). |
+| **Distance Metric** | **Euclidean**, **Manhattan**, or **Network** (shortest path along an OSMnx street network). |
+| **Network** | Required when the metric is **Network**: the OSMnx street network object. |
+
+### Graph types
+
+| Type | Meaning | Extra parameter |
+| --- | --- | --- |
+| **K-Nearest Neighbors** | Connect each node to its K closest nodes. | **K (Neighbors)** — must be `< feature count`. |
+| **Delaunay** | Delaunay triangulation. | — |
+| **Fixed Radius** | Connect all nodes within a distance (Gilbert graph). | **Radius (meters)**. |
+| **Waxman** | Probabilistic graph; edge likelihood decays with distance. | **Beta**, **R0**, **Seed**. |
+| **Gabriel** | Gabriel graph (a subset of Delaunay). | — |
+| **Relative Neighborhood** | Relative Neighborhood Graph (RNG). | — |
+| **EMST** | Euclidean Minimum Spanning Tree. | — |
+| **Contiguity** | Polygon adjacency graph. | **Contiguity Type**: **Queen** (share edges or vertices) / **Rook** (share only edges). |
+
+**Generate Graph** builds the network.
+
+## Subpanel — Multi-Layer Graphs {#multi}
+
+Connects features *across* layers (e.g. restaurants → hospitals → schools).
+
+| Control | Description |
+| --- | --- |
+| **Layer 1 / Layer 2** | The two required feature layers. |
+| **Layer 3 (Optional)** | A third optional layer. |
+| **Method** | **K-Nearest Neighbors** (set **K**) or **Fixed Radius** (set **Radius**). |
+| **Metric** | Euclidean / Manhattan / Network (with a **Network** object). |
+| **Generate Multi-Layer Graph** | Builds the cross-layer bridge graph; per-edge-type attributes are created for coloring. |
+
+## Subpanel — Group Nodes (Polygon → Point) {#group}
+
+Connects polygon zones to the points they contain (e.g. districts → buildings).
+
+| Control | Description |
+| --- | --- |
+| **Polygons** | Polygon feature object (zones). |
+| **Points** | Point feature object. |
+| **Predicate** | Containment rule: **Covered By**, **Within** (strict interior), or **Intersects** (boundary or interior). |
+| **Metric** | Euclidean / Manhattan / Network (with a **Network** object). |
+| **Generate Group Nodes** | Connects each point to its containing polygon(s). |
+
+## Subpanel — Advanced Settings {#advanced}
+
+Controls duplicate handling, useful when OSM ways/relations were imported as
+many vertices.
+
+| Control | Description |
+| --- | --- |
+| **Deduplicate Points** | Merge coincident points before building the graph. |
+| **Dedup Tolerance** | Points within this distance (meters) are merged. |
+
+## Subpanel — Visualization {#viz}
+
+Controls how generated edges and nodes are displayed.
+
+| Control | Description |
+| --- | --- |
+| **Edge Thickness** | Thickness of the curve edges. |
+| **Visualize Limit** | Maximum number of edges to render (caps very dense graphs). |
+| **Color by Attribute** | Tag nodes/edges with per-type attributes. Inspect them in the Spreadsheet editor and drive colors via Geometry Nodes or shaders. |
+
+## Typical workflow
+
+1. Prepare a **point feature** object in [Data Import](data.qmd).
+2. In **Single-Layer**, pick a **Graph Type** and **Metric** (select an OSMnx
+   network for **Network** distance), then **Generate Graph**.
+3. For cross-type relations use **Multi-Layer**; for containment use
+   **Group Nodes**.
+4. Tune **Advanced Settings** (deduplication) and **Visualization** (thickness,
+   limit, coloring) as needed.

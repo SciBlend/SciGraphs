@@ -1,0 +1,93 @@
+---
+title: "Metapath Analysis"
+---
+
+::: {.lead}
+The Metapath Analysis panel connects amenities through the street network using
+city2graph's metapath algorithm. It builds a *street dual graph* (segments as
+nodes), bridges amenities to their nearest segments, and traces multi-hop paths
+between amenities.
+:::
+
+::: {.callout-important}
+**Two inputs are required:** an **OSMnx street network** must be the *active*
+object in the 3D viewport, and an **amenities** feature object must be chosen in
+the panel. Amenity objects can come from OSMnx feature downloads
+(`is_osm_features`) or City2Graph Data Import (`is_city2graph`); a green
+checkmark with the feature count confirms a valid choice. Denser amenity sets
+(e.g. **buildings**) produce many more edges than sparse POI tags.
+:::
+
+## Configuration
+
+| Control | Description |
+| --- | --- |
+| **Amenities** | The feature object whose points are connected through the street network. |
+
+## Complete Analysis
+
+The one-click pipeline. It creates the dual graph, bridges amenities, and
+computes metapaths in a single run.
+
+| Control | Description | Default |
+| --- | --- | --- |
+| **Hops** | Number of segment-to-segment hops in each metapath (path length). | 3 (1–10) |
+| **K Neighbors** | Nearest segments each amenity is bridged to. | 1 (1–5) |
+| **Amenity Limit** | Maximum amenities analyzed, for performance. | 100 (10–1000) |
+| **Visualization Limit** | Maximum metapaths drawn as curves. | 200 (10–1000) |
+| **Curve Thickness** | Bevel depth of the metapath curves. | 0.0002 |
+| **Run Complete Analysis** | Executes the full pipeline. | — |
+
+::: {.callout-tip}
+More edges come from more amenities and more connectivity: raise **Hops**,
+**K Neighbors**, and **Amenity Limit**, and feed a dense amenities object
+(buildings).
+:::
+
+## Weighted Metapaths (Dijkstra)
+
+Connects nodes reachable within a cost threshold along the network. **Requires
+bridges to have been computed first** (run the Complete Analysis or the
+step-by-step bridge operator).
+
+| Control | Description |
+| --- | --- |
+| **Weight Attribute** | Edge attribute used as cost (e.g. `length`). |
+| **Cost Threshold** | Maximum travel cost for a connection. |
+| **Min Cost Threshold** | Minimum travel cost (excludes very short connections). |
+| **Endpoint Type** | Node type to connect (e.g. `amenity`). |
+| **Compute Weighted Metapaths** | Runs the Dijkstra-based computation. |
+
+## Advanced: Step-by-Step
+
+For debugging, run the three stages individually:
+
+| Step | Operator | Result |
+| --- | --- | --- |
+| **1. Create Street Dual Graph** | Builds the segment-as-node dual graph. | A `*_StreetDual` object. |
+| **2. Bridge Amenities** | Connects amenities to their nearest segments. | Adds bridges to the dual graph (`*_Bridges`). |
+| **3. Compute Metapaths** | Traces multi-hop paths between amenities. | A `*_Metapaths_<n>hop` object. |
+
+## Reading the result
+
+When a metapath object is active, the panel reports its statistics:
+
+| Object | Reported fields |
+| --- | --- |
+| **Street Dual Graph** | Segments (nodes), connections (edges), and bridge count once amenities are bridged. |
+| **Metapath Result** | Total vs unique paths, hop count, multiplicity range/average, and visualized curve count. |
+| **Metapath Mesh** | Total/unique paths and whether the `multiplicity` edge attribute is available. |
+
+**Convert to Mesh (View in Spreadsheet)** turns a metapath result into a mesh
+whose **edge** domain carries a `multiplicity` attribute, inspectable in the
+Spreadsheet editor.
+
+## Typical workflow
+
+1. Activate the **OSMnx street network** in the viewport.
+2. In [Data Import](data.qmd), download a dense amenities layer (e.g.
+   **buildings**) and select it as **Amenities**.
+3. Set **Hops**, **K Neighbors**, and **Amenity Limit**, then
+   **Run Complete Analysis**.
+4. Optionally add **Weighted Metapaths**, and **Convert to Mesh** to inspect
+   path multiplicity.

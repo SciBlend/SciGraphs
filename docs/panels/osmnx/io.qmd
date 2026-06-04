@@ -1,0 +1,37 @@
+---
+title: "IO / Export"
+---
+
+::: {.lead}
+The IO / Export panel saves and loads networks: a GraphML round-trip, export to
+GIS interchange formats, and a local graph cache.
+:::
+
+## GraphML (OSMnx native)
+
+| Control | Description |
+| --- | --- |
+| **Path** | GraphML file path. |
+| **Save / Load** | Save the active network to GraphML, or load one back. |
+
+## Export Formats (GIS interop)
+
+| Control | Description |
+| --- | --- |
+| **Format** | Target format (GeoPackage, OSM XML, Gephi, SVG, etc.). |
+| **Export…** | Export the active network in the chosen format. |
+
+## Graph Cache
+
+| Control | Description |
+| --- | --- |
+| **Cache Directory** | Location of the local cache (shown for OSMnx objects). |
+| **Save to Cache** | Save the current network to the cache. |
+| **Manage Cache** | Browse and load cached graphs. |
+| **Open Cache Directory** | Open the cache folder in the file browser. |
+
+## Typical workflow
+
+1. Use **GraphML** for a lossless OSMnx round-trip.
+2. **Export** to a GIS format for interoperability with other tools.
+3. **Save to Cache** to reuse a downloaded network without re-querying OSM.

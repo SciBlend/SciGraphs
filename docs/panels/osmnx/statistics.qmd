@@ -1,0 +1,58 @@
+---
+title: "Statistics & Centrality"
+---
+
+::: {.lead}
+The Statistics & Centrality panel reports network-wide metrics, node centrality,
+street orientation, and node-pair distances.
+:::
+
+::: {.callout-note}
+Requires an active OSMnx graph. Project the graph and add edge lengths first for
+accurate metric results.
+:::
+
+## Basic Stats
+
+| Control | Description |
+| --- | --- |
+| **Area (km2)** | Network area; the refresh button estimates it from the graph. |
+| **Compute Statistics** | Reports node/edge counts, total and average edge length, average degree, circuity, intersection and dead-end counts, and densities per km². |
+
+## Circuity
+
+| Control | Description |
+| --- | --- |
+| **Calculate Circuity** | Reports the average circuity (network vs straight-line distance ratio). |
+
+## Centrality
+
+| Control | Description |
+| --- | --- |
+| **Kind** | Centrality measure (e.g. betweenness, closeness). |
+| **Weighted** | Use edge weights. |
+| **Fast** | Use a fast approximation. |
+| **Compute Centrality** | Computes the chosen measure onto the nodes. |
+
+## Orientation Analysis
+
+| Control | Description |
+| --- | --- |
+| **Orientation Entropy** | Compute the street-orientation entropy. |
+| **Bearing Distribution** | Compute the distribution of edge bearings. |
+| **Bins** | Bin count for the orientation rose. |
+| **Render Rose to Image** | Render an orientation rose as an image. |
+
+## Node-Pair Distances
+
+| Control | Description |
+| --- | --- |
+| **Node A / Node B** | The two nodes (eyedroppers pick them in the viewport). |
+| **Compute Distances** | Reports straight-line, network, and travel-time distances plus circuity. |
+
+## Typical workflow
+
+1. Set/estimate the **Area** and **Compute Statistics**.
+2. Compute **Centrality** to drive node coloring/sizing.
+3. Use **Orientation Analysis** for street-grid morphology, and **Node-Pair
+   Distances** for point-to-point comparisons.

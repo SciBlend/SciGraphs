@@ -1,0 +1,36 @@
+---
+title: "GeoAI Export"
+---
+
+::: {.lead}
+The GeoAI Export panel exports a graph for graph-neural-network training and
+provides a ready-to-use PyTorch Geometric loader script.
+:::
+
+## Graph Export for GNN
+
+| Control | Description |
+| --- | --- |
+| **Format** | **JSON** (node-link format, recommended for PyG) or **GraphML** (standard XML). |
+| **Type** | **Homogeneous** (single node/edge type) or **Heterogeneous** (multiple node/edge types). |
+| **Export Path** | Destination file path. |
+| **Export Graph** | Select the graph object and export it. |
+
+## PyTorch Geometric
+
+| Control | Description |
+| --- | --- |
+| **Save Loader Script** | Writes an external Python script that reconstructs the exported graph as a PyG `Data`/`HeteroData` structure. |
+
+::: {.callout-tip}
+Export as **JSON** + **Heterogeneous** for city2graph multi-type graphs
+(buildings, segments, amenities). The saved loader script reads that file back
+into PyG without manual wiring.
+:::
+
+## Typical workflow
+
+1. Build a graph with any City2Graph panel and select it.
+2. Choose the **Format** and **Type**, set an **Export Path**, then
+   **Export Graph**.
+3. **Save Loader Script** next to the exported file to load it in PyG.

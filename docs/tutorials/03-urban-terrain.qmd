@@ -12,7 +12,7 @@ Granada figure from the SciGraphs paper.
 
 ## 1. Download the street network
 
-1. Open the **OSMnx** tab and expand **[Download](../panels/osmnx/index.qmd#download)**.
+1. Open the **OSMnx** tab and expand **[Download](../panels/osmnx/download.qmd)**.
 2. Choose a method — **Place** is simplest; enter e.g. `Granada, Spain`. Pick the
    **network type** (`drive`, `walk`, `bike`…).
 3. Set **Options** (Simplify, Keep Curved Geometry, Scale Factor) and press
@@ -20,14 +20,14 @@ Granada figure from the SciGraphs paper.
 
 ## 2. Project and add attributes
 
-1. In **[Graph Operations](../panels/osmnx/index.qmd#graph-ops)**, press **Project
+1. In **[Graph Operations](../panels/osmnx/graph-operations.qmd)**, press **Project
    to CRS** so distances are metric.
-2. In **[Network Attributes](../panels/osmnx/index.qmd#attributes)**, add
+2. In **[Network Attributes](../panels/osmnx/attributes.qmd)**, add
    **Lengths**, and optionally **Speeds** and **Travel Times**.
 
 ## 3. Add terrain
 
-1. Expand **[Elevation & Terrain](../panels/osmnx/index.qmd#elevation)**.
+1. Expand **[Elevation & Terrain](../panels/osmnx/elevation.qmd)**.
 2. In **1 · Get Elevation Data**, choose a DEM source (OpenTopography with an API
    key, Open-Elevation, or a local GeoTIFF). Enable both **apply to nodes** and
    **create terrain**, set the **Vertical Scale**, and press **Get Elevation
@@ -40,9 +40,9 @@ Granada figure from the SciGraphs paper.
 ## 4. Add an amenity proximity graph (City2Graph)
 
 1. With the OSMnx network active, open the **City2Graph** tab and expand
-   **[Data Import](../panels/city2graph/index.qmd#data)**. Set **Define Area** to
+   **[Data Import](../panels/city2graph/data.qmd)**. Set **Define Area** to
    **From OSMnx** and download **places/amenities**.
-2. Expand **[Proximity Graphs ▸ Single-Layer](../panels/city2graph/index.qmd#proximity-single)**.
+2. Expand **[Proximity Graphs ▸ Single-Layer](../panels/city2graph/proximity.qmd#single)**.
    Set **Features** to the amenities object, choose **KNN** with `k = 20`, and a
    **Network** distance metric pointing at the OSMnx street network.
 3. Press **Generate Graph**. The amenity graph drapes onto the same terrain,

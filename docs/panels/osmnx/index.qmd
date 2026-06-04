@@ -4,136 +4,53 @@ title: "OSMnx"
 
 ::: {.lead}
 The OSMnx tab downloads and analyzes real-world street networks from
-OpenStreetMap. It exposes the full OSMnx toolbox — download, projection,
-routing, accessibility, statistics, features, and elevation/terrain — adapted to
-the Blender environment.
+OpenStreetMap. It exposes the full OSMnx toolbox — download, projection, routing,
+accessibility, statistics, features, and elevation/terrain — adapted to the
+Blender environment.
 :::
 
-The root **OSMnx** panel shows the active network's name, node/edge counts,
-place, and CRS once a graph is imported. Most subpanels require an imported
-OSMnx graph and display a hint pointing to **Download** until one exists.
-Subpanels appear in workflow order.
+The root **OSMnx** panel is a status header: once a graph is imported it shows
+the active network's name, node/edge counts, place, and CRS. Most subpanels
+require an imported OSMnx graph and display a hint pointing to **Download** until
+one exists; subpanels appear in workflow order.
 
-## Download {#download}
+## Panels in this tab
 
-Imports a street network into Blender.
+Each panel of the addon has its own reference page:
 
-| Method | Inputs |
+| Panel | What it does |
 | --- | --- |
-| **Place** | A place name geocoded by Nominatim (e.g. `Madrid, Spain`); a geocoder result index disambiguates results. |
-| **Multi-Place** | Several place names (one per line), unioned into a single graph. |
-| **Point** | Latitude/longitude centre plus a radius in metres. |
-| **Address** | A postal address plus a search radius. |
-| **BBox** | North/south/east/west bounding-box coordinates. |
-| **Polygon** | A mesh object whose vertices are treated as `(lon, lat)`. |
-| **XML** | A local `.osm` XML file. |
+| [Download](download.qmd) | Import a street network by place, point, bbox, polygon, or XML. |
+| [Graph Operations](graph-operations.qmd) | Project, convert, simplify, consolidate, and truncate the graph. |
+| [Network Attributes](attributes.qmd) | Add edge lengths, bearings, speeds, and travel times. |
+| [Routing & Paths](routing.qmd) | Shortest path, K alternatives, and batch many-to-many routing. |
+| [Accessibility](accessibility.qmd) | Isochrones, ego subgraphs, and network DBSCAN. |
+| [Statistics & Centrality](statistics.qmd) | Basic stats, circuity, centrality, orientation, node-pair distances. |
+| [Features & POIs](features.qmd) | Download OSM features, snap POIs, and geocoding/geometry helpers. |
+| [Elevation & Terrain](elevation.qmd) | DEM sourcing, 3D positions, grades, terrain mesh, and basemaps. |
+| [IO / Export](io.qmd) | GraphML round-trip, GIS export formats, and the graph cache. |
 
-**Network Type & Filter** — choose a `network_type` (drive, walk, bike, etc.),
-a custom-filter preset, or an advanced filter string. **Options** include
-**Simplify**, **Keep Curved Geometry**, **Truncate by Edge**, **Retain All**,
-and a **Scale Factor**. **Import from OSM** runs the download.
+## Header status fields
 
-## Graph Operations {#graph-ops}
+When an OSMnx network is active, the header reports:
 
-Transform the imported graph.
-
-- **Projection** — project the WGS84 graph to a metric CRS (**Project to CRS**);
-  the current CRS is shown when projected.
-- **Graph Type Conversion** — convert **To Undirected** or **To DiGraph**.
-- **GeoDataFrame Conversion** — round-trip **Graph to GeoDataFrames** and back.
-- **Simplification** — **Simplify Graph** and **Consolidate Intersections**
-  (with a tolerance in metres).
-- **Truncation** — truncate to a bounding box, polygon, or distance, and **Keep
-  Largest Component**.
-
-## Network Attributes {#attributes}
-
-Compute edge metrics. Checkmarks indicate metrics already present.
-
-- **Lengths** — add edge lengths.
-- **Bearings** — add edge bearings (reports the bearing entropy).
-- **Speed & Travel Time** — add edge speeds (with a fallback speed in km/h) and
-  travel times. Travel times require speeds first.
-
-## Routing & Paths {#routing}
-
-- **Source & Target Nodes** — set endpoints (eyedroppers pick nodes in the
-  viewport); choose the weight to **Minimize** (length, travel time, or an
-  elevation-impedance with an `alpha`).
-- **Shortest Path** — **Calculate Path** reports distance, node/edge counts, and
-  travel time. **Summarize** and **Elevation Profile** add route rise and mean
-  absolute grade.
-- **K Alternative Routes** — compute the `K` shortest alternatives.
-- **Batch (Many-to-Many)** — run routing over random OD pairs across CPU cores;
-  reports the reached fraction and mean distance.
-
-## Accessibility {#accessibility}
-
-- **Isochrones** — reachable areas from a centre node for a set of trip times
-  and travel speed; choose the isochrone mode (e.g. buffer-union with a buffer).
-- **Ego Subgraph** — extract the neighbourhood subgraph around a node.
-- **Network-Constrained DBSCAN** — cluster nodes by network (not Euclidean)
-  distance.
-
-## Statistics & Centrality {#statistics}
-
-- **Basic Stats** — set/estimate the network area, then compute counts, total
-  and average edge length, average degree, circuity, intersection and dead-end
-  counts, and densities per km².
-- **Circuity** — compute the average circuity.
-- **Centrality** — choose a kind (e.g. betweenness/closeness), optionally
-  weighted and/or using a fast approximation, and compute it.
-- **Orientation Analysis** — orientation entropy, bearing distribution, and a
-  rendered **Orientation Rose** image (configurable bin count).
-- **Node-Pair Distances** — pick two nodes and compute straight-line, network,
-  and travel-time distances plus circuity.
-
-## Features & POIs {#features}
-
-- **Download OSM Features** — fetch features (POIs, buildings, etc.) by place,
-  address, point, bbox, polygon, or from an XML file.
-- **Snap POIs to Street Network** — snap downloaded POIs to the nearest network
-  element using a chosen mode.
-- **Geocoding & Geometry** — geocode addresses, convert geocodes to
-  GeoDataFrames, derive bounding boxes from points, convert bboxes to polygons,
-  buffer geometry, interpolate points, and sample points on the graph.
-
-## Elevation & Terrain {#elevation}
-
-A staged pipeline for 3D terrain integration.
-
-1. **Get Elevation Data** — choose a DEM source (OpenTopography with API key and
-   dataset, Open-Elevation / OpenTopoData providers with resolution and parallel
-   workers, or a local GeoTIFF). Choose whether to apply elevation to nodes
-   and/or create a terrain mesh (Displace with subdivisions, or a subsampled
-   grid). Set vertical scale and base offset. An **Export AOI** helper lets you
-   fetch a DEM externally (Copernicus, EarthData) and re-enter it as a local
-   GeoTIFF.
-2. **3D Positions** — apply elevation to node positions (**Apply 3D Positions**)
-   or **Flatten to 2D**.
-3. **Slope / Grade** — compute edge grades; reports mean/max grade and the
-   percentage of steep edges (>5%).
-4. **Terrain Object** — show/hide or remove the generated terrain mesh.
-5. **Basemap Texture** — drape a basemap onto the terrain from OSM/ESRI tiles,
-   WMS, Mapbox, or MapTiler (API keys set in preferences); a live tile-count
-   estimate warns before large downloads.
-
-This subpanel powers the [urban-terrain tutorial](../../tutorials/03-urban-terrain.qmd).
-
-## IO / Export {#io}
-
-- **GraphML (OSMnx native)** — save/load the round-trip GraphML.
-- **Export Formats (GIS interop)** — export to a chosen GIS format (GeoPackage,
-  OSM XML, Gephi, SVG, etc.).
-- **Graph Cache** — save the current network to the local cache and manage
-  cached graphs.
+| Field | Meaning |
+| --- | --- |
+| **Network** | Name of the active graph object. |
+| **Nodes / Edges** | Node and edge counts. |
+| **Place** | The query/place name used to download it. |
+| **CRS** | The coordinate reference system (only shown once projected). |
 
 ## Typical workflow
 
-1. **Download** a network by place, point, or bbox.
-2. **Project to CRS** in **Graph Operations**, then add **Lengths**,
-   **Speeds**, and **Travel Times** in **Network Attributes**.
-3. Use **Routing**, **Accessibility**, and **Statistics & Centrality** for
-   analysis, mapping results to attributes.
-4. Add **Elevation & Terrain** for 3D context and a basemap, then visualize and
-   render via the [SciGraphs Visualization panel](../scigraphs/visualization.qmd).
+1. **[Download](download.qmd)** a network by place, point, or bbox.
+2. **Project to CRS** in **[Graph Operations](graph-operations.qmd)**, then add
+   **Lengths**, **Speeds**, and **Travel Times** in
+   **[Network Attributes](attributes.qmd)**.
+3. Use **[Routing](routing.qmd)**, **[Accessibility](accessibility.qmd)**, and
+   **[Statistics & Centrality](statistics.qmd)** for analysis, mapping results to
+   attributes.
+4. Add **[Elevation & Terrain](elevation.qmd)** for 3D context and a basemap,
+   then visualize and render via the
+   [SciGraphs Visualization panel](../scigraphs/visualization.qmd).
+5. **[Export](io.qmd)** or cache the result.

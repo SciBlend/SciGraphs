@@ -1,0 +1,36 @@
+---
+title: "Network Attributes"
+---
+
+::: {.lead}
+The Network Attributes panel computes per-edge metrics used by routing,
+statistics, and visualization. Checkmarks indicate metrics already present on the
+active graph.
+:::
+
+::: {.callout-note}
+Requires an active OSMnx graph. Project the graph first
+([Graph Operations](graph-operations.qmd)) so metric values are accurate.
+:::
+
+## Edge Metrics
+
+| Control | Description |
+| --- | --- |
+| **Add Lengths** | Add edge lengths (in CRS units). |
+| **Add Bearings** | Add edge compass bearings; reports the **bearing entropy** once computed. |
+
+## Speed & Travel Time
+
+| Control | Description |
+| --- | --- |
+| **Fallback Speed (km/h)** | Speed used where OSM `maxspeed` is missing. |
+| **Add Speeds** | Infer edge speeds (re-runnable as **Recalculate Speeds**). |
+| **Add Travel Times** | Compute travel times from speeds. Disabled until speeds exist. |
+
+## Typical workflow
+
+1. **Add Lengths** (and **Bearings** for orientation analysis).
+2. **Add Speeds**, optionally adjusting the **Fallback Speed**.
+3. **Add Travel Times**, which unlocks travel-time weighting in
+   [Routing & Paths](routing.qmd).

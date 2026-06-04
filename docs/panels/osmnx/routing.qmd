@@ -1,0 +1,52 @@
+---
+title: "Routing & Paths"
+---
+
+::: {.lead}
+The Routing & Paths panel computes shortest paths, K alternative routes, and
+many-to-many batch routing across the network.
+:::
+
+::: {.callout-note}
+Requires an active OSMnx graph. Travel-time weighting requires travel times from
+[Network Attributes](attributes.qmd).
+:::
+
+## Source & Target Nodes
+
+| Control | Description |
+| --- | --- |
+| **Source / Target** | Path endpoints. The eyedropper buttons pick nodes directly in the viewport. |
+| **Minimize** | Weight to optimize: length, travel time, or **elevation impedance**. |
+| **Alpha** | Elevation-impedance strength (only shown for that weight). |
+
+## Shortest Path
+
+| Control | Description |
+| --- | --- |
+| **Calculate Path** | Computes the path and reports distance, node/edge counts, and travel time. |
+| **Summarize** | Adds route rise and mean absolute grade. |
+| **Elevation Profile** | Builds a profile curve of the route. |
+
+## K Alternative Routes
+
+| Control | Description |
+| --- | --- |
+| **K** | Number of alternative routes to compute. |
+| **Compute K Alternatives** | Computes the K shortest distinct routes. |
+
+## Batch (Many-to-Many)
+
+| Control | Description |
+| --- | --- |
+| **Random OD Pairs** | Number of random origin–destination pairs to route. |
+| **CPU Cores (0=auto)** | Parallel workers for the batch. |
+| **Run Batch Routing** | Routes all pairs; reports the reached fraction and mean distance. |
+
+## Typical workflow
+
+1. Pick **Source** and **Target** (eyedroppers), and a **Minimize** weight.
+2. **Calculate Path**, then **Summarize** / **Elevation Profile** for terrain
+   insight.
+3. Use **K Alternatives** for route variety, or **Batch** for network-wide
+   reachability statistics.

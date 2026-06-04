@@ -1,0 +1,32 @@
+---
+title: "Graph Tools"
+---
+
+::: {.lead}
+The Graph Tools panel applies utility operations to an existing graph: keep only
+the largest component, filter by distance, clip to a boundary, or compute an
+isochrone.
+:::
+
+Select the operation from the **Tool** dropdown; the relevant parameters appear
+below it, and **Apply** runs it on the active graph.
+
+| Tool | Action | Parameters |
+| --- | --- | --- |
+| **Remove Isolated** | Keep only the largest connected component. | — |
+| **Filter by Distance** | Remove nodes beyond a distance from a center. | **Center** object, **Filter Distance** (CRS units). |
+| **Clip to Area** | Clip the graph to a polygon boundary. | **Clip Polygon** object. |
+| **Isochrone** | Generate a reachability polygon from a center. | **Center** object, **Travel Cost** threshold, **Weight Attribute** (edge cost, e.g. `travel_time`). |
+
+::: {.callout-note}
+The info box below the parameters restates what the selected tool will do before
+you apply it.
+:::
+
+## Typical workflow
+
+1. Select the graph object to operate on.
+2. Pick a **Tool** and fill in its parameters.
+3. **Apply**. Run **Remove Isolated** first when a graph has stray fragments,
+   then **Clip** or **Filter** to focus on an area, and **Isochrone** for
+   reachability analysis.

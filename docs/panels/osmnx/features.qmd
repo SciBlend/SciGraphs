@@ -1,0 +1,48 @@
+---
+title: "Features & POIs"
+---
+
+::: {.lead}
+The Features & POIs panel downloads OpenStreetMap features (points of interest,
+buildings, and other tagged geometry), snaps them to the street network, and
+provides geocoding/geometry helpers.
+:::
+
+## Download OSM Features
+
+Download features by area; each button uses the corresponding query type.
+
+| Control | Description |
+| --- | --- |
+| **Place** | Download features for a geocoded place. |
+| **Address** | Download features around a postal address. |
+| **Point** | Download features around a coordinate. |
+| **BBox** | Download features within a bounding box. |
+| **Polygon (active obj)** | Download features within the active mesh's polygon. |
+| **From XML File** | Load features from a local `.osm` XML file. |
+
+## Snap POIs to Street Network
+
+| Control | Description |
+| --- | --- |
+| **Mode** | How POIs attach to the network (e.g. nearest node or edge). |
+| **Snap Active POIs** | Snaps the active POI object to the nearest network element. |
+
+## Geocoding & Geometry
+
+| Control | Description |
+| --- | --- |
+| **Geocode Address** | Resolve an address to coordinates. |
+| **Geocode to GeoDataFrame** | Resolve a place to a GeoDataFrame geometry. |
+| **BBox from Point** | Derive a bounding box around a point. |
+| **BBox to Polygon** | Convert a bounding box into a polygon. |
+| **Buffer Geometry** | Buffer the active geometry by a distance. |
+| **Interpolate Points** | Interpolate points along lines. |
+| **Sample Points on Graph** | Sample random points on the graph edges. |
+
+## Typical workflow
+
+1. **Download OSM Features** by the area method that matches your graph.
+2. Optionally **Snap POIs** to the street network for graph-aligned analysis.
+3. Use the **Geocoding & Geometry** helpers to build inputs for other panels
+   (e.g. polygons for [Graph Operations](graph-operations.qmd) truncation).

@@ -1,0 +1,62 @@
+---
+title: "Graph Operations"
+---
+
+::: {.lead}
+The Graph Operations panel transforms the imported graph: project it to a metric
+CRS, convert between directed/undirected and GeoDataFrame representations,
+simplify and consolidate it, and truncate it to an area.
+:::
+
+::: {.callout-note}
+Requires an active OSMnx graph. Until one is imported the panel shows a hint
+pointing to [Download](download.qmd).
+:::
+
+## Projection
+
+| Control | Description |
+| --- | --- |
+| **Project to CRS** | Project the WGS84 graph to an appropriate metric CRS. The current CRS is shown once projected. |
+
+::: {.callout-tip}
+Project **before** computing lengths, speeds, statistics, or distances so that
+metric values are accurate.
+:::
+
+## Graph Type Conversion
+
+| Control | Description |
+| --- | --- |
+| **To Undirected** | Convert to an undirected graph. |
+| **To DiGraph** | Convert to a simple directed graph. |
+
+## GeoDataFrame Conversion
+
+| Control | Description |
+| --- | --- |
+| **Graph to GeoDataFrames** | Export nodes/edges as GeoDataFrames. |
+| **GeoDataFrames to Graph** | Rebuild the graph from GeoDataFrames. |
+
+## Simplification
+
+| Control | Description |
+| --- | --- |
+| **Simplify Graph** | Remove interstitial nodes, keeping topology. |
+| **Tolerance (m)** | Merge distance for **Consolidate Intersections**. |
+| **Consolidate Intersections** | Merge nearby intersections within the tolerance. |
+
+## Truncation
+
+| Control | Description |
+| --- | --- |
+| **Truncate to BBox** | Clip to a bounding box. |
+| **Truncate to Polygon** | Clip to a polygon. |
+| **Truncate by Distance** | Clip to a distance from a center. |
+| **Keep Largest Component** | Discard all but the largest connected component. |
+
+## Typical workflow
+
+1. **Project to CRS** immediately after download.
+2. Optionally **Simplify** / **Consolidate Intersections** to clean topology.
+3. **Truncate** or **Keep Largest Component** to focus the area of interest.

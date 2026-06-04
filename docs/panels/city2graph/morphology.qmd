@@ -1,0 +1,71 @@
+---
+title: "Urban Morphology"
+---
+
+::: {.lead}
+The Urban Morphology panel builds morphological representations of the city: it
+turns processed street segments into a graph, generates morphological
+tessellations around buildings, and wires the building–street relationship graph
+used in urban form analysis.
+:::
+
+## Segments → Graph
+
+Converts a **processed segments** object (see *Process Segments* in
+[Data Import](data.qmd)) into a graph.
+
+| Control | Description |
+| --- | --- |
+| **Segments → Graph** | Select the processed segments object, then build the graph. |
+
+## Tessellation
+
+Generates a morphological tessellation (parcel-like cells) around selected
+buildings.
+
+| Control | Description |
+| --- | --- |
+| **Shrink Factor** | Morphological tessellation shrink factor (0–1). |
+| **Segment Length** | Discretization segment length for the tessellation boundaries. |
+| **Generate Tessellation** | Select the buildings (and optional barrier objects), then build the cells. |
+
+## Morphological Graph
+
+Builds the heterogeneous building/street relationship graph.
+
+| Control | Description |
+| --- | --- |
+| **Center from OSMnx** | Use the active OSMnx graph's center. Disable to set **Center Latitude / Longitude** manually. |
+| **Analysis Radius (m)** | Radius of the analysis area around the center. |
+| **Clipping Buffer (m)** | Extra buffer around the area to avoid edge effects. |
+| **Contiguity Rule** | Adjacency rule for cells: **Queen** (share edges or vertices) or **Rook** (share only edges). |
+| **Keep Buildings / Keep Segments** | Preserve those geometries in the result. |
+
+### Relations to include
+
+Pick which relation types the graph should contain:
+
+| Relation | Meaning |
+| --- | --- |
+| **Private ↔ Private** | Adjacency between tessellation cells (parcel neighbours). |
+| **Public ↔ Public** | Connectivity between street segments. |
+| **Private ↔ Public** | Interface (façade) between parcels and street segments. |
+
+::: {.callout-note}
+Enabling **all three** relations produces a single coherent heterogeneous graph
+(faster, uses the high-level builder). Enabling a **subset** wires only the
+requested relations and produces **one Blender object per active relation type**.
+At least one relation must be enabled.
+:::
+
+Select the **buildings + street network**, then run **Morphological Graph**.
+
+## Typical workflow
+
+1. In [Data Import](data.qmd), download **buildings** and **segments**, and run
+   **Process Segments**.
+2. Optionally **Segments → Graph** for a pure street graph.
+3. **Generate Tessellation** around the buildings.
+4. Set the center, radius, and contiguity, choose the **relations**, then build
+   the **Morphological Graph**.
+5. Continue with [Graph Tools](graph-tools.qmd) or [GeoAI Export](export.qmd).
