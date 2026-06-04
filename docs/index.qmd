@@ -4,9 +4,7 @@ subtitle: "Graph visualization and analysis within Blender"
 toc: false
 page-layout: full
 about:
-  template: trestles
-  image: assets/sciblend-favicon.png
-  image-shape: round
+  template: solana
   links:
     - icon: github
       text: GitHub

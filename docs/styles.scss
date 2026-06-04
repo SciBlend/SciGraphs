@@ -19,11 +19,10 @@ $navbar-fg: #1f2329;
   max-height: 28px;
 }
 
-// Light mode uses the dark (black) logo against the light background.
+// Light mode uses the dark (black) logo against the light navbar.
 // The light stylesheet stays active in dark mode (dark is layered on top),
-// so these overrides must be scoped to the body's light-mode class.
-body.quarto-light .navbar-logo.light-content,
-body.quarto-light .about-image {
+// so this override must be scoped to the body's light-mode class.
+body.quarto-light .navbar-logo.light-content {
   content: url("assets/sciblend-favicon-dark.png");
 }
 

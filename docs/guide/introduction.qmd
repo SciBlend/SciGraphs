@@ -55,18 +55,6 @@ source data (a non-destructive workflow). Because Geometry Nodes evaluate
 lazily on the GPU and use hardware instancing, a single modifier can place
 millions of node glyphs and edge primitives with minimal memory overhead.
 
-## How SciGraphs compares
-
-Tools such as Gephi, Cytoscape, Graphia, yFiles, and Neo4j Bloom cover a large
-portion of the analysis workflow but treat 3D as a secondary feature or omit it
-entirely, and none support *geometry-aware embeddings* where graph topology is
-mapped onto a meaningful spatial substrate (geospatial terrain, sparse-matrix
-coordinates, mesh surfaces).
-
-By embedding the Python scientific stack within Blender, SciGraphs lets
-researchers move from data ingestion to publication-ready 3D renders without
-exporting geometry or losing analytical metadata.
-
 ::: {.callout-note}
 ## How this documentation is organized
 - The **[Guide](introduction.qmd)** covers concepts, installation, the system
