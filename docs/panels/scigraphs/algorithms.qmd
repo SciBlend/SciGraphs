@@ -1,0 +1,73 @@
+---
+title: "Graph Algorithms"
+---
+
+::: {.lead}
+The Graph Algorithms panel runs classical algorithmic operations on the graph
+structure and turns the results into mesh attributes and animations.
+:::
+
+The parent panel requires a graph to be loaded; otherwise it prompts you to
+create one in the [Data panel](data.qmd).
+
+## Subpanel — Traversal {#traversal}
+
+Breadth-first and depth-first search, visualized as an animation of the visiting
+order.
+
+| Control | Description |
+| --- | --- |
+| **Algorithm** | `BFS` or `DFS`. |
+| **Start mode** | How start nodes are chosen (automatic or `Manual`). |
+| **Nodes** | Manual list of start nodes (shown when start mode is `Manual`). |
+| **Mode** | `Discrete` (step-by-step) or `Continuous` (smooth wave). |
+| **Speed** | Animation pacing. |
+| **Smoothness** | Wave smoothness (continuous mode only). |
+| **Loop** | Repeats the animation. |
+| **Animate Traversal** | Records the traversal and keyframes it. |
+
+The operation writes the attributes `traversal_activation` and
+`traversal_order`, and reports the algorithm, mode, and number of visited nodes.
+
+## Subpanel — Pathfinding {#pathfinding}
+
+Shortest paths between two nodes.
+
+| Control | Description |
+| --- | --- |
+| **Algorithm** | `Dijkstra` (optimal for non-negative weights), `A*` (uses node positions as a heuristic for speed), or `Bellman-Ford` (handles negative weights). |
+| **Source Node / Target Node** | Path endpoints. The eyedropper buttons pick a node directly. |
+| **Find Path** | Computes and highlights the shortest path. |
+| **Pick Source and Target in Viewport** | Interactive tool to click both endpoints in the 3D view. |
+
+## Subpanel — Spanning Trees {#spanning}
+
+Minimum (or maximum) spanning trees.
+
+| Control | Description |
+| --- | --- |
+| **Algorithm** | `Kruskal` (sort edges + union-find), `Prim` (grow from a start node), or `Maximum` (heaviest spanning tree). |
+| **Compute MST** | Computes the tree and marks its edges. |
+
+## Subpanel — Network Flow {#flow}
+
+::: {.callout-note}
+**When it appears:** only for **directed** graphs.
+:::
+
+Maximum flow and minimum cut via the Ford–Fulkerson algorithm.
+
+| Control | Description |
+| --- | --- |
+| **Source Node / Sink Node** | The flow endpoints. |
+| **Max Flow** | Computes the maximum flow value and saturating assignment. |
+| **Min Cut** | Computes the minimum cut separating source from sink. |
+
+## Typical workflow
+
+1. Load and lay out a graph.
+2. Use **Traversal** to animate exploration order, **Pathfinding** to highlight
+   routes, **Spanning Trees** to extract a backbone, or — for directed graphs —
+   **Network Flow** to analyze capacity.
+3. Resulting attributes (e.g. `traversal_activation`) can drive colour and size
+   in the [Visualization panel](visualization.qmd).

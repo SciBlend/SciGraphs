@@ -1,0 +1,77 @@
+---
+title: "Installation"
+---
+
+## Requirements
+
+- **Blender 5.1.0+**
+- Bundled Python wheels target **Python 3.13** (the interpreter shipped with
+  Blender 5.1.x).
+- Supported platforms: Linux x64, Windows x64, macOS ARM64 (Apple Silicon).
+- Internet access is required for geospatial features (geocoding, OSM networks,
+  maps, DEM) and SQL database connections.
+
+All third-party dependencies are bundled as wheels — no manual `pip install` is
+needed. Key dependencies include `networkx`, `igraph`, `rustworkx`, `osmnx`,
+`city2graph`, `overturemaps`, `geopandas`, `shapely`, `pyproj`, `momepy`,
+`libpysal`, `scikit-learn`, `scipy`, `pandas`, `pyarrow`, `duckdb`, `pillow`,
+and `requests`.
+
+## Install from a release
+
+1. Download the platform zip for your system from the
+   [GitHub releases / Actions artifacts](https://github.com/SciBlend/SciGraphs/actions).
+2. Open Blender, then go to **Edit ▸ Preferences ▸ Add-ons**.
+3. Select **Install from Disk**, then choose the downloaded zip.
+4. Enable the **SciGraphs** add-on if it is not already active.
+
+## Install the development version
+
+1. Open [GitHub Actions](https://github.com/SciBlend/SciGraphs/actions).
+2. Select the latest successful workflow run.
+3. Download the artifact for your platform.
+4. Extract the downloaded zip to obtain the actual extension zip file.
+5. Install it manually following the steps above.
+
+## Build from source
+
+```bash
+git clone https://github.com/SciBlend/SciGraphs.git
+cd SciGraphs
+./scripts/fetch_wheels.sh   # download bundled dependency wheels for all platforms
+./build_extension.sh        # build per-platform zips and install for your OS
+```
+
+The bundled dependency wheels are **not** tracked in git, so
+`scripts/fetch_wheels.sh` must be run first to populate the `wheels/` directory
+(it downloads the Python 3.13 wheels for every platform from the `constraints/`
+files). Then `build_extension.sh` uses Blender's
+`extension build --split-platforms` command to produce per-platform zips in
+`dist/` and installs the one matching your operating system.
+
+## Opening the panels
+
+After enabling the add-on, open the 3D Viewport sidebar with `N`, then look for
+the SciGraphs tabs:
+
+- **SciGraphs** — the core combinatorial workflow (Data, Layout, Algorithms,
+  Analysis, Visualization, Export, Reproducibility).
+- **OSMnx** — street-network download and analysis.
+- **City2Graph** — urban morphology, transport, and heterogeneous graphs.
+
+::: {.callout-tip}
+If the tabs do not appear, confirm the add-on is enabled and that you are in the
+**3D Viewport** (`View3D`) editor. The sidebar tab labels are docked vertically
+along the right edge of the viewport.
+:::
+
+## Native bindings
+
+Two native bindings are built and maintained by the project author:
+
+- **`scigraphs-utils`** powers the Graphviz layouts (dot, neato, fdp, sfdp,
+  twopi, circo, osage, patchwork), including native 3D variants.
+- **`pysurprise`** provides the SurpriseMe community-detection algorithms and
+  the Surprise quality metric.
+
+Both are bundled as platform-specific wheels in the extension.

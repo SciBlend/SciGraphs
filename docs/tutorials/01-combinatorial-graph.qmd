@@ -1,0 +1,73 @@
+---
+title: "Tutorial 1 — A combinatorial graph from a file"
+---
+
+::: {.lead}
+Import a network from an edge-list file, lay it out in 3D, compute node
+importance and community structure, encode those metrics visually, and render a
+publication-quality image.
+:::
+
+**What you need:** a CSV edge list (two columns of node identifiers, optionally a
+weight and extra attribute columns) or a GEXF/GraphML file. Any small-to-medium
+graph works.
+
+## 1. Import the graph
+
+1. Open the **SciGraphs** tab and expand **[Data](../panels/scigraphs/data.qmd)**.
+2. In **Step 1**, keep the source on **File** and set the **Filepath**. For a
+   CSV, set the **Delimiter**; native GEXF files are detected automatically.
+   Press **Load File**.
+3. In **Step 2**, map **Source Nodes** and **Target Nodes** to the right
+   columns. Leave **Directed Graph** off for an undirected network. Tick any
+   extra columns under **Import as Attributes** to bring them in.
+4. In **Step 3**, press **Create Graph**.
+5. In **Step 4**, press **Setup Visual** so the graph becomes renderable
+   geometry (instanced node spheres and edge tubes).
+
+## 2. Lay out the nodes
+
+1. Expand **[Layout & Positioning](../panels/scigraphs/layout.qmd)**.
+2. In **Algorithm Selection**, choose an algorithm. For most graphs **Yifan Hu
+   (sfdp)** gives high-quality 3D results; for very large graphs prefer
+   **igraph DrL**.
+3. Optionally tune values in **Algorithm Parameters**.
+4. Press **Apply Layout Now** in **Quick Settings** for a one-shot layout — or
+   open **Interactive Mode**, press **Start Execution**, watch convergence, and
+   **Bake to Animation**.
+
+## 3. Analyze
+
+1. Expand **[Analysis](../panels/scigraphs/analysis.qmd)**.
+2. Under **Centrality Metrics**, pick a **Method** (e.g. betweenness) and press
+   **Calculate**. The result is stored as a node attribute.
+3. Under **Community Detection**, choose an algorithm (e.g. Infomap) and press
+   **Detect Communities**. The **Surprise** quality metric is computed
+   automatically.
+4. Optionally run **Statistical Analysis** for global descriptors (density,
+   diameter, clustering, degree distribution).
+
+## 4. Encode the metrics visually
+
+1. Expand **[Visualization](../panels/scigraphs/visualization.qmd)**.
+2. In **Appearance**, set base node and edge sizes.
+3. Drive **node colour** from the community id or centrality, and **node size**
+   from degree or centrality, using a scientific colormap.
+4. In **Scene Setup**, apply a **Material Preset** and **Setup Lighting**.
+5. In **Edge Style**, pick a preset such as **Gephi** or **Bundled** depending on
+   edge density.
+6. Optionally enable **Text Labels** and use the **Attribute Filter** to label
+   only the most central nodes.
+
+## 5. Render and export
+
+1. Set the camera and choose Cycles (photorealistic) or EEVEE (fast) in
+   Blender's render properties, then render (`F12`).
+2. Expand **[Export & Tools](../panels/scigraphs/export.qmd)** to write the graph
+   to GEXF/GraphML/JSON/Pajek, export node positions, or generate a statistics
+   report.
+
+::: {.callout-tip}
+Because metrics are stored as named attributes, you can re-colour or re-size the
+same layout on a different metric instantly — no need to recompute the layout.
+:::

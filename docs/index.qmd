@@ -1,0 +1,84 @@
+---
+title: "SciGraphs"
+subtitle: "Graph visualization and analysis within Blender"
+toc: false
+page-layout: full
+about:
+  template: trestles
+  image: assets/sciblend-favicon.png
+  image-shape: round
+  links:
+    - icon: github
+      text: GitHub
+      href: https://github.com/SciBlend/SciGraphs
+    - icon: book
+      text: Read the guide
+      href: guide/introduction.qmd
+    - icon: mortarboard
+      text: Tutorials
+      href: tutorials/index.qmd
+---
+
+**SciGraphs** is an open-source Blender extension that brings graph ingestion,
+analysis, and high-fidelity 3D rendering into a single, reproducible pipeline.
+It turns abstract networks and real-world spatial graphs into native Blender
+objects driven by Geometry Nodes, mapping analytical results (centralities,
+communities, topological invariants) to named attributes that procedurally
+drive colour, scale, and animation.
+
+It combines the analytical power of NetworkX, igraph, and Graphviz with
+Blender's Cycles and EEVEE path-traced rendering, supporting two complementary
+domains:
+
+- **Combinatorial graphs** — classical network metrics, community structure,
+  and algorithmic layouts mapped procedurally via attribute-driven properties.
+- **Spatial and geometric graphs** — networks visualized using their intrinsic
+  coordinate data (geospatial, sparse-matrix, mesh) or laid out via topological
+  analysis, including multi-layer urban morphologies through the City2Graph
+  module.
+
+::: {.hero}
+![Granada, Spain — a 37,814-intersection street network plus a 20-NN amenity proximity graph draped onto SRTM 30 m terrain.](assets/GRANADA13.png)
+:::
+
+## Where to start
+
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-4}
+### Guide
+Concepts, installation, and the end-to-end workflow.
+
+[Read the guide →](guide/introduction.qmd)
+:::
+
+::: {.g-col-12 .g-col-md-4}
+### Panel Reference
+A usage guide for every panel and subpanel in the sidebar.
+
+[Browse panels →](panels/overview.qmd)
+:::
+
+::: {.g-col-12 .g-col-md-4}
+### Tutorials
+Hands-on, end-to-end walkthroughs of real scenarios.
+
+[Start a tutorial →](tutorials/index.qmd)
+:::
+
+:::
+
+## Citing SciGraphs
+
+SciGraphs is described in *Visualization and Analysis of Graphs with SciGraphs*,
+José Marín, Ignacio Marín, Ignacio García-Fernández, The Eurographics
+Association, 2026.
+
+```bibtex
+@article{marin2026visualization,
+  title={Visualization and Analysis of Graphs with SciGraphs},
+  author={Mar{\'\i}n, Jos{\'e} and Mar{\'\i}n, Ignacio and Garc{\'\i}a-Fern{\'a}ndez, Ignacio},
+  year={2026},
+  publisher={The Eurographics Association}
+}
+```

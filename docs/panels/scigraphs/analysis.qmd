@@ -1,0 +1,121 @@
+---
+title: "Analysis"
+---
+
+::: {.lead}
+The Analysis panel computes the network measures that drive the visual
+encoding: centralities, communities, directed-structure metrics, global
+statistics, and topological invariants. Every result is stored as a named mesh
+attribute.
+:::
+
+The parent panel requires a graph to be loaded.
+
+## Subpanel — Centrality Metrics {#centrality}
+
+Node-importance measures for undirected graphs.
+
+| Control | Description |
+| --- | --- |
+| **Method** | Degree, betweenness, closeness, or eigenvector centrality. |
+| **Calculate** (Node Importance) | Computes the chosen centrality and stores it as an attribute. |
+| **Calculate** (Local Clustering) | Computes the local clustering coefficient per node. |
+
+## Subpanel — Community Detection {#community}
+
+Partitions the graph into communities using the SurpriseMe algorithms
+(`pysurprise`).
+
+| Algorithm | Reference |
+| --- | --- |
+| **CPM** — Clique Percolation Method | Traag et al., Phys. Rev. E 84 (2011) |
+| **Infomap** — map-equation framework | Rosvall & Bergstrom, PNAS 105 (2008) |
+| **RB** — Reichardt–Bornholdt Potts model | Phys. Rev. E 74 (2006) |
+| **RN** — resolution-free Potts model | Ronhovde & Nussinov, Phys. Rev. E 81 (2010) |
+| **RNSC** — Restricted Neighbourhood Search | King et al., Bioinformatics 20 (2004) |
+| **SCluster** — hierarchical clustering (Jerarca) | Aldecoa & Marín, PLoS ONE 5 (2010) |
+| **UVCluster** — iterative cluster analysis (Jerarca) | Arnau et al., Bioinformatics 21 (2005) |
+
+| Control | Description |
+| --- | --- |
+| **Clustering Algorithm** | One of the seven algorithms above. |
+| **Detect Communities** | Runs detection and assigns a community id per node. The **Surprise** quality metric is computed automatically. |
+
+## Subpanel — Directed Analysis {#directed}
+
+::: {.callout-note}
+**When it appears:** only for **directed** graphs. It groups three child
+subpanels.
+:::
+
+### Directed Centrality {#directed-centrality}
+
+| Control | Description |
+| --- | --- |
+| **Method** | PageRank (web importance), hub score (points to many authorities), authority score (pointed to by many hubs), in-degree (popularity), out-degree (influence), or Katz centrality. |
+| **Calculate** | Computes the chosen directed centrality. |
+
+### Structure Analysis {#structure}
+
+| Control | Description |
+| --- | --- |
+| **Detect Patterns** | Classifies the graph: DAG/acyclic, presence and count of cycles, strong connectivity, and the number of strongly connected components. |
+| **Find SCCs** | Labels strongly connected components and reports the component count and largest component size. |
+
+### Flow Analysis {#flow-analysis}
+
+| Control | Description |
+| --- | --- |
+| **Analyze Flow** | Classifies node roles into sources, sinks, and intermediaries and reports their counts. |
+| **Mode** | Flow animation mode: `Discrete` (binary 0→1 switching) or `Continuous` (smooth gradient wave). |
+| **Speed / Smoothness / Loop** | Animation pacing, gradient smoothness (continuous), and looping. When looping, the panel reports how many cycles fit in the timeline. |
+| **Create Flow Animation** | Propagates activation from source nodes through the directed topology, writing `flow_activation` and `flow_distance` attributes. |
+
+## Subpanel — Statistical Analysis {#statistical}
+
+Global graph metrics.
+
+| Control | Description |
+| --- | --- |
+| **Calculate Statistics** | Computes density, global clustering, diameter, average path length, assortativity, and the degree distribution (mean, median, std, range). Results are displayed inline. |
+
+## Subpanel — Topological Analysis {#topology}
+
+Switches between analysis modes with a mode selector at the top. The
+**Surface Embedding** child subpanel is shown in `Surface` mode.
+
+### Surface Embedding {#surface}
+
+::: {.callout-note}
+**When it appears:** when the topology mode is set to `Surface`.
+:::
+
+| Control | Description |
+| --- | --- |
+| **Embedding Surface** | The target surface type (e.g. `Plane`). |
+| **Check Planarity** | Boyer–Myrvold planarity test; for non-planar graphs reports the Kuratowski subdivision type ($K_5$ or $K_{3,3}$). |
+| **Calculate Genus** | Reports the genus lower bound and the Euler characteristic ($V$, $E$, $F$, $\chi$). |
+| **Compute Faces** | For planar graphs, detects faces and writes the `face_id` attribute. |
+| **Create Dual Graph** | Builds the geometric dual $G^*$ (vertices = face centroids, edges between adjacent faces); the dual can be toggled or removed. |
+| **Compute Embedding** | Computes a crossing-free straight-line drawing (Chrobak–Payne for planar inputs) and generates a surface mesh. |
+| **Validate Crossings** | Verifies the drawing has no edge crossings and reports any found. |
+
+### Results Summary {#topology-results}
+
+::: {.callout-note}
+**When it appears:** once any topology analysis has run.
+:::
+
+A read-only summary of all topology properties: planarity, genus bound, face
+count, cycles, linked pairs, intrinsic linking, and the Euler characteristic.
+
+## Typical workflow
+
+1. For an undirected graph, compute a **centrality** and detect **communities**;
+   for a directed graph, use **Directed Analysis**.
+2. Run **Statistical Analysis** for global descriptors.
+3. Use **Topological Analysis** for planarity, genus, and crossing-free
+   embeddings.
+4. Map the resulting attributes to colour/size in the
+   [Visualization panel](visualization.qmd) or stratify them with the
+   [Network Splitter 3D](layout.qmd#splitter).

@@ -1,0 +1,96 @@
+---
+title: "Visualization"
+---
+
+::: {.lead}
+The Visualization panel controls how the graph looks: node and edge geometry,
+material and lighting presets, edge styling, and on-render text labels. It is
+where attribute-driven encodings become visible.
+:::
+
+The parent panel requires a graph to be loaded. The rendering geometry itself is
+created by **Setup Visual** (available in the [Data panel](data.qmd) Step 4),
+which instances node spheres and edge cylinders through Geometry Nodes.
+
+## Subpanel — Appearance {#appearance}
+
+Base geometry of nodes and edges.
+
+| Control | Description |
+| --- | --- |
+| **Node Size** | Base radius of node glyphs. |
+| **Node Resolution** | Tessellation of the node primitive. |
+| **Node Shape** | Glyph shape used for nodes. |
+| **Attr Mult** (node) | Multiplier applied when node size is driven by an attribute. |
+| **Edge Thickness** | Base radius of edge tubes. |
+| **Edge Resolution** | Tessellation of the edge primitive. |
+| **Attr Mult** (edge) | Multiplier applied when edge thickness is driven by an attribute. |
+| **Show Arrows** | Adds direction arrows; exposes arrow **Size** and **Position** along the edge. |
+| **Update Appearance** | Applies the appearance settings to the geometry. |
+
+## Subpanel — Scene Setup {#scene}
+
+Materials and lighting for renders.
+
+| Control | Description |
+| --- | --- |
+| **Material Preset** | A predefined material style; **Apply Preset** assigns it. |
+| **Lighting** | A lighting rig preset; **Setup Lighting** builds the lights in the scene. |
+
+## Subpanel — Edge Style {#edge-style}
+
+Controls the geometric routing of edges, from straight tubes to bundled,
+curved, orthogonal, and tapered styles.
+
+| Control | Description |
+| --- | --- |
+| **Preset** | A named bundle of style settings. |
+| **Type** | The routing type: straight, `Curved`, `Quadratic`, `Arc`, `Tapered`, `Orthogonal`, or `Bundled`. The settings below change with the type. |
+| **Curve Settings** | For curved types: **Curvature**, **Segments**, and **Direction**. |
+| **Orthogonal Settings** | For orthogonal edges: **Style** and **Segments**. |
+| **Bundling Settings** | For bundled edges: **Strength**, **Iterations**, **Compatibility** threshold, and **Segments**. |
+| **Taper Settings** | For tapered edges: **Start Thickness** and **End Thickness**. |
+| **Multi-Edge Handling** | **Auto-Offset Parallel Edges** (with **Offset Distance**) and **Self-Loop Radius**. |
+| **OSMnx Options** | For OSMnx graphs: **Preserve Street Geometry** keeps the original curved street shapes. |
+
+### Quick presets
+
+One-click presets emulate familiar tools and use cases: **Gephi**,
+**Cytoscape**, **Schematic**, **Bundled**, **Flow**, and **Minimal**.
+
+| Action | Description |
+| --- | --- |
+| **Apply Edge Style** | Applies the configured style to the graph. |
+| **Preview** (eye icon) | Previews the style without committing. |
+| **Reset** (loop icon) | Restores straight edges. |
+
+## Subpanel — Text Labels {#text}
+
+::: {.callout-note}
+Enable the overlay with the checkbox in the subpanel header. Labels are
+composited over the final render using the scene camera and render resolution.
+:::
+
+| Control | Description |
+| --- | --- |
+| **Source** | Where label text comes from; choose `Attribute` to label by a named attribute. |
+| **Attribute** | The attribute to display (when source is `Attribute`). |
+| **Number Format** | Format type (float, scientific, percentage…), decimals, thousands separator, and optional prefix/suffix. |
+| **Size Mode** | `Fixed`, `Proportional`, or `Adaptive` (adaptive compensates for perspective). Exposes **Base Size** and/or **Scale Factor**. |
+| **Visibility** | **Max Distance** beyond which labels hide, and **Depth Occlusion** so labels behind geometry are hidden. |
+| **Attribute Filter** | Optionally show labels only for nodes matching an attribute/operator/value condition (e.g. degree above a threshold). |
+| **Font** | System font or a custom font file. |
+| **Appearance** | Text colour and an optional background with colour and opacity. |
+| **Auto Update** | Periodically regenerates the overlay (with an interval); start/stop the modal updater. |
+| **Generate / Update / Remove** | Build, refresh, or remove the overlay image. |
+
+## Typical workflow
+
+1. Run **Setup Visual** so the graph has renderable geometry.
+2. In **Appearance**, set base node/edge sizes; enable direction arrows for
+   directed graphs.
+3. Apply a **Material Preset** and **Lighting** in **Scene Setup**.
+4. Choose an **Edge Style** (or a quick preset) appropriate to the density.
+5. Drive node/edge **colour and size from attributes** (centrality, community,
+   etc.) and add **Text Labels** for key nodes.
+6. Render with Cycles or EEVEE and continue to [Export](export.qmd).

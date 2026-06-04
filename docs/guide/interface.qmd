@@ -1,0 +1,114 @@
+---
+title: "The sidebar interface"
+---
+
+SciGraphs adds three tabs to the **3D Viewport sidebar** (press `N` to toggle).
+Each tab groups a set of panels; panels contain collapsible subpanels. This page
+gives the complete map of the interface so you can locate any control quickly.
+
+## Tabs
+
+| Tab | Purpose |
+| --- | --- |
+| **SciGraphs** | Core combinatorial workflow: import, layout, algorithms, analysis, visualization, export, reproducibility. |
+| **OSMnx** | Download and analyze OpenStreetMap street networks. |
+| **City2Graph** | Build heterogeneous urban graphs (morphology, proximity, transport, metapaths). |
+
+## SciGraphs tab
+
+The main `SciGraphs` panel hosts the core workflow panels, each documented in
+the Panel Reference.
+
+```
+SciGraphs
+├── Data                          → panels/scigraphs/data.qmd
+│   ├── Geospatial Options
+│   └── Temporal Data
+├── Layout & Positioning          → panels/scigraphs/layout.qmd
+│   ├── Algorithm Selection
+│   ├── Quick Settings
+│   ├── Interactive Mode
+│   ├── Algorithm Parameters
+│   └── Network Splitter 3D
+├── Graph Algorithms              → panels/scigraphs/algorithms.qmd
+│   ├── Traversal
+│   ├── Pathfinding
+│   ├── Spanning Trees
+│   └── Network Flow
+├── Analysis                      → panels/scigraphs/analysis.qmd
+│   ├── Centrality Metrics
+│   ├── Community Detection
+│   ├── Directed Analysis
+│   │   ├── Directed Centrality
+│   │   ├── Structure Analysis
+│   │   └── Flow Analysis
+│   ├── Statistical Analysis
+│   └── Topological Analysis
+│       ├── Surface Embedding
+│       └── Results Summary
+├── Visualization                 → panels/scigraphs/visualization.qmd
+│   ├── Appearance
+│   ├── Scene Setup
+│   ├── Edge Style
+│   └── Text Labels
+└── Export & Tools                → panels/scigraphs/export.qmd
+    ├── Export Options
+    └── Utilities
+
+Reproducibility (top-level)        → panels/scigraphs/reproducibility.qmd
+```
+
+## OSMnx tab
+
+```
+OSMnx
+├── Download
+├── Graph Operations
+├── Network Attributes
+├── Routing & Paths
+├── Accessibility
+├── Statistics & Centrality
+├── Features & POIs
+├── Elevation & Terrain
+└── IO / Export
+```
+
+See [the OSMnx reference](../panels/osmnx/index.qmd).
+
+## City2Graph tab
+
+```
+City2Graph
+├── Data Import
+├── Urban Morphology
+├── Transportation
+├── Mobility (OD Matrix)
+├── Graph Tools
+├── GeoAI Export
+├── Proximity Graphs
+│   ├── Single-Layer Graphs
+│   ├── Multi-Layer Graphs
+│   ├── Group Nodes (Polygon → Point)
+│   ├── Advanced Settings
+│   └── Visualization
+└── Metapath Analysis
+```
+
+See [the City2Graph reference](../panels/city2graph/index.qmd).
+
+## Conventions used in the Panel Reference
+
+Each panel page follows the same structure:
+
+- **What it does** — a short description of the panel's role.
+- **When it appears** — any conditions controlling visibility (some panels only
+  show for directed graphs, geospatial data, or after a graph exists).
+- **Controls** — a table of every field, toggle, and button with its meaning.
+- **Typical workflow** — the recommended order of operations.
+
+::: {.callout-note}
+Many panels are hidden until they are relevant. For example, the **Network
+Flow** and **Directed Analysis** panels only appear when the active object is a
+*directed* graph, and **Geospatial Options** / **Temporal Data** only appear
+once a file is loaded or SQL columns are available.
+:::

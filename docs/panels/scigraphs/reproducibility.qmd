@@ -1,0 +1,77 @@
+---
+title: "Reproducibility"
+---
+
+::: {.lead}
+The Reproducibility panel replays an entire pipeline — dataset, analysis,
+layout, visualization, render, and export — from a short declarative JSON or
+YAML file, and records a provenance manifest so results are bit-for-bit
+reproducible.
+:::
+
+This panel sits at the top level of the **SciGraphs** sidebar tab. The same
+controls are also surfaced inside the [Data panel](data.qmd) when the data
+source is set to **Repro**.
+
+## Controls
+
+### Pipeline
+
+| Control | Description |
+| --- | --- |
+| **Pipeline file** | Path to the pipeline `.json` or `.yaml` specification. |
+| **Validate** | Checks the specification against the schema without executing it. |
+| **Run** | Executes the full pipeline with deterministic seeding. |
+
+### Templates
+
+| Control | Description |
+| --- | --- |
+| **Export Template** | Writes a starter pipeline file you can edit. |
+| **Export Current Scene** | Serializes the current graph and settings into a pipeline specification, capturing what you built interactively. |
+
+### Artifacts
+
+| Control | Description |
+| --- | --- |
+| **Artifacts folder** | Output directory for run artifacts (default `//repro/`). |
+| **Open Folder** | Opens the artifacts directory in the file browser. |
+
+When a graph is active, a **Current Graph** box reports its node/edge counts and
+source (OSMnx, geospatial, or custom).
+
+## The pipeline specification
+
+A pipeline is a declarative description of the five workflow stages:
+
+```json
+{
+  "meta": { "title": "complex_demo", "seed": 42 },
+  "dataset": { "source": "osmnx", "method": "PLACE", "query": "Burjassot, Valencia, Spain", "network_type": "drive" },
+  "analysis": { "metrics": ["degree", "betweenness"] },
+  "layout": { "algorithm": "YIFAN_HU", "scale": 8.0 },
+  "visual": { "node_color": "betweenness", "node_size": "degree", "colormap": "magma", "edge_style": "GEPHI_DEFAULT" }
+}
+```
+
+## Run artifacts
+
+Each run emits:
+
+- a **canonical (normalized) specification** — the fully resolved pipeline;
+- a **provenance manifest** with input/output hashes and timing;
+- an **execution log**.
+
+Together with the `meta.seed`, these guarantee that the same inputs reproduce
+the same result. Ready-to-run examples live in the repository under
+`examples/pipelines/`.
+
+## Typical workflow
+
+1. Build a scene interactively, then **Export Current Scene** to capture it as a
+   specification — or **Export Template** and edit it by hand.
+2. **Validate** the specification.
+3. **Run** the pipeline and inspect the artifacts in the **Artifacts** folder.
+
+See the [reproducible-pipeline tutorial](../../tutorials/05-reproducible-pipeline.qmd)
+for a complete walkthrough.

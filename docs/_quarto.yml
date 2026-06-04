@@ -1,0 +1,94 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "SciGraphs"
+  description: "Graph visualization and analysis within Blender."
+  favicon: assets/sciblend-favicon.png
+  site-url: https://sciblend.github.io/SciGraphs
+  repo-url: https://github.com/SciBlend/SciGraphs
+  repo-actions: [edit, issue]
+  page-navigation: true
+  back-to-top-navigation: true
+  navbar:
+    logo: assets/sciblend-favicon.png
+    pinned: true
+    search: true
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "Guide"
+        href: guide/introduction.qmd
+      - text: "Panel Reference"
+        href: panels/overview.qmd
+      - text: "Tutorials"
+        href: tutorials/index.qmd
+    right:
+      - icon: github
+        href: https://github.com/SciBlend/SciGraphs
+        aria-label: GitHub
+  sidebar:
+    style: docked
+    collapse-level: 2
+    contents:
+      - section: "Guide"
+        contents:
+          - guide/introduction.qmd
+          - guide/installation.qmd
+          - guide/architecture.qmd
+          - guide/interface.qmd
+          - guide/pipeline.qmd
+      - section: "Panel Reference"
+        contents:
+          - panels/overview.qmd
+          - section: "SciGraphs tab"
+            contents:
+              - panels/scigraphs/data.qmd
+              - panels/scigraphs/layout.qmd
+              - panels/scigraphs/algorithms.qmd
+              - panels/scigraphs/analysis.qmd
+              - panels/scigraphs/visualization.qmd
+              - panels/scigraphs/export.qmd
+              - panels/scigraphs/reproducibility.qmd
+          - section: "OSMnx tab"
+            contents:
+              - panels/osmnx/index.qmd
+          - section: "City2Graph tab"
+            contents:
+              - panels/city2graph/index.qmd
+      - section: "Tutorials"
+        contents:
+          - tutorials/index.qmd
+          - tutorials/01-combinatorial-graph.qmd
+          - tutorials/02-geospatial-globe.qmd
+          - tutorials/03-urban-terrain.qmd
+          - tutorials/04-sparse-matrix.qmd
+          - tutorials/05-reproducible-pipeline.qmd
+  page-footer:
+    left: "SciGraphs is released under the GPL-3.0-or-later license."
+    right:
+      - text: "Maintainer: José Marín"
+        href: mailto:jose.marin-farina@uv.es
+
+format:
+  html:
+    theme:
+      light:
+        - cosmo
+        - styles.scss
+      dark:
+        - cosmo
+        - styles-dark.scss
+    toc: true
+    toc-depth: 3
+    toc-expand: 2
+    code-copy: true
+    code-overflow: wrap
+    link-external-newwindow: true
+    link-external-icon: true
+    smooth-scroll: true
+    anchor-sections: true
+    grid:
+      sidebar-width: 320px
+      body-width: 920px

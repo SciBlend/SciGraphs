@@ -1,0 +1,150 @@
+---
+title: "Data"
+---
+
+::: {.lead}
+The Data panel is the entry point of the pipeline: it imports heterogeneous
+network data and builds the Blender graph object that every other panel
+operates on.
+:::
+
+The panel is organized as a numbered, step-by-step flow. The exact steps shown
+depend on the selected **data source**.
+
+## Step 1 — Select data source
+
+A row of toggles selects one of four ingestion pathways:
+
+| Source | Use it for |
+| --- | --- |
+| **File** | Flat files — GEXF (native graph), CSV/JSON edge lists and node tables, GraphML. The importer auto-detects native graph files. |
+| **Database** | Live SQL connections (PostgreSQL, MySQL/MariaDB, SQLite; SQL Server optional) executing a `SELECT` query. |
+| **SuiteSparse** | Matrices downloaded by identifier from the SuiteSparse Matrix Collection. |
+| **Repro** | Replaying a declarative reproducible pipeline (see [Reproducibility](reproducibility.qmd)). |
+
+### File source
+
+| Control | Description |
+| --- | --- |
+| **Filepath** | Path to the input file. If a native graph file (GEXF) is detected, a notice appears and structure mapping is automatic. |
+| **Delimiter** | Column delimiter for CSV/tabular files (shown only for non-native files). |
+| **Load File** | Parses the file and loads its columns so you can map graph structure. |
+
+### Database source
+
+| Control | Description |
+| --- | --- |
+| **Connection** | Selects a saved database profile. The gear icon opens database preferences. |
+| **Test** | Tests the selected connection. |
+| **Add New** | Opens preferences to create a new connection profile. |
+| **SQL Query** | The `SELECT` statement that returns the edge/node rows. |
+| **Load Columns** | Executes the query metadata and loads available columns. |
+| **Preview** | Previews query results. |
+
+::: {.callout-important}
+Only `SELECT` queries are allowed. SciGraphs never modifies your database.
+:::
+
+### SuiteSparse source
+
+| Control | Description |
+| --- | --- |
+| **Matrix Identifier** | `Group/Name` of the matrix (e.g. `Grund/bayer09`). |
+| **Graph Representation** | `Symmetric` (standard adjacency via $A + A^\top$, denser/rounder layouts) or `Bipartite` (rows and columns as separate node sets, preserving matrix structure with elongated layouts). |
+| **Giant component only** | Keeps only the largest connected component via union-find, discarding isolated fragments. |
+| **Auto layout on import** | Optionally computes a default layout immediately; pick the algorithm and scale. When coordinate data is present in the archive it is used directly and layout is skipped. |
+| **Download & Create Graph** | Fetches the matrix and builds the graph in one step. |
+| **Browse Collection** | Opens the online collection to find matrix identifiers. |
+
+## Step 2 — Define graph structure
+
+Shown for File and Database sources once data is loaded.
+
+| Control | Description |
+| --- | --- |
+| **Source Nodes** | Column providing the source endpoint of each edge. |
+| **Target Nodes** | Column providing the target endpoint of each edge. |
+| **Directed Graph** | Treats edges as directed (unlocks directed analysis and flow panels). |
+| **Remove Self-Loops** | Drops edges whose source equals its target. |
+| **Weight Column** | Optional numeric column used as edge weight. |
+| **Import as Attributes** | A checklist of the remaining columns. Tick the ones to import as node/edge attributes; icons mark numeric, datetime, and text types. Use **All** / **None** to toggle the whole list. |
+
+## Step 3 — Create graph object
+
+| Control | Description |
+| --- | --- |
+| **Auto layout on import** | Optionally lays out the graph immediately after creation (Default Layout + Scale). Skipped automatically in geospatial mode. |
+| **Create Graph** | Builds the Blender graph object from the file or SQL results. |
+
+## Importing node attributes
+
+When a graph object already exists, an **Import Node Attributes** section lets
+you attach a vertex-only attribute table from a separate file.
+
+| Control | Description |
+| --- | --- |
+| **Filepath** | The attribute file. |
+| **Delimiter / Header** | Parsing options for the file. |
+| **Import Node Attributes** | Matches rows to nodes by name. Format: `node_name <sep> value(s)`; nodes missing from the file receive `NaN`. |
+
+## Step 4 — Apply visualization
+
+A shortcut to **Setup Visual**, which adds the Geometry Nodes rendering setup
+(instanced node spheres and edge cylinders). This is the same operation
+documented in the [Visualization panel](visualization.qmd) and is the bridge
+from raw topology to renderable geometry.
+
+---
+
+## Subpanel — Geospatial Options {#geospatial}
+
+::: {.callout-note}
+**When it appears:** after a file is loaded or SQL columns are available. Enable
+it with the checkbox in the subpanel header.
+:::
+
+Embeds the graph into real-world coordinates instead of using a force-directed
+layout.
+
+| Control | Description |
+| --- | --- |
+| **Auto-Geocode Source/Target** | Geocodes node names (countries/cities) to coordinates via Nominatim. The first run may be slow, then results are cached. |
+| **Latitude / Longitude column** | Alternative to geocoding: use explicit coordinate columns. |
+| **Show Earth Globe** | Adds a 3D globe; configure **Globe Radius** and **Globe Quality** (subdivisions). |
+| **Globe Theme** | Texture theme: NASA Blue Marble (satellite), NASA VIIRS (night lights), Urban Dark, Topographic Shaded, Data Overlay (transparent), or none. |
+| **Texture Quality** | Resolution of the downloaded globe texture. |
+| **PBR Settings** | Water shine, water roughness, land roughness, surface relief (bump strength) for physically based globe materials. |
+| **Pre-download / Clear Cache** | Manage the cached globe textures. |
+| **Material Style** (theme = none) | Simple globe material, including a `World Map` mode with map detail and feature type. |
+| **Edge Style** | Edge representation for geodesic arcs on the globe. |
+
+This subpanel drives the **global-scale** geospatial embedding used in the
+[geospatial globe tutorial](../../tutorials/02-geospatial-globe.qmd).
+
+## Subpanel — Temporal Data {#temporal}
+
+::: {.callout-note}
+**When it appears:** after a file is loaded or SQL columns are available. Enable
+it with the checkbox in the subpanel header.
+:::
+
+Builds a sequence of graph snapshots from a time column and plays them back.
+
+| Control | Description |
+| --- | --- |
+| **Time Column** | Column holding timestamps. |
+| **Aggregation** | How rows are grouped into snapshots; `Range` exposes **From** / **To** bounds. |
+| **Analyze Time Column** | Inspects the time column and prepares snapshot creation. |
+| **Create Temporal Graphs** | Builds the snapshot sequence (enabled after analysis). |
+| **Playback** | Transport controls — first, previous, play, next, last — plus **Refresh** and **Clear**. |
+
+## Typical workflow
+
+1. Pick a **data source** in Step 1 and load it.
+2. Map **Source/Target** columns and choose directedness in Step 2; tick any
+   attribute columns to import.
+3. Optionally enable **Geospatial** or **Temporal** options.
+4. **Create Graph** in Step 3.
+5. **Setup Visual** in Step 4 to make the graph renderable, then continue to
+   [Layout](layout.qmd), [Analysis](analysis.qmd), and
+   [Visualization](visualization.qmd).

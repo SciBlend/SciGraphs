@@ -1,0 +1,73 @@
+---
+title: "Tutorial 5 — A reproducible pipeline"
+---
+
+::: {.lead}
+Capture an entire workflow — dataset, analysis, layout, visualization, render,
+and export — in a short declarative file, then replay it deterministically with
+a provenance manifest.
+:::
+
+Reproducible pipelines turn an interactive session into a single, version-able
+specification. Given the same `seed` and inputs, a run produces the same result,
+and every run records hashes, timing, and a log.
+
+## 1. Get a starter specification
+
+Open **SciGraphs ▸ [Reproducibility](../panels/scigraphs/reproducibility.qmd)**
+and either:
+
+- press **Export Template** for a blank starter, or
+- build a scene interactively and press **Export Current Scene** to serialize
+  exactly what you made.
+
+## 2. Understand the specification
+
+A pipeline is JSON or YAML with one block per workflow stage:
+
+```json
+{
+  "meta": { "title": "burjassot_walk_network", "seed": 42 },
+  "dataset": { "source": "osmnx", "method": "PLACE", "query": "Burjassot, Valencia, Spain", "network_type": "drive" },
+  "analysis": { "metrics": ["degree", "betweenness"] },
+  "layout": { "algorithm": "YIFAN_HU", "scale": 8.0 },
+  "visual": { "node_color": "betweenness", "colormap": "viridis", "edge_style": "GEPHI_DEFAULT" }
+}
+```
+
+| Block | Purpose |
+| --- | --- |
+| `meta` | Title and the random `seed` that makes the run deterministic. |
+| `dataset` | The data source and its parameters (file, SQL, OSMnx, SuiteSparse). |
+| `analysis` | Metrics and community/topology operations to compute. |
+| `layout` | Layout algorithm and scale. |
+| `visual` | Attribute-to-encoding mapping (colour, size, colormap, edge style). |
+
+Ready-to-run examples live in `examples/pipelines/` — including OSMnx walk/drive
+networks, a GEXF layout/render, and a SuiteSparse layout/analysis pipeline.
+
+## 3. Validate and run
+
+1. Set the **Pipeline file** path to your specification.
+2. Press **Validate** to check it against the schema.
+3. Set the **Artifacts folder** (default `//repro/`) and press **Run**.
+
+## 4. Inspect the artifacts
+
+Each run writes, into the artifacts folder:
+
+- a **normalized specification** — the fully resolved pipeline;
+- a **provenance manifest** (`run_manifest.json`) with input/output hashes and
+  timing;
+- an **execution log** (`run.log`);
+- the produced outputs (e.g. a GEXF graph, `positions.csv`, `statistics.txt`).
+
+Press **Open Folder** to browse them.
+
+## Why this matters
+
+The same seed and inputs reproduce the same visualization, so figures in a paper
+can be regenerated exactly, shared as a few-kilobyte file, and audited via the
+provenance manifest. See the
+[Reproducibility panel reference](../panels/scigraphs/reproducibility.qmd) for
+every control.

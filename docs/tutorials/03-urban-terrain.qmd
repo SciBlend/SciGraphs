@@ -1,0 +1,61 @@
+---
+title: "Tutorial 3 — An urban network on terrain"
+---
+
+::: {.lead}
+Download a real street network with OSMnx, drape it onto Digital Elevation Model
+terrain, and add a heterogeneous amenity proximity graph — reproducing the
+Granada figure from the SciGraphs paper.
+:::
+
+![Granada, Spain: the complete OSMnx street network (left) and a 20-NN amenity proximity graph (right), both draped onto SRTM 30 m terrain.](../assets/GRANADA13.png)
+
+## 1. Download the street network
+
+1. Open the **OSMnx** tab and expand **[Download](../panels/osmnx/index.qmd#download)**.
+2. Choose a method — **Place** is simplest; enter e.g. `Granada, Spain`. Pick the
+   **network type** (`drive`, `walk`, `bike`…).
+3. Set **Options** (Simplify, Keep Curved Geometry, Scale Factor) and press
+   **Import from OSM**.
+
+## 2. Project and add attributes
+
+1. In **[Graph Operations](../panels/osmnx/index.qmd#graph-ops)**, press **Project
+   to CRS** so distances are metric.
+2. In **[Network Attributes](../panels/osmnx/index.qmd#attributes)**, add
+   **Lengths**, and optionally **Speeds** and **Travel Times**.
+
+## 3. Add terrain
+
+1. Expand **[Elevation & Terrain](../panels/osmnx/index.qmd#elevation)**.
+2. In **1 · Get Elevation Data**, choose a DEM source (OpenTopography with an API
+   key, Open-Elevation, or a local GeoTIFF). Enable both **apply to nodes** and
+   **create terrain**, set the **Vertical Scale**, and press **Get Elevation
+   Data**.
+3. In **2 · 3D Positions**, press **Apply 3D Positions** so the network conforms
+   to the terrain surface.
+4. Optionally compute **3 · Slope / Grade**, then add a **5 · Basemap Texture**
+   (OSM/ESRI tiles, WMS, Mapbox, or MapTiler) onto the terrain mesh.
+
+## 4. Add an amenity proximity graph (City2Graph)
+
+1. With the OSMnx network active, open the **City2Graph** tab and expand
+   **[Data Import](../panels/city2graph/index.qmd#data)**. Set **Define Area** to
+   **From OSMnx** and download **places/amenities**.
+2. Expand **[Proximity Graphs ▸ Single-Layer](../panels/city2graph/index.qmd#proximity-single)**.
+   Set **Features** to the amenities object, choose **KNN** with `k = 20`, and a
+   **Network** distance metric pointing at the OSMnx street network.
+3. Press **Generate Graph**. The amenity graph drapes onto the same terrain,
+   revealing how service density concentrates in the valley while isolated
+   mountain amenities produce long-range connections.
+
+## 5. Visualize and render
+
+Use the **[Visualization panel](../panels/scigraphs/visualization.qmd)** to size
+and colour the street and amenity layers (for OSMnx edges, enable **Preserve
+Street Geometry** in **Edge Style**). Frame the scene and render with Cycles.
+
+This single pipeline unifies heterogeneous graph construction, geospatial
+projection, terrain integration, and multi-attribute visual encoding — a
+workflow that would otherwise require coordinating OSMnx, QGIS, and Blender
+separately.

@@ -1,0 +1,154 @@
+---
+title: "Layout & Positioning"
+---
+
+::: {.lead}
+The Layout panel assigns spatial positions to nodes. It exposes the full graph
+drawing toolbox — force-directed, spectral, geometric, hierarchical, and
+Graphviz algorithms — in both 2D and 3D variants.
+:::
+
+The parent panel shows a quick status card with the node and edge counts of the
+active graph and, for large graphs, a recommendation to avoid slow algorithms
+(e.g. it warns when `Spring`/`Spring 3D` is selected on graphs above 1,000 or
+10,000 nodes and suggests DrL, Yifan Hu, or LGL instead). If no graph is loaded,
+it prompts you to create one in the [Data panel](data.qmd) first.
+
+## Subpanel — Algorithm Selection {#algorithm}
+
+Choose the layout algorithm. An **Algorithm Info** card reports its
+dimensionality (2D/3D), an indicative speed rating, and the use case it is best
+suited for.
+
+### Available algorithms
+
+| Algorithm | Dim | Speed | Best for |
+| --- | --- | --- | --- |
+| Random | 3D | Instant | Quick test, initial positions |
+| Grid | 2D | Instant | Regular 2D arrangement |
+| Sphere | 3D | Instant | Spherical distribution |
+| Spiral 3D | 3D | Instant | Temporal/sequential data |
+| Helix | 3D | Instant | DNA-like, paired data |
+| Cube | 3D | Instant | Bounded 3D space |
+| Spectral 3D | 3D | Fast | Community structure |
+| MDS 3D | 3D | Medium | Distance preservation |
+| Hierarchical 3D | 3D | Fast | Tree-like structures |
+| Bipartite 3D | 3D | Fast | Two-set graphs |
+| **Yifan Hu (sfdp)** | 3D | Fast | Large graphs, best quality |
+| **igraph DrL** | 3D | Very fast | Massive graphs (100k+) |
+| igraph Fruchterman–Reingold | 3D | Fast | General purpose |
+| igraph Kamada–Kawai | 3D | Medium | Reproducible layouts |
+| igraph LGL | 3D | Fast | Very large sparse graphs |
+| igraph Davidson–Harel | 2D | Medium | High-quality optimization |
+| igraph Graphopt | 2D | Fast | Energy minimization |
+| ForceAtlas2 | 2D | Medium | Gephi compatibility |
+| Spring | 2D | Slow | Classic 2D (NetworkX) |
+| Spring 3D | 3D | Very slow | Classic 3D (NetworkX) |
+| Sugiyama | 2D | Fast | DAGs, workflows, processes |
+| Circular Hierarchy | 2D | Fast | Hierarchies from roots |
+| Graphviz dot/neato/fdp/sfdp/twopi/circo/osage/patchwork | 2D* | Fast | Canonical Graphviz drawings |
+
+\* The Graphviz `neato`, `fdp`, and `sfdp` engines support native 3D via
+`scigraphs-utils` 0.1.1 or newer.
+
+## Subpanel — Quick Settings {#quick-settings}
+
+A minimal one-click path: set the global **Scale** and press **Apply Layout
+Now** to compute the layout once with default parameters.
+
+## Subpanel — Interactive Mode {#interactive}
+
+Gephi-style real-time layout that computes positions iteratively over the
+timeline so you can watch convergence and stop at any point.
+
+| Control | Description |
+| --- | --- |
+| **Timeline** | Reports the current frame range used for the animation. |
+| **Iterations/Frame** | Number of solver iterations performed per frame. |
+| **Speed (sec/frame)** | Wall-clock pacing of the animation. |
+| **Auto-Stop Energy** | Energy threshold below which the layout stops automatically (convergence). |
+| **Live Update** | Updates the viewport every frame. |
+| **Show Forces** | Visualizes the forces acting on nodes. |
+| **Start Execution** | Begins the iterative layout. |
+| **Reset** | Restarts from the initial positions. |
+| **Bake to Animation** | Stores positions as keyframes for playback/render. |
+
+A **Current Status** box reports the iteration count and energy, and indicates
+when the layout is converging.
+
+::: {.callout-tip}
+Algorithm-specific parameters (next subpanel) are honoured in **Interactive
+Mode**. The one-click **Apply Layout Now** uses default values.
+:::
+
+## Subpanel — Algorithm Parameters {#parameters}
+
+::: {.callout-note}
+**When it appears:** only for algorithms that expose custom parameters (Spring,
+ForceAtlas2, the igraph family, Yifan Hu, and the Graphviz engines).
+:::
+
+The fields shown adapt to the selected algorithm. The most important groups:
+
+**Spring (NetworkX)** — iterations; force dynamics (repulsion, attraction,
+gravity, edge distance); convergence control (initial temperature, cooling
+factor).
+
+**ForceAtlas2** — scaling ratio, gravity, strong gravity, lin-log mode,
+Barnes–Hut optimization (with theta), jitter tolerance, edge-weight influence.
+
+**Fruchterman–Reingold** — start temperature, cool exponent, max delta, area,
+repulse radius.
+
+**Kamada–Kawai** — max iterations, epsilon, KK constant.
+
+**DrL** — global edge-cut plus per-phase parameters (Init, Liquid, Expansion,
+Cooldown, Crunch, Simmer), each with iterations, temperature, attraction, and
+damping multiplier.
+
+**LGL** — max iterations, max delta, area, cool exponent, repulse radius, cell
+size.
+
+**Davidson–Harel** — max/fine iterations, cooling factor, and weights (node
+distance, border, edge lengths, edge crossings, node–edge distance).
+
+**Graphopt** — iterations, node charge, node mass, spring length, spring
+constant, max simulated-annealing movement.
+
+**Yifan Hu (sfdp)** — dimension mode (2D, 3D, or 2D+Z with a Z-depth method and
+scale), force parameters (`K`, repulsive force, max iterations), quality
+controls (smoothing, quadtree, multilevel levels, beautify), and overlap removal
+(with `prism` scaling). Plus pass-through advanced Graphviz attributes.
+
+**Graphviz engines** — engine-specific options (e.g. `dot` rank direction and
+separations; `neato` mode/model/start/maxiter; `twopi` root and rank
+separation; `circo` minimum distance; `osage` packing) and three pass-through
+fields for raw graph/node/edge attributes.
+
+## Subpanel — Network Splitter 3D {#splitter}
+
+Decomposes any computed layout into distinct **Z-layers**, separating nodes
+along the vertical axis by a chosen criterion. Apply it *after* a 2D/3D layout.
+
+| Control | Description |
+| --- | --- |
+| **Split Criterion** | `Community`, `Attribute`, `Degree`, `Centrality`, or connected component. Each exposes its own options (community algorithm + resolution; attribute name; degree/centrality bins). |
+| **Layer Height** | Vertical spacing between layers. |
+| **Base Z** | Z offset of the first layer. |
+| **Order** | Ordering of layers along Z. |
+| **Preserve XY Positions** | Keeps the original planar coordinates within each layer. |
+| **Center Each Layer** | Recentres nodes within their layer. |
+| **Scale by Layer Size** | Scales layers according to their node count. |
+| **Inter-Layer Edges** | Controls how edges spanning layers are drawn. |
+| **Split Network** | Performs the split; a status line reports the resulting layer count and criterion. |
+| **Reset** | Restores the unsplit layout. |
+
+## Typical workflow
+
+1. In **Algorithm Selection**, pick an algorithm appropriate to your graph size
+   and structure (consult the table above).
+2. Tune values in **Algorithm Parameters** if needed.
+3. Either press **Apply Layout Now** (Quick Settings) for a one-shot result, or
+   use **Interactive Mode** to watch convergence and bake an animation.
+4. Optionally apply **Network Splitter 3D** to stratify communities or metrics
+   into Z-layers.

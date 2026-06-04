@@ -1,0 +1,65 @@
+---
+title: "Tutorial 2 — A geospatial flow map on a globe"
+---
+
+::: {.lead}
+Reproduce the kind of global flow map shown in the SciGraphs paper: nodes are
+countries placed on a 3D globe, edges are geodesic great-circle arcs, and node
+size encodes a flow volume.
+:::
+
+![Global refugee migration flows (UNHCR, 2000–2016): country nodes scaled by displaced population, connected by geodesic arcs on a textured globe, rendered in Cycles.](../assets/REFUGEES3.png)
+
+**What you need:** an edge list whose source/target columns are place names
+(countries or cities), ideally with a weight column for flow volume — or
+explicit latitude/longitude columns.
+
+## 1. Import with geocoding
+
+1. Open **SciGraphs ▸ [Data](../panels/scigraphs/data.qmd)** and load your file
+   (**File** source, set the delimiter, **Load File**).
+2. Map **Source Nodes** / **Target Nodes** and set the **Weight Column** to your
+   flow volume. Enable **Directed Graph** if the flows are directional.
+
+## 2. Configure the globe
+
+1. Expand the **[Geospatial Options](../panels/scigraphs/data.qmd#geospatial)**
+   subpanel and enable it via its header checkbox.
+2. Turn on **Auto-Geocode Source/Target as Countries/Cities** so the node names
+   are resolved to coordinates via Nominatim. (Alternatively, disable geocoding
+   and point the **Latitude**/**Longitude** fields at coordinate columns.)
+3. Enable **Show Earth Globe**, set the **Globe Radius** and **Globe Quality**.
+4. Choose a **Globe Theme** — e.g. **NASA Blue Marble** for satellite imagery —
+   and tune the **PBR Settings** (water shine/roughness, land roughness, surface
+   relief). Use **Pre-download** to cache the texture.
+5. Set the **Edge Style** for the geodesic arcs.
+
+## 3. Create the graph
+
+Press **Create Graph** in **Step 3**, then **Setup Visual** in **Step 4**. The
+nodes are placed on the globe and edges are drawn as great-circle arcs.
+
+::: {.callout-note}
+In geospatial mode the layout step is skipped automatically — positions come
+from coordinates, not from a layout algorithm.
+:::
+
+## 4. Encode flow volume
+
+1. In **[Visualization ▸ Appearance](../panels/scigraphs/visualization.qmd#appearance)**,
+   drive **node size** from the weighted in-degree (total displaced population)
+   using the attribute multiplier.
+2. Colour nodes or arcs by origin/destination class or by volume with a
+   scientific colormap.
+
+## 5. Render
+
+Frame the globe with the camera, add the lighting rig
+(**[Scene Setup](../panels/scigraphs/visualization.qmd#scene)**), and render with
+Cycles for path-traced imagery. Because the graph attributes (flow volumes,
+classifications) remain accessible, you can re-style interactively without
+re-projecting.
+
+This workflow produces publication-quality imagery that is impractical to
+achieve in conventional 2D network tools without exporting geometry to external
+3D software.

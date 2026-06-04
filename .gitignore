@@ -26,6 +26,10 @@ build/
 build_temp/
 *.zip
 
+# Quarto documentation site
+docs/_site/
+docs/.quarto/
+
 # Geospatial cache
 .geocode_cache.json
 .naturalearth_cache/
@@ -54,3 +58,5 @@ test_databases/
 paper_scigraphs/*
 images_ignore/*
 examples/*
+/.quarto/
+**/*.quarto_ipynb

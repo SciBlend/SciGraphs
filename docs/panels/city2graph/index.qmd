@@ -1,0 +1,162 @@
+---
+title: "City2Graph"
+---
+
+::: {.lead}
+The City2Graph tab builds *heterogeneous urban graphs* from real-world data:
+buildings, streets, amenities, and transit, connected by morphological,
+proximity, and metapath relationships. It targets urban analytics and GeoAI
+workflows.
+:::
+
+The root **City2Graph** panel reports the active object's type (OSMnx network,
+tessellation, morphological graph, or travel graph) and its feature/node/edge
+counts. OSMnx street networks can be used directly by City2Graph operations.
+
+## Data Import {#data}
+
+Acquires the raw urban data layers.
+
+- **Overture API Key** — status badge; a `DEMO` key links to preferences.
+- **1 · Define Area** — choose how to bound the data: from an active OSMnx
+  graph, by place name, point + radius, address, bounding box, or polygon mesh.
+- **2 · Feature Types** — toggle which Overture layers to fetch (buildings,
+  segments, places, water, land), with a per-type feature **limit**. Buildings
+  and places come from Overture Maps; segments, water, and land from OSMnx.
+- **3 · Download** — **Get as Polygons** or **Get as Points**, and **Convert
+  Selected to Centroids**.
+- **Local File** — load GeoJSON or Shapefile data instead.
+- **Process Segments** — prepare a selected segment object (optionally with
+  connectors) for graph construction.
+- **GTFS Transit Data** — import a GTFS feed; once loaded you can create stop
+  and route objects and visualize them.
+
+## Urban Morphology {#morphology}
+
+Builds morphological graphs from buildings and streets.
+
+- **Segments → Graph** — convert a processed segments object into a graph.
+- **Tessellation** — generate a morphological tessellation around selected
+  buildings (with shrink and segment parameters and optional barriers).
+- **Morphological Graph** — build the building/street relationship graph. Set
+  the analysis centre (from the OSMnx graph or explicit lat/lon), distance,
+  clipping buffer, and contiguity. Choose which **relations** to include
+  (private–private, public–public, private–public): enabling all yields a single
+  heterogeneous graph, while a subset produces one Blender object per relation.
+
+## Transportation {#transport}
+
+::: {.callout-note}
+**Requires GTFS data** loaded in the Data Import panel.
+:::
+
+- **Travel Summary Graph** — build a transit travel-summary graph for an
+  optional calendar date range (empty = all data).
+- **GTFS OD Graph** — aggregate trip legs into an origin–destination graph;
+  configure directedness and a top-N edge limit (0 = no limit, which can be
+  memory-intensive).
+
+## Mobility (OD Matrix) {#mobility}
+
+Builds graphs from an external origin–destination matrix.
+
+- **Load OD Matrix** — load the matrix file.
+- **OD to Graph** — map zones (a zones object and its id column), matrix type,
+  source/target/weight columns, a threshold, and directedness, then build the
+  graph.
+
+## Graph Tools {#graph-tools}
+
+Utility operations on an existing graph, selected via the **Tool** dropdown:
+
+| Tool | Action |
+| --- | --- |
+| **Remove Isolated** | Keep only the largest connected component. |
+| **Filter** | Remove nodes beyond a distance from a centre. |
+| **Clip** | Clip the graph to a polygon boundary object. |
+| **Isochrone** | Generate a reachability polygon from a centre using a weight attribute and threshold. |
+
+**Apply** runs the selected tool.
+
+## GeoAI Export {#export}
+
+- **Graph Export for GNN** — export the selected graph in a chosen format and
+  type to a path.
+- **PyTorch Geometric** — save an external loader script that reconstructs the
+  graph as a PyG structure.
+
+## Proximity Graphs {#proximity}
+
+Generates spatial networks from OSM feature objects. Contains five child
+subpanels.
+
+### Single-Layer Graphs {#proximity-single}
+
+Connects features within one layer.
+
+- **Features** — the OSM features object (a checkmark confirms validity and
+  feature count).
+- **Graph Type** — KNN, fixed-radius, Waxman, contiguity, Delaunay, Gabriel,
+  relative neighborhood, or minimum spanning tree. Type-specific parameters
+  appear below (e.g. `k` for KNN, radius for fixed-radius, beta/r0/seed for
+  Waxman, contiguity type).
+- **Distance Metric** — Euclidean or `Network` (requires selecting an OSMnx
+  street network).
+- **Generate Graph** — builds the proximity graph.
+
+### Multi-Layer Graphs {#proximity-multi}
+
+Connects *different* feature types (e.g. restaurants → hospitals).
+
+- **Layer 1 / Layer 2 / Layer 3 (optional)** — the feature objects to connect.
+- **Connection Method** — KNN (with `k`) or radius.
+- **Metric** — Euclidean or network. Node attributes are created per edge type
+  for downstream colouring.
+
+### Group Nodes (Polygon → Point) {#proximity-group}
+
+Connects polygon zones to the points they contain (e.g. districts → buildings).
+
+- **Polygons / Points** — the two feature objects.
+- **Containment Rule** — a spatial **Predicate** and a distance metric.
+- **Generate Group Nodes** — builds the containment graph.
+
+### Advanced Settings {#proximity-advanced}
+
+- **Deduplicate** — merge duplicate points (useful for OSM ways/relations
+  imported as vertices) within a **tolerance** in metres.
+
+### Visualization {#proximity-viz}
+
+- **Edge Display** — curve thickness and a visualization edge limit.
+- **Node Coloring** — colour nodes by attribute; multi-layer graphs create
+  per-edge-type attributes inspectable in the Spreadsheet editor.
+
+## Metapath Analysis {#metapaths}
+
+Connects amenities through the street network using the City2Graph metapath
+algorithm (heterogeneous information network paradigm).
+
+- **Configuration** — the amenities object (validated with a feature count).
+- **Complete Analysis** — set hops, k-neighbours, amenity limit, visualization
+  limit, and curve thickness, then **Run Complete Analysis** (requires an active
+  OSMnx network). This runs the full wizard end to end.
+- **Weighted Metapaths (Dijkstra)** — connect nodes reachable within a cost
+  threshold using a weight attribute, a min/max threshold, and an endpoint type
+  (requires bridges computed first).
+- **Advanced: Step-by-Step** — run the three stages individually for debugging:
+  (1) create the street dual graph, (2) bridge amenities, (3) compute metapaths.
+- **Result inspection** — when a metapath result/mesh is selected, the panel
+  reports raw/unique counts, multiplicity statistics, and offers **Convert to
+  Mesh** so multiplicity can be viewed in the Spreadsheet editor (Edge domain).
+
+## Typical workflow
+
+1. In **Data Import**, define an area and download buildings, segments, and
+   places; load GTFS if you need transit.
+2. Build a **Morphological Graph**, or generate **Proximity Graphs** over
+   amenities, or run **Metapath Analysis** to connect amenities along the
+   street network.
+3. Refine with **Graph Tools** (keep largest component, clip, isochrone).
+4. Visualize in Blender (the city2graph proximity layers carry per-type
+   attributes) and/or **export** for GNN training via the GeoAI Export panel.

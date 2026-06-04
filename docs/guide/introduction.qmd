@@ -1,0 +1,78 @@
+---
+title: "Introduction"
+---
+
+## What is SciGraphs?
+
+Graphs are one of the most versatile abstractions in science: a set of nodes
+and edges encodes pairwise relationships, enabling analyses of spatial
+proximity, information flow, temporal evolution, or hierarchical containment.
+In practice, the usefulness of a graph model often depends on whether humans can
+perceive structure — communities, bottlenecks, symmetries, hierarchies, and
+anomalies that guide hypothesis formation.
+
+Most network visualization still defaults to 2D node–link diagrams, which
+exhibit well-known failure modes at scale: edge crossings, overplotting, and
+visual "hairballs" that obscure topology when graphs become large or dense.
+At the same time, a persistent gap exists between analytical network
+exploration and high-fidelity 3D scientific communication. Many scientific
+problems — spatial networks (transport, migration, infrastructure), multi-layer
+urban contexts, or geometric/topological constraints — benefit from depth cues,
+lighting, and a physically meaningful environment.
+
+**SciGraphs** addresses this gap. It is an open-source Blender extension that
+unifies graph ingestion, analysis, and rendering into a single pipeline,
+preserving analytical metadata throughout while providing cinematographic
+composition, physically based lighting, and realistic camera effects.
+
+## The two domains
+
+SciGraphs is designed around two complementary domains.
+
+| Domain | Description | Typical inputs |
+| --- | --- | --- |
+| **Combinatorial graphs** | Spatialization derived from layout algorithms; analysis focuses on network measures and mesoscale structure. | Edge lists, GEXF, GraphML, SQL queries, SuiteSparse matrices |
+| **Spatial / geometric graphs** | Geospatial networks and coordinate-faithful embeddings from external data sources. | OSMnx street networks, Overture Maps, sparse-matrix coordinates, urban morphology |
+
+## Why Blender?
+
+Blender is a free, open-source 3D creation suite that has gained traction in
+scientific visualization owing to three key features:
+
+1. **A fully scriptable Python API** that exposes every aspect of the
+   application, from scene construction to render dispatch.
+2. **Two production-grade render engines** — Cycles (unbiased path-tracer) and
+   EEVEE Next (real-time rasterizer) — producing photorealistic or
+   interactive-quality imagery.
+3. **Geometry Nodes**, a node-based visual programming environment for
+   procedural geometry generation that operates on *named attributes*.
+
+The Geometry Nodes attribute model maps naturally to graph analytics: metrics
+computed by SciGraphs are stored as per-node or per-edge named attributes, and
+Geometry Nodes read those attributes to drive instance scale, colour-ramp
+lookups, node size, or any other visual parameter — without ever modifying the
+source data (a non-destructive workflow). Because Geometry Nodes evaluate
+lazily on the GPU and use hardware instancing, a single modifier can place
+millions of node glyphs and edge primitives with minimal memory overhead.
+
+## How SciGraphs compares
+
+Tools such as Gephi, Cytoscape, Graphia, yFiles, and Neo4j Bloom cover a large
+portion of the analysis workflow but treat 3D as a secondary feature or omit it
+entirely, and none support *geometry-aware embeddings* where graph topology is
+mapped onto a meaningful spatial substrate (geospatial terrain, sparse-matrix
+coordinates, mesh surfaces).
+
+By embedding the Python scientific stack within Blender, SciGraphs lets
+researchers move from data ingestion to publication-ready 3D renders without
+exporting geometry or losing analytical metadata.
+
+::: {.callout-note}
+## How this documentation is organized
+- The **[Guide](introduction.qmd)** covers concepts, installation, the system
+  architecture, the sidebar interface, and the end-to-end pipeline.
+- The **[Panel Reference](../panels/overview.qmd)** documents every panel and
+  subpanel in the sidebar, with a usage guide for each.
+- The **[Tutorials](../tutorials/index.qmd)** are hands-on walkthroughs of
+  complete scenarios.
+:::

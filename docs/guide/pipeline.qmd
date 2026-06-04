@@ -1,0 +1,78 @@
+---
+title: "The end-to-end workflow"
+---
+
+Whatever the data source, a SciGraphs project follows the same five-stage
+pipeline. This page is the conceptual backbone; each stage links to the panels
+that implement it.
+
+```{mermaid}
+flowchart LR
+    A["1 Import or Generate"] --> B["2 Analyze"]
+    B --> C["3 Lay Out"]
+    C --> D["4 Visualize"]
+    D --> E["5 Render & Export"]
+```
+
+## 1. Import or generate a graph
+
+Load a file or database, download an OSMnx network, build an urban morphology
+graph, or pull a SuiteSparse matrix. Source detection and column mapping are
+handled in the **[Data panel](../panels/scigraphs/data.qmd)**; spatial sources
+have their own tabs ([OSMnx](../panels/osmnx/index.qmd),
+[City2Graph](../panels/city2graph/index.qmd)).
+
+The result is a single Blender object carrying the graph as mesh topology
+(vertices = nodes, edges = edges) plus custom properties such as `num_nodes`,
+`num_edges`, and `is_directed`.
+
+## 2. Analyze
+
+Compute centrality, community structure, statistics, and topology. Results are
+stored as **named mesh attributes** on the graph object, which become available
+to colour and size mappings later. See the
+**[Analysis panel](../panels/scigraphs/analysis.qmd)** and the
+**[Graph Algorithms panel](../panels/scigraphs/algorithms.qmd)**.
+
+This stage is optional but generally precedes visualization, because the metrics
+it produces inform the visual encoding.
+
+## 3. Lay out
+
+Arrange nodes with any of the 2D/3D force-directed, spectral, geometric, or
+Graphviz layout algorithms — or skip layout entirely when the data carries
+intrinsic coordinates (geospatial, sparse-matrix). See the
+**[Layout & Positioning panel](../panels/scigraphs/layout.qmd)**.
+
+## 4. Visualize
+
+Apply Geometry Nodes via **Setup Visual**, then drive node/edge colour and size
+from attributes using scientific colormaps and edge-style presets. See the
+**[Visualization panel](../panels/scigraphs/visualization.qmd)**.
+
+## 5. Render & export
+
+Render with Cycles or EEVEE, and export the graph (GEXF, GraphML, JSON, CSV,
+Pajek), node positions, or a statistics report. See the
+**[Export & Tools panel](../panels/scigraphs/export.qmd)**.
+
+## Reproducing the whole pipeline
+
+SciGraphs can replay an entire pipeline — dataset, analysis, layout,
+visualization, render, and export — from a short declarative JSON or YAML file:
+
+```json
+{
+  "meta": { "title": "complex_demo", "seed": 42 },
+  "dataset": { "source": "osmnx", "method": "PLACE", "query": "Burjassot, Valencia, Spain", "network_type": "drive" },
+  "analysis": { "metrics": ["degree", "betweenness"] },
+  "layout": { "algorithm": "YIFAN_HU", "scale": 8.0 },
+  "visual": { "node_color": "betweenness", "node_size": "degree", "colormap": "magma", "edge_style": "GEPHI_DEFAULT" }
+}
+```
+
+Each run emits a canonical specification, a provenance manifest (with
+input/output hashes and timing), and an execution log, so the same seed and
+inputs reproduce the same result. See the
+**[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)** and the
+**[reproducible-pipeline tutorial](../tutorials/05-reproducible-pipeline.qmd)**.

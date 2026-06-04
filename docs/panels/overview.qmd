@@ -1,0 +1,35 @@
+---
+title: "Panel Reference"
+---
+
+This reference documents **every panel and subpanel** in the SciGraphs sidebar,
+organized by tab. Each page describes what a panel does, when it is visible, the
+meaning of every control, and the recommended workflow.
+
+For a high-level map of the whole interface, see
+**[The sidebar interface](../guide/interface.qmd)**.
+
+## SciGraphs tab
+
+The core combinatorial workflow.
+
+| Panel | What it covers |
+| --- | --- |
+| [Data](scigraphs/data.qmd) | Importing from files, SQL databases, SuiteSparse, and reproducible pipelines; geospatial and temporal options. |
+| [Layout & Positioning](scigraphs/layout.qmd) | Choosing and tuning layout algorithms; interactive layout; Network Splitter 3D. |
+| [Graph Algorithms](scigraphs/algorithms.qmd) | Traversal (BFS/DFS), pathfinding, spanning trees, network flow. |
+| [Analysis](scigraphs/analysis.qmd) | Centrality, community detection, directed analysis, statistics, topology. |
+| [Visualization](scigraphs/visualization.qmd) | Node/edge appearance, scene presets, edge styles, text labels. |
+| [Export & Tools](scigraphs/export.qmd) | Export to graph formats, node positions, statistics reports. |
+| [Reproducibility](scigraphs/reproducibility.qmd) | Declarative pipeline replay and provenance. |
+
+## OSMnx tab
+
+[Street-network download and analysis](osmnx/index.qmd) — download, graph
+operations, attributes, routing, accessibility, statistics, features, elevation,
+and IO.
+
+## City2Graph tab
+
+[Heterogeneous urban graphs](city2graph/index.qmd) — data import, morphology,
+transportation, mobility, proximity graphs, metapaths, and GeoAI export.

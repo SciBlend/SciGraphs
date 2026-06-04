@@ -1,0 +1,28 @@
+---
+title: "Tutorials"
+---
+
+These hands-on walkthroughs take you from raw data to a finished 3D
+visualization. Each one exercises a different part of SciGraphs and maps every
+step back to the panels documented in the [Panel Reference](../panels/overview.qmd).
+
+| # | Tutorial | You will learn |
+| --- | --- | --- |
+| 1 | [A combinatorial graph from a file](01-combinatorial-graph.qmd) | Import an edge list, lay it out, compute centrality and communities, and render. |
+| 2 | [A geospatial flow map on a globe](02-geospatial-globe.qmd) | Geocode nodes, project onto a 3D globe, and draw geodesic arcs (à la the refugee-flows figure). |
+| 3 | [An urban network on terrain](03-urban-terrain.qmd) | Download a street network with OSMnx, drape it onto DEM terrain, and add an amenity proximity graph (the Granada figure). |
+| 4 | [A sparse matrix from SuiteSparse](04-sparse-matrix.qmd) | Import a benchmark matrix, lay it out, and colour by eigenvector centrality. |
+| 5 | [A reproducible pipeline](05-reproducible-pipeline.qmd) | Capture a whole workflow in a declarative file and replay it with provenance. |
+
+::: {.callout-tip}
+If you are new to SciGraphs, start with tutorial 1, then read
+[The end-to-end workflow](../guide/pipeline.qmd) to see how the stages fit
+together.
+:::
+
+## Before you begin
+
+- Install and enable SciGraphs (see [Installation](../guide/installation.qmd)).
+- Open the 3D Viewport sidebar with `N` and locate the **SciGraphs**, **OSMnx**,
+  and **City2Graph** tabs.
+- For geospatial tutorials, ensure Blender has internet access.
