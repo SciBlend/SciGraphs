@@ -51,14 +51,65 @@ if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
     echo "  Copying wheels referenced in manifest..."
     mkdir -p "$BUILD_DIR/wheels"
     MISSING_WHEELS=false
+
+    # Resolve the platform family of a wheel filename's platform tag (the
+    # last '-'-delimited field). Used to reconcile manylinux tag-spelling
+    # differences between environments (e.g. pip fetching a manylinux_2_28
+    # wheel where the manifest pins the manylinux2014/2_17 spelling, or vice
+    # versa). PyPI publishes both for some packages and the resolver may pick
+    # either depending on platform-tag priority and pip version.
+    _wheel_family() {
+        case "$1" in
+            *manylinux*|*musllinux*) echo "linux" ;;
+            *win*) echo "win" ;;
+            *macos*) echo "macos" ;;
+            *any*) echo "any" ;;
+            *) echo "" ;;
+        esac
+    }
+
+    # Find an alternative wheel for the same distribution/version/python/abi
+    # whose platform tag belongs to the same family as the requested one.
+    _find_alt_wheel() {
+        local wanted="$1"
+        local prefix="${wanted%-*}"          # strip platform tag field
+        local wanted_tag="${wanted##*-}"
+        local family
+        family="$(_wheel_family "$wanted_tag")"
+        local cand base ct
+        for cand in wheels/"$prefix"-*.whl; do
+            [ -e "$cand" ] || continue
+            base="$(basename "$cand")"
+            ct="${base##*-}"
+            if [ "$(_wheel_family "$ct")" = "$family" ]; then
+                # Prefer manylinux over musllinux for linux requests.
+                if [ "$family" = "linux" ]; then
+                    case "$ct" in *manylinux*) echo "$base"; return 0 ;; esac
+                else
+                    echo "$base"; return 0
+                fi
+            fi
+        done
+        return 1
+    }
+
     while IFS= read -r wheel; do
         if [ -f "wheels/$wheel" ]; then
             cp "wheels/$wheel" "$BUILD_DIR/wheels/"
+            continue
+        fi
+
+        alt="$(_find_alt_wheel "$wheel" || true)"
+        if [ -n "$alt" ] && [ -f "wheels/$alt" ]; then
+            echo "  NOTE: reconciling '$wheel' -> '$alt'"
+            cp "wheels/$alt" "$BUILD_DIR/wheels/"
+            sed -i "s|./wheels/$wheel|./wheels/$alt|" "$BUILD_DIR/blender_manifest.toml"
         else
             echo "  WARNING: manifest references missing wheel: $wheel"
             MISSING_WHEELS=true
         fi
     done < <(grep -oP '\./wheels/\K[^"]+\.whl' blender_manifest.toml)
+
     if [ "$MISSING_WHEELS" = true ]; then
         echo "  Some manifest wheels are missing. Run scripts/fetch_wheels.sh."; exit 1
     fi
