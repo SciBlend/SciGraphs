@@ -90,6 +90,7 @@ website:
               - tutorials/panels/osmnx/features.qmd
               - tutorials/panels/osmnx/io.qmd
               - tutorials/panels/osmnx/elevation.qmd
+              - tutorials/panels/osmnx/basemaps.qmd
           - section: "City2Graph panels"
             contents:
               - tutorials/panels/city2graph/data.qmd

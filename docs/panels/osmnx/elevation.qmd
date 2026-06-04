@@ -66,6 +66,9 @@ This panel powers the
 
 ## Step-by-step tutorial
 
-For a worked example using **Avenida de las Naciones Unidas, La Paz** (2 km
+For a worked example using **Avenida Naciones Unidas, La Paz** (2 km
 radius), follow
-[Elevation, DEM & 3D terrain](../../tutorials/panels/osmnx/elevation.qmd).
+[Elevation, DEM & 3D terrain](../../tutorials/panels/osmnx/elevation.qmd). To
+drape satellite, street or WMS imagery from the mapping APIs onto that terrain,
+continue with
+[Basemaps & API textures](../../tutorials/panels/osmnx/basemaps.qmd).

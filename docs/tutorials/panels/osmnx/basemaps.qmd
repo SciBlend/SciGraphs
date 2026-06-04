@@ -1,0 +1,102 @@
+---
+title: "OSMnx · Basemaps & API textures (La Paz)"
+---
+
+::: {.lead}
+Drape satellite, street and WMS imagery over the **Avenida Naciones Unidas, La
+Paz** terrain. La Paz's dramatic relief makes each basemap texture
+fetched through the imagery APIs (ESRI, OpenStreetMap, Mapbox, MapTiler, WMS)
+read clearly across the slopes, so it is the reference case for this workflow.
+:::
+
+This walkthrough focuses on **Step 5 — Basemap Texture** of the
+[Elevation panel](../../panels/osmnx/elevation.qmd) and continues from
+[Elevation, DEM & 3D terrain](elevation.qmd).
+
+## Before you begin
+
+- Complete [Elevation, DEM & 3D terrain](elevation.qmd) so an OSMnx terrain mesh
+  exists for the 2 km radius around Avenida Naciones Unidas, La Paz. The basemap
+  controls only appear once a terrain object is present.
+- Ensure Blender has internet access. The imagery APIs stream map tiles or a WMS
+  image over the network.
+- Mapbox and MapTiler require their own API keys, set in add-on preferences. ESRI,
+  OpenStreetMap and most public WMS endpoints work without a key.
+
+## 1. Why La Paz for basemaps
+
+A basemap is fetched for the terrain's geographic bounding box and UV-mapped onto
+the mesh, so it follows the elevation surface instead of lying flat. On gentle
+terrain the difference is subtle; on La Paz's steep relief the imagery wraps over
+ridges and valleys, which makes it the clearest case to verify that the texture is
+georeferenced and aligned with the streets.
+
+![The La Paz terrain ready to receive a basemap.](../../../assets/guides/osmnx/10-basemap-terrain.png)
+
+## 2. Choose an imagery source
+
+Expand **Step 5 — Basemap Texture** and set **Source**:
+
+| Source | Imagery | API key |
+| --- | --- | --- |
+| **ESRI** | Esri World Imagery (satellite tiles) | No |
+| **OSM** | OpenStreetMap standard street tiles | No |
+| **MAPBOX** | Mapbox Satellite tiles | Yes |
+| **MAPTILER** | MapTiler Satellite tiles | Yes |
+| **WMS** | Any OGC WMS `GetMap` layer | Depends on server |
+
+For a first pass, **ESRI** gives high-resolution satellite imagery with no key.
+
+![Selecting an imagery source in the Basemap Texture step.](../../../assets/guides/osmnx/10-basemap-source.png)
+
+::: {.callout-note}
+For **Mapbox** or **MapTiler**, set the matching key in add-on preferences. When a
+key-bound source is selected without a key, the panel shows a hint and the fetch
+is blocked until the key is provided.
+:::
+
+## 3. Set zoom (tile sources)
+
+For tile sources (ESRI/OSM/Mapbox/MapTiler), set **Zoom**. Higher zoom means more
+detail and more tiles to download. A live tile-count estimate is shown so you can
+balance detail against download size before fetching; very high zoom over the 2 km
+radius is capped to protect against accidental large requests.
+
+![The zoom control with the live tile-count estimate.](../../../assets/guides/osmnx/10-basemap-zoom.png)
+
+## 4. Fetch and apply
+
+Press **Fetch & Apply**. The add-on downloads the tiles (or the single WMS image),
+stitches them into one georeferenced image, and drapes it over the La Paz terrain
+using per-vertex UV mapping. The active source and its attribution are shown once
+the basemap is applied.
+
+![Esri satellite imagery draped over the La Paz terrain.](../../../assets/guides/osmnx/10-basemap-esri.png)
+
+::: {.callout-tip}
+Fetching is cancellable. If you interrupt a long download, in-flight tile requests
+are dropped so Blender's UI does not freeze.
+:::
+
+## 5. Use a WMS layer
+
+To use an institutional or national orthophoto service, set **Source** to **WMS**
+and fill in **WMS URL** and **Layer**. The add-on issues a single `GetMap` request
+in `EPSG:4326` for the terrain's bounding box, so the returned image maps linearly
+onto the mesh.
+
+![A WMS orthophoto layer applied to the terrain.](../../../assets/guides/osmnx/10-basemap-wms.png)
+
+## 6. Compare and swap textures
+
+Press **Clear** to remove the current basemap, then fetch a different source to
+compare them on the same relief — for example ESRI satellite versus an OSM street
+basemap versus a WMS orthophoto. Downloaded tiles are cached, so re-fetching the
+same source and zoom is fast.
+
+![Comparing satellite and street basemaps on the same La Paz terrain.](../../../assets/guides/osmnx/10-basemap-compare.png)
+
+## Next steps
+
+This completes the OSMnx tutorials. Move on to the City2Graph tab with
+[Import urban data](../city2graph/data.qmd).

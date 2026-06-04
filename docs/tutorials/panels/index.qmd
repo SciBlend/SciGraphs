@@ -17,7 +17,7 @@ chain them into a full pipeline.
 | Area | Used for | Why |
 | --- | --- | --- |
 | **Burjassot, Valencia (Spain)** | Every panel except elevation | Compact, well-connected urban area with rich amenities. |
-| **Avenida de las Naciones Unidas, La Paz (Bolivia)** — 2 km radius | [Elevation, DEM & 3D terrain](osmnx/elevation.qmd) | Strong relief makes DEMs, node elevations and street grades clearly visible. |
+| **Avenida Naciones Unidas, La Paz (Bolivia)** — 2 km radius | [Elevation, DEM & 3D terrain](osmnx/elevation.qmd) and [Basemaps & API textures](osmnx/basemaps.qmd) | Strong relief makes DEMs, node elevations and street grades clearly visible, and shows basemap textures fetched through the imagery APIs draped over the 3D terrain. |
 
 ## OSMnx panels
 
@@ -32,6 +32,7 @@ chain them into a full pipeline.
 | 7 | [Download features (POIs)](osmnx/features.qmd) | [Features](../../panels/osmnx/features.qmd) |
 | 8 | [Save, export and cache](osmnx/io.qmd) | [Import/Export](../../panels/osmnx/io.qmd) |
 | 9 | [Elevation, DEM & 3D terrain](osmnx/elevation.qmd) | [Elevation](../../panels/osmnx/elevation.qmd) |
+| 10 | [Basemaps & API textures](osmnx/basemaps.qmd) | [Elevation](../../panels/osmnx/elevation.qmd) |
 
 ## City2Graph panels
 
