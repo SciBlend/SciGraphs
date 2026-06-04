@@ -40,7 +40,7 @@ class SCIGRAPHS_PT_c2g_metapaths(bpy.types.Panel):
         col.prop(props, "metapath_amenities_object", text="Amenities")
         
         amenities_obj = props.metapath_amenities_object
-        if amenities_obj and amenities_obj.get("is_osm_features"):
+        if amenities_obj and (amenities_obj.get("is_osm_features") or amenities_obj.get("is_city2graph")):
             feature_count = amenities_obj.get("feature_count", 0)
             info_row = col.row()
             info_row.scale_y = 0.8
@@ -49,7 +49,7 @@ class SCIGRAPHS_PT_c2g_metapaths(bpy.types.Panel):
             warning_row = col.row()
             warning_row.scale_y = 0.8
             warning_row.alert = True
-            warning_row.label(text="  Not a valid OSM features object", icon='ERROR')
+            warning_row.label(text="  Not a valid features object", icon='ERROR')
         
         layout.separator()
         

@@ -48,8 +48,20 @@ fi
 cp -r SciGraphs/* "$BUILD_DIR/"
 
 if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
-    echo "  Copying wheels..."
-    cp -r wheels "$BUILD_DIR/"
+    echo "  Copying wheels referenced in manifest..."
+    mkdir -p "$BUILD_DIR/wheels"
+    MISSING_WHEELS=false
+    while IFS= read -r wheel; do
+        if [ -f "wheels/$wheel" ]; then
+            cp "wheels/$wheel" "$BUILD_DIR/wheels/"
+        else
+            echo "  WARNING: manifest references missing wheel: $wheel"
+            MISSING_WHEELS=true
+        fi
+    done < <(grep -oP '\./wheels/\K[^"]+\.whl' blender_manifest.toml)
+    if [ "$MISSING_WHEELS" = true ]; then
+        echo "  Some manifest wheels are missing. Run scripts/fetch_wheels.sh."; exit 1
+    fi
 else
     echo "  No wheels found. Run scripts/fetch_wheels.sh first."
     mkdir -p "$BUILD_DIR/wheels"

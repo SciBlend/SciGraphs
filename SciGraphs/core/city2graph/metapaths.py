@@ -43,83 +43,142 @@ def create_street_dual_graph_c2g(osmnx_graph):
     return dual_nodes_gdf, dual_edges_gdf
 
 
+def _amenities_from_cached_gdf(features_obj):
+    """
+    Rebuild a GeoDataFrame from the City2Graph base64 pickle cache.
+
+    City2Graph objects store the source GeoDataFrame in the
+    ``_c2g_gdf_pickle`` custom property. This is the preferred source as
+    it requires no network access and preserves the original geometry.
+
+    Args:
+        features_obj: Blender object that may carry the cache.
+
+    Returns:
+        GeoDataFrame with a valid CRS, or None if the cache is absent
+        or cannot be decoded.
+    """
+    cached = features_obj.get("_c2g_gdf_pickle")
+    if not cached:
+        return None
+
+    import pickle
+    import base64
+
+    try:
+        gdf = pickle.loads(base64.b64decode(cached))
+    except Exception as e:
+        print(f"Warning: Could not decode cached GeoDataFrame: {e}")
+        return None
+
+    if gdf is None or len(gdf) == 0:
+        return None
+
+    if gdf.crs is None:
+        gdf = gdf.set_crs(features_obj.get("_c2g_gdf_crs", "EPSG:4326"))
+
+    return gdf
+
+
+def _amenities_from_place(features_obj):
+    """
+    Re-download amenity features for the object's place name.
+
+    Only applies to OSMnx feature objects geocoded from a place name
+    (not point/bbox queries).
+
+    Args:
+        features_obj: Blender object exposing a ``place_name`` property.
+
+    Returns:
+        GeoDataFrame of amenities, or None if the object has no usable
+        place name or the download fails.
+    """
+    place = features_obj.get("place_name", "")
+
+    if not place or place.startswith("Point") or place.startswith("BBox"):
+        return None
+
+    import osmnx as ox
+
+    tags = {
+        'amenity': ['cafe', 'restaurant', 'pub', 'bar', 'museum', 'theatre', 'cinema']
+    }
+
+    try:
+        return ox.features_from_place(place, tags=tags)
+    except Exception as e:
+        print(f"Warning: Could not re-download amenities from '{place}': {e}")
+        return None
+
+
+def _amenities_from_mesh(features_obj):
+    """
+    Extract vertex positions from the Blender mesh as a last resort.
+
+    Args:
+        features_obj: Blender object with mesh data.
+
+    Returns:
+        GeoDataFrame of points, or None if the object has no vertices.
+    """
+    if not features_obj.data or not getattr(features_obj.data, "vertices", None):
+        return None
+
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    points = [Point(v.co.x, v.co.y) for v in features_obj.data.vertices]
+
+    if not points:
+        return None
+
+    original_crs = features_obj.get("crs", "EPSG:4326")
+    return gpd.GeoDataFrame(geometry=points, crs=original_crs)
+
+
 def prepare_amenities_from_features(features_obj, target_crs, limit=None):
     """
-    Convert features object to amenities GeoDataFrame.
-    
+    Convert a features object to an amenities GeoDataFrame.
+
+    Resolution order:
+        1. City2Graph objects cache the source GeoDataFrame as a
+           base64-encoded pickle (``_c2g_gdf_pickle``); it is used directly.
+        2. OSMnx feature objects geocoded from a place name re-download
+           amenities for that place.
+        3. As a last resort, vertex positions are read from the mesh.
+
     Args:
         features_obj: Blender object with features (from OSMnx or City2Graph)
         target_crs: Target CRS to project to (should match dual graph)
         limit: Maximum number of amenities to return (None for all)
-        
+
     Returns:
         GeoDataFrame: Amenities with Point geometry and clean integer index
     """
     import geopandas as gpd
-    import osmnx as ox
-    
-    place = features_obj.get("place_name", "")
-    
-    if not place:
-        raise ValueError("Features object missing 'place_name' property. Please re-download features using OSMnx operators.")
-    
-    # Try to download amenities fresh (only works for place-based queries)
-    tags = {
-        'amenity': ['cafe', 'restaurant', 'pub', 'bar', 'museum', 'theatre', 'cinema']
-    }
-    
-    amenities_gdf = None
-    
-    # Check if this was downloaded from a place name (not point/bbox)
-    if not place.startswith("Point") and not place.startswith("BBox"):
-        try:
-            amenities_gdf = ox.features_from_place(place, tags=tags)
-        except Exception as e:
-            print(f"Warning: Could not re-download amenities from '{place}': {e}")
-            print("Attempting to extract from Blender object...")
-    
-    # If re-download failed or was from point/bbox, extract from Blender mesh
+
+    amenities_gdf = _amenities_from_cached_gdf(features_obj)
+
     if amenities_gdf is None or len(amenities_gdf) == 0:
-        # Extract coordinates from Blender object
-        if not features_obj.data or not features_obj.data.vertices:
-            raise ValueError("Features object has no mesh data")
-        
-        # Get original CRS from object
-        original_crs = features_obj.get("crs", "EPSG:4326")
-        
-        # Extract vertex positions and reverse transformation
-        from shapely.geometry import Point
-        
-        points = []
-        for vert in features_obj.data.vertices:
-            # TODO: This needs proper coordinate transformation back to geographic/projected space
-            # For now, this is a placeholder - the re-download approach is preferred
-            points.append(Point(vert.co.x, vert.co.y))
-        
-        if not points:
-            raise ValueError("No valid points extracted from features object")
-        
-        amenities_gdf = gpd.GeoDataFrame(geometry=points, crs=original_crs)
-    
-    # Reset index BEFORE projection to avoid MultiIndex issues
+        amenities_gdf = _amenities_from_place(features_obj)
+
+    if amenities_gdf is None or len(amenities_gdf) == 0:
+        amenities_gdf = _amenities_from_mesh(features_obj)
+
+    if amenities_gdf is None or len(amenities_gdf) == 0:
+        raise ValueError("Could not extract amenities from the selected object")
+
     amenities_gdf = amenities_gdf.reset_index(drop=True)
-    
-    # Project to target CRS
     amenities_gdf = amenities_gdf.to_crs(target_crs)
-    
-    # Convert to Point geometry (centroids)
     amenities_gdf['geometry'] = amenities_gdf.geometry.centroid
-    
-    # Create clean GeoDataFrame with only geometry
     amenities_gdf = gpd.GeoDataFrame(amenities_gdf[['geometry']], crs=amenities_gdf.crs)
-    
-    # Apply limit if specified
+
     if limit:
         amenities_gdf = amenities_gdf.head(limit)
-    
-    # Ensure clean integer index
+
     amenities_gdf = amenities_gdf.reset_index(drop=True)
-    
+
     return amenities_gdf
 
 

@@ -36,6 +36,30 @@ def _create_metapath_material():
     return mat
 
 
+def _reproject_to_geographic(gdf):
+    """Return the GeoDataFrame in EPSG:4326 when a projected CRS is set.
+
+    Aligning every overlay (dual nodes, bridges, metapaths) with the OSMnx
+    mesh requires geographic coordinates, since the mesh is always built with
+    an equirectangular projection centered on the network.
+    """
+    try:
+        if gdf.crs is not None and not gdf.crs.is_geographic:
+            return gdf.to_crs("EPSG:4326")
+    except Exception:
+        pass
+    return gdf
+
+
+def _resolve_geo_center(center_lat, center_lon, gdf):
+    """Return a geographic center, falling back to the GeoDataFrame bounds."""
+    if center_lat is None or center_lon is None:
+        bounds = gdf.total_bounds
+        center_lon = (bounds[0] + bounds[2]) / 2.0
+        center_lat = (bounds[1] + bounds[3]) / 2.0
+    return center_lat, center_lon
+
+
 class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
     """Create dual graph where street segments become nodes (City2Graph method)"""
     bl_idname = "scigraphs.create_street_dual_graph"
@@ -95,21 +119,18 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
             is_intersection_layer = bm.verts.layers.int.new("is_intersection")
             
             # Create vertices (dual nodes)
+            placement_nodes_gdf = _reproject_to_geographic(dual_nodes_gdf)
+            place_center_lat, place_center_lon = _resolve_geo_center(
+                center_lat, center_lon, placement_nodes_gdf
+            )
             vert_map = {}
-            for idx, row in dual_nodes_gdf.iterrows():
+            for idx, row in placement_nodes_gdf.iterrows():
                 geom = row.geometry
-                
-                if crs_is_geographic and center_lat and center_lon:
-                    # Geographic coordinates - use OSMnx conversion
-                    x, y, z = _latlon_to_local_3d(geom.y, geom.x, center_lat, center_lon, dual_scale)
-                else:
-                    # Projected coordinates - use centroid offset
-                    x = (geom.x - centroid_x) * dual_scale
-                    y = (geom.y - centroid_y) * dual_scale
-                    z = 0.0
-                
+                x, y, z = _latlon_to_local_3d(
+                    geom.y, geom.x, place_center_lat, place_center_lon, dual_scale
+                )
                 v = bm.verts.new((x, y, z))
-                v[is_intersection_layer] = 1  # Mark as intersection for setup visual
+                v[is_intersection_layer] = 1
                 vert_map[idx] = v
             
             bm.verts.ensure_lookup_table()
@@ -223,8 +244,8 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
             self.report({'ERROR'}, "No amenities object selected. Select one in the Metapath Analysis panel.")
             return {'CANCELLED'}
         
-        if not amenities_obj.get("is_osm_features"):
-            self.report({'ERROR'}, "Selected object is not a valid OSM features object")
+        if not amenities_obj.get("is_osm_features") and not amenities_obj.get("is_city2graph"):
+            self.report({'ERROR'}, "Selected object is not a valid features object")
             return {'CANCELLED'}
         
         self.report({'INFO'}, "Bridging amenities to street segments...")
@@ -290,17 +311,14 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
         if len(bridge_edges) == 0:
             return
         
-        # Get OSMnx transformation parameters (NOT dual graph centroid)
-        center_lat = dual_obj.get("osmnx_center_lat")
-        center_lon = dual_obj.get("osmnx_center_lon")
         scale = dual_obj.get("osmnx_scale", 0.001)
-        crs_is_geographic = dual_obj.get("crs_is_geographic", False)
-        
-        # Fallback centroid if geographic coords but no OSMnx params
-        centroid_x = dual_obj.get("centroid_x", 0)
-        centroid_y = dual_obj.get("centroid_y", 0)
         
         from ....core.mesh.geometry import _latlon_to_local_3d
+        
+        bridge_edges = _reproject_to_geographic(bridge_edges)
+        center_lat, center_lon = _resolve_geo_center(
+            dual_obj.get("osmnx_center_lat"), dual_obj.get("osmnx_center_lon"), bridge_edges
+        )
         
         # Create curve
         curve_data = bpy.data.curves.new(f'{dual_obj.name}_Bridges', type='CURVE')
@@ -316,14 +334,7 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
                     polyline.points.add(len(coords) - 1)
                     
                     for i, (lon, lat) in enumerate(coords):
-                        # Use same transformation as OSMnx graph
-                        if crs_is_geographic and center_lat and center_lon:
-                            blender_x, blender_y, blender_z = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
-                        else:
-                            blender_x = (lon - centroid_x) * scale
-                            blender_y = (lat - centroid_y) * scale
-                            blender_z = 0.0
-                        
+                        blender_x, blender_y, blender_z = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
                         polyline.points[i].co = (blender_x, blender_y, blender_z + 0.01, 1.0)
         
         # Create object
@@ -414,17 +425,14 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         vis_limit = props.metapath_visualize_limit
         curve_thickness = props.metapath_curve_thickness
         
-        # Get OSMnx transformation parameters (NOT dual graph centroid)
-        center_lat = dual_obj.get("osmnx_center_lat")
-        center_lon = dual_obj.get("osmnx_center_lon")
         scale = dual_obj.get("osmnx_scale", 0.001)
-        crs_is_geographic = dual_obj.get("crs_is_geographic", False)
-        
-        # Fallback centroid if geographic coords but no OSMnx params
-        centroid_x = dual_obj.get("centroid_x", 0)
-        centroid_y = dual_obj.get("centroid_y", 0)
         
         from ....core.mesh.geometry import _latlon_to_local_3d
+        
+        metapath_gdf = _reproject_to_geographic(metapath_gdf)
+        center_lat, center_lon = _resolve_geo_center(
+            dual_obj.get("osmnx_center_lat"), dual_obj.get("osmnx_center_lon"), metapath_gdf
+        )
         
         # Metapaths already grouped with multiplicity column
         has_multiplicity = 'multiplicity' in metapath_gdf.columns
@@ -459,14 +467,7 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
                 polyline.points.add(len(coords) - 1)
                 
                 for i, (lon, lat) in enumerate(coords):
-                    # Use same transformation as OSMnx graph
-                    if crs_is_geographic and center_lat and center_lon:
-                        blender_x, blender_y, blender_z = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
-                    else:
-                        blender_x = (lon - centroid_x) * scale
-                        blender_y = (lat - centroid_y) * scale
-                        blender_z = 0.0
-                    
+                    blender_x, blender_y, blender_z = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
                     polyline.points[i].co = (blender_x, blender_y, blender_z + 0.05, 1.0)
                 
                 # Store multiplicity for this spline
@@ -559,8 +560,8 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
             self.report({'ERROR'}, "No amenities object selected. Select one in the Metapath Analysis panel.")
             return {'CANCELLED'}
         
-        if not amenities_obj.get("is_osm_features"):
-            self.report({'ERROR'}, "Selected object is not a valid OSM features object")
+        if not amenities_obj.get("is_osm_features") and not amenities_obj.get("is_city2graph"):
+            self.report({'ERROR'}, "Selected object is not a valid features object")
             return {'CANCELLED'}
         
         self.report({'INFO'}, "Starting complete metapath analysis...")
@@ -886,14 +887,14 @@ class SCIGRAPHS_OT_ComputeMetapathsByWeight(bpy.types.Operator):
         vis_limit = props.metapath_visualize_limit
         curve_thickness = props.metapath_curve_thickness
 
-        center_lat = dual_obj.get("osmnx_center_lat")
-        center_lon = dual_obj.get("osmnx_center_lon")
         scale = dual_obj.get("osmnx_scale", 0.001)
-        crs_is_geographic = dual_obj.get("crs_is_geographic", False)
-        centroid_x = dual_obj.get("centroid_x", 0)
-        centroid_y = dual_obj.get("centroid_y", 0)
 
         from ....core.mesh.geometry import _latlon_to_local_3d
+
+        metapath_gdf = _reproject_to_geographic(metapath_gdf)
+        center_lat, center_lon = _resolve_geo_center(
+            dual_obj.get("osmnx_center_lat"), dual_obj.get("osmnx_center_lon"), metapath_gdf
+        )
 
         curve_data = bpy.data.curves.new(f'{dual_obj.name}_WeightedMP_{weight_attr}', type='CURVE')
         curve_data.dimensions = '3D'
@@ -909,12 +910,7 @@ class SCIGRAPHS_OT_ComputeMetapathsByWeight(bpy.types.Operator):
             polyline = curve_data.splines.new('POLY')
             polyline.points.add(len(coords) - 1)
             for i, (lon, lat) in enumerate(coords):
-                if crs_is_geographic and center_lat and center_lon:
-                    bx, by, bz = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
-                else:
-                    bx = (lon - centroid_x) * scale
-                    by = (lat - centroid_y) * scale
-                    bz = 0.0
+                bx, by, bz = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
                 polyline.points[i].co = (bx, by, bz + 0.05, 1.0)
             visualized += 1
 

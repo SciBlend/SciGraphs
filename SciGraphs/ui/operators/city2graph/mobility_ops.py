@@ -35,7 +35,8 @@ class SCIGRAPHS_OT_C2G_LoadODMatrix(bpy.types.Operator):
             return {'CANCELLED'}
 
         import pickle
-        context.scene["c2g_od_data"] = pickle.dumps(od_data)
+        import base64
+        context.scene["c2g_od_data"] = base64.b64encode(pickle.dumps(od_data)).decode("ascii")
         context.scene["c2g_od_path"] = path
 
         self.report({'INFO'}, f"Loaded OD matrix: {len(od_data)} rows from {path}")
@@ -74,7 +75,8 @@ class SCIGRAPHS_OT_C2G_ODToGraph(bpy.types.Operator):
             return {'CANCELLED'}
 
         import pickle
-        od_data = pickle.loads(context.scene["c2g_od_data"])
+        import base64
+        od_data = pickle.loads(base64.b64decode(context.scene["c2g_od_data"]))
 
         zone_id_col = props.od_zone_id_col.strip() or None
         matrix_type = props.od_matrix_type.lower()
