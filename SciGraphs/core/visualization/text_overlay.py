@@ -59,6 +59,46 @@ class ProjectedNode:
     attribute_value: Optional[float]  # Value of filter attribute if applicable
 
 
+def resolve_node_names(obj) -> Optional[List[str]]:
+    """
+    Resolve node names for a graph object from its stored metadata.
+
+    Tries ``obj["node_names"]`` (JSON list) first, then falls back to
+    ``obj["nodes_data"]`` (comma-separated string used by geospatial graphs),
+    and finally to generated names based on vertex indices.
+
+    Args:
+        obj: Graph object
+
+    Returns:
+        List of node names aligned with mesh vertex order, or None if the
+        object is not a valid mesh.
+    """
+    if obj is None or obj.type != 'MESH':
+        return None
+
+    mesh = obj.data
+    node_names = None
+
+    node_names_json = obj.get("node_names")
+    nodes_data = obj.get("nodes_data")
+
+    if node_names_json:
+        try:
+            node_names = json.loads(node_names_json)
+        except json.JSONDecodeError:
+            log("Warning: Could not parse node_names JSON")
+
+    if node_names is None and nodes_data:
+        node_names = [n.strip() for n in nodes_data.split(",")]
+
+    if node_names is None:
+        log("Warning: No node names found, using vertex indices")
+        node_names = [f"Node_{i}" for i in range(len(mesh.vertices))]
+
+    return node_names
+
+
 def get_node_positions_from_object(obj) -> Dict[str, Vector]:
     """
     Extract node positions from a graph object.
@@ -73,26 +113,9 @@ def get_node_positions_from_object(obj) -> Dict[str, Vector]:
         return {}
     
     mesh = obj.data
-    node_names = None
-    
-    # Try different sources for node names
-    node_names_json = obj.get("node_names")
-    nodes_data = obj.get("nodes_data")
-    
-    if node_names_json:
-        try:
-            node_names = json.loads(node_names_json)
-        except json.JSONDecodeError:
-            log("Warning: Could not parse node_names JSON")
-    
-    if node_names is None and nodes_data:
-        # nodes_data is comma-separated string (used by geospatial graphs)
-        node_names = [n.strip() for n in nodes_data.split(",")]
-    
+    node_names = resolve_node_names(obj)
     if node_names is None:
-        # Fallback: generate names from vertex indices
-        log("Warning: No node names found, using vertex indices")
-        node_names = [f"Node_{i}" for i in range(len(mesh.vertices))]
+        return {}
     
     positions = {}
     world_matrix = obj.matrix_world
@@ -121,14 +144,9 @@ def get_node_attribute_values(obj, attribute_name: str) -> Dict[str, float]:
         return {}
     
     mesh = obj.data
-    node_names_json = obj.get("node_names")
+    node_names = resolve_node_names(obj)
     
-    if not node_names_json:
-        return {}
-    
-    try:
-        node_names = json.loads(node_names_json)
-    except json.JSONDecodeError:
+    if not node_names:
         return {}
     
     values = {}

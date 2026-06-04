@@ -110,9 +110,14 @@ class SCIGRAPHS_OT_GenerateTextOverlay(bpy.types.Operator):
         
         if props.text_source == 'ATTRIBUTE' and props.text_attribute and props.text_attribute != 'NONE':
             attr_values = text_overlay.get_node_attribute_values(obj, props.text_attribute)
+            if not attr_values:
+                self.report(
+                    {'WARNING'},
+                    f"Attribute '{props.text_attribute}' has no values; showing node IDs"
+                )
             for node in projected:
                 if node.name in attr_values:
-                    node.name = str(attr_values[node.name])
+                    node.name = repr(attr_values[node.name])
         
         image_path = text_overlay.generate_text_image(
             projected, resolution, settings, camera
