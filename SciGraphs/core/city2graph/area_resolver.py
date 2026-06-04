@@ -210,6 +210,7 @@ def resolve_area(context):
             'scale': scene_props.osmnx_scale or _DEFAULT_SCALE,
             'osmnx_obj': osmnx_obj,
             'source': f"Place '{place}'",
+            'place_name': place,
         }
 
     if method == 'POINT':

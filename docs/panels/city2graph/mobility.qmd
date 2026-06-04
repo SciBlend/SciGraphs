@@ -31,15 +31,11 @@ Maps the loaded matrix onto zones and builds the flow graph.
 | **OD to Graph** | Builds the graph. |
 
 ::: {.callout-tip}
-The default column names (`zone_id`, `source`, `target`, `flow`) match the test
-files produced by the OD-matrix example notebook, so those load without extra
-configuration.
+The default column names (`zone_id`, `source`, `target`, `flow`) are a common
+convention, so matrices using them load without extra configuration.
 :::
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Prepare a **zones** object (polygons with a unique id column) and an OD file.
-2. **Load OD Matrix**.
-3. Map the **zones**, the **id column**, the **matrix type**, and the
-   source/target/weight columns.
-4. Set a **threshold** and directedness, then **OD to Graph**.
+For a worked example, follow
+[Map an OD matrix](../../tutorials/panels/city2graph/mobility.qmd).

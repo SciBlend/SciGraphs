@@ -75,4 +75,4 @@ Each run emits a canonical specification, a provenance manifest (with
 input/output hashes and timing), and an execution log, so the same seed and
 inputs reproduce the same result. See the
 **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)** and the
-**[reproducible-pipeline tutorial](../tutorials/05-reproducible-pipeline.qmd)**.
+**[reproducible-pipeline example](../examples/05-reproducible-pipeline.qmd)**.

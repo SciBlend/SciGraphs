@@ -9,6 +9,28 @@ from .geometry import _latlon_to_local_3d
 from ...utils.logger import log
 
 
+def _resolve_projection_metadata(obj):
+    """Return the (center_lat, center_lon, scale) projection metadata of an object.
+
+    OSMnx feature objects store the projection under ``osmnx_*`` keys, while
+    Overture/city2graph objects use the ``c2g_*`` keys. This resolver accepts
+    either so visualization works with both sources.
+    """
+    center_lat = obj.get("osmnx_center_lat")
+    center_lon = obj.get("osmnx_center_lon")
+    scale = obj.get("osmnx_scale")
+
+    if center_lat is None or center_lon is None:
+        center_lat = obj.get("c2g_center_lat")
+        center_lon = obj.get("c2g_center_lon")
+        scale = obj.get("c2g_scale")
+
+    if scale is None:
+        scale = 0.001
+
+    return center_lat, center_lon, scale
+
+
 def create_feature_mesh_from_gdf(gdf, name="OSM_Features", separate_by_type=False, osmnx_obj=None):
     """
     Create Blender mesh objects from a GeoDataFrame.
@@ -119,9 +141,7 @@ def create_curves_from_gdf(edges_gdf, name, feature_obj, thickness=0.0002, limit
     if edges_gdf is None or len(edges_gdf) == 0:
         return None
 
-    center_lat = feature_obj.get("osmnx_center_lat")
-    center_lon = feature_obj.get("osmnx_center_lon")
-    scale = feature_obj.get("osmnx_scale", 0.001)
+    center_lat, center_lon, scale = _resolve_projection_metadata(feature_obj)
 
     if center_lat is None or center_lon is None:
         return None

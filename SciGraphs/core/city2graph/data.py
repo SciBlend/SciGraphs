@@ -1,4 +1,5 @@
 from ...utils.logger import log
+from ..feature_tags import resolve_feature_tags, overture_type_from_preset, overture_place_keywords
 from .get_c2g import get_city2graph
 from . import utils
 from . import overture_api
@@ -272,7 +273,7 @@ def process_overture_segments(segments_gdf, connectors_gdf=None, get_barriers=Tr
         return None
 
 
-def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api=False, place_name=None, limit=10000):
+def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api=False, place_name=None, limit=10000, place_categories=None):
     """
     Download Overture Maps data within bounding box.
     
@@ -344,7 +345,7 @@ def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api
                     log("Buildings not returned by Overture; falling back to OSMnx")
                     gdf = _fetch_features_via_osmnx(bbox, 'building')
             elif feature_type == 'place':
-                gdf = overture_api.query_overture_places(bbox, limit=limit)
+                gdf = overture_api.query_overture_places(bbox, categories=place_categories, limit=limit)
             elif feature_type in ('segment', 'water', 'land'):
                 log(
                     f"'{feature_type}' is not served by Overture REST; "
@@ -393,6 +394,96 @@ def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api
         return None
     
     return result_objects
+
+
+def _filter_gdf_to_nodes(gdf):
+    """Keep only OSM node elements from a features GeoDataFrame.
+
+    Mirrors the notebook workflow (``element == "node"``) so point-feature
+    counts match. Returns the gdf unchanged when no element index is present.
+    """
+    if gdf is None or not hasattr(gdf.index, "names"):
+        return gdf
+    for name in gdf.index.names:
+        if name and "element" in name.lower():
+            return gdf[gdf.index.get_level_values(name) == "node"]
+    return gdf
+
+
+def download_features(bbox, source, feature_type, custom_tags="", osmnx_obj=None,
+                      limit=10000, nodes_only=False, place_name=None):
+    """Download and materialise features using the shared import selector.
+
+    When ``source`` is OSMnx and ``place_name`` is provided, the features are
+    queried within the place's administrative polygon (``features_from_place``)
+    instead of the bounding box, matching the notebook workflow. Otherwise the
+    bounding box is used.
+    """
+    source = source or 'OVERTURE'
+    feature_type = feature_type or 'BUILDING'
+
+    if source == 'OVERTURE':
+        overture_type = overture_type_from_preset(feature_type)
+        if overture_type is not None:
+            place_categories = (
+                overture_place_keywords(feature_type)
+                if overture_type == 'place' else None
+            )
+            result = load_overture_data(
+                bbox=bbox,
+                types=[overture_type],
+                osmnx_obj=osmnx_obj,
+                limit=limit,
+                place_categories=place_categories,
+            )
+            if result:
+                for objects in result.values():
+                    for obj in objects:
+                        obj["feature_source"] = "OVERTURE"
+                        obj["feature_type"] = feature_type
+            return result
+        log("Custom tags are not available in Overture mode; using OSMnx")
+
+    from ..osmnx import features as ox_features
+    from types import SimpleNamespace
+
+    tags = resolve_feature_tags(SimpleNamespace(
+        feat_type=feature_type,
+        feat_custom_tags=custom_tags,
+    ))
+    if not tags:
+        return None
+
+    if place_name:
+        log(f"Querying OSMnx features within place polygon: '{place_name}'")
+        gdf = ox_features.features_from_place(place_name, tags)
+    else:
+        gdf = ox_features.features_from_bbox(bbox, tags)
+    if gdf is None or len(gdf) == 0:
+        return None
+
+    if nodes_only:
+        gdf = _filter_gdf_to_nodes(gdf)
+        log(f"Filtered to node elements: {len(gdf)} features")
+        if len(gdf) == 0:
+            return None
+
+    collection_name = f"C2G_OSMnx_{feature_type.title().replace('_', '')}"
+    objects = utils.gdf_to_blender_mesh(
+        gdf,
+        name=f"osmnx_{feature_type.lower()}",
+        collection_name=collection_name,
+        osmnx_obj=osmnx_obj,
+    )
+    if not objects:
+        return None
+
+    for obj in objects:
+        obj["is_osm_features"] = True
+        obj["feature_type"] = feature_type
+        obj["feature_source"] = "OSMNX"
+
+    return {feature_type.lower(): objects}
 
 
 def load_overture_buildings(bbox, osmnx_obj=None):

@@ -1,0 +1,83 @@
+---
+title: "OSMnx · Elevation, DEM & 3D terrain (La Paz)"
+---
+
+::: {.lead}
+Build a 3D urban terrain for **Avenida de las Naciones Unidas, La Paz** within a
+2 km radius. La Paz's dramatic relief makes the DEM pipeline, node elevations and
+street grades clearly visible.
+:::
+
+This walkthrough mirrors the [Elevation panel](../../panels/osmnx/elevation.qmd).
+
+## Before you begin
+
+- Open the **OSMnx** tab and ensure Blender has internet access.
+- An OpenTopography API key gives the best DEM quality; Open-Elevation works
+  without one. A local GeoTIFF is also supported.
+
+## 1. Download the area (2 km radius)
+
+In **Download**, set **Download Method** to **Point** (or **Address**), enter the
+location near Avenida de las Naciones Unidas, set **Distance** to `2000` m, and
+press **Download Graph**. Then **Project Graph** in
+[Graph Operations](graph-operations.qmd).
+
+![Downloading a 2 km radius around Avenida Naciones Unidas, La Paz.](../../../assets/guides/osmnx/09-download-lapaz.png)
+
+## 2. Get elevation data
+
+Expand **Elevation**. In **Get Elevation**:
+
+- **DEM Source**: **OpenTopography**, **Open-Elevation**, or **Local GeoTIFF**
+  (set **Local Path**).
+- Enable **Apply to Nodes** and **Create Terrain**.
+- Set the **Vertical Scale** and, for API sources, the **API Resolution** and
+  **Workers**.
+
+Press **Get Elevation**. Node elevations are fetched and a terrain mesh is built
+under the network.
+
+![The Get Elevation controls with a DEM source selected.](../../../assets/guides/osmnx/09-get-elevation.png)
+
+::: {.callout-note}
+For a local DEM, set **DEM Source** to **Local GeoTIFF** and the **Local Path**.
+Use **Export AOI** to write the area of interest for downloading a Copernicus
+DEM tile.
+:::
+
+## 3. Apply 3D positions
+
+Press **Apply 3D Positions** so the network conforms to the terrain surface,
+draping the streets across the slopes.
+
+![The network draped onto La Paz terrain.](../../../assets/guides/osmnx/09-apply-3d.png)
+
+## 4. Add edge grades
+
+Press **Add Edge Grades** to compute each edge's slope (`grade`) and its absolute
+value (`grade_abs`). The steep streets of La Paz produce high grades.
+
+![Edge grades coloured along the streets.](../../../assets/guides/osmnx/09-grades.png)
+
+## 5. Elevation-aware routing
+
+Open [Routing](routing.qmd), set **Path Weight** to **elevation_impedance** and
+choose an **Alpha**. The cost becomes `length * (1 + alpha * |grade|)`, so steep
+climbs are penalized and flatter detours win. Compare against a plain **length**
+route to see the difference.
+
+![Comparing a flat-preferring route against a length-only route.](../../../assets/guides/osmnx/09-elevation-routing.png)
+
+## 6. Add a basemap
+
+In **Get Basemap**, choose a **Basemap Source** (ESRI/OSM/Mapbox/MapTiler/WMS)
+and **Zoom**, then **Fetch Basemap** to drape satellite or map imagery over the
+terrain.
+
+![Satellite imagery draped over the La Paz terrain.](../../../assets/guides/osmnx/09-basemap.png)
+
+## Next steps
+
+This completes the OSMnx tutorials. Move on to the City2Graph tab with
+[Import urban data](../city2graph/data.qmd).

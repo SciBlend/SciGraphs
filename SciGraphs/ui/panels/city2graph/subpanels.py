@@ -1,5 +1,7 @@
 import bpy
 
+from ..feature_selector import draw_feature_selector
+
 
 class SCIGRAPHS_PT_c2g_data(bpy.types.Panel):
     """Data import panel."""
@@ -94,29 +96,10 @@ class SCIGRAPHS_PT_c2g_data(bpy.types.Panel):
                 icon='INFO',
             )
 
-        # --- 2 · Feature Types ---
         layout.separator()
-        box = layout.box()
-        box.label(text="2 · Feature Types", icon='OUTLINER_OB_MESH')
-        col = box.column(align=True)
-        col.prop(props, "c2g_overture_building")
-        col.prop(props, "c2g_overture_segment")
-        col.prop(props, "c2g_overture_place")
-        col.prop(props, "c2g_overture_water")
-        col.prop(props, "c2g_overture_land")
-
-        # Source badge: Overture REST for buildings/places, OSMnx for
-        # the rest (matches what the c2g notebooks recommend).
-        src = box.box()
-        src.scale_y = 0.7
-        src.label(text="Sources:", icon='INFO')
-        src.label(text="• Buildings, Places → Overture Maps")
-        src.label(text="• Segments, Water, Land → OSMnx (Overpass)")
-
-        col2 = box.column(align=True)
-        col2.prop(props, "c2g_overture_limit", text="Max Features / Type")
-        if props.c2g_overture_limit > 15000:
-            warn = col2.row()
+        draw_feature_selector(layout, scene_props, title="2 · Feature Source & Tags")
+        if scene_props.feat_limit > 15000:
+            warn = layout.row()
             warn.scale_y = 0.85
             warn.alert = True
             warn.label(

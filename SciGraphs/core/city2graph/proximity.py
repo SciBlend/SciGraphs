@@ -1,54 +1,50 @@
 """
-Proximity graph generation from Blender OSM feature objects.
+Proximity graph generation from Blender feature objects.
 
-Provides wrapper functions that convert Blender meshes to GeoDataFrames,
-call city2graph proximity functions, and return results ready for visualization.
+Provides wrapper functions that convert Blender meshes (OSMnx or
+Overture/city2graph feature objects) to GeoDataFrames, call city2graph
+proximity functions, and return results ready for visualization.
 """
 
-def _extract_gdf_from_feature_object(obj, target_crs=None, deduplicate=True, tolerance=0.5):
+def _extract_gdf_from_feature_object(obj, target_crs=None, deduplicate=True,
+                                     tolerance=0.5, as_points=True):
     """
-    Extract GeoDataFrame from Blender OSM feature object.
+    Extract a GeoDataFrame from a Blender feature object.
     
     Args:
-        obj: Blender object with OSM features
+        obj: Blender feature object (OSMnx or Overture/city2graph)
         target_crs: Optional CRS to project to (defaults to UTM based on location)
         deduplicate: If True, remove duplicate/nearby points
         tolerance: Distance threshold in meters for deduplication (after CRS conversion)
+        as_points: If True, reduce non-point geometries to their representative
+            point so the result is point-only. Set to False to preserve the
+            original polygon/line geometry (e.g. for containment predicates).
         
     Returns:
-        GeoDataFrame: Points extracted from vertices
+        GeoDataFrame: Features extracted from the object
         
     Note:
-        OSM features can be nodes (points), ways (lines/polygons), or relations.
-        When ways/relations are imported, each vertex becomes a point.
-        Use deduplicate=True to consolidate nearby points (default).
+        Point objects map each vertex to one node. When ``as_points`` is True,
+        polygon/line objects (such as Overture buildings) are reduced to one
+        representative point per feature so they can be used as proximity-graph
+        nodes. Use deduplicate=True to consolidate nearby points (default).
     """
     if not obj or not obj.data:
         raise ValueError("Invalid object: no mesh data")
     
-    if not obj.get("is_osm_features"):
-        raise ValueError("Object is not an OSM features object")
+    if not obj.get("is_osm_features") and not obj.get("is_city2graph"):
+        raise ValueError("Object is not a feature object (OSM or city2graph)")
     
-    center_lat = obj.get("osmnx_center_lat")
-    center_lon = obj.get("osmnx_center_lon")
-    scale = obj.get("osmnx_scale", 0.001)
+    from . import utils as c2g_utils
     
-    if center_lat is None or center_lon is None:
+    gdf = c2g_utils.blender_to_geopandas(obj, crs="EPSG:4326")
+    
+    if gdf is None or len(gdf) == 0:
         raise ValueError("Object missing coordinate transformation parameters")
     
-    import geopandas as gpd
-    from shapely.geometry import Point
-    from ..mesh.geometry import _local_3d_to_latlon
-    
-    points = []
-    for vert in obj.data.vertices:
-        lat, lon = _local_3d_to_latlon(
-            vert.co.x, vert.co.y,
-            center_lat, center_lon, scale
-        )
-        points.append(Point(lon, lat))
-    
-    gdf = gpd.GeoDataFrame(geometry=points, crs="EPSG:4326")
+    if as_points and not (gdf.geom_type == "Point").all():
+        gdf = gdf.copy()
+        gdf["geometry"] = gdf.geometry.representative_point()
     
     if target_crs:
         gdf = gdf.to_crs(target_crs)
@@ -61,9 +57,9 @@ def _extract_gdf_from_feature_object(obj, target_crs=None, deduplicate=True, tol
         )
         gdf = gdf.to_crs(utm_crs)
     
-    if deduplicate and len(gdf) > 0:
+    if deduplicate and len(gdf) > 0 and (gdf.geom_type == "Point").all():
+        import geopandas as gpd
         from shapely.ops import unary_union
-        from shapely.geometry import MultiPoint
         
         buffered = gdf.geometry.buffer(tolerance / 2)
         dissolved = unary_union(buffered)
@@ -488,7 +484,7 @@ def generate_group_nodes_from_features(polygons_obj, points_obj,
     """
     import city2graph as c2g
     
-    polygons_gdf = _extract_gdf_from_feature_object(polygons_obj)
+    polygons_gdf = _extract_gdf_from_feature_object(polygons_obj, as_points=False)
     points_gdf = _extract_gdf_from_feature_object(points_obj)
     
     network_gdf = None

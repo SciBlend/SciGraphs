@@ -10,7 +10,16 @@ provides geocoding/geometry helpers.
 
 ## Download OSM Features
 
-Download features by area; each button uses the corresponding query type.
+Download features by area; each button uses the corresponding query type. The
+feature source/type selector is shared with **City2Graph ▸ Data Import**, so the
+same preset or custom tags drive both entry points.
+
+| Selector | Description |
+| --- | --- |
+| **Source** | Choose **OSMnx / Overpass** for direct OSM tag queries, or **Overture / City2Graph** for Overture-backed presets with OSMnx fallbacks. |
+| **Feature** | Shared preset such as Buildings, Amenities, Restaurant, Shop, Health, Water, Highway, or Custom Tags. |
+| **Tags** | For **Custom Tags**, enter comma-separated `key=value` pairs such as `amenity=restaurant`. |
+| **Max Features** | Limit used by sources that support capping returned features. |
 
 | Control | Description |
 | --- | --- |
@@ -40,9 +49,7 @@ Download features by area; each button uses the corresponding query type.
 | **Interpolate Points** | Interpolate points along lines. |
 | **Sample Points on Graph** | Sample random points on the graph edges. |
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. **Download OSM Features** by the area method that matches your graph.
-2. Optionally **Snap POIs** to the street network for graph-aligned analysis.
-3. Use the **Geocoding & Geometry** helpers to build inputs for other panels
-   (e.g. polygons for [Graph Operations](graph-operations.qmd) truncation).
+For a worked example using Burjassot, follow
+[Download features (POIs)](../../tutorials/panels/osmnx/features.qmd).

@@ -11,6 +11,24 @@ from bpy.props import (
 )
 
 from .callbacks import get_column_items, get_db_profile_items, get_attribute_items, get_system_fonts
+from ..core.feature_tags import FEATURE_SOURCE_ITEMS, feature_type_items_for_source
+
+_FEAT_TYPE_ITEMS_CACHE = {}
+
+
+def _feat_type_items(self, context):
+    """Enum items for ``feat_type``, filtered by the selected feature source.
+
+    The returned list is cached per source to keep the string references alive,
+    which avoids Blender's dynamic-EnumProperty memory corruption.
+    """
+    source = getattr(self, "feat_source", "OVERTURE")
+    items = _FEAT_TYPE_ITEMS_CACHE.get(source)
+    if items is None:
+        items = feature_type_items_for_source(source)
+        _FEAT_TYPE_ITEMS_CACHE[source] = items
+    return items
+
 
 class CSVColumnItem(bpy.types.PropertyGroup):
     """Property group to store information about a CSV column."""
@@ -32,6 +50,43 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('REPRO', "Repro", "Run or validate a reproducible pipeline"),
         ],
         default='FILE',
+    )
+
+    feat_source: EnumProperty(
+        name="Feature Source",
+        description="Backend used for feature downloads",
+        items=FEATURE_SOURCE_ITEMS,
+        default='OVERTURE',
+    )
+
+    feat_type: EnumProperty(
+        name="Feature Type",
+        description="Feature preset or custom OSM tags to download",
+        items=_feat_type_items,
+    )
+
+    feat_custom_tags: StringProperty(
+        name="Custom Tags",
+        description="Custom OSM tags as key=value pairs, comma-separated",
+        default="building=yes",
+    )
+
+    feat_nodes_only: BoolProperty(
+        name="Nodes Only",
+        description=(
+            "OSMnx source only: keep only node elements (exclude ways/relations), "
+            "matching the notebook workflow for point features"
+        ),
+        default=False,
+    )
+
+    feat_limit: IntProperty(
+        name="Feature Limit",
+        description="Maximum features per query where the selected source supports limiting",
+        default=10000,
+        min=100,
+        max=50000,
+        soft_max=20000,
     )
     
     filepath: StringProperty(

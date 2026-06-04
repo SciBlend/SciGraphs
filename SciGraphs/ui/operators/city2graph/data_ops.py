@@ -2,24 +2,14 @@ import bpy
 from bpy.props import StringProperty
 
 
-def _selected_feature_types(props):
-    """Collect the feature-type checkboxes that are currently enabled.
-
-    Centralised so the unified Polygons/Points operators read the same
-    state from the same panel checkboxes.
-    """
-    types = []
-    if props.c2g_overture_building:
-        types.append('building')
-    if props.c2g_overture_segment:
-        types.append('segment')
-    if props.c2g_overture_place:
-        types.append('place')
-    if props.c2g_overture_water:
-        types.append('water')
-    if props.c2g_overture_land:
-        types.append('land')
-    return types
+def _flatten_result_objects(result):
+    """Return a flat list of objects from a feature-download result dict."""
+    objects = []
+    if not result:
+        return objects
+    for group in result.values():
+        objects.extend(group)
+    return objects
 
 
 class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
@@ -44,7 +34,7 @@ class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
     def execute(self, context):
         from ....core.city2graph import data, area_resolver
 
-        props = context.scene.city2graph
+        scene_props = context.scene.scigraphs
 
         try:
             area = area_resolver.resolve_area(context)
@@ -55,27 +45,28 @@ class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
         bbox = area['bbox']
         osmnx_obj = area['osmnx_obj']
 
-        types = _selected_feature_types(props)
-        if not types:
-            self.report({'ERROR'}, "No feature types selected")
-            return {'CANCELLED'}
-
         self.report({'INFO'}, f"Area: {area['source']}")
-        self.report({'INFO'}, f"Downloading Overture Maps polygons: {', '.join(types)}")
+        self.report({'INFO'}, f"Downloading {scene_props.feat_type} from {scene_props.feat_source}")
 
-        result = data.load_overture_data(
+        place_name = area.get('place_name') if scene_props.feat_source == 'OSMNX' else None
+
+        result = data.download_features(
             bbox,
-            types=types,
+            source=scene_props.feat_source,
+            feature_type=scene_props.feat_type,
+            custom_tags=scene_props.feat_custom_tags,
             osmnx_obj=osmnx_obj,
-            limit=props.c2g_overture_limit,
+            limit=scene_props.feat_limit,
+            nodes_only=scene_props.feat_nodes_only,
+            place_name=place_name,
         )
 
         if result is None or len(result) == 0:
             self.report({'ERROR'}, "No data downloaded")
             return {'CANCELLED'}
 
-        total_objects = sum(len(objs) for objs in result.values())
-        self.report({'INFO'}, f"Created {total_objects} object(s) from Overture Maps")
+        total_objects = len(_flatten_result_objects(result))
+        self.report({'INFO'}, f"Created {total_objects} feature object(s)")
 
         return {'FINISHED'}
 
@@ -103,7 +94,7 @@ class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
     def execute(self, context):
         from ....core.city2graph import data, area_resolver, utils
 
-        props = context.scene.city2graph
+        scene_props = context.scene.scigraphs
 
         try:
             area = area_resolver.resolve_area(context)
@@ -114,59 +105,40 @@ class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
         bbox = area['bbox']
         osmnx_obj = area['osmnx_obj']
 
-        types = _selected_feature_types(props)
-        if not types:
-            self.report({'ERROR'}, "No feature types selected")
-            return {'CANCELLED'}
-
         self.report({'INFO'}, f"Area: {area['source']}")
-        self.report({'INFO'}, f"Downloading as points: {', '.join(types)}")
+        self.report({'INFO'}, f"Downloading {scene_props.feat_type} as points from {scene_props.feat_source}")
 
-        # Always include 'place' for native points if any non-place type
-        # was selected; harmless when the user already enabled it.
-        non_place = [t for t in types if t != 'place']
+        place_name = area.get('place_name') if scene_props.feat_source == 'OSMNX' else None
 
-        # 1. Fetch native points (places).
-        result = {}
-        if 'place' in types:
-            place_data = data.load_overture_data(
-                bbox,
-                types=['place'],
-                osmnx_obj=osmnx_obj,
-                limit=props.c2g_overture_limit,
-            )
-            if place_data:
-                result.update(place_data)
-
-        # 2. Fetch the rest as their normal geometries and reduce to
-        #    representative points before materialising in Blender.
-        for ftype in non_place:
-            full = data.load_overture_data(
-                bbox,
-                types=[ftype],
-                osmnx_obj=osmnx_obj,
-                limit=props.c2g_overture_limit,
-            )
-            # ``load_overture_data`` already materialises the GDFs into
-            # Blender objects, so we don't have raw GDFs here. We
-            # post-process by converting the new objects to centroids
-            # and removing the originals.
-            if not full:
-                continue
-            for objs in full.values():
-                for obj in list(objs):
-                    centroid_obj = utils.mesh_to_centroids(obj)
-                    if centroid_obj is None:
-                        continue
-                    centroid_obj["c2g_point_source"] = ftype
-                    bpy.data.objects.remove(obj, do_unlink=True)
-                    result.setdefault(ftype, []).append(centroid_obj)
-
-        if not result:
+        full = data.download_features(
+            bbox,
+            source=scene_props.feat_source,
+            feature_type=scene_props.feat_type,
+            custom_tags=scene_props.feat_custom_tags,
+            osmnx_obj=osmnx_obj,
+            limit=scene_props.feat_limit,
+            nodes_only=scene_props.feat_nodes_only,
+            place_name=place_name,
+        )
+        objects = _flatten_result_objects(full)
+        if not objects:
             self.report({'ERROR'}, "No point features were created")
             return {'CANCELLED'}
 
-        total = sum(len(v) for v in result.values())
+        point_objects = []
+        for obj in list(objects):
+            centroid_obj = utils.mesh_to_centroids(obj)
+            if centroid_obj is None:
+                continue
+            centroid_obj["c2g_point_source"] = scene_props.feat_type
+            bpy.data.objects.remove(obj, do_unlink=True)
+            point_objects.append(centroid_obj)
+
+        if not point_objects:
+            self.report({'ERROR'}, "No point features were created")
+            return {'CANCELLED'}
+
+        total = len(point_objects)
         self.report({'INFO'}, f"Created {total} point object(s)")
         return {'FINISHED'}
 

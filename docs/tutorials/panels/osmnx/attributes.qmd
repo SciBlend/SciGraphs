@@ -1,0 +1,50 @@
+---
+title: "OSMnx · Add edge attributes"
+---
+
+::: {.lead}
+Enrich the Burjassot network with the edge attributes that routing, statistics
+and orientation analysis depend on: lengths, bearings, speeds and travel times.
+:::
+
+This walkthrough mirrors the
+[Network Attributes panel](../../panels/osmnx/attributes.qmd).
+
+## Before you begin
+
+Have a downloaded network active (see [Download a street network](download.qmd)).
+Projecting it first ([Clean up the graph](graph-operations.qmd)) is recommended.
+
+## 1. Edge lengths
+
+Press **Add Edge Lengths** to compute the geodesic length of every edge in
+meters. Fresh downloads already include lengths, but recompute them after any
+geometry edit.
+
+![Add Edge Lengths computes per-edge length in meters.](../../../assets/guides/osmnx/03-lengths.png)
+
+## 2. Edge speeds
+
+Press **Add Edge Speeds**. Where OSM provides a `maxspeed` tag it is used;
+otherwise the **Fallback Speed** field (default `30` km/h) applies.
+
+![Add Edge Speeds with a fallback of 30 km/h.](../../../assets/guides/osmnx/03-speeds.png)
+
+## 3. Travel times
+
+Press **Add Travel Times** to derive a `travel_time` attribute from length and
+speed. This unlocks time-based routing and isochrones.
+
+![Add Travel Times derives travel_time from length and speed.](../../../assets/guides/osmnx/03-travel-times.png)
+
+## 4. Edge bearings
+
+Press **Add Edge Bearings** to compute each edge's compass bearing (0–360°),
+required by the orientation entropy and rose in the
+[Statistics tutorial](statistics.qmd).
+
+![Add Edge Bearings computes per-edge compass bearings.](../../../assets/guides/osmnx/03-bearings.png)
+
+## Next steps
+
+With speeds and travel times in place, continue with [Find routes](routing.qmd).

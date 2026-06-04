@@ -1,0 +1,44 @@
+---
+title: "OSMnx · Save, export and cache"
+---
+
+::: {.lead}
+Persist the Burjassot network as GraphML, export it to GIS formats for external
+tools, and reuse downloads through the cache.
+:::
+
+This walkthrough mirrors the [Import/Export panel](../../panels/osmnx/io.qmd).
+
+## Before you begin
+
+Have a downloaded network active (see [Download a street network](download.qmd)).
+
+## 1. Save and load GraphML
+
+Set the **GraphML Path** and press **Save GraphML** to write the network in
+OSMnx's native format, preserving all attributes. Press **Load GraphML** to read
+one back in.
+
+![Saving the network to GraphML.](../../../assets/guides/osmnx/08-graphml.png)
+
+## 2. Export to GIS formats
+
+Set the **Export Format** — **GeoPackage**, **OSM XML**, **GraphML (Gephi)** or
+**SVG** — and press **Export**. GeoPackage is ideal for QGIS; GraphML (Gephi)
+for network-analysis tools.
+
+![Choosing an export format.](../../../assets/guides/osmnx/08-export.png)
+
+## 3. Use the cache
+
+Press **Save to Cache** to store the full graph object on disk. **View Cached
+Graphs** lists what is available, **Load from Cache** restores one instantly, and
+**Open Cache Directory** reveals the folder. This avoids re-downloading the same
+area.
+
+![The graph cache controls.](../../../assets/guides/osmnx/08-cache.png)
+
+## Next steps
+
+For the 3D terrain workflow, continue with
+[Elevation, DEM & 3D terrain](elevation.qmd).

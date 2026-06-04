@@ -50,9 +50,7 @@ accurate metric results.
 | **Node A / Node B** | The two nodes (eyedroppers pick them in the viewport). |
 | **Compute Distances** | Reports straight-line, network, and travel-time distances plus circuity. |
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Set/estimate the **Area** and **Compute Statistics**.
-2. Compute **Centrality** to drive node coloring/sizing.
-3. Use **Orientation Analysis** for street-grid morphology, and **Node-Pair
-   Distances** for point-to-point comparisons.
+For a worked example using Burjassot, follow
+[Compute statistics](../../tutorials/panels/osmnx/statistics.qmd).

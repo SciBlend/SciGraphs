@@ -4,6 +4,8 @@ Accessibility → Statistics → Features → Elevation → IO/Export."""
 import bpy
 import os
 
+from ..feature_selector import draw_feature_selector
+
 
 def _is_osmnx_obj(obj):
     """True if the given object is an imported OSMnx network."""
@@ -577,6 +579,8 @@ class SCIGRAPHS_PT_osmnx_features(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Download OSM Features", icon='MESH_DATA')
+
+        draw_feature_selector(layout, props, title="Feature Source & Tags")
 
         col = layout.column(align=True)
         col.label(text="Download by:")

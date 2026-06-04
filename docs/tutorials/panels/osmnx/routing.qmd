@@ -1,0 +1,63 @@
+---
+title: "OSMnx · Find routes"
+---
+
+::: {.lead}
+Compute shortest paths across the Burjassot network, generate alternative
+routes, summarize a route's metrics, and run many origin-destination pairs at
+once.
+:::
+
+This walkthrough mirrors the [Routing panel](../../panels/osmnx/routing.qmd).
+
+## Before you begin
+
+Download a `drive` network and add **Edge Speeds** and **Travel Times** (see
+[Add edge attributes](attributes.qmd)) so time-based routing works.
+
+## 1. Pick origin and destination
+
+In **Routing**, press the **Select Source** eyedropper and click a node in the
+viewport, then **Select Target** and click another. The node IDs appear in the
+panel.
+
+![Selecting source and target nodes with the eyedroppers.](../../../assets/guides/osmnx/04-select-od.png)
+
+## 2. Shortest path
+
+Set **Path Weight** to **length** and press **Shortest Path**. The route is
+highlighted and its distance is reported. Switch the weight to **travel_time**
+to optimize for time instead.
+
+![A shortest path highlighted across the network.](../../../assets/guides/osmnx/04-shortest-path.png)
+
+::: {.callout-note}
+The **elevation_impedance** weight needs edge grades; see the
+[Elevation tutorial](elevation.qmd).
+:::
+
+## 3. Alternative routes
+
+Set **K** (default `3`) and press **K Shortest Paths** to draw several distinct
+alternatives between the same endpoints.
+
+![Three alternative routes between the same endpoints.](../../../assets/guides/osmnx/04-k-shortest.png)
+
+## 4. Route summary
+
+Press **Route Summary** to report the active route's length, travel time, mean
+absolute grade and rise.
+
+![Route Summary reports length, time and grade.](../../../assets/guides/osmnx/04-route-summary.png)
+
+## 5. Batch routing
+
+Set **Random N** (number of OD pairs) and **Batch CPUs**, then press **Batch
+Routes** to sample and route many pairs at once, reporting aggregate statistics.
+
+![Batch routing many random OD pairs.](../../../assets/guides/osmnx/04-batch.png)
+
+## Next steps
+
+Continue with [Measure accessibility](accessibility.qmd) for isochrones and
+reachable-area analysis.

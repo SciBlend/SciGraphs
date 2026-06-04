@@ -28,9 +28,7 @@ Export as **JSON** + **Heterogeneous** for city2graph multi-type graphs
 into PyG without manual wiring.
 :::
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Build a graph with any City2Graph panel and select it.
-2. Choose the **Format** and **Type**, set an **Export Path**, then
-   **Export Graph**.
-3. **Save Loader Script** next to the exported file to load it in PyG.
+For a worked example using Burjassot, follow
+[Export for GeoAI](../../tutorials/panels/city2graph/export.qmd).

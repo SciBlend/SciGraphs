@@ -1,12 +1,15 @@
 ---
-title: "Tutorials"
+title: "Examples"
 ---
 
-These hands-on walkthroughs take you from raw data to a finished 3D
-visualization. Each one exercises a different part of SciGraphs and maps every
-step back to the panels documented in the [Panel Reference](../panels/overview.qmd).
+These end-to-end examples take you from raw data to a finished 3D
+visualization, each reproducing a figure or workflow from the SciGraphs paper.
+For panel-by-panel walkthroughs of every control, see the
+[Tutorials](../tutorials/panels/index.qmd) instead; each one exercises a
+different part of SciGraphs and maps every step back to the panels documented in
+the [Panel Reference](../panels/overview.qmd).
 
-| # | Tutorial | You will learn |
+| # | Example | You will learn |
 | --- | --- | --- |
 | 1 | [A combinatorial graph from a file](01-combinatorial-graph.qmd) | Import an edge list, lay it out, compute centrality and communities, and render. |
 | 2 | [A geospatial flow map on a globe](02-geospatial-globe.qmd) | Geocode nodes, project onto a 3D globe, and draw geodesic arcs (à la the refugee-flows figure). |
@@ -15,9 +18,10 @@ step back to the panels documented in the [Panel Reference](../panels/overview.q
 | 5 | [A reproducible pipeline](05-reproducible-pipeline.qmd) | Capture a whole workflow in a declarative file and replay it with provenance. |
 
 ::: {.callout-tip}
-If you are new to SciGraphs, start with tutorial 1, then read
+If you are new to SciGraphs, start with example 1, then read
 [The end-to-end workflow](../guide/pipeline.qmd) to see how the stages fit
-together.
+together. For a guided tour of a single panel, browse the
+[Tutorials](../tutorials/panels/index.qmd).
 :::
 
 ## Before you begin

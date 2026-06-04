@@ -1,0 +1,45 @@
+---
+title: "City2Graph · Map an OD matrix"
+---
+
+::: {.lead}
+Turn an external origin-destination flow matrix plus a zones layer into a spatial
+graph, with edges drawn between zone centroids and weighted by flow.
+:::
+
+This walkthrough mirrors the [Mobility panel](../../panels/city2graph/mobility.qmd).
+
+## Before you begin
+
+Prepare two things:
+
+- A **zones** object (polygons) with a unique ID column — load it in
+  [Import urban data](data.qmd) (**Load File**).
+- An **OD matrix** CSV (edgelist or adjacency) of flows between those zone IDs.
+
+## 1. Set the zones
+
+In **Mobility**, set the **Zones Object** and the **Zone ID Column** (e.g.
+`zone_id`) that matches the IDs in your matrix.
+
+![Selecting the zones object and ID column.](../../../assets/guides/city2graph/06-zones.png)
+
+## 2. Load the OD matrix
+
+Set the **OD Matrix Path**, choose the **Matrix Type** (**Edgelist** or
+**Adjacency**) and, for edgelists, the **Source**, **Target** and **Weight**
+columns. Press **Load OD Matrix**.
+
+![Loading the OD matrix and mapping its columns.](../../../assets/guides/city2graph/06-load-matrix.png)
+
+## 3. Build the OD graph
+
+Set a **Threshold** to drop weak flows and toggle **Directed**, then press **OD
+to Graph**. Edges are drawn between zone centroids and weighted by flow.
+
+![The OD flow graph between zone centroids.](../../../assets/guides/city2graph/06-od-graph.png)
+
+## Next steps
+
+Continue with [Post-process a graph](graph-tools.qmd) to filter, clip or build
+isochrones on any graph.

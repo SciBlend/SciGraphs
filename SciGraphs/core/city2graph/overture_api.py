@@ -184,13 +184,61 @@ def query_overture_buildings(bbox, limit=10000):
         return None
 
 
+def _place_category_text(value):
+    """Return a lowercase searchable string from an Overture category value.
+
+    Overture place features expose categories as a dict (``primary`` plus
+    ``alternate``), a list, or a plain string depending on the serialization.
+    This normalizes any of those shapes to a single lowercase string.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, dict):
+        parts = [value.get("primary", "")]
+        alternate = value.get("alternate")
+        if isinstance(alternate, (list, tuple)):
+            parts.extend(str(item) for item in alternate)
+        elif alternate:
+            parts.append(str(alternate))
+        return " ".join(str(part) for part in parts if part).lower()
+    if isinstance(value, (list, tuple)):
+        return " ".join(str(item) for item in value).lower()
+    return str(value).lower()
+
+
+def _filter_places_by_keywords(gdf, keywords):
+    """Filter a places GeoDataFrame to rows whose category matches a keyword."""
+    if not keywords:
+        return gdf
+
+    column = None
+    for candidate in ("categories", "category"):
+        if candidate in gdf.columns:
+            column = candidate
+            break
+    if column is None:
+        log("Places response has no category column; skipping category filter")
+        return gdf
+
+    lowered = [kw.lower() for kw in keywords]
+
+    def _matches(value):
+        text = _place_category_text(value)
+        return any(kw in text for kw in lowered)
+
+    filtered = gdf[gdf[column].apply(_matches)]
+    log(f"Filtered places by categories {lowered}: {len(filtered)}/{len(gdf)} kept")
+    return filtered
+
+
 def query_overture_places(bbox, categories=None, limit=10000):
     """
     Query places (POIs) from Overture Maps.
     
     Args:
         bbox: Tuple of (north, south, east, west) coordinates
-        categories: Optional list of place categories to filter
+        categories: Optional list of category keywords; places whose category
+            contains any keyword are kept (client-side filter)
         limit: Max features to request from the API
     
     Returns:
@@ -212,9 +260,6 @@ def query_overture_places(bbox, categories=None, limit=10000):
         "radius": int(radius_m),
         "limit": int(limit) if limit and limit > 0 else 10000,
     }
-    
-    if categories:
-        params["categories"] = ",".join(categories)
     
     geojson = _make_api_request("/places", params)
     
@@ -250,6 +295,9 @@ def query_overture_places(bbox, categories=None, limit=10000):
                 (gdf.geometry.x <= east)
             )
             gdf = gdf[bounds_filter]
+            
+            if categories:
+                gdf = _filter_places_by_keywords(gdf, categories)
             
             log(f"Retrieved {len(gdf)} places")
             return gdf

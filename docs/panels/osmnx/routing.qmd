@@ -43,10 +43,7 @@ Requires an active OSMnx graph. Travel-time weighting requires travel times from
 | **CPU Cores (0=auto)** | Parallel workers for the batch. |
 | **Run Batch Routing** | Routes all pairs; reports the reached fraction and mean distance. |
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Pick **Source** and **Target** (eyedroppers), and a **Minimize** weight.
-2. **Calculate Path**, then **Summarize** / **Elevation Profile** for terrain
-   insight.
-3. Use **K Alternatives** for route variety, or **Batch** for network-wide
-   reachability statistics.
+For a worked example using Burjassot, follow
+[Find routes](../../tutorials/panels/osmnx/routing.qmd).

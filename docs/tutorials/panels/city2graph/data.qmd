@@ -1,0 +1,58 @@
+---
+title: "City2Graph · Import urban data"
+---
+
+::: {.lead}
+Bring urban features into City2Graph for Burjassot: Overture buildings and
+places, local GIS files, and GTFS public-transport feeds.
+:::
+
+This walkthrough mirrors the [Data Import panel](../../panels/city2graph/data.qmd).
+
+## Before you begin
+
+Open the **City2Graph** tab. To align downloads with an existing street network,
+keep an OSMnx network active and use **From OSMnx** as the area method.
+
+## 1. Define the area
+
+In **Data Import**, set **Define Area**. The simplest option is **Place** with
+`Burjassot, Valencia, Spain`. Other methods (**From OSMnx**, **Point**,
+**Address**, **BBox**, **Polygon**) reuse the OSMnx area fields.
+
+![Defining the Burjassot area in Data Import.](../../../assets/guides/city2graph/01-define-area.png)
+
+## 2. Download Overture features
+
+Toggle the **Overture** layers you need — **building**, **segment**, **place**,
+**water**, **land** — and set a **Limit**. Press **Get as Mesh** for footprints,
+or **Get as Points** to create point nodes directly.
+
+![Selecting Overture layers and downloading.](../../../assets/guides/city2graph/01-overture.png)
+
+## 3. Convert to centroids
+
+Press **Convert to Centroids** to reduce polygon footprints to one point each —
+the node representation that proximity graphs expect.
+
+![Converting building footprints to centroids.](../../../assets/guides/city2graph/01-centroids.png)
+
+## 4. Load a local file
+
+Press **Load File** and pick a GeoPackage, Shapefile or GeoJSON to import your
+own zones or features.
+
+![Loading a local GIS file.](../../../assets/guides/city2graph/01-load-file.png)
+
+## 5. Import GTFS
+
+Set the **GTFS Path** (a São Paulo feed ships under `examples/GTFS/`) and press
+**Import GTFS**. Then **Visualize GTFS** to draw stops and routes.
+
+![Importing and visualizing a GTFS feed.](../../../assets/guides/city2graph/01-gtfs.png)
+
+## Next steps
+
+With features in hand, continue with
+[Build a morphological graph](morphology.qmd) or
+[Build proximity graphs](proximity.qmd).

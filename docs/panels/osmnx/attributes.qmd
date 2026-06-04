@@ -28,9 +28,7 @@ Requires an active OSMnx graph. Project the graph first
 | **Add Speeds** | Infer edge speeds (re-runnable as **Recalculate Speeds**). |
 | **Add Travel Times** | Compute travel times from speeds. Disabled until speeds exist. |
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. **Add Lengths** (and **Bearings** for orientation analysis).
-2. **Add Speeds**, optionally adjusting the **Fallback Speed**.
-3. **Add Travel Times**, which unlocks travel-time weighting in
-   [Routing & Paths](routing.qmd).
+For a worked example using Burjassot, follow
+[Add edge attributes](../../tutorials/panels/osmnx/attributes.qmd).

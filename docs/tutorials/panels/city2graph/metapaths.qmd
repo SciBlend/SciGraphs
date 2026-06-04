@@ -1,0 +1,55 @@
+---
+title: "City2Graph · Analyze metapaths"
+---
+
+::: {.lead}
+Connect Burjassot amenities through the street network using metapaths: build a
+street dual graph, bridge amenities to segments, and materialize
+amenity-to-amenity relations by hop count or by weight.
+:::
+
+This walkthrough mirrors the
+[Metapath Analysis panel](../../panels/city2graph/metapaths.qmd).
+
+## Before you begin
+
+Have a `drive` (or `walk`) street network and an amenities feature object active
+(see [Import urban data](data.qmd)).
+
+## 1. Configure the analysis
+
+In **Metapath Analysis**, set the **Amenities Object**, the **K Neighbors**
+(how many segments each amenity bridges to, default `1`) and an **Amenity
+Limit** to cap large areas.
+
+![Configuring the amenities object and parameters.](../../../assets/guides/city2graph/04-config.png)
+
+## 2. Materialize by hops
+
+Expand **Materialize by Hops**, set **Hops** (default `3`) and press **Compute
+Metapaths**. This builds the street dual graph, bridges amenities to their
+nearest segments, and connects amenities reachable within that many segment
+hops.
+
+![Amenity-to-amenity metapaths within 3 hops.](../../../assets/guides/city2graph/04-hops.png)
+
+## 3. Materialize by weight
+
+Expand **Materialize by Weight**, set the **Weight Attr** (e.g. `length`), a
+**Threshold** and an optional **Min Threshold**, choose the **Endpoint Type**,
+and press **Compute by Weight**. Amenities within the cost band are connected
+using a Dijkstra search.
+
+![Weighted metapaths within a cost band.](../../../assets/guides/city2graph/04-weight.png)
+
+## 4. Inspect and visualize
+
+In **Result & Inspect**, press **Convert to Mesh** to draw the metapath curves in
+the viewport, where edge multiplicity reflects how many distinct paths connect
+each amenity pair.
+
+![Metapath curves drawn in the viewport.](../../../assets/guides/city2graph/04-mesh.png)
+
+## Next steps
+
+Continue with [Model public transport](transportation.qmd) for GTFS-based graphs.

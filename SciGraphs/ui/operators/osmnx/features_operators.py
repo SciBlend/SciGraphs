@@ -1,41 +1,13 @@
 import bpy
 from bpy.props import StringProperty, EnumProperty, FloatProperty, IntProperty, BoolProperty
 
+from ....core.feature_tags import FEATURE_TYPE_ITEMS, tags_from_preset
 from ....core.mesh.geo_mesh import create_feature_mesh_from_gdf as _create_feature_mesh_from_gdf
-
-
-# Shared tag presets (used by From-Address / From-Polygon / From-XML).
-# Covers the most common OSM categories referenced across the notebooks.
-FEATURE_TAG_PRESETS = {
-    'BUILDING':          {"building": True},
-    'AMENITY':           {"amenity": True},
-    'RESTAURANT':        {"amenity": ["restaurant"]},
-    'SHOP':              {"shop": True},
-    'LEISURE':           {"leisure": True},
-    'PARKING':           {"amenity": ["parking"]},
-    'BUS_STOP':          {"highway": ["bus_stop"]},
-    'RAIL_STATION':      {"railway": ["station", "halt", "stop", "tram_stop"]},
-    'PARK':              {"leisure": ["park", "garden", "nature_reserve", "playground"]},
-    'EDUCATION':         {"amenity": ["school", "university", "college", "kindergarten", "library"]},
-    'HEALTH':            {"amenity": ["hospital", "clinic", "doctors", "pharmacy", "dentist"]},
-    'AMENITY_METAPATH':  {"amenity": ["cafe", "restaurant", "pub", "bar", "museum", "theatre", "cinema"]},
-    'LANDUSE':           {"landuse": True},
-    'NATURAL':           {"natural": True},
-    'WATER':             {"natural": ["water"]},
-    'HIGHWAY':           {"highway": True},
-}
 
 
 def _tags_from_preset(preset, custom_tags_str=""):
     """Resolve a preset enum (or 'CUSTOM') to an OSM tags dict."""
-    if preset != 'CUSTOM':
-        return dict(FEATURE_TAG_PRESETS.get(preset, {"building": True}))
-    tags = {}
-    for pair in custom_tags_str.split(','):
-        if '=' in pair:
-            key, value = pair.split('=', 1)
-            tags[key.strip()] = value.strip()
-    return tags
+    return tags_from_preset(preset, custom_tags_str)
 
 
 def _find_osmnx_object(context):
@@ -47,6 +19,31 @@ def _find_osmnx_object(context):
         if o.get("is_osmnx", False):
             return o
     return None
+
+
+def _download_overture_from_bbox(context, bbox, feature_type, custom_tags, operator):
+    """Run the shared Overture/City2Graph import path for OSMnx area shortcuts."""
+    props = context.scene.scigraphs
+    if props.feat_source != 'OVERTURE':
+        return None
+
+    from ....core.city2graph import data
+
+    result = data.download_features(
+        bbox,
+        source='OVERTURE',
+        feature_type=feature_type,
+        custom_tags=custom_tags,
+        osmnx_obj=_find_osmnx_object(context),
+        limit=props.feat_limit,
+    )
+    if not result:
+        operator.report({'ERROR'}, "No features found")
+        return {'CANCELLED'}
+
+    total = sum(len(objects) for objects in result.values())
+    operator.report({'INFO'}, f"Created {total} feature object(s)")
+    return {'FINISHED'}
 
 
 class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
@@ -64,8 +61,7 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
     
     feature_type: EnumProperty(
         name="Feature Type",
-        items=[(k, k.replace('_', ' ').title(), "") for k in FEATURE_TAG_PRESETS]
-            + [('CUSTOM', "Custom Tags", "Use custom OSM tags")],
+        items=FEATURE_TYPE_ITEMS,
         default='BUILDING',
     )
     
@@ -93,6 +89,14 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
         if not tags:
             self.report({'ERROR'}, "No tags specified")
             return {'CANCELLED'}
+
+        if context.scene.scigraphs.feat_source == 'OVERTURE':
+            from ....core.city2graph.area_resolver import _geocode_place_bbox
+            result = _download_overture_from_bbox(
+                context, _geocode_place_bbox(self.place), self.feature_type, self.custom_tags, self,
+            )
+            if result is not None:
+                return result
         
         self.report({'INFO'}, f"Downloading features from {self.place}...")
         
@@ -164,8 +168,9 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
     def invoke(self, context, event):
         props = context.scene.scigraphs
         self.place = props.osmnx_features_place or props.osmnx_place_name
-        self.feature_type = props.osmnx_feature_type
-        self.custom_tags = props.osmnx_custom_tags
+        self.feature_type = props.feat_type
+        self.custom_tags = props.feat_custom_tags
+        self.filter_nodes_only = props.feat_nodes_only
         return context.window_manager.invoke_props_dialog(self)
 
 
@@ -204,8 +209,7 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
     
     feature_type: EnumProperty(
         name="Feature Type",
-        items=[(k, k.replace('_', ' ').title(), "") for k in FEATURE_TAG_PRESETS]
-            + [('CUSTOM', "Custom Tags", "Custom key=value,...")],
+        items=FEATURE_TYPE_ITEMS,
         default='BUILDING',
     )
 
@@ -226,6 +230,15 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
         if not tags:
             self.report({'ERROR'}, "No tags specified")
             return {'CANCELLED'}
+
+        if context.scene.scigraphs.feat_source == 'OVERTURE':
+            from ....core.city2graph.area_resolver import _bbox_from_radius
+            result = _download_overture_from_bbox(
+                context, _bbox_from_radius(self.latitude, self.longitude, self.distance),
+                self.feature_type, self.custom_tags, self,
+            )
+            if result is not None:
+                return result
         
         self.report({'INFO'}, f"Downloading features...")
         
@@ -299,8 +312,9 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
         self.latitude = props.osmnx_latitude
         self.longitude = props.osmnx_longitude
         self.distance = props.osmnx_features_distance
-        self.feature_type = props.osmnx_feature_type
-        self.custom_tags = props.osmnx_custom_tags
+        self.feature_type = props.feat_type
+        self.custom_tags = props.feat_custom_tags
+        self.filter_nodes_only = props.feat_nodes_only
         return context.window_manager.invoke_props_dialog(self)
 
 
@@ -313,8 +327,7 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
     
     feature_type: EnumProperty(
         name="Feature Type",
-        items=[(k, k.replace('_', ' ').title(), "") for k in FEATURE_TAG_PRESETS]
-            + [('CUSTOM', "Custom Tags", "Custom key=value,...")],
+        items=FEATURE_TYPE_ITEMS,
         default='BUILDING',
     )
 
@@ -322,8 +335,8 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
 
     def invoke(self, context, event):
         props = context.scene.scigraphs
-        self.feature_type = props.osmnx_feature_type
-        self.custom_tags = props.osmnx_custom_tags
+        self.feature_type = props.feat_type
+        self.custom_tags = props.feat_custom_tags
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
@@ -337,6 +350,12 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
         if not tags:
             self.report({'ERROR'}, "No tags specified")
             return {'CANCELLED'}
+
+        result = _download_overture_from_bbox(
+            context, bbox, self.feature_type, self.custom_tags, self,
+        )
+        if result is not None:
+            return result
         
         self.report({'INFO'}, f"Downloading features...")
         
@@ -411,8 +430,7 @@ class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
 
     feature_preset: EnumProperty(
         name="Feature Preset",
-        items=[(k, k.replace('_', ' ').title(), "") for k in FEATURE_TAG_PRESETS]
-            + [('CUSTOM', "Custom Tags", "Custom key=value,...")],
+        items=FEATURE_TYPE_ITEMS,
         default='BUILDING',
     )
 
@@ -422,9 +440,8 @@ class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
         props = context.scene.scigraphs
         self.address = props.osmnx_geocode_address or props.osmnx_address
         self.distance = props.osmnx_features_distance
-        if props.osmnx_feature_type in FEATURE_TAG_PRESETS or props.osmnx_feature_type == 'CUSTOM':
-            self.feature_preset = props.osmnx_feature_type
-        self.custom_tags = props.osmnx_custom_tags
+        self.feature_preset = props.feat_type
+        self.custom_tags = props.feat_custom_tags
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
@@ -438,6 +455,16 @@ class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
         if not tags:
             self.report({'ERROR'}, "No tags specified")
             return {'CANCELLED'}
+
+        if context.scene.scigraphs.feat_source == 'OVERTURE':
+            from ....core.city2graph.area_resolver import _bbox_from_radius, _geocode_place_bbox
+            n, s, e, w = _geocode_place_bbox(self.address)
+            result = _download_overture_from_bbox(
+                context, _bbox_from_radius((n + s) / 2.0, (e + w) / 2.0, self.distance),
+                self.feature_preset, self.custom_tags, self,
+            )
+            if result is not None:
+                return result
 
         gdf = features.features_from_address(self.address, tags, dist=self.distance)
         if gdf is None or len(gdf) == 0:
@@ -473,8 +500,7 @@ class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
 
     feature_preset: EnumProperty(
         name="Feature Preset",
-        items=[(k, k.replace('_', ' ').title(), "") for k in FEATURE_TAG_PRESETS]
-            + [('CUSTOM', "Custom Tags", "Custom key=value,...")],
+        items=FEATURE_TYPE_ITEMS,
         default='BUILDING',
     )
 
@@ -486,9 +512,8 @@ class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
 
     def invoke(self, context, event):
         props = context.scene.scigraphs
-        if props.osmnx_feature_type in FEATURE_TAG_PRESETS or props.osmnx_feature_type == 'CUSTOM':
-            self.feature_preset = props.osmnx_feature_type
-        self.custom_tags = props.osmnx_custom_tags
+        self.feature_preset = props.feat_type
+        self.custom_tags = props.feat_custom_tags
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
@@ -519,6 +544,16 @@ class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
         if not tags:
             self.report({'ERROR'}, "No tags specified")
             return {'CANCELLED'}
+
+        result = _download_overture_from_bbox(
+            context,
+            (max(y for _x, y in verts), min(y for _x, y in verts), max(x for x, _y in verts), min(x for x, _y in verts)),
+            self.feature_preset,
+            self.custom_tags,
+            self,
+        )
+        if result is not None:
+            return result
 
         gdf = features.features_from_polygon(polygon, tags)
         if gdf is None or len(gdf) == 0:
@@ -555,14 +590,16 @@ class SCIGRAPHS_OT_FeaturesFromXML(bpy.types.Operator):
 
     feature_preset: EnumProperty(
         name="Feature Preset",
-        items=[(k, k.replace('_', ' ').title(), "") for k in FEATURE_TAG_PRESETS]
-            + [('CUSTOM', "Custom Tags", "Custom key=value,...")],
+        items=FEATURE_TYPE_ITEMS,
         default='BUILDING',
     )
 
     custom_tags: StringProperty(name="Custom Tags", default="")
 
     def invoke(self, context, event):
+        props = context.scene.scigraphs
+        self.feature_preset = props.feat_type
+        self.custom_tags = props.feat_custom_tags
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 

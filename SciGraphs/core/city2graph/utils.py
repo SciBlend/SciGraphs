@@ -14,7 +14,7 @@ def _copy_projection_metadata(src, dst):
     keys = (
         "c2g_center_lat", "c2g_center_lon", "c2g_scale",
         "osmnx_center_lat", "osmnx_center_lon", "osmnx_scale",
-        "is_city2graph",
+        "is_city2graph", "is_osm_features",
     )
     for key in keys:
         if key in src:
@@ -104,6 +104,7 @@ def mesh_to_centroids(obj, name=None, collection_name=None):
     target_coll.objects.link(new_obj)
 
     _copy_projection_metadata(obj, new_obj)
+    new_obj["feature_count"] = len(centroids)
     new_obj["c2g_geometry_kind"] = "POINT"
     new_obj["c2g_derived_from"] = obj.name
     # Centroids are a fresh geometry; never inherit the source GDF.
@@ -563,10 +564,9 @@ def filter_graph_by_distance(graph, center, threshold, nodes=None, edges=None):
     
     try:
         from city2graph.utils import filter_graph_by_distance as c2g_filter
-        
+
         log(f"Filtering graph by distance: threshold={threshold}")
-        return c2g_filter(graph=graph, center=center, threshold=threshold,
-                         nodes=nodes, edges=edges)
+        return c2g_filter(graph=graph, center_point=center, threshold=threshold)
     except Exception as e:
         log(f"Error in filter_graph_by_distance: {e}")
         return None
@@ -596,9 +596,9 @@ def create_isochrone(graph, center, threshold, weight="length"):
     
     try:
         from city2graph.utils import create_isochrone as c2g_isochrone
-        
+
         log(f"Creating isochrone: threshold={threshold}, weight={weight}")
-        return c2g_isochrone(graph=graph, center=center, threshold=threshold, weight=weight)
+        return c2g_isochrone(graph=graph, center_point=center, threshold=threshold, edge_attr=weight)
     except Exception as e:
         log(f"Error in create_isochrone: {e}")
         return None
@@ -627,9 +627,9 @@ def clip_graph(graph, polygon, nodes=None, edges=None):
     
     try:
         from city2graph.utils import clip_graph as c2g_clip
-        
+
         log("Clipping graph to polygon")
-        return c2g_clip(graph=graph, polygon=polygon, nodes=nodes, edges=edges)
+        return c2g_clip(graph=graph, area=polygon, as_nx=True)
     except Exception as e:
         log(f"Error in clip_graph: {e}")
         return None
@@ -657,9 +657,9 @@ def remove_isolated_components(graph, nodes=None, edges=None):
     
     try:
         from city2graph.utils import remove_isolated_components as c2g_remove
-        
+
         log("Removing isolated components")
-        return c2g_remove(graph=graph, nodes=nodes, edges=edges)
+        return c2g_remove(graph, as_nx=True)
     except Exception as e:
         log(f"Error in remove_isolated_components: {e}")
         return None

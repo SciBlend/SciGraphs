@@ -1,0 +1,67 @@
+---
+title: "OSMnx · Download a street network"
+---
+
+::: {.lead}
+Download the Burjassot street network from OpenStreetMap and turn it into an
+editable Blender graph object. This is the starting point for every other OSMnx
+tutorial.
+:::
+
+This walkthrough mirrors the [Download panel](../../panels/osmnx/download.qmd).
+
+## Before you begin
+
+- Enable SciGraphs and open the 3D Viewport sidebar with `N`.
+- Make sure Blender has internet access (OSM downloads happen live).
+- Open the **OSMnx** tab.
+
+## 1. Choose the download method
+
+Expand **Download** and set the **Download Method** to **Place**. This geocodes
+an administrative boundary and clips the network to it — the simplest and most
+reproducible option.
+
+![The OSMnx Download panel with Download Method set to Place.](../../../assets/guides/osmnx/01-download-method.png)
+
+## 2. Enter the place name
+
+In **Place Name**, type:
+
+```
+Burjassot, Valencia, Spain
+```
+
+If a place is ambiguous, increase **Which Result** to pick a different geocoding
+candidate.
+
+![Entering the Burjassot place name.](../../../assets/guides/osmnx/01-download-place-name.png)
+
+## 3. Set the network type and options
+
+- **Network Type**: `drive` (vehicular streets). Other options include `walk`,
+  `bike`, `all` and `all_public`.
+- Leave **Simplify** on to merge interstitial nodes into clean edges.
+- Keep **Retain Geometry** and **Truncate by Edge** on; leave **Retain All** off
+  so disconnected fragments are dropped.
+
+![Network type and download options.](../../../assets/guides/osmnx/01-download-options.png)
+
+## 4. Download
+
+Press **Download Graph**. After a few seconds the network appears in the
+viewport as a graph object, and the panel header shows the node and edge counts.
+
+![The Burjassot drive network in the viewport.](../../../assets/guides/osmnx/01-download-result.png)
+
+::: {.callout-tip}
+Need a fixed radius instead of a boundary? Switch the **Download Method** to
+**Point** and set **Latitude/Longitude** and **Distance**, or **Address** and
+**Distance**. The other methods (**BBox**, **Polygon**, **XML**) follow the same
+pattern.
+:::
+
+## Next steps
+
+Continue with [Clean up the graph](graph-operations.qmd) to project the network
+to a metric CRS and remove disconnected fragments.

@@ -60,12 +60,7 @@ At least one relation must be enabled.
 
 Select the **buildings + street network**, then run **Morphological Graph**.
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. In [Data Import](data.qmd), download **buildings** and **segments**, and run
-   **Process Segments**.
-2. Optionally **Segments → Graph** for a pure street graph.
-3. **Generate Tessellation** around the buildings.
-4. Set the center, radius, and contiguity, choose the **relations**, then build
-   the **Morphological Graph**.
-5. Continue with [Graph Tools](graph-tools.qmd) or [GeoAI Export](export.qmd).
+For a worked example using Burjassot, follow
+[Build a morphological graph](../../tutorials/panels/city2graph/morphology.qmd).

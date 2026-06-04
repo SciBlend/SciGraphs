@@ -23,10 +23,7 @@ The info box below the parameters restates what the selected tool will do before
 you apply it.
 :::
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Select the graph object to operate on.
-2. Pick a **Tool** and fill in its parameters.
-3. **Apply**. Run **Remove Isolated** first when a graph has stray fragments,
-   then **Clip** or **Filter** to focus on an area, and **Isochrone** for
-   reachability analysis.
+For a worked example using Burjassot, follow
+[Post-process a graph](../../tutorials/panels/city2graph/graph-tools.qmd).

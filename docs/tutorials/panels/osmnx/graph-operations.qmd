@@ -1,0 +1,65 @@
+---
+title: "OSMnx · Clean up the graph"
+---
+
+::: {.lead}
+Project the Burjassot network to a metric CRS, convert between graph
+representations, consolidate intersections, and trim the network to a study
+area.
+:::
+
+This walkthrough mirrors the
+[Graph Operations panel](../../panels/osmnx/graph-operations.qmd).
+
+## Before you begin
+
+Download a network first (see [Download a street network](download.qmd)) and
+keep it active.
+
+## 1. Project to a metric CRS
+
+Fresh downloads are in geographic coordinates (degrees). In **Graph
+Operations**, press **Project Graph** to reproject to a local UTM zone so that
+lengths and areas are in meters.
+
+![Project Graph reprojects the network to UTM.](../../../assets/guides/osmnx/02-project.png)
+
+## 2. Convert representations
+
+Use the conversion buttons as your analysis requires:
+
+- **To Undirected** — collapse two-way streets into single edges (needed for
+  orientation statistics).
+- **To DiGraph** — a simple directed graph keyed by `length`.
+- **Graph → GDFs** / **GDFs → Graph** — round-trip through GeoDataFrames for
+  external editing.
+
+![The conversion buttons.](../../../assets/guides/osmnx/02-convert.png)
+
+## 3. Consolidate intersections
+
+Complex junctions are often modelled as several nearby nodes. Set the
+**Tolerance** (default `10` m) and press **Consolidate Intersections** to merge
+them into single nodes — useful before centrality analysis.
+
+![Consolidating intersections with a 10 m tolerance.](../../../assets/guides/osmnx/02-consolidate.png)
+
+## 4. Truncate to a study area
+
+- **Truncate by Distance** — keep only nodes within a network distance of a
+  source node.
+- **Truncate by BBox / Polygon** — clip to a rectangle or a polygon object.
+
+![Truncating the network by distance from a source node.](../../../assets/guides/osmnx/02-truncate.png)
+
+## 5. Keep the largest component
+
+Press **Largest Component** to drop disconnected fragments and keep one
+contiguous network.
+
+![Largest Component removes disconnected fragments.](../../../assets/guides/osmnx/02-largest-component.png)
+
+## Next steps
+
+Continue with [Add edge attributes](attributes.qmd) to compute lengths, speeds
+and travel times.

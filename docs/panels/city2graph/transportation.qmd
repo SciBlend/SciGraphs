@@ -37,10 +37,7 @@ Big feeds can produce millions of OD pairs. Setting **Top N Pairs** to `0`
 (no limit) can exhaust memory — a warning appears when it is unset.
 :::
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. In [Data Import](data.qmd), set the **GTFS File** and **Import GTFS**.
-2. Choose a **calendar window** (or All) and build the **Travel Summary Graph**.
-3. Optionally aggregate trips into a **GTFS OD Graph**, capping **Top N Pairs**.
-4. Refine and export with [Graph Tools](graph-tools.qmd) and
-   [GeoAI Export](export.qmd).
+For a worked example, follow
+[Model public transport](../../tutorials/panels/city2graph/transportation.qmd).

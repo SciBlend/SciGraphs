@@ -14,7 +14,7 @@ about:
       href: https://sciblend.github.io/SciGraphs/guide/introduction.html
     - icon: mortarboard
       text: Tutorials
-      href: https://sciblend.github.io/SciGraphs/tutorials/index.html
+      href: https://sciblend.github.io/SciGraphs/tutorials/panels/index.html
 ---
 
 **SciGraphs** is an open-source Blender extension that brings graph ingestion,
@@ -59,9 +59,9 @@ A usage guide for every panel and subpanel in the sidebar.
 
 ::: {.g-col-12 .g-col-md-4}
 ### Tutorials
-Hands-on, end-to-end walkthroughs of real scenarios.
+Step-by-step walkthroughs of each panel, plus end-to-end examples.
 
-[Start a tutorial →](tutorials/index.qmd)
+[Start a tutorial →](tutorials/panels/index.qmd)
 :::
 
 :::

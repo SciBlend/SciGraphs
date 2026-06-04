@@ -23,7 +23,9 @@ website:
       - text: "Panel Reference"
         href: panels/overview.qmd
       - text: "Tutorials"
-        href: tutorials/index.qmd
+        href: tutorials/panels/index.qmd
+      - text: "Examples"
+        href: examples/index.qmd
     right:
       - icon: github
         href: https://github.com/SciBlend/SciGraphs
@@ -76,12 +78,36 @@ website:
               - panels/city2graph/export.qmd
       - section: "Tutorials"
         contents:
-          - tutorials/index.qmd
-          - tutorials/01-combinatorial-graph.qmd
-          - tutorials/02-geospatial-globe.qmd
-          - tutorials/03-urban-terrain.qmd
-          - tutorials/04-sparse-matrix.qmd
-          - tutorials/05-reproducible-pipeline.qmd
+          - tutorials/panels/index.qmd
+          - section: "OSMnx panels"
+            contents:
+              - tutorials/panels/osmnx/download.qmd
+              - tutorials/panels/osmnx/graph-operations.qmd
+              - tutorials/panels/osmnx/attributes.qmd
+              - tutorials/panels/osmnx/routing.qmd
+              - tutorials/panels/osmnx/accessibility.qmd
+              - tutorials/panels/osmnx/statistics.qmd
+              - tutorials/panels/osmnx/features.qmd
+              - tutorials/panels/osmnx/io.qmd
+              - tutorials/panels/osmnx/elevation.qmd
+          - section: "City2Graph panels"
+            contents:
+              - tutorials/panels/city2graph/data.qmd
+              - tutorials/panels/city2graph/morphology.qmd
+              - tutorials/panels/city2graph/proximity.qmd
+              - tutorials/panels/city2graph/metapaths.qmd
+              - tutorials/panels/city2graph/transportation.qmd
+              - tutorials/panels/city2graph/mobility.qmd
+              - tutorials/panels/city2graph/graph-tools.qmd
+              - tutorials/panels/city2graph/export.qmd
+      - section: "Examples"
+        contents:
+          - examples/index.qmd
+          - examples/01-combinatorial-graph.qmd
+          - examples/02-geospatial-globe.qmd
+          - examples/03-urban-terrain.qmd
+          - examples/04-sparse-matrix.qmd
+          - examples/05-reproducible-pipeline.qmd
   page-footer:
     left: "SciGraphs is released under the GPL-3.0-or-later license."
     right:

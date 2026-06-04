@@ -55,8 +55,7 @@ metric values are accurate.
 | **Truncate by Distance** | Clip to a distance from a center. |
 | **Keep Largest Component** | Discard all but the largest connected component. |
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. **Project to CRS** immediately after download.
-2. Optionally **Simplify** / **Consolidate Intersections** to clean topology.
-3. **Truncate** or **Keep Largest Component** to focus the area of interest.
+For a worked example using Burjassot, follow
+[Clean up the graph](../../tutorials/panels/osmnx/graph-operations.qmd).

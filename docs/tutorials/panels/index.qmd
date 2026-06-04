@@ -1,0 +1,53 @@
+---
+title: "Panel tutorials"
+---
+
+::: {.lead}
+Step-by-step walkthroughs of every OSMnx and City2Graph panel, each following a
+concrete case so you can reproduce the result button by button. These are the
+worked "typical workflows" referenced from the
+[Panel Reference](../../panels/overview.qmd).
+:::
+
+Every tutorial mirrors one panel and ends where the next one begins, so you can
+chain them into a full pipeline.
+
+## Example areas
+
+| Area | Used for | Why |
+| --- | --- | --- |
+| **Burjassot, Valencia (Spain)** | Every panel except elevation | Compact, well-connected urban area with rich amenities. |
+| **Avenida de las Naciones Unidas, La Paz (Bolivia)** — 2 km radius | [Elevation, DEM & 3D terrain](osmnx/elevation.qmd) | Strong relief makes DEMs, node elevations and street grades clearly visible. |
+
+## OSMnx panels
+
+| # | Tutorial | Panel |
+| --- | --- | --- |
+| 1 | [Download a street network](osmnx/download.qmd) | [Download](../../panels/osmnx/download.qmd) |
+| 2 | [Clean up the graph](osmnx/graph-operations.qmd) | [Graph Operations](../../panels/osmnx/graph-operations.qmd) |
+| 3 | [Add edge attributes](osmnx/attributes.qmd) | [Network Attributes](../../panels/osmnx/attributes.qmd) |
+| 4 | [Find routes](osmnx/routing.qmd) | [Routing](../../panels/osmnx/routing.qmd) |
+| 5 | [Measure accessibility](osmnx/accessibility.qmd) | [Accessibility](../../panels/osmnx/accessibility.qmd) |
+| 6 | [Compute statistics](osmnx/statistics.qmd) | [Statistics](../../panels/osmnx/statistics.qmd) |
+| 7 | [Download features (POIs)](osmnx/features.qmd) | [Features](../../panels/osmnx/features.qmd) |
+| 8 | [Save, export and cache](osmnx/io.qmd) | [Import/Export](../../panels/osmnx/io.qmd) |
+| 9 | [Elevation, DEM & 3D terrain](osmnx/elevation.qmd) | [Elevation](../../panels/osmnx/elevation.qmd) |
+
+## City2Graph panels
+
+| # | Tutorial | Panel |
+| --- | --- | --- |
+| 1 | [Import urban data](city2graph/data.qmd) | [Data Import](../../panels/city2graph/data.qmd) |
+| 2 | [Build a morphological graph](city2graph/morphology.qmd) | [Urban Morphology](../../panels/city2graph/morphology.qmd) |
+| 3 | [Build proximity graphs](city2graph/proximity.qmd) | [Proximity Graphs](../../panels/city2graph/proximity.qmd) |
+| 4 | [Analyze metapaths](city2graph/metapaths.qmd) | [Metapath Analysis](../../panels/city2graph/metapaths.qmd) |
+| 5 | [Model public transport](city2graph/transportation.qmd) | [Transportation](../../panels/city2graph/transportation.qmd) |
+| 6 | [Map an OD matrix](city2graph/mobility.qmd) | [Mobility](../../panels/city2graph/mobility.qmd) |
+| 7 | [Post-process a graph](city2graph/graph-tools.qmd) | [Graph Tools](../../panels/city2graph/graph-tools.qmd) |
+| 8 | [Export for GeoAI](city2graph/export.qmd) | [Export](../../panels/city2graph/export.qmd) |
+
+::: {.callout-tip}
+New to the add-on? Enable SciGraphs (see [Installation](../../guide/installation.qmd)),
+open the 3D Viewport sidebar with `N`, and start with
+[Download a street network](osmnx/download.qmd).
+:::

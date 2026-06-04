@@ -62,12 +62,10 @@ basemaps (below) require their own keys.
 | **Clear** | Remove the applied basemap. |
 
 This panel powers the
-[urban-terrain tutorial](../../tutorials/03-urban-terrain.qmd).
+[urban-terrain example](../../examples/03-urban-terrain.qmd).
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Pick a **Source**, choose **Apply to Nodes/Terrain**, set scale/offset, and
-   **Get Elevation Data**.
-2. **Apply 3D Positions** and **Calculate Grades**.
-3. Manage the **Terrain Object**, then **Fetch & Apply** a **Basemap**, and
-   render via the [Visualization panel](../scigraphs/visualization.qmd).
+For a worked example using **Avenida de las Naciones Unidas, La Paz** (2 km
+radius), follow
+[Elevation, DEM & 3D terrain](../../tutorials/panels/osmnx/elevation.qmd).

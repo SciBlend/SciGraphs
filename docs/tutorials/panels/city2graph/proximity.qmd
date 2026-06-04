@@ -1,0 +1,68 @@
+---
+title: "City2Graph · Build proximity graphs"
+---
+
+::: {.lead}
+Build spatial proximity networks over Burjassot amenities: single-layer graphs
+(KNN, Delaunay, radius…), multi-layer graphs that bridge feature types, and
+group-node graphs that link zones to the points they contain.
+:::
+
+This walkthrough mirrors the
+[Proximity Graphs panel](../../panels/city2graph/proximity.qmd).
+
+## Before you begin
+
+Create a point feature object — download amenities as points in
+[Import urban data](data.qmd) (**Get as Points**), or convert footprints with
+**Convert to Centroids**.
+
+## 1. Single-layer graph
+
+Expand **Single-Layer Graphs** and set:
+
+- **Features** — the amenities object.
+- **Graph Type** — start with **K-Nearest Neighbors** and **K** = `5`.
+- **Distance Metric** — **Euclidean** (or **Network** with a street **Network**
+  object).
+
+Press **Generate Graph**.
+
+![A KNN proximity graph over Burjassot amenities.](../../../assets/guides/city2graph/03-single-layer.png)
+
+### Try other graph types
+
+Switch the **Graph Type** to explore **Delaunay**, **Fixed Radius** (set
+**Radius**), **Waxman** (set **Beta/R0/Seed**), **Gabriel**, **Relative
+Neighborhood**, **EMST** or **Contiguity** (set **Queen/Rook**).
+
+![The Graph Type dropdown with all topology options.](../../../assets/guides/city2graph/03-graph-types.png)
+
+## 2. Multi-layer bridge graph
+
+Expand **Multi-Layer Graphs**, assign **Layer 1** and **Layer 2** (e.g.
+amenities and shops), pick a **Method** (**KNN** or **Fixed Radius**) and press
+**Generate Multi-Layer Graph** to connect across layers.
+
+![A multi-layer graph bridging two feature types.](../../../assets/guides/city2graph/03-multi-layer.png)
+
+## 3. Group nodes (zones ▸ points)
+
+Expand **Group Nodes**, set **Polygons** (zones) and **Points**, choose a
+**Predicate** (**Covered By**, **Within**, **Intersects**) and press **Generate
+Group Nodes** to link each point to its containing zone.
+
+![Connecting points to the zones that contain them.](../../../assets/guides/city2graph/03-group-nodes.png)
+
+## 4. Tune deduplication and visualization
+
+In **Advanced Settings**, enable **Deduplicate Points** and set the **Dedup
+Tolerance** when OSM ways imported as many vertices. In **Visualization**, adjust
+**Edge Thickness** and the **Visualize Limit** for dense graphs.
+
+![Advanced and visualization controls.](../../../assets/guides/city2graph/03-advanced.png)
+
+## Next steps
+
+Continue with [Analyze metapaths](metapaths.qmd) to connect amenities through the
+street network.

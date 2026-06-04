@@ -1,0 +1,55 @@
+---
+title: "OSMnx · Measure accessibility"
+---
+
+::: {.lead}
+Generate walking isochrones around a point in Burjassot, extract a single-radius
+neighborhood, and cluster nodes by network distance.
+:::
+
+This walkthrough mirrors the
+[Accessibility panel](../../panels/osmnx/accessibility.qmd).
+
+## Before you begin
+
+Download a `walk` network and project it (see
+[Clean up the graph](graph-operations.qmd)).
+
+## 1. Set the center
+
+In **Accessibility**, choose the **Center Node** (use the eyedropper to click a
+node in the viewport, e.g. the town center).
+
+![Selecting the isochrone center node.](../../../assets/guides/osmnx/05-center.png)
+
+## 2. Isochrones
+
+Set:
+
+- **Trip Times**: `5, 10, 15, 20` (minutes).
+- **Travel Speed**: `4.5` km/h (walking).
+- **Mode**: **Buffer Union** (smooth blobs) or **Convex Hull** (simpler shapes).
+
+Press **Isochrones**. Nested polygons show how far you can walk in each time
+budget.
+
+![Nested walking isochrones around the center.](../../../assets/guides/osmnx/05-isochrones.png)
+
+## 3. Ego subgraph
+
+Press **Ego Subgraph** to extract the sub-network within a network-distance
+radius of the center node — handy for isolating a neighborhood.
+
+![The ego subgraph around the center node.](../../../assets/guides/osmnx/05-ego.png)
+
+## 4. Network DBSCAN
+
+Press **Network DBSCAN** to cluster nodes by network distance using `eps_meters`
+and `min_samples`. Clusters reveal pockets of dense connectivity.
+
+![Network DBSCAN clusters coloured by label.](../../../assets/guides/osmnx/05-dbscan.png)
+
+## Next steps
+
+Continue with [Compute statistics](statistics.qmd) for morphometrics and street
+orientation.

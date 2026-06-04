@@ -61,6 +61,8 @@ millions of node glyphs and edge primitives with minimal memory overhead.
   architecture, the sidebar interface, and the end-to-end pipeline.
 - The **[Panel Reference](../panels/overview.qmd)** documents every panel and
   subpanel in the sidebar, with a usage guide for each.
-- The **[Tutorials](../tutorials/index.qmd)** are hands-on walkthroughs of
+- The **[Tutorials](../tutorials/panels/index.qmd)** are step-by-step
+  walkthroughs of each individual panel, using the Burjassot and La Paz cases.
+- The **[Examples](../examples/index.qmd)** are end-to-end walkthroughs of
   complete scenarios.
 :::

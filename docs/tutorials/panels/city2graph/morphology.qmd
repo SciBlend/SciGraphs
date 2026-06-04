@@ -1,0 +1,58 @@
+---
+title: "City2Graph · Build a morphological graph"
+---
+
+::: {.lead}
+Tessellate Burjassot's building footprints, convert street segments to a graph,
+and build the morphological graph that links private (buildings) and public
+(streets) space.
+:::
+
+This walkthrough mirrors the
+[Urban Morphology panel](../../panels/city2graph/morphology.qmd).
+
+## Before you begin
+
+Prepare two inputs:
+
+- A **buildings** object — download Overture/OSM buildings in
+  [Import urban data](data.qmd).
+- A **street network** object — download it in the
+  [OSMnx Download tutorial](../osmnx/download.qmd).
+
+Both should be projected to a metric CRS.
+
+## 1. Convert segments to a graph
+
+In **Urban Morphology**, press **Segments to Graph** to turn the street network
+into a segment graph that the morphological graph builds on.
+
+![Converting street segments to a graph.](../../../assets/guides/city2graph/02-segments.png)
+
+## 2. Generate the tessellation
+
+Set **Shrink** (default `0.4`) and **Segment Length** (default `0.5`), then press
+**Generate Tessellation**. This carves the space around buildings into
+morphological cells.
+
+![Morphological tessellation around the buildings.](../../../assets/guides/city2graph/02-tessellation.png)
+
+## 3. Build the morphological graph
+
+Set the parameters:
+
+- **Center** — from the active OSMnx object, or enter **Lat/Lon** manually.
+- **Distance** and **Clipping Buffer** — the study radius and a margin.
+- **Contiguity** — **Queen** or **Rook** adjacency.
+- The **private↔private**, **public↔public** and **private↔public** relation
+  toggles.
+
+Press **Morphological Graph**. The result is a heterogeneous graph of private
+(building) and public (street) nodes.
+
+![The morphological graph linking buildings and streets.](../../../assets/guides/city2graph/02-morphological-graph.png)
+
+## Next steps
+
+Continue with [Build proximity graphs](proximity.qmd) for spatial networks over
+point features.

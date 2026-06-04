@@ -1,0 +1,57 @@
+---
+title: "City2Graph · Post-process a graph"
+---
+
+::: {.lead}
+Clean up and subset any graph object: remove isolated components, filter by
+distance from a center, clip to a polygon, and build isochrones.
+:::
+
+This walkthrough mirrors the
+[Graph Tools panel](../../panels/city2graph/graph-tools.qmd).
+
+## Before you begin
+
+Have any graph object active — a street network, a proximity graph, or a
+morphological graph.
+
+## 1. Choose an action
+
+In **Graph Tools**, set the **Action**: **Remove Isolated**, **Filter**, **Clip**
+or **Isochrone**.
+
+![The Graph Tools action selector.](../../../assets/guides/city2graph/07-action.png)
+
+## 2. Remove isolated components
+
+With **Remove Isolated**, press **Apply** to keep only the largest connected
+component, discarding stray fragments.
+
+![Keeping only the largest connected component.](../../../assets/guides/city2graph/07-remove-isolated.png)
+
+## 3. Filter by distance
+
+With **Filter**, set the **Center** object and a **Threshold** distance, then
+**Apply** to keep nodes within that distance.
+
+![Filtering the graph by distance from a center.](../../../assets/guides/city2graph/07-filter.png)
+
+## 4. Clip to a polygon
+
+With **Clip**, set the clip mesh and **Apply** to keep only the part of the graph
+inside the polygon.
+
+![Clipping the graph to a polygon.](../../../assets/guides/city2graph/07-clip.png)
+
+## 5. Build an isochrone
+
+With **Isochrone**, set the **Isochrone Center**, a **Threshold** and the
+**Weight Attr** (e.g. `travel_time`), then **Apply** to extract the reachable
+sub-network.
+
+![An isochrone sub-network from a center node.](../../../assets/guides/city2graph/07-isochrone.png)
+
+## Next steps
+
+Continue with [Export for GeoAI](export.qmd) to take a graph into a GNN
+framework.

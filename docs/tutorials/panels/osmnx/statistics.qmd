@@ -1,0 +1,54 @@
+---
+title: "OSMnx · Compute statistics"
+---
+
+::: {.lead}
+Compute morphometric statistics for the Burjassot network, measure circuity and
+centrality, and analyze street orientation with an entropy value and a polar
+rose.
+:::
+
+This walkthrough mirrors the [Statistics panel](../../panels/osmnx/statistics.qmd).
+
+## Before you begin
+
+Download and project a `drive` network (see
+[Clean up the graph](graph-operations.qmd)).
+
+## 1. Basic statistics
+
+Press **Estimate Area** to compute the network's spatial extent, then **Basic
+Stats** for node/edge counts, average degree, street density and total street
+length.
+
+![Basic statistics for the Burjassot network.](../../../assets/guides/osmnx/06-basic-stats.png)
+
+## 2. Circuity
+
+Press **Circuity** to report the ratio of network distance to straight-line
+distance. Values near `1.0` indicate a straight, grid-like layout.
+
+![Circuity measures how direct the street network is.](../../../assets/guides/osmnx/06-circuity.png)
+
+## 3. Centrality
+
+Set **Kind** to **Betweenness (node)**, **Betweenness (edge)** or **Closeness**,
+toggle **Weighted**, and press **Centrality**. Results are written as attributes
+you can drive colors from.
+
+![Edge betweenness centrality coloured along the streets.](../../../assets/guides/osmnx/06-centrality.png)
+
+## 4. Orientation entropy and rose
+
+Make sure bearings are present (**Add Edge Bearings**, see
+[Add edge attributes](attributes.qmd)). Press **Orientation Entropy** for a
+single value — higher means a less grid-like, more organic layout. Then press
+**Orientation Rose** (using the **Rose Bins** field, default `36`) to build a
+polar histogram of street directions.
+
+![A polar rose of street orientations for Burjassot.](../../../assets/guides/osmnx/06-orientation-rose.png)
+
+## Next steps
+
+Continue with [Download features (POIs)](features.qmd) to add amenities and
+buildings.

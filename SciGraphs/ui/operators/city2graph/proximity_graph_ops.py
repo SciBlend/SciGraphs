@@ -13,7 +13,50 @@ from ....utils.blender_helpers import get_or_create_collection as _get_or_create
 from ....core.mesh.geo_mesh import (
     create_curves_from_gdf as _create_curves_from_gdf,
     create_nodes_mesh_from_gdf as _create_nodes_mesh_from_gdf,
+    _resolve_projection_metadata,
 )
+
+
+def _effective_feature_count(obj):
+    """Count the real features of a feature object from its mesh geometry.
+
+    Mirrors how the geometry is interpreted downstream: one feature per face
+    (polygons), per connected edge chain (lines), or per isolated vertex
+    (points). Used as a fallback when the ``feature_count`` custom property is
+    missing or zero.
+    """
+    if obj is None or obj.type != 'MESH' or not obj.data:
+        return 0
+
+    mesh = obj.data
+    if len(mesh.polygons) > 0:
+        return len(mesh.polygons)
+    if len(mesh.edges) > 0:
+        import bmesh
+
+        bm = bmesh.new()
+        try:
+            bm.from_mesh(mesh)
+            bm.verts.ensure_lookup_table()
+            parent = list(range(len(bm.verts)))
+
+            def find(i):
+                while parent[i] != i:
+                    parent[i] = parent[parent[i]]
+                    i = parent[i]
+                return i
+
+            for edge in bm.edges:
+                ra, rb = find(edge.verts[0].index), find(edge.verts[1].index)
+                if ra != rb:
+                    parent[ra] = rb
+
+            connected = {find(v.index) for v in bm.verts if any(True for _ in v.link_edges)}
+            isolated = sum(1 for v in bm.verts if not any(True for _ in v.link_edges))
+            return len(connected) + isolated
+        finally:
+            bm.free()
+    return len(mesh.vertices)
 
 
 class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
@@ -34,12 +77,13 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
             self.report({'ERROR'}, "No feature object selected")
             return {'CANCELLED'}
         
-        if not feature_obj.get("is_osm_features"):
-            self.report({'ERROR'}, "Selected object is not OSM features")
+        if not feature_obj.get("is_osm_features") and not feature_obj.get("is_city2graph"):
+            self.report({'ERROR'}, "Selected object is not a feature object (OSM or city2graph)")
             return {'CANCELLED'}
         
-        # Validate feature count
-        feature_count = feature_obj.get("feature_count", 0)
+        # Validate feature count. ``feature_count`` may be missing or stale on
+        # derived objects (e.g. centroids), so fall back to the real geometry.
+        feature_count = feature_obj.get("feature_count", 0) or _effective_feature_count(feature_obj)
         if feature_count < 2:
             self.report({'ERROR'}, f"Need at least 2 features, found {feature_count}")
             return {'CANCELLED'}
@@ -214,8 +258,8 @@ class SCIGRAPHS_OT_GenerateMultilayerGraph(bpy.types.Operator):
             return {'CANCELLED'}
         
         for name, obj in layer_objects.items():
-            if not obj.get("is_osm_features"):
-                self.report({'ERROR'}, f"{name} is not a valid OSM features object")
+            if not obj.get("is_osm_features") and not obj.get("is_city2graph"):
+                self.report({'ERROR'}, f"{name} is not a valid feature object (OSM or city2graph)")
                 return {'CANCELLED'}
         
         method = props.prox_multilayer_method.lower()
@@ -251,9 +295,7 @@ class SCIGRAPHS_OT_GenerateMultilayerGraph(bpy.types.Operator):
             ref_obj = list(layer_objects.values())[0]
             
             all_nodes_bm = bmesh.new()
-            center_lat = ref_obj.get("osmnx_center_lat")
-            center_lon = ref_obj.get("osmnx_center_lon")
-            scale = ref_obj.get("osmnx_scale", 0.001)
+            center_lat, center_lon, scale = _resolve_projection_metadata(ref_obj)
             
             from ....core.mesh.geometry import _latlon_to_local_3d
             from shapely.geometry import Point
@@ -359,12 +401,12 @@ class SCIGRAPHS_OT_GenerateGroupNodesGraph(bpy.types.Operator):
             self.report({'ERROR'}, "Both polygons and points objects required")
             return {'CANCELLED'}
         
-        if not polygons_obj.get("is_osm_features"):
-            self.report({'ERROR'}, "Polygons object is not OSM features")
+        if not polygons_obj.get("is_osm_features") and not polygons_obj.get("is_city2graph"):
+            self.report({'ERROR'}, "Polygons object is not a feature object (OSM or city2graph)")
             return {'CANCELLED'}
         
-        if not points_obj.get("is_osm_features"):
-            self.report({'ERROR'}, "Points object is not OSM features")
+        if not points_obj.get("is_osm_features") and not points_obj.get("is_city2graph"):
+            self.report({'ERROR'}, "Points object is not a feature object (OSM or city2graph)")
             return {'CANCELLED'}
         
         distance_metric = props.prox_distance_metric.lower()
@@ -403,9 +445,7 @@ class SCIGRAPHS_OT_GenerateGroupNodesGraph(bpy.types.Operator):
             
             # Create nodes visualization (combined from both layers)
             all_nodes_bm = bmesh.new()
-            center_lat = ref_obj.get("osmnx_center_lat")
-            center_lon = ref_obj.get("osmnx_center_lon")
-            scale = ref_obj.get("osmnx_scale", 0.001)
+            center_lat, center_lon, scale = _resolve_projection_metadata(ref_obj)
             
             from ....core.mesh.geometry import _latlon_to_local_3d
             from shapely.geometry import Point

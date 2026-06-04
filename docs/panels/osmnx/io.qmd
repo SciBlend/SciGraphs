@@ -30,8 +30,7 @@ GIS interchange formats, and a local graph cache.
 | **Manage Cache** | Browse and load cached graphs. |
 | **Open Cache Directory** | Open the cache folder in the file browser. |
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Use **GraphML** for a lossless OSMnx round-trip.
-2. **Export** to a GIS format for interoperability with other tools.
-3. **Save to Cache** to reuse a downloaded network without re-querying OSM.
+For a worked example using Burjassot, follow
+[Save, export and cache](../../tutorials/panels/osmnx/io.qmd).

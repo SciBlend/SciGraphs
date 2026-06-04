@@ -73,5 +73,5 @@ the same result. Ready-to-run examples live in the repository under
 2. **Validate** the specification.
 3. **Run** the pipeline and inspect the artifacts in the **Artifacts** folder.
 
-See the [reproducible-pipeline tutorial](../../tutorials/05-reproducible-pipeline.qmd)
+See the [reproducible-pipeline example](../../examples/05-reproducible-pipeline.qmd)
 for a complete walkthrough.

@@ -56,8 +56,13 @@ class SCIGRAPHS_PT_c2g_proximity_single(bpy.types.Panel):
         col.prop(props, "prox_feature_object", text="Features")
         
         feature_obj = props.prox_feature_object
-        if feature_obj and feature_obj.get("is_osm_features"):
+        if feature_obj and (feature_obj.get("is_osm_features") or feature_obj.get("is_city2graph")):
             feature_count = feature_obj.get("feature_count", 0)
+            if not feature_count and feature_obj.type == 'MESH' and feature_obj.data:
+                mesh = feature_obj.data
+                feature_count = (
+                    len(mesh.polygons) or len(mesh.edges) or len(mesh.vertices)
+                )
             info_row = col.row()
             info_row.scale_y = 0.8
             info_row.label(text=f"  {feature_count} features", icon='CHECKMARK')
@@ -65,7 +70,7 @@ class SCIGRAPHS_PT_c2g_proximity_single(bpy.types.Panel):
             warning_row = col.row()
             warning_row.scale_y = 0.8
             warning_row.alert = True
-            warning_row.label(text="  Not a valid OSM features object", icon='ERROR')
+            warning_row.label(text="  Not a valid feature object", icon='ERROR')
         
         layout.separator()
         
@@ -125,7 +130,7 @@ class SCIGRAPHS_PT_c2g_proximity_single(bpy.types.Panel):
         req_box = layout.box()
         req_box.scale_y = 0.7
         req_box.label(text="Requirements:", icon='INFO')
-        req_box.label(text="• Select OSM features object above")
+        req_box.label(text="• Select a feature object above (OSM or city2graph)")
         if props.prox_distance_metric == 'NETWORK':
             req_box.label(text="• Select OSMnx street network")
         
@@ -165,7 +170,7 @@ class SCIGRAPHS_PT_c2g_proximity_multi(bpy.types.Panel):
         col.prop(props, "prox_layer1_object", text="Layer 1")
         
         layer1_obj = props.prox_layer1_object
-        if layer1_obj and layer1_obj.get("is_osm_features"):
+        if layer1_obj and (layer1_obj.get("is_osm_features") or layer1_obj.get("is_city2graph")):
             count = layer1_obj.get("feature_count", 0)
             info_row = col.row()
             info_row.scale_y = 0.8
@@ -175,7 +180,7 @@ class SCIGRAPHS_PT_c2g_proximity_multi(bpy.types.Panel):
         col.prop(props, "prox_layer2_object", text="Layer 2")
         
         layer2_obj = props.prox_layer2_object
-        if layer2_obj and layer2_obj.get("is_osm_features"):
+        if layer2_obj and (layer2_obj.get("is_osm_features") or layer2_obj.get("is_city2graph")):
             count = layer2_obj.get("feature_count", 0)
             info_row = col.row()
             info_row.scale_y = 0.8
@@ -185,7 +190,7 @@ class SCIGRAPHS_PT_c2g_proximity_multi(bpy.types.Panel):
         col.prop(props, "prox_layer3_object", text="Layer 3 (Optional)")
         
         layer3_obj = props.prox_layer3_object
-        if layer3_obj and layer3_obj.get("is_osm_features"):
+        if layer3_obj and (layer3_obj.get("is_osm_features") or layer3_obj.get("is_city2graph")):
             count = layer3_obj.get("feature_count", 0)
             info_row = col.row()
             info_row.scale_y = 0.8
@@ -257,7 +262,7 @@ class SCIGRAPHS_PT_c2g_proximity_group(bpy.types.Panel):
         col.prop(props, "prox_polygons_object", text="Polygons")
         
         polygons_obj = props.prox_polygons_object
-        if polygons_obj and polygons_obj.get("is_osm_features"):
+        if polygons_obj and (polygons_obj.get("is_osm_features") or polygons_obj.get("is_city2graph")):
             info_row = col.row()
             info_row.scale_y = 0.8
             info_row.label(text=f"  {polygons_obj.get('feature_count', 0)} features", icon='CHECKMARK')
@@ -266,7 +271,7 @@ class SCIGRAPHS_PT_c2g_proximity_group(bpy.types.Panel):
         col.prop(props, "prox_points_object", text="Points")
         
         points_obj = props.prox_points_object
-        if points_obj and points_obj.get("is_osm_features"):
+        if points_obj and (points_obj.get("is_osm_features") or points_obj.get("is_city2graph")):
             info_row = col.row()
             info_row.scale_y = 0.8
             info_row.label(text=f"  {points_obj.get('feature_count', 0)} features", icon='CHECKMARK')

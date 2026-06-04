@@ -4,9 +4,8 @@ title: "Data Import"
 
 ::: {.lead}
 The Data Import panel is the entry point of the City2Graph pipeline. It acquires
-the raw urban layers — buildings, street segments, places, water, land — plus
-GTFS transit feeds, and materializes them as Blender objects every other panel
-can consume.
+urban feature layers from the shared feature selector, plus GTFS transit feeds,
+and materializes them as Blender objects every other panel can consume.
 :::
 
 At the very top, an **Overture API Key** badge shows whether a production key is
@@ -33,23 +32,42 @@ If you pick a non-OSMnx method while an OSMnx graph is active, a hint confirms
 that the **outputs will still be aligned** with that graph's coordinate space.
 :::
 
-## Step 2 — Feature Types
+## Step 2 — Feature Source & Tags
 
-Toggle which layers to fetch, then set a per-type cap.
+Choose one feature source, one feature preset or a custom OSM tag expression, and
+the maximum number of features to request.
 
 | Control | Description |
 | --- | --- |
-| **Buildings** | Building footprints (Overture Maps). |
-| **Road Segments** | Street segments (OSMnx / Overpass). |
-| **Places (POIs)** | Points of interest (Overture Maps). |
-| **Water** | Water features (OSMnx / Overpass). |
-| **Land Use** | Land-use polygons (OSMnx / Overpass). |
-| **Max Features / Type** | Upper bound per feature type. Values above ~15 000 may be slow or capped server-side (a warning appears). |
+| **Source** | **Overture / City2Graph** or **OSMnx / Overpass**. The **Feature** list adapts to the source: Overture only lists what its API serves (buildings, places, segments, water, land, and the POI presets that filter the places layer), while OSMnx lists every preset plus **Custom Tags**. |
+| **Feature** | Feature preset for the selected source. Custom OSM tags are available only in OSMnx mode. |
+| **Tags** | Shown for **Custom Tags**; enter comma-separated OSM `key=value` pairs such as `amenity=restaurant` or `building=yes`. |
+| **Max Features** | Upper bound where the selected source supports limiting. Values above ~15 000 may be slow or capped server-side (a warning appears). |
+| **Nodes Only** | OSMnx source only: keep just node elements (exclude ways/relations), matching the notebook point-feature workflow. |
 
-Sources, as recommended by the city2graph notebooks:
+::: {.callout-note}
+With **Source = OSMnx** and **Area Method = By Place Name**, features are queried
+within the place's administrative polygon (`features_from_place`), so counts
+match `ox.features_from_place(...)`. Other area methods use the bounding box,
+which returns more features because it is a rectangle around the area.
+:::
 
-- **Buildings, Places** → Overture Maps (richest schema).
-- **Segments, Water, Land** → OSMnx (Overpass), which covers these reliably.
+The Overture source maps presets to the closest available layer:
+
+- **Buildings** → Overture buildings.
+- **Amenity** → Overture places (all POIs, unfiltered).
+- **Restaurant / Shop / Health / Education / Leisure / Parking / ...** → Overture
+  places filtered by matching category keywords, so each preset returns a
+  distinct subset rather than the full place list.
+- **Highway** → OSMnx street segments.
+- **Water / Land / Natural / Park** → OSMnx fallback layers.
+- **Custom Tags** → OSMnx, because Overture does not support arbitrary OSM tags.
+
+::: {.callout-note}
+Overture's place taxonomy differs from OpenStreetMap tags, so counts will not
+match an OSMnx `{"amenity": ...}` query. For OSM-tag-exact results, switch the
+**Source** to **OSMnx / Overpass**.
+:::
 
 ## Step 3 — Download
 
@@ -87,12 +105,7 @@ connectors object — then run **Process Segments**.
 
 A loaded feed unlocks the [Transportation](transportation.qmd) panel.
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Confirm the **Overture API Key** status (use a production key for large areas).
-2. **Define an area** (Step 1) — the simplest path is to activate an OSMnx graph
-   and use *From OSMnx Graph*.
-3. Tick the **feature types** you need and set a sensible limit (Step 2).
-4. **Download** as polygons or points (Step 3), or load a local file.
-5. Optionally **Process Segments** and **Import GTFS** for morphology and transit
-   workflows.
+For a worked example using Burjassot, follow
+[Import urban data](../../tutorials/panels/city2graph/data.qmd).

@@ -42,10 +42,7 @@ Pick how the area is defined; the inputs change with the method.
 
 **Import from OSM** runs the download and creates the network object.
 
-## Typical workflow
+## Step-by-step tutorial
 
-1. Pick a **method** and fill in its inputs.
-2. Choose a **Network Type** (or a preset/advanced filter).
-3. Set the **options** (Simplify is recommended for most analyses).
-4. **Import from OSM**, then continue to
-   [Graph Operations](graph-operations.qmd) to project the graph.
+For a worked example using Burjassot, follow
+[Download a street network](../../tutorials/panels/osmnx/download.qmd).

@@ -1,0 +1,42 @@
+---
+title: "City2Graph · Model public transport"
+---
+
+::: {.lead}
+Turn a GTFS public-transport feed into graphs: a travel-summary graph of
+stop-to-stop service and an origin-destination graph between stops.
+:::
+
+This walkthrough mirrors the
+[Transportation panel](../../panels/city2graph/transportation.qmd).
+
+## Before you begin
+
+Import a GTFS feed first in [Import urban data](data.qmd) (**Import GTFS**). A
+São Paulo feed ships under `examples/GTFS/`. The Transportation panel activates
+once a feed is loaded.
+
+## 1. Filter the service period
+
+In **Transportation**, set **Calendar Start** and **Calendar End** to restrict
+the analysis to a date range (leave as **All** for the full feed).
+
+![Selecting the GTFS service period.](../../../assets/guides/city2graph/05-calendar.png)
+
+## 2. Travel summary graph
+
+Press **Travel Summary Graph** to aggregate services into a stop-to-stop graph
+weighted by travel time and frequency.
+
+![A travel-summary graph between transit stops.](../../../assets/guides/city2graph/05-travel-summary.png)
+
+## 3. Origin-destination pairs
+
+Toggle **Directed** and set **Top N** (cap the number of pairs, `0` = no limit),
+then press **Get OD Pairs** to build the GTFS OD graph between stops.
+
+![The OD graph derived from GTFS.](../../../assets/guides/city2graph/05-od.png)
+
+## Next steps
+
+Continue with [Map an OD matrix](mobility.qmd) to bring in external flow data.
