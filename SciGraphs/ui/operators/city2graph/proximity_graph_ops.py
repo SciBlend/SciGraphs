@@ -13,6 +13,8 @@ from ....utils.blender_helpers import get_or_create_collection as _get_or_create
 from ....core.mesh.geo_mesh import (
     create_curves_from_gdf as _create_curves_from_gdf,
     create_nodes_mesh_from_gdf as _create_nodes_mesh_from_gdf,
+    create_native_graph_from_gdfs as _create_native_graph_from_gdfs,
+    create_native_heterograph_from_dicts as _create_native_heterograph_from_dicts,
     _resolve_projection_metadata,
 )
 
@@ -174,41 +176,25 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
             collection_name = f"ProximityGraph_{graph_type}"
             collection = _get_or_create_collection(collection_name)
             
-            curve_obj = _create_curves_from_gdf(
+            graph_obj = _create_native_graph_from_gdfs(
+                nodes_gdf,
                 edges_gdf,
-                f"{graph_type}_Edges",
+                f"{graph_type}_Graph",
                 feature_obj,
-                thickness=props.prox_curve_thickness,
-                limit=props.prox_visualize_limit
+                markers={
+                    "is_proximity_graph": True,
+                    "graph_type": graph_type,
+                    "distance_metric": distance_metric,
+                },
             )
             
-            if curve_obj:
-                collection.objects.link(curve_obj)
-                
-                curve_obj["is_proximity_graph"] = True
-                curve_obj["graph_type"] = graph_type
-                curve_obj["num_nodes"] = len(nodes_gdf)
-                curve_obj["num_edges"] = len(edges_gdf)
-                curve_obj["distance_metric"] = distance_metric
-                
-                mat = bpy.data.materials.get("ProximityGraph_Material")
-                if not mat:
-                    mat = bpy.data.materials.new(name="ProximityGraph_Material")
-                    mat.use_nodes = True
-                    bsdf = mat.node_tree.nodes.get("Principled BSDF")
-                    if bsdf:
-                        bsdf.inputs['Base Color'].default_value = (0.2, 0.6, 1.0, 1.0)
-                        if 'Emission Color' in bsdf.inputs:
-                            bsdf.inputs['Emission Color'].default_value = (0.2, 0.6, 1.0, 1.0)
-                            bsdf.inputs['Emission Strength'].default_value = 1.0
-                
-                if curve_obj.data.materials:
-                    curve_obj.data.materials[0] = mat
-                else:
-                    curve_obj.data.materials.append(mat)
-                
-                context.view_layer.objects.active = curve_obj
-                curve_obj.select_set(True)
+            if graph_obj is None:
+                self.report({'ERROR'}, "Failed to materialise graph mesh")
+                return {'CANCELLED'}
+            
+            collection.objects.link(graph_obj)
+            context.view_layer.objects.active = graph_obj
+            graph_obj.select_set(True)
             
             elapsed = time.time() - start_time
             log(f"{graph_type} graph created successfully in {elapsed:.2f}s")
@@ -294,80 +280,25 @@ class SCIGRAPHS_OT_GenerateMultilayerGraph(bpy.types.Operator):
             
             ref_obj = list(layer_objects.values())[0]
             
-            all_nodes_bm = bmesh.new()
-            center_lat, center_lon, scale = _resolve_projection_metadata(ref_obj)
+            graph_obj = _create_native_heterograph_from_dicts(
+                nodes_dict,
+                edges_dict,
+                "MultiLayer_Graph",
+                ref_obj,
+                markers={
+                    "is_multilayer_graph": True,
+                    "num_layers": len(layer_objects),
+                    "num_edge_types": len(edges_dict),
+                },
+            )
             
-            from ....core.mesh.geometry import _latlon_to_local_3d
-            from shapely.geometry import Point
+            if graph_obj is None:
+                self.report({'ERROR'}, "Failed to materialise multi-layer graph mesh")
+                return {'CANCELLED'}
             
-            for layer_name, layer_gdf in nodes_dict.items():
-                if layer_gdf.crs and str(layer_gdf.crs).upper() != "EPSG:4326":
-                    nodes_dict[layer_name] = layer_gdf.to_crs("EPSG:4326")
-            
-            node_attributes = {}
-            
-            for layer_name, layer_gdf in nodes_dict.items():
-                for idx, row in layer_gdf.iterrows():
-                    geom = row.geometry
-                    if isinstance(geom, Point):
-                        x, y, z = _latlon_to_local_3d(geom.y, geom.x, center_lat, center_lon, scale)
-                        vert = all_nodes_bm.verts.new((x, y, z))
-                        
-                        for edge_key in edges_dict.keys():
-                            src_layer = edge_key[0]
-                            tgt_layer = edge_key[2]
-                            attr_name = f"{src_layer}_{tgt_layer}"
-                            if attr_name not in node_attributes:
-                                node_attributes[attr_name] = []
-                            
-                            participates = 0
-                            if layer_name == src_layer or layer_name == tgt_layer:
-                                edges_gdf = edges_dict[edge_key]
-                                if not edges_gdf.empty:
-                                    participates = 1
-                            
-                            node_attributes[attr_name].append(participates)
-            
-            if len(all_nodes_bm.verts) > 0:
-                mesh = bpy.data.meshes.new("MultiLayer_Nodes")
-                all_nodes_bm.to_mesh(mesh)
-                all_nodes_bm.free()
-                
-                for attr_name, values in node_attributes.items():
-                    attr = mesh.attributes.new(name=attr_name, type='INT', domain='POINT')
-                    attr.data.foreach_set('value', values)
-                
-                nodes_obj = bpy.data.objects.new("MultiLayer_Nodes", mesh)
-                main_collection.objects.link(nodes_obj)
-                
-                nodes_obj["is_multilayer_graph"] = True
-                nodes_obj["num_layers"] = len(layer_objects)
-                nodes_obj["num_edge_types"] = len(edges_dict)
-                
-                context.view_layer.objects.active = nodes_obj
-                nodes_obj.select_set(True)
-                
-                print(f"Node attributes created: {list(node_attributes.keys())}")
-            else:
-                all_nodes_bm.free()
-            
-            for edge_key, edges_gdf in edges_dict.items():
-                src_layer, relation, tgt_layer = edge_key
-                edge_name = f"{src_layer}_{relation}_{tgt_layer}"
-                
-                curve_obj = _create_curves_from_gdf(
-                    edges_gdf,
-                    edge_name,
-                    ref_obj,
-                    thickness=props.prox_curve_thickness,
-                    limit=props.prox_visualize_limit
-                )
-                
-                if curve_obj:
-                    main_collection.objects.link(curve_obj)
-                    
-                    curve_obj["edge_type"] = edge_key
-                    curve_obj["num_edges"] = len(edges_gdf)
+            main_collection.objects.link(graph_obj)
+            context.view_layer.objects.active = graph_obj
+            graph_obj.select_set(True)
             
             elapsed = time.time() - start_time
             self.report({'INFO'}, f"Multi-layer graph created successfully ({elapsed:.2f}s)")
@@ -443,63 +374,25 @@ class SCIGRAPHS_OT_GenerateGroupNodesGraph(bpy.types.Operator):
             
             ref_obj = polygons_obj
             
-            # Create nodes visualization (combined from both layers)
-            all_nodes_bm = bmesh.new()
-            center_lat, center_lon, scale = _resolve_projection_metadata(ref_obj)
+            graph_obj = _create_native_heterograph_from_dicts(
+                nodes_dict,
+                edges_dict,
+                "GroupNodes_Graph",
+                ref_obj,
+                markers={
+                    "is_group_nodes_graph": True,
+                    "num_node_types": len(nodes_dict),
+                    "num_edge_types": len(edges_dict),
+                },
+            )
             
-            from ....core.mesh.geometry import _latlon_to_local_3d
-            from shapely.geometry import Point
+            if graph_obj is None:
+                self.report({'ERROR'}, "Failed to materialise group nodes graph mesh")
+                return {'CANCELLED'}
             
-            # Convert all node GDFs to EPSG:4326
-            for layer_name, layer_gdf in nodes_dict.items():
-                if layer_gdf.crs and str(layer_gdf.crs).upper() != "EPSG:4326":
-                    nodes_dict[layer_name] = layer_gdf.to_crs("EPSG:4326")
-            
-            # Create vertices for all nodes
-            for layer_name, layer_gdf in nodes_dict.items():
-                for idx, row in layer_gdf.iterrows():
-                    geom = row.geometry
-                    if isinstance(geom, Point):
-                        x, y, z = _latlon_to_local_3d(geom.y, geom.x, center_lat, center_lon, scale)
-                        all_nodes_bm.verts.new((x, y, z))
-            
-            if len(all_nodes_bm.verts) > 0:
-                mesh = bpy.data.meshes.new("GroupNodes_Nodes")
-                all_nodes_bm.to_mesh(mesh)
-                all_nodes_bm.free()
-                
-                nodes_obj = bpy.data.objects.new("GroupNodes_Nodes", mesh)
-                main_collection.objects.link(nodes_obj)
-                
-                nodes_obj["is_group_nodes_graph"] = True
-                nodes_obj["num_node_types"] = len(nodes_dict)
-                nodes_obj["num_edge_types"] = len(edges_dict)
-                
-                context.view_layer.objects.active = nodes_obj
-                nodes_obj.select_set(True)
-                
-                log(f"Created {len(mesh.vertices)} node vertices")
-            else:
-                all_nodes_bm.free()
-            
-            # Create edge visualizations
-            for edge_key, edges_gdf in edges_dict.items():
-                src_layer, relation, tgt_layer = edge_key
-                edge_name = f"{src_layer}_{relation}_{tgt_layer}"
-                
-                curve_obj = _create_curves_from_gdf(
-                    edges_gdf,
-                    edge_name,
-                    ref_obj,
-                    thickness=props.prox_curve_thickness,
-                    limit=props.prox_visualize_limit
-                )
-                
-                if curve_obj:
-                    main_collection.objects.link(curve_obj)
-                    
-                    curve_obj["edge_type"] = edge_key
-                    curve_obj["num_edges"] = len(edges_gdf)
+            main_collection.objects.link(graph_obj)
+            context.view_layer.objects.active = graph_obj
+            graph_obj.select_set(True)
             
             elapsed = time.time() - start_time
             log(f"Group nodes graph created successfully in {elapsed:.2f}s")

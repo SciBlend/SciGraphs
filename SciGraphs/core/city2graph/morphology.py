@@ -517,6 +517,8 @@ def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osm
     
     bm = bmesh.new()
     node_to_vert = {}
+    node_to_idx = {}
+    node_positions = []
     
     center_lat = None
     center_lon = None
@@ -548,6 +550,8 @@ def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osm
         
         vert = bm.verts.new(pos)
         node_to_vert[node] = vert
+        node_to_idx[node] = verts_created
+        node_positions.append((float(pos[0]), float(pos[1]), float(pos[2])))
         verts_created += 1
     
     log(f"Created {verts_created} vertices in Blender mesh from {G.number_of_nodes()} graph nodes")
@@ -556,12 +560,19 @@ def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osm
     
     edges_created = 0
     edges_failed = 0
-    for u, v in G.edges():
+    created_edges = []
+    edge_numeric_values = {}
+    for u, v, edge_data in G.edges(data=True):
         if u in node_to_vert and v in node_to_vert:
             try:
                 bm.edges.new([node_to_vert[u], node_to_vert[v]])
                 edges_created += 1
-            except ValueError as e:
+                created_edges.append((node_to_idx[u], node_to_idx[v]))
+                for key, value in edge_data.items():
+                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        continue
+                    edge_numeric_values.setdefault(key, []).append(float(value))
+            except ValueError:
                 edges_failed += 1
     
     if edges_failed > 0:
@@ -578,14 +589,28 @@ def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osm
     collection.objects.link(obj)
     
     obj["is_city2graph"] = True
+    obj["is_scigraphs_graph"] = True
     obj["num_nodes"] = G.number_of_nodes()
-    obj["num_edges"] = G.number_of_edges()
+    obj["num_edges"] = edges_created
+    obj["is_directed"] = bool(G.is_directed())
+    obj["node_positions"] = [c for p in node_positions for c in p]
+    obj["nodes_data"] = ",".join(str(i) for i in range(verts_created))
+    edges_flat = []
+    for src_idx, tgt_idx in created_edges:
+        edges_flat.append(str(src_idx))
+        edges_flat.append(str(tgt_idx))
+    obj["edges_data"] = ",".join(edges_flat)
     
     if center_lat is not None:
         obj["c2g_center_lat"] = center_lat
         obj["c2g_center_lon"] = center_lon
         obj["c2g_scale"] = scale
     
-    log(f"Created graph object: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+    for key, values in edge_numeric_values.items():
+        if len(values) == len(mesh.edges) and len(values) > 0:
+            attr = mesh.attributes.new(name=f"edge_{key}", type='FLOAT', domain='EDGE')
+            attr.data.foreach_set("value", values)
+    
+    log(f"Created graph object: {G.number_of_nodes()} nodes, {edges_created} edges")
     return obj
 

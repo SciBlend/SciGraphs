@@ -367,17 +367,18 @@ class SCIGRAPHS_PT_c2g_proximity_viz(bpy.types.Panel):
         layout.separator()
         
         box = layout.box()
-        box.label(text="Node Coloring", icon='COLOR')
+        box.label(text="Setup & Coloring", icon='COLOR')
+        
+        info_box = box.box()
+        info_box.scale_y = 0.7
+        info_box.label(text="Generated graphs are native SciGraphs meshes.")
+        info_box.label(text="1. Setup Visualization to instance nodes/edges.")
+        info_box.label(text="2. Open Coloring to colour by attribute.")
         
         col = box.column(align=True)
-        col.prop(props, "prox_color_by_attribute")
-        
-        if props.prox_color_by_attribute:
-            info_box = col.box()
-            info_box.scale_y = 0.7
-            info_box.label(text="Multi-layer: Attributes created per edge type")
-            info_box.label(text="Use Spreadsheet Editor to inspect attributes")
-            info_box.label(text="Use Geometry Nodes or shaders for coloring")
+        col.scale_y = 1.2
+        col.operator("scigraphs.setup_visualization", icon='MOD_HUE_SATURATION', text="Setup Visualization")
+        col.operator("scigraphs.color_show_toolbar", icon='COLOR', text="Open Coloring")
 
 
 classes = [

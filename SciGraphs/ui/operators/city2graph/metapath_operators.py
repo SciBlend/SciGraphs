@@ -124,6 +124,8 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                 center_lat, center_lon, placement_nodes_gdf
             )
             vert_map = {}
+            vert_index = {}
+            node_positions = []
             for idx, row in placement_nodes_gdf.iterrows():
                 geom = row.geometry
                 x, y, z = _latlon_to_local_3d(
@@ -132,16 +134,20 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                 v = bm.verts.new((x, y, z))
                 v[is_intersection_layer] = 1
                 vert_map[idx] = v
+                vert_index[idx] = len(node_positions)
+                node_positions.append((float(x), float(y), float(z)))
             
             bm.verts.ensure_lookup_table()
             
             # Create edges (dual edges)
-            for idx, row in dual_edges_gdf.iterrows():
+            created_edge_rows = []
+            for row_pos, idx in enumerate(dual_edges_gdf.index):
                 if isinstance(idx, tuple) and len(idx) == 2:
                     src, tgt = idx
                     if src in vert_map and tgt in vert_map:
                         try:
                             bm.edges.new([vert_map[src], vert_map[tgt]])
+                            created_edge_rows.append(row_pos)
                         except ValueError:
                             pass
             
@@ -187,6 +193,37 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                     edges_flat.append(str(idx[0]))
                     edges_flat.append(str(idx[1]))
             dual_obj["edges_data"] = ",".join(edges_flat)
+            
+            dual_obj["node_positions"] = [c for p in node_positions for c in p]
+            dual_obj["is_directed"] = False
+            
+            import numpy as _np
+            for col in dual_nodes_gdf.columns:
+                if col == "geometry":
+                    continue
+                try:
+                    if not _np.issubdtype(dual_nodes_gdf[col].dtype, _np.number):
+                        continue
+                except TypeError:
+                    continue
+                values = [float(v) if v is not None else 0.0 for v in dual_nodes_gdf[col].tolist()]
+                if len(values) == len(mesh.vertices):
+                    attr = mesh.attributes.new(name=f"node_{col}", type='FLOAT', domain='POINT')
+                    attr.data.foreach_set("value", values)
+            
+            for col in dual_edges_gdf.columns:
+                if col == "geometry":
+                    continue
+                try:
+                    if not _np.issubdtype(dual_edges_gdf[col].dtype, _np.number):
+                        continue
+                except TypeError:
+                    continue
+                series = dual_edges_gdf[col].tolist()
+                values = [float(series[r]) if series[r] is not None else 0.0 for r in created_edge_rows]
+                if len(values) == len(mesh.edges):
+                    attr = mesh.attributes.new(name=f"edge_{col}", type='FLOAT', domain='EDGE')
+                    attr.data.foreach_set("value", values)
             
             # Store dual graph data for next steps
             import pickle
@@ -444,15 +481,27 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         else:
             print(f"Visualizing {len(metapath_gdf)} metapaths")
         
-        # Create curve
-        curve_data = bpy.data.curves.new(f'{dual_obj.name}_Metapaths_{hops}hop', type='CURVE')
-        curve_data.dimensions = '3D'
-        curve_data.bevel_depth = curve_thickness
+        # Build a native MESH: each metapath connection becomes one edge
+        # between its endpoint amenities, with multiplicity as an EDGE attribute.
+        mesh = bpy.data.meshes.new(f'{dual_obj.name}_Metapaths_{hops}hop_mesh')
+        bm = bmesh.new()
         
-        # Add splines for metapaths (limited for performance)
+        vert_by_key = {}
+        node_positions = []
+        
+        def _get_vert(lon, lat):
+            key = (round(lon, 7), round(lat, 7))
+            if key in vert_by_key:
+                return vert_by_key[key]
+            bx, by, bz = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
+            v = bm.verts.new((bx, by, bz + 0.05))
+            vert_by_key[key] = v
+            node_positions.append((float(bx), float(by), float(bz + 0.05)))
+            return v
+        
         visualized = 0
         multiplicity_list = []
-        spline_to_multiplicity = {}  # Map spline index to multiplicity
+        edge_pairs = []
         
         for idx, row in metapath_gdf.head(vis_limit).iterrows():
             if not hasattr(row, 'geometry') or not row.geometry:
@@ -463,22 +512,25 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
             
             coords = list(geom.coords)
             if len(coords) >= 2:
-                polyline = curve_data.splines.new('POLY')
-                polyline.points.add(len(coords) - 1)
-                
-                for i, (lon, lat) in enumerate(coords):
-                    blender_x, blender_y, blender_z = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
-                    polyline.points[i].co = (blender_x, blender_y, blender_z + 0.05, 1.0)
-                
-                # Store multiplicity for this spline
-                spline_to_multiplicity[len(curve_data.splines) - 1] = multiplicity
+                v_src = _get_vert(coords[0][0], coords[0][1])
+                v_tgt = _get_vert(coords[-1][0], coords[-1][1])
+                if v_src is v_tgt:
+                    continue
+                try:
+                    bm.edges.new([v_src, v_tgt])
+                except ValueError:
+                    continue
                 multiplicity_list.append(multiplicity)
+                edge_pairs.append((v_src.index, v_tgt.index))
                 visualized += 1
         
-        # Create object
+        bm.verts.ensure_lookup_table()
+        bm.to_mesh(mesh)
+        bm.free()
+        
         metapath_obj = bpy.data.objects.new(
-            f'{dual_obj.name}_Metapaths_{hops}hop', 
-            curve_data
+            f'{dual_obj.name}_Metapaths_{hops}hop',
+            mesh
         )
         
         # Add to collection
@@ -488,22 +540,31 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         metapath_collection = _get_or_create_collection("Metapaths", main_collection)
         metapath_collection.objects.link(metapath_obj)
         
-        # Apply cyan emissive material
-        mat = _create_metapath_material()
-        metapath_obj.data.materials.append(mat)
-        
         # Store metadata including multiplicity statistics
         import json
         import numpy as np
         
         metapath_obj["is_metapath_result"] = True
+        metapath_obj["is_city2graph"] = True
         metapath_obj["num_metapaths_raw"] = int(metapath_gdf['multiplicity'].sum()) if has_multiplicity else len(metapath_gdf)
         metapath_obj["num_metapaths_unique"] = len(metapath_gdf)  # Unique connections
         metapath_obj["metapath_hops"] = hops
         metapath_obj["num_visualized"] = visualized
+        metapath_obj["num_nodes"] = len(node_positions)
+        metapath_obj["num_edges"] = visualized
+        metapath_obj["is_directed"] = False
+        metapath_obj["node_positions"] = [c for p in node_positions for c in p]
+        metapath_obj["nodes_data"] = ",".join(str(i) for i in range(len(node_positions)))
+        metapath_obj["edges_data"] = ",".join(str(i) for pair in edge_pairs for i in pair)
+        metapath_obj["c2g_center_lat"] = center_lat
+        metapath_obj["c2g_center_lon"] = center_lon
+        metapath_obj["c2g_scale"] = scale
         
-        # Store multiplicity per spline as JSON (spline_index -> multiplicity)
-        metapath_obj["spline_multiplicity"] = json.dumps(spline_to_multiplicity)
+        # Multiplicity as an EDGE scalar attribute so the native coloring
+        # pipeline can colour connections by how many raw paths they carry.
+        if len(multiplicity_list) == len(mesh.edges) and multiplicity_list:
+            mult_attr = mesh.attributes.new(name="edge_multiplicity", type='FLOAT', domain='EDGE')
+            mult_attr.data.foreach_set("value", [float(m) for m in multiplicity_list])
         
         # Store multiplicity list (in order) for easy access
         metapath_obj["multiplicity_list"] = json.dumps(multiplicity_list)
@@ -896,9 +957,21 @@ class SCIGRAPHS_OT_ComputeMetapathsByWeight(bpy.types.Operator):
             dual_obj.get("osmnx_center_lat"), dual_obj.get("osmnx_center_lon"), metapath_gdf
         )
 
-        curve_data = bpy.data.curves.new(f'{dual_obj.name}_WeightedMP_{weight_attr}', type='CURVE')
-        curve_data.dimensions = '3D'
-        curve_data.bevel_depth = curve_thickness
+        mesh = bpy.data.meshes.new(f'{dual_obj.name}_WeightedMP_{weight_attr}_mesh')
+        bm = bmesh.new()
+        vert_by_key = {}
+        node_positions = []
+        edge_pairs = []
+
+        def _get_vert(lon, lat):
+            key = (round(lon, 7), round(lat, 7))
+            if key in vert_by_key:
+                return vert_by_key[key]
+            bx, by, bz = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
+            v = bm.verts.new((bx, by, bz + 0.05))
+            vert_by_key[key] = v
+            node_positions.append((float(bx), float(by), float(bz + 0.05)))
+            return v
 
         visualized = 0
         for _, row in metapath_gdf.head(vis_limit).iterrows():
@@ -907,14 +980,22 @@ class SCIGRAPHS_OT_ComputeMetapathsByWeight(bpy.types.Operator):
             coords = list(row.geometry.coords)
             if len(coords) < 2:
                 continue
-            polyline = curve_data.splines.new('POLY')
-            polyline.points.add(len(coords) - 1)
-            for i, (lon, lat) in enumerate(coords):
-                bx, by, bz = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
-                polyline.points[i].co = (bx, by, bz + 0.05, 1.0)
+            v_src = _get_vert(coords[0][0], coords[0][1])
+            v_tgt = _get_vert(coords[-1][0], coords[-1][1])
+            if v_src is v_tgt:
+                continue
+            try:
+                bm.edges.new([v_src, v_tgt])
+            except ValueError:
+                continue
+            edge_pairs.append((v_src.index, v_tgt.index))
             visualized += 1
 
-        metapath_obj = bpy.data.objects.new(f'{dual_obj.name}_WeightedMP_{weight_attr}', curve_data)
+        bm.verts.ensure_lookup_table()
+        bm.to_mesh(mesh)
+        bm.free()
+
+        metapath_obj = bpy.data.objects.new(f'{dual_obj.name}_WeightedMP_{weight_attr}', mesh)
 
         original_name = dual_obj.get("original_graph", "Graph")
         collection_name = f"MetapathAnalysis_{original_name}"
@@ -922,14 +1003,22 @@ class SCIGRAPHS_OT_ComputeMetapathsByWeight(bpy.types.Operator):
         mp_collection = _get_or_create_collection("WeightedMetapaths", main_collection)
         mp_collection.objects.link(metapath_obj)
 
-        mat = _create_metapath_material()
-        metapath_obj.data.materials.append(mat)
         metapath_obj["is_metapath_result"] = True
         metapath_obj["is_weighted_metapath"] = True
+        metapath_obj["is_city2graph"] = True
         metapath_obj["num_metapaths_raw"] = len(metapath_gdf)
         metapath_obj["num_metapaths_unique"] = len(metapath_gdf)
         metapath_obj["weight_attr"] = weight_attr
         metapath_obj["num_visualized"] = visualized
+        metapath_obj["num_nodes"] = len(node_positions)
+        metapath_obj["num_edges"] = visualized
+        metapath_obj["is_directed"] = False
+        metapath_obj["node_positions"] = [c for p in node_positions for c in p]
+        metapath_obj["nodes_data"] = ",".join(str(i) for i in range(len(node_positions)))
+        metapath_obj["edges_data"] = ",".join(str(i) for pair in edge_pairs for i in pair)
+        metapath_obj["c2g_center_lat"] = center_lat
+        metapath_obj["c2g_center_lon"] = center_lon
+        metapath_obj["c2g_scale"] = scale
 
 
 classes = [

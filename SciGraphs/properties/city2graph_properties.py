@@ -370,8 +370,8 @@ class City2GraphProperties(bpy.types.PropertyGroup):
     
     prox_visualize_limit: IntProperty(
         name="Visualization Limit",
-        description="Maximum number of edges to visualize as curves",
-        default=1000,
+        description="Maximum number of edges to materialise in the graph mesh",
+        default=1000000,
         min=10,
         max=10000000,
     )
