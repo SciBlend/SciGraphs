@@ -28,60 +28,350 @@ from ...utils.logger import log
 # Tile source registry
 # ---------------------------------------------------------------------------
 
-#: Each entry describes a slippy-map XYZ tile provider. ``url`` is a Python
+#: Each entry describes a slippy-map XYZ tile style. ``url`` is a Python
 #: ``str.format`` template using ``{z}`` ``{x}`` ``{y}`` and optionally
 #: ``{key}`` for the API key.  ``needs_key`` flags whether the addon must
-#: read a key from preferences before requesting tiles.
+#: read a key from preferences before requesting tiles, and ``key_pref``
+#: names the :class:`AddonPreferences` attribute holding that key so the
+#: caller can resolve it generically.  ``provider`` groups styles by the
+#: API that serves them, for UI grouping and attribution.
+#:
+#: Many APIs expose dozens of styles from a single key; this registry lists
+#: the most useful raster styles per provider so users can pick the look
+#: that fits their scene (satellite, streets, dark, light, topographic, ...).
+ESRI_ATTRIBUTION = (
+    'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, '
+    'and the GIS User Community'
+)
+CARTO_ATTRIBUTION = (
+    '© OpenStreetMap contributors © CARTO'
+)
+STADIA_ATTRIBUTION = (
+    '© Stadia Maps © Stamen Design © OpenMapTiles © OpenStreetMap contributors'
+)
+
+
+def _esri_service(service: str) -> str:
+    return (
+        'https://server.arcgisonline.com/ArcGIS/rest/services/'
+        f'{service}/MapServer/tile/{{z}}/{{y}}/{{x}}'
+    )
+
+
+def _carto_style(style: str) -> str:
+    return f'https://basemaps.cartocdn.com/{style}/{{z}}/{{x}}/{{y}}.png'
+
+
+def _mapbox_style(style: str) -> str:
+    return (
+        f'https://api.mapbox.com/styles/v1/mapbox/{style}/tiles/256/'
+        '{z}/{x}/{y}?access_token={key}'
+    )
+
+
+def _maptiler_map(map_id: str, ext: str = 'jpg') -> str:
+    return f'https://api.maptiler.com/maps/{map_id}/256/{{z}}/{{x}}/{{y}}.{ext}?key={{key}}'
+
+
+def _stadia_style(style: str, ext: str = 'png') -> str:
+    return f'https://tiles.stadiamaps.com/tiles/{style}/{{z}}/{{x}}/{{y}}.{ext}?api_key={{key}}'
+
+
 TILE_SOURCES: dict[str, dict] = {
-    'ESRI': {
-        'name': 'Esri World Imagery (Satellite)',
-        'url': (
-            'https://server.arcgisonline.com/ArcGIS/rest/services/'
-            'World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        ),
-        'attribution': (
-            'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, '
-            'and the GIS User Community'
-        ),
-        'tile_size': 256,
-        'max_zoom': 19,
-        'needs_key': False,
-        'extension': 'jpg',
+    # --- Esri (no key required) -------------------------------------------
+    'ESRI_IMAGERY': {
+        'name': 'Esri · Satellite (World Imagery)',
+        'provider': 'Esri',
+        'url': _esri_service('World_Imagery'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 19, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
     },
+    'ESRI_STREET': {
+        'name': 'Esri · Streets',
+        'provider': 'Esri',
+        'url': _esri_service('World_Street_Map'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 19, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+    'ESRI_TOPO': {
+        'name': 'Esri · Topographic',
+        'provider': 'Esri',
+        'url': _esri_service('World_Topo_Map'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 19, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+    'ESRI_DARK_GRAY': {
+        'name': 'Esri · Dark Gray Canvas',
+        'provider': 'Esri',
+        'url': _esri_service('Canvas/World_Dark_Gray_Base'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 16, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+    'ESRI_LIGHT_GRAY': {
+        'name': 'Esri · Light Gray Canvas',
+        'provider': 'Esri',
+        'url': _esri_service('Canvas/World_Light_Gray_Base'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 16, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+    'ESRI_OCEAN': {
+        'name': 'Esri · Ocean Base',
+        'provider': 'Esri',
+        'url': _esri_service('Ocean/World_Ocean_Base'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 13, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+    'ESRI_HILLSHADE': {
+        'name': 'Esri · Hillshade',
+        'provider': 'Esri',
+        'url': _esri_service('Elevation/World_Hillshade'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 16, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+    'ESRI_TERRAIN': {
+        'name': 'Esri · Terrain Base',
+        'provider': 'Esri',
+        'url': _esri_service('World_Terrain_Base'),
+        'attribution': ESRI_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 13, 'needs_key': False,
+        'key_pref': None, 'extension': 'jpg',
+    },
+
+    # --- OpenStreetMap (no key required) ----------------------------------
     'OSM': {
-        'name': 'OpenStreetMap Standard',
+        'name': 'OpenStreetMap · Standard',
+        'provider': 'OpenStreetMap',
         'url': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         'attribution': '© OpenStreetMap contributors',
-        'tile_size': 256,
-        'max_zoom': 19,
-        'needs_key': False,
-        'extension': 'png',
+        'tile_size': 256, 'max_zoom': 19, 'needs_key': False,
+        'key_pref': None, 'extension': 'png',
     },
-    'MAPBOX': {
-        'name': 'Mapbox Satellite',
-        'url': (
-            'https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/'
-            '{z}/{x}/{y}?access_token={key}'
+    'OPENTOPOMAP': {
+        'name': 'OpenTopoMap · Topographic',
+        'provider': 'OpenStreetMap',
+        'url': 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+        'attribution': (
+            '© OpenStreetMap contributors, SRTM — © OpenTopoMap (CC-BY-SA)'
         ),
+        'tile_size': 256, 'max_zoom': 17, 'needs_key': False,
+        'key_pref': None, 'extension': 'png',
+    },
+
+    # --- CARTO (no key required for fair use) -----------------------------
+    'CARTO_VOYAGER': {
+        'name': 'CARTO · Voyager',
+        'provider': 'CARTO',
+        'url': _carto_style('rastertiles/voyager'),
+        'attribution': CARTO_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': False,
+        'key_pref': None, 'extension': 'png',
+    },
+    'CARTO_POSITRON': {
+        'name': 'CARTO · Positron (Light)',
+        'provider': 'CARTO',
+        'url': _carto_style('light_all'),
+        'attribution': CARTO_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': False,
+        'key_pref': None, 'extension': 'png',
+    },
+    'CARTO_DARK_MATTER': {
+        'name': 'CARTO · Dark Matter',
+        'provider': 'CARTO',
+        'url': _carto_style('dark_all'),
+        'attribution': CARTO_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': False,
+        'key_pref': None, 'extension': 'png',
+    },
+
+    # --- Mapbox (requires access token) -----------------------------------
+    'MAPBOX_SATELLITE': {
+        'name': 'Mapbox · Satellite',
+        'provider': 'Mapbox',
+        'url': _mapbox_style('satellite-v9'),
         'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256,
-        'max_zoom': 22,
-        'needs_key': True,
-        'extension': 'jpg',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'mapbox_api_key', 'extension': 'jpg',
     },
-    'MAPTILER': {
-        'name': 'MapTiler Satellite',
-        'url': (
-            'https://api.maptiler.com/maps/satellite/256/'
-            '{z}/{x}/{y}.jpg?key={key}'
-        ),
+    'MAPBOX_SATELLITE_STREETS': {
+        'name': 'Mapbox · Satellite Streets',
+        'provider': 'Mapbox',
+        'url': _mapbox_style('satellite-streets-v12'),
+        'attribution': '© Mapbox © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'mapbox_api_key', 'extension': 'jpg',
+    },
+    'MAPBOX_STREETS': {
+        'name': 'Mapbox · Streets',
+        'provider': 'Mapbox',
+        'url': _mapbox_style('streets-v12'),
+        'attribution': '© Mapbox © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'mapbox_api_key', 'extension': 'png',
+    },
+    'MAPBOX_OUTDOORS': {
+        'name': 'Mapbox · Outdoors',
+        'provider': 'Mapbox',
+        'url': _mapbox_style('outdoors-v12'),
+        'attribution': '© Mapbox © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'mapbox_api_key', 'extension': 'png',
+    },
+    'MAPBOX_LIGHT': {
+        'name': 'Mapbox · Light',
+        'provider': 'Mapbox',
+        'url': _mapbox_style('light-v11'),
+        'attribution': '© Mapbox © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'mapbox_api_key', 'extension': 'png',
+    },
+    'MAPBOX_DARK': {
+        'name': 'Mapbox · Dark',
+        'provider': 'Mapbox',
+        'url': _mapbox_style('dark-v11'),
+        'attribution': '© Mapbox © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'mapbox_api_key', 'extension': 'png',
+    },
+
+    # --- MapTiler (requires key, free tier) -------------------------------
+    'MAPTILER_SATELLITE': {
+        'name': 'MapTiler · Satellite',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('satellite', 'jpg'),
         'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256,
-        'max_zoom': 22,
-        'needs_key': True,
-        'extension': 'jpg',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'jpg',
+    },
+    'MAPTILER_HYBRID': {
+        'name': 'MapTiler · Satellite Hybrid',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('hybrid', 'jpg'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'jpg',
+    },
+    'MAPTILER_STREETS': {
+        'name': 'MapTiler · Streets',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('streets-v2', 'png'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'png',
+    },
+    'MAPTILER_TOPO': {
+        'name': 'MapTiler · Topographic',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('topo-v2', 'png'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'png',
+    },
+    'MAPTILER_OUTDOOR': {
+        'name': 'MapTiler · Outdoor',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('outdoor-v2', 'png'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'png',
+    },
+    'MAPTILER_BASIC': {
+        'name': 'MapTiler · Basic',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('basic-v2', 'png'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'png',
+    },
+    'MAPTILER_WINTER': {
+        'name': 'MapTiler · Winter',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('winter-v2', 'png'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'png',
+    },
+    'MAPTILER_OCEAN': {
+        'name': 'MapTiler · Ocean',
+        'provider': 'MapTiler',
+        'url': _maptiler_map('ocean', 'png'),
+        'attribution': '© MapTiler © OpenStreetMap',
+        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
+        'key_pref': 'maptiler_api_key', 'extension': 'png',
+    },
+
+    # --- Stadia Maps / Stamen (requires key, free tier) -------------------
+    'STADIA_ALIDADE_SMOOTH': {
+        'name': 'Stadia · Alidade Smooth (Light)',
+        'provider': 'Stadia',
+        'url': _stadia_style('alidade_smooth', 'png'),
+        'attribution': STADIA_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
+        'key_pref': 'stadia_api_key', 'extension': 'png',
+    },
+    'STADIA_ALIDADE_SMOOTH_DARK': {
+        'name': 'Stadia · Alidade Smooth Dark',
+        'provider': 'Stadia',
+        'url': _stadia_style('alidade_smooth_dark', 'png'),
+        'attribution': STADIA_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
+        'key_pref': 'stadia_api_key', 'extension': 'png',
+    },
+    'STADIA_OUTDOORS': {
+        'name': 'Stadia · Outdoors',
+        'provider': 'Stadia',
+        'url': _stadia_style('outdoors', 'png'),
+        'attribution': STADIA_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
+        'key_pref': 'stadia_api_key', 'extension': 'png',
+    },
+    'STADIA_STAMEN_TONER': {
+        'name': 'Stadia · Stamen Toner (B/W)',
+        'provider': 'Stadia',
+        'url': _stadia_style('stamen_toner', 'png'),
+        'attribution': STADIA_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
+        'key_pref': 'stadia_api_key', 'extension': 'png',
+    },
+    'STADIA_STAMEN_TERRAIN': {
+        'name': 'Stadia · Stamen Terrain',
+        'provider': 'Stadia',
+        'url': _stadia_style('stamen_terrain', 'png'),
+        'attribution': STADIA_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 18, 'needs_key': True,
+        'key_pref': 'stadia_api_key', 'extension': 'png',
+    },
+    'STADIA_STAMEN_WATERCOLOR': {
+        'name': 'Stadia · Stamen Watercolor',
+        'provider': 'Stadia',
+        'url': _stadia_style('stamen_watercolor', 'jpg'),
+        'attribution': STADIA_ATTRIBUTION,
+        'tile_size': 256, 'max_zoom': 16, 'needs_key': True,
+        'key_pref': 'stadia_api_key', 'extension': 'jpg',
     },
 }
+
+
+#: Backward-compatible aliases for the original flat source keys so scenes
+#: saved before the catalog expansion keep working.
+_LEGACY_SOURCE_ALIASES: dict[str, str] = {
+    'ESRI': 'ESRI_IMAGERY',
+    'MAPBOX': 'MAPBOX_SATELLITE',
+    'MAPTILER': 'MAPTILER_SATELLITE',
+}
+
+
+def resolve_source(source: str) -> str:
+    """Map a (possibly legacy) source key onto a current :data:`TILE_SOURCES` key."""
+    if source in TILE_SOURCES:
+        return source
+    return _LEGACY_SOURCE_ALIASES.get(source, source)
 
 
 _USER_AGENT = (
@@ -185,6 +475,7 @@ def fetch_basemap(
     if source == 'WMS':
         return _fetch_wms_basemap(bounds, wms_url, wms_layer, out_path)
 
+    source = resolve_source(source)
     if source not in TILE_SOURCES:
         raise ValueError(f"Unknown basemap source: {source!r}")
 

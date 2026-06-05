@@ -858,24 +858,26 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                 except Exception:  # noqa: BLE001
                     pass
 
-            # Key-required hint.
-            if props.osmnx_basemap_source in ('MAPBOX', 'MAPTILER'):
-                from ....preferences import get_preferences
-                _prefs = get_preferences()
-                _key = ""
-                if _prefs is not None:
-                    _key = (
-                        _prefs.mapbox_api_key
-                        if props.osmnx_basemap_source == 'MAPBOX'
-                        else _prefs.maptiler_api_key
-                    ) or ""
-                if not _key.strip():
-                    warn = bm.row()
-                    warn.alert = True
-                    warn.label(
-                        text="Set the API key in Add-on Preferences",
-                        icon='ERROR',
-                    )
+            # Key-required hint (generic, driven by the tile-source registry).
+            if props.osmnx_basemap_source != 'WMS':
+                from ....core.geo import imagery as _imagery
+                _src = _imagery.resolve_source(props.osmnx_basemap_source)
+                _cfg = _imagery.TILE_SOURCES.get(_src, {})
+                if _cfg.get('needs_key'):
+                    from ....preferences import get_preferences
+                    _prefs = get_preferences()
+                    _key_pref = _cfg.get('key_pref')
+                    _key = ""
+                    if _prefs is not None and _key_pref:
+                        _key = (getattr(_prefs, _key_pref, "") or "")
+                    if not _key.strip():
+                        _provider = _cfg.get('provider', 'This provider')
+                        warn = bm.row()
+                        warn.alert = True
+                        warn.label(
+                            text=f"Set the {_provider} API key in Add-on Preferences",
+                            icon='ERROR',
+                        )
 
             row = bm.row(align=True)
             row.scale_y = 1.2

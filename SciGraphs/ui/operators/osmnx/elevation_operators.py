@@ -1834,30 +1834,33 @@ class SCIGRAPHS_OT_FetchBasemap(bpy.types.Operator):
             f"E={bounds['east']:.5f} W={bounds['west']:.5f}"
         )
 
-        source = props.osmnx_basemap_source
+        source = imagery.resolve_source(props.osmnx_basemap_source)
 
         api_key = None
         wms_url = None
         wms_layer = None
-        if source in ('MAPBOX', 'MAPTILER'):
-            from ....preferences import get_preferences
-            prefs = get_preferences()
-            if source == 'MAPBOX':
-                api_key = (prefs.mapbox_api_key or "").strip() if prefs else ""
-            else:
-                api_key = (prefs.maptiler_api_key or "").strip() if prefs else ""
-            if not api_key:
-                self.report(
-                    {'ERROR'},
-                    f"{source} requires an API key in Preferences > Add-ons > SciGraphs",
-                )
-                return {'CANCELLED'}
-        elif source == 'WMS':
+        if source == 'WMS':
             wms_url = (props.osmnx_wms_url or "").strip()
             wms_layer = (props.osmnx_wms_layer or "").strip()
             if not wms_url or not wms_layer:
                 self.report({'ERROR'}, "WMS source needs both URL and Layer name")
                 return {'CANCELLED'}
+        else:
+            cfg = imagery.TILE_SOURCES.get(source, {})
+            if cfg.get('needs_key'):
+                from ....preferences import get_preferences
+                prefs = get_preferences()
+                key_pref = cfg.get('key_pref')
+                api_key = ""
+                if prefs and key_pref:
+                    api_key = (getattr(prefs, key_pref, "") or "").strip()
+                if not api_key:
+                    provider = cfg.get('provider', source)
+                    self.report(
+                        {'ERROR'},
+                        f"{provider} requires an API key in Preferences > Add-ons > SciGraphs",
+                    )
+                    return {'CANCELLED'}
 
         # Pre-flight tile estimate so the user does not nuke their disk.
         if source != 'WMS':

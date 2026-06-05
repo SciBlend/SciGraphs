@@ -19,8 +19,8 @@ class SCIGRAPHS_MT_PIE_main(bpy.types.Menu):
         pie.operator("scigraphs.reset_layout", text="Reset Layout", icon='FILE_REFRESH')
         pie.operator_context = 'INVOKE_DEFAULT'
         pie.operator("scigraphs.update_appearance", text="Update Look", icon='MATERIAL')
+        pie.operator("scigraphs.quick_import_dialog", text="Import", icon='IMPORT')
         pie.operator_context = 'EXEC_DEFAULT'
-        pie.operator("scigraphs.check_planarity", text="Planarity", icon='MESH_PLANE')
         pie.operator("scigraphs.export_gexf", text="Export GEXF", icon='EXPORT')
 
 
