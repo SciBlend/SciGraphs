@@ -66,61 +66,60 @@ _ACTION_DEFINITIONS = (
     ("c2g_mesh", "Path Mesh", "METAPATH", "Convert metapaths to mesh", 'MESH_DATA'),
     ("c2g_graph_tools", "Graph Tools", "TOOLS", "Filter, clip, clean, or create isochrones from City2Graph graphs", 'MODIFIER'),
     ("c2g_export", "Export C2G", "DATA", "Export the active City2Graph graph", 'EXPORT'),
+    ("c2g_panel_data", "Data Import", "CITY2GRAPH", "Open the Data Import subpanel", 'IMPORT'),
+    ("c2g_panel_morphology", "Urban Morphology", "MORPHOLOGY", "Open the Urban Morphology subpanel", 'FORCE_MAGNETIC'),
+    ("c2g_panel_proximity", "Proximity Graphs", "PROXIMITY", "Open the Proximity Graphs subpanel", 'PIVOT_INDIVIDUAL'),
+    ("c2g_panel_metapaths", "Metapath Analysis", "METAPATH", "Open the Metapath Analysis subpanel", 'CURVE_PATH'),
+    ("c2g_panel_transport", "Transportation", "TRANSPORT", "Open the Transportation subpanel", 'TIME'),
+    ("c2g_panel_mobility", "Mobility", "MOBILITY", "Open the Mobility (OD Matrix) subpanel", 'SPREADSHEET'),
+    ("c2g_panel_graph_tools", "Graph Tools", "TOOLS", "Open the Graph Tools subpanel", 'MODIFIER'),
+    ("c2g_panel_export", "GeoAI Export", "DATA", "Open the GeoAI Export subpanel", 'EXPORT'),
+    ("sg_panel_data", "Data", "DATA", "Open the Data subpanel", 'IMPORT'),
+    ("sg_panel_layout", "Layout & Positioning", "LAYOUT", "Open the Layout & Positioning subpanel", 'NODETREE'),
+    ("sg_panel_algorithms", "Graph Algorithms", "ALGORITHMS", "Open the Graph Algorithms subpanel", 'SCRIPT'),
+    ("sg_panel_analysis", "Analysis", "ANALYSIS", "Open the Analysis subpanel", 'VIEWZOOM'),
+    ("sg_panel_visualization", "Visualization", "VISUAL", "Open the Visualization subpanel", 'GEOMETRY_NODES'),
+    ("sg_panel_export", "Export & Tools", "TOOLS", "Open the Export & Tools subpanel", 'EXPORT'),
+    ("ox_panel_download", "Download", "OSMNX", "Open the Download subpanel", 'WORLD'),
+    ("ox_panel_graph_ops", "Graph Operations", "OSMNX", "Open the Graph Operations subpanel", 'MOD_DECIM'),
+    ("ox_panel_attributes", "Network Attributes", "ANALYSIS", "Open the Network Attributes subpanel", 'DRIVER'),
+    ("ox_panel_routing", "Routing & Paths", "ROUTING", "Open the Routing & Paths subpanel", 'TRACKING'),
+    ("ox_panel_accessibility", "Accessibility", "ACCESS", "Open the Accessibility subpanel", 'MESH_CIRCLE'),
+    ("ox_panel_statistics", "Statistics & Centrality", "ANALYSIS", "Open the Statistics & Centrality subpanel", 'INFO'),
+    ("ox_panel_features", "Features & POIs", "DATA", "Open the Features & POIs subpanel", 'POINTCLOUD_DATA'),
+    ("ox_panel_elevation", "Elevation & Terrain", "TERRAIN", "Open the Elevation & Terrain subpanel", 'URL'),
+    ("ox_panel_io", "IO / Export", "DATA", "Open the IO / Export subpanel", 'EXPORT'),
 )
 
 _TOOLBAR_PROFILES = {
     _TOOLBAR_SCIGRAPHS: (
-        "panel_data",
-        "panel_layout",
-        "panel_algorithms",
-        "panel_analysis",
-        "panel_visualization",
-        "panel_export",
+        "sg_panel_data",
+        "sg_panel_layout",
+        "sg_panel_algorithms",
+        "sg_panel_analysis",
+        "sg_panel_visualization",
+        "sg_panel_export",
     ),
     _TOOLBAR_OSMNX: (
-        "osmnx_import",
-        "osmnx_project",
-        "osmnx_simplify",
-        "osmnx_consolidate",
-        "osmnx_speeds",
-        "osmnx_travel_times",
-        "osmnx_shortest_path",
-        "osmnx_k_routes",
-        "osmnx_batch_routes",
-        "osmnx_route_summary",
-        "osmnx_isochrones",
-        "osmnx_stats",
-        "osmnx_centrality",
-        "osmnx_attr_colors",
-        "osmnx_orientations",
-        "osmnx_elevation_api",
-        "osmnx_grades",
-        "osmnx_features",
-        "osmnx_cache",
-        "osmnx_export",
+        "ox_panel_download",
+        "ox_panel_graph_ops",
+        "ox_panel_attributes",
+        "ox_panel_routing",
+        "ox_panel_accessibility",
+        "ox_panel_statistics",
+        "ox_panel_features",
+        "ox_panel_elevation",
+        "ox_panel_io",
     ),
     _TOOLBAR_CITY2GRAPH: (
-        "c2g_boundary",
-        "c2g_overture",
-        "c2g_file",
-        "c2g_process_segments",
-        "c2g_segments_graph",
-        "c2g_tessellation",
-        "c2g_morphology",
-        "c2g_proximity",
-        "c2g_multilayer",
-        "c2g_group_nodes",
-        "c2g_gtfs",
-        "c2g_travel",
-        "c2g_od_matrix",
-        "c2g_od_graph",
-        "c2g_dual",
-        "c2g_bridge_amenities",
-        "c2g_metapath_wizard",
-        "c2g_weighted_metapaths",
-        "c2g_mesh",
-        "c2g_graph_tools",
-        "c2g_export",
+        "c2g_panel_data",
+        "c2g_panel_morphology",
+        "c2g_panel_proximity",
+        "c2g_panel_metapaths",
+        "c2g_panel_transport",
+        "c2g_panel_mobility",
+        "c2g_panel_graph_tools",
+        "c2g_panel_export",
     ),
 }
 
@@ -134,15 +133,45 @@ _ACTION_INFO = {
 }
 
 
+_TOOLBAR_ORDER = (_TOOLBAR_SCIGRAPHS, _TOOLBAR_OSMNX, _TOOLBAR_CITY2GRAPH)
+
+_TOOLBAR_LABELS = {
+    _TOOLBAR_SCIGRAPHS: "SciGraphs",
+    _TOOLBAR_OSMNX: "OSMnx",
+    _TOOLBAR_CITY2GRAPH: "City2Graph",
+}
+
+
 def set_active_toolbar(context, toolbar):
-    """Select the toolbar profile to show when the quick toolbar is visible."""
+    """Select the toolbar profile to show when the quick toolbar is visible.
+
+    Honors the manual override set by the navbar arrows: while the override is
+    active, contextual auto-switching from the side panels is ignored so the
+    user-selected profile stays put.
+    """
     wm = context.window_manager
     if toolbar not in _TOOLBAR_PROFILES:
         toolbar = _TOOLBAR_SCIGRAPHS
 
+    if getattr(wm, "scigraphs_quick_toolbar_manual", False):
+        return
+
     if hasattr(wm, "scigraphs_active_quick_toolbar") and wm.scigraphs_active_quick_toolbar != toolbar:
         wm.scigraphs_active_quick_toolbar = toolbar
         _tag_3d_views(context)
+
+
+def select_active_toolbar(context, toolbar):
+    """Force a toolbar profile from the navbar arrows and pin it as manual."""
+    wm = context.window_manager
+    if toolbar not in _TOOLBAR_PROFILES:
+        toolbar = _TOOLBAR_SCIGRAPHS
+
+    if hasattr(wm, "scigraphs_quick_toolbar_manual"):
+        wm.scigraphs_quick_toolbar_manual = True
+    if hasattr(wm, "scigraphs_active_quick_toolbar"):
+        wm.scigraphs_active_quick_toolbar = toolbar
+    _tag_3d_views(context)
 
 
 def _active_toolbar(context):
@@ -150,6 +179,14 @@ def _active_toolbar(context):
     if toolbar not in _TOOLBAR_PROFILES:
         return _TOOLBAR_SCIGRAPHS
     return toolbar
+
+
+def _cycle_toolbar(current, step):
+    try:
+        index = _TOOLBAR_ORDER.index(current)
+    except ValueError:
+        index = 0
+    return _TOOLBAR_ORDER[(index + step) % len(_TOOLBAR_ORDER)]
 
 
 def _current_actions(context):
@@ -420,8 +457,33 @@ class SCIGRAPHS_OT_set_quick_toolbar(bpy.types.Operator):
 
     def execute(self, context):
         context.window_manager.scigraphs_show_quick_toolbar = True
-        set_active_toolbar(context, self.toolbar)
+        select_active_toolbar(context, self.toolbar)
         self.report({'INFO'}, f"{self.toolbar} quick toolbar shown")
+        return {'FINISHED'}
+
+
+class SCIGRAPHS_OT_cycle_quick_toolbar(bpy.types.Operator):
+    """Switch the floating toolbar to the previous or next profile."""
+    bl_idname = "scigraphs.cycle_quick_toolbar"
+    bl_label = "Cycle SciGraphs Quick Toolbar"
+    bl_description = "Switch the floating toolbar between SciGraphs, OSMnx, and City2Graph"
+
+    direction: bpy.props.EnumProperty(
+        name="Direction",
+        items=[
+            ('PREV', "Previous", "Switch to the previous toolbar profile"),
+            ('NEXT', "Next", "Switch to the next toolbar profile"),
+        ],
+        default='NEXT',
+        options={'SKIP_SAVE'},
+    )
+
+    def execute(self, context):
+        context.window_manager.scigraphs_show_quick_toolbar = True
+        step = 1 if self.direction == 'NEXT' else -1
+        target = _cycle_toolbar(_active_toolbar(context), step)
+        select_active_toolbar(context, target)
+        self.report({'INFO'}, f"{_TOOLBAR_LABELS.get(target, target)} toolbar")
         return {'FINISHED'}
 
 
@@ -1015,6 +1077,136 @@ class SCIGRAPHS_OT_city2graph_quick_action_dialog(bpy.types.Operator):
         return op()
 
 
+class _PanelDrawProxy:
+    """Lightweight stand-in exposing a fixed layout to a Panel draw method."""
+
+    def __init__(self, layout):
+        self.layout = layout
+
+
+_SCIGRAPHS_SUBPANELS = (
+    ("sg_data", "Data", 'IMPORT', "SCIGRAPHS_PT_data"),
+    ("sg_layout", "Layout & Positioning", 'NODETREE', "SCIGRAPHS_PT_layout"),
+    ("sg_algorithms", "Graph Algorithms", 'SCRIPT', "SCIGRAPHS_PT_algorithms"),
+    ("sg_analysis", "Analysis", 'VIEWZOOM', "SCIGRAPHS_PT_analysis"),
+    ("sg_visualization", "Visualization", 'GEOMETRY_NODES', "SCIGRAPHS_PT_visualization"),
+    ("sg_export", "Export & Tools", 'EXPORT', "SCIGRAPHS_PT_export"),
+)
+
+_OSMNX_SUBPANELS = (
+    ("ox_download", "Download", 'WORLD', "SCIGRAPHS_PT_osmnx_download"),
+    ("ox_graph_ops", "Graph Operations", 'MOD_DECIM', "SCIGRAPHS_PT_osmnx_graph_ops"),
+    ("ox_attributes", "Network Attributes", 'DRIVER', "SCIGRAPHS_PT_osmnx_attributes"),
+    ("ox_routing", "Routing & Paths", 'TRACKING', "SCIGRAPHS_PT_osmnx_routing"),
+    ("ox_accessibility", "Accessibility", 'MESH_CIRCLE', "SCIGRAPHS_PT_osmnx_accessibility"),
+    ("ox_statistics", "Statistics & Centrality", 'INFO', "SCIGRAPHS_PT_osmnx_statistics"),
+    ("ox_features", "Features & POIs", 'POINTCLOUD_DATA', "SCIGRAPHS_PT_osmnx_features"),
+    ("ox_elevation", "Elevation & Terrain", 'URL', "SCIGRAPHS_PT_osmnx_elevation"),
+    ("ox_io", "IO / Export", 'EXPORT', "SCIGRAPHS_PT_osmnx_io"),
+)
+
+_CITY2GRAPH_SUBPANELS = (
+    ("data", "Data Import", 'IMPORT', "SCIGRAPHS_PT_c2g_data"),
+    ("morphology", "Urban Morphology", 'FORCE_MAGNETIC', "SCIGRAPHS_PT_c2g_morphology"),
+    ("proximity", "Proximity Graphs", 'PIVOT_INDIVIDUAL', "SCIGRAPHS_PT_c2g_proximity"),
+    ("metapaths", "Metapath Analysis", 'CURVE_PATH', "SCIGRAPHS_PT_c2g_metapaths"),
+    ("transport", "Transportation", 'TIME', "SCIGRAPHS_PT_c2g_transport"),
+    ("mobility", "Mobility (OD Matrix)", 'SPREADSHEET', "SCIGRAPHS_PT_c2g_mobility"),
+    ("graph_tools", "Graph Tools", 'MODIFIER', "SCIGRAPHS_PT_c2g_graph_tools"),
+    ("export", "GeoAI Export", 'EXPORT', "SCIGRAPHS_PT_c2g_export"),
+)
+
+_SUBPANEL_BY_KEY = {
+    key: (label, icon, panel_id)
+    for key, label, icon, panel_id in (
+        *_SCIGRAPHS_SUBPANELS,
+        *_OSMNX_SUBPANELS,
+        *_CITY2GRAPH_SUBPANELS,
+    )
+}
+
+
+class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
+    """Open a SciGraphs side-panel subpanel as a popup, mirroring its full contents."""
+    bl_idname = "scigraphs.open_subpanel"
+    bl_label = "Open Subpanel"
+    bl_description = "Open a side-panel subpanel as a popup dialog"
+
+    subpanel: bpy.props.StringProperty(options={'SKIP_SAVE'})
+
+    def invoke(self, context, event):
+        if self.subpanel not in _SUBPANEL_BY_KEY:
+            self.report({'WARNING'}, f"Unknown subpanel: {self.subpanel}")
+            return {'CANCELLED'}
+        return context.window_manager.invoke_popup(self, width=560)
+
+    def draw(self, context):
+        layout = self.layout
+        entry = _SUBPANEL_BY_KEY.get(self.subpanel)
+        if entry is None:
+            layout.label(text="Unknown subpanel", icon='ERROR')
+            return
+
+        label, icon, panel_id = entry
+        panel_cls = getattr(bpy.types, panel_id, None)
+        if panel_cls is None:
+            layout.label(text=f"Panel not available: {panel_id}", icon='ERROR')
+            return
+
+        header = layout.row()
+        header.label(text=label, icon=icon)
+        layout.separator()
+
+        self._draw_panel_tree(context, layout, panel_id)
+
+    def _draw_panel_tree(self, context, layout, panel_id):
+        panel_cls = getattr(bpy.types, panel_id, None)
+        if panel_cls is None:
+            return
+
+        if hasattr(panel_cls, "poll") and not panel_cls.poll(context):
+            return
+
+        panel_cls.draw(_PanelDrawProxy(layout), context)
+
+        for child_id in self._child_panels(panel_id):
+            child_cls = getattr(bpy.types, child_id, None)
+            if child_cls is None:
+                continue
+            box = layout.box()
+            box.label(text=getattr(child_cls, "bl_label", child_id))
+            self._draw_child_panel(context, box, child_cls, child_id)
+
+    def _draw_child_panel(self, context, layout, panel_cls, panel_id):
+        if hasattr(panel_cls, "poll") and not panel_cls.poll(context):
+            layout.label(text="Not available in the current context.", icon='INFO')
+            return
+        panel_cls.draw(_PanelDrawProxy(layout), context)
+
+        for child_id in self._child_panels(panel_id):
+            child_cls = getattr(bpy.types, child_id, None)
+            if child_cls is None:
+                continue
+            sub = layout.box()
+            sub.label(text=getattr(child_cls, "bl_label", child_id))
+            self._draw_child_panel(context, sub, child_cls, child_id)
+
+    @staticmethod
+    def _child_panels(parent_id):
+        children = []
+        for attr in dir(bpy.types):
+            cls = getattr(bpy.types, attr, None)
+            if cls is None:
+                continue
+            if getattr(cls, "bl_parent_id", None) == parent_id:
+                children.append(attr)
+        children.sort(key=lambda name: getattr(getattr(bpy.types, name), "bl_order", 1000))
+        return children
+
+    def execute(self, context):
+        return {'FINISHED'}
+
+
 class SCIGRAPHS_OT_panel_quick_dialog(bpy.types.Operator):
     """Panel-oriented quick controls for the SciGraphs toolbar."""
     bl_idname = "scigraphs.panel_quick_dialog"
@@ -1339,7 +1531,7 @@ class SCIGRAPHS_OT_drag_quick_toolbar(bpy.types.Operator):
     def invoke(self, context, event):
         wm = context.window_manager
         if wm.scigraphs_quick_toolbar_x < 0 or wm.scigraphs_quick_toolbar_y < 0:
-            x, y, _spacing = _toolbar_origin(context, len(_current_actions(context)) + 2)
+            x, y, _spacing = _toolbar_origin(context, len(_current_actions(context)) + 4)
             wm.scigraphs_quick_toolbar_x = int(x)
             wm.scigraphs_quick_toolbar_y = int(y)
 
@@ -1370,7 +1562,7 @@ class SCIGRAPHS_OT_drag_quick_toolbar(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        x, y, _spacing = _toolbar_origin(context, len(_current_actions(context)) + 2)
+        x, y, _spacing = _toolbar_origin(context, len(_current_actions(context)) + 4)
         context.window_manager.scigraphs_quick_toolbar_x = int(x)
         context.window_manager.scigraphs_quick_toolbar_y = int(y)
         _tag_3d_views(context)
@@ -1398,7 +1590,35 @@ class SCIGRAPHS_OT_quick_toolbar_action(bpy.types.Operator):
                 "panel_export": "EXPORT",
             }
 
-            if action in panel_actions:
+            subpanel_actions = {
+                "sg_panel_data": "sg_data",
+                "sg_panel_layout": "sg_layout",
+                "sg_panel_algorithms": "sg_algorithms",
+                "sg_panel_analysis": "sg_analysis",
+                "sg_panel_visualization": "sg_visualization",
+                "sg_panel_export": "sg_export",
+                "ox_panel_download": "ox_download",
+                "ox_panel_graph_ops": "ox_graph_ops",
+                "ox_panel_attributes": "ox_attributes",
+                "ox_panel_routing": "ox_routing",
+                "ox_panel_accessibility": "ox_accessibility",
+                "ox_panel_statistics": "ox_statistics",
+                "ox_panel_features": "ox_features",
+                "ox_panel_elevation": "ox_elevation",
+                "ox_panel_io": "ox_io",
+                "c2g_panel_data": "data",
+                "c2g_panel_morphology": "morphology",
+                "c2g_panel_proximity": "proximity",
+                "c2g_panel_metapaths": "metapaths",
+                "c2g_panel_transport": "transport",
+                "c2g_panel_mobility": "mobility",
+                "c2g_panel_graph_tools": "graph_tools",
+                "c2g_panel_export": "export",
+            }
+
+            if action in subpanel_actions:
+                bpy.ops.scigraphs.open_subpanel('INVOKE_DEFAULT', subpanel=subpanel_actions[action])
+            elif action in panel_actions:
                 bpy.ops.scigraphs.panel_quick_dialog('INVOKE_DEFAULT', panel=panel_actions[action])
             elif action == "pie_main":
                 bpy.ops.wm.call_menu_pie(name="SCIGRAPHS_MT_PIE_main")
@@ -1550,6 +1770,28 @@ class SCIGRAPHS_GGT_quick_toolbar(bpy.types.GizmoGroup):
         move_button.target_set_operator("scigraphs.drag_quick_toolbar")
         self._buttons.append(move_button)
 
+        prev_button = self.gizmos.new("GIZMO_GT_button_2d")
+        prev_button.icon = 'TRIA_LEFT'
+        prev_button.color = (0.10, 0.10, 0.14)
+        prev_button.color_highlight = (0.25, 0.35, 0.55)
+        prev_button.alpha = 0.6
+        prev_button.alpha_highlight = 0.95
+        prev_button.scale_basis = 12
+        op_props = prev_button.target_set_operator("scigraphs.cycle_quick_toolbar")
+        op_props.direction = 'PREV'
+        self._prev_button = prev_button
+
+        next_button = self.gizmos.new("GIZMO_GT_button_2d")
+        next_button.icon = 'TRIA_RIGHT'
+        next_button.color = (0.10, 0.10, 0.14)
+        next_button.color_highlight = (0.25, 0.35, 0.55)
+        next_button.alpha = 0.6
+        next_button.alpha_highlight = 0.95
+        next_button.scale_basis = 12
+        op_props = next_button.target_set_operator("scigraphs.cycle_quick_toolbar")
+        op_props.direction = 'NEXT'
+        self._next_button = next_button
+
         for action, _label, category, _description, icon in _ACTION_DEFINITIONS:
             button = self.gizmos.new("GIZMO_GT_button_2d")
             button.icon = icon
@@ -1574,11 +1816,17 @@ class SCIGRAPHS_GGT_quick_toolbar(bpy.types.GizmoGroup):
 
     def draw_prepare(self, context):
         current_actions = _current_actions(context)
-        x, y, spacing = _toolbar_origin(context, len(current_actions) + len(self._buttons))
+        active = _active_toolbar(context)
+        leading = 4
+        x, y, spacing = _toolbar_origin(context, len(current_actions) + leading)
 
-        visible_buttons = [self._buttons[0]]
+        move_button = self._buttons[0]
+        close_button = self._buttons[-1]
+
+        visible_buttons = [move_button, self._prev_button]
         visible_buttons.extend(self._action_buttons[action] for action in current_actions)
-        visible_buttons.append(self._buttons[-1])
+        visible_buttons.append(self._next_button)
+        visible_buttons.append(close_button)
 
         hidden_pos = Matrix.Translation((-10000, -10000, 0))
         for button in self._action_buttons.values():
@@ -1587,14 +1835,35 @@ class SCIGRAPHS_GGT_quick_toolbar(bpy.types.GizmoGroup):
         for index, button in enumerate(visible_buttons):
             button.matrix_basis = Matrix.Translation((x + index * spacing, y, 0))
 
+        prev_target = _cycle_toolbar(active, -1)
+        next_target = _cycle_toolbar(active, 1)
+        active_label = _TOOLBAR_LABELS.get(active, active)
+
         tooltip = None
-        if getattr(visible_buttons[0], "is_highlight", False):
+        if getattr(move_button, "is_highlight", False):
             tooltip = ("Move Toolbar", "Drag to reposition the floating SciGraphs toolbar.", "TOOLBAR", x, y)
-        elif getattr(visible_buttons[-1], "is_highlight", False):
+        elif getattr(self._prev_button, "is_highlight", False):
+            tooltip = (
+                f"Toolbar: {active_label}",
+                f"Switch to the {_TOOLBAR_LABELS.get(prev_target, prev_target)} toolbar.",
+                "TOOLBAR",
+                x + spacing,
+                y,
+            )
+        elif getattr(self._next_button, "is_highlight", False):
+            next_x = x + (len(visible_buttons) - 2) * spacing
+            tooltip = (
+                f"Toolbar: {active_label}",
+                f"Switch to the {_TOOLBAR_LABELS.get(next_target, next_target)} toolbar.",
+                "TOOLBAR",
+                next_x,
+                y,
+            )
+        elif getattr(close_button, "is_highlight", False):
             close_x = x + (len(visible_buttons) - 1) * spacing
             tooltip = ("Hide Toolbar", "Hide the floating toolbar. You can re-enable it from the SciGraphs viewport menu.", "TOOLBAR", close_x, y)
         else:
-            for action_index, action in enumerate(current_actions, start=1):
+            for action_index, action in enumerate(current_actions, start=2):
                 button = self._action_buttons[action]
                 if getattr(button, "is_highlight", False):
                     info = _ACTION_INFO.get(action)
@@ -1644,10 +1913,12 @@ _CLASSES = [
     SCIGRAPHS_OT_enable_node_gizmos,
     SCIGRAPHS_OT_toggle_quick_toolbar,
     SCIGRAPHS_OT_set_quick_toolbar,
+    SCIGRAPHS_OT_cycle_quick_toolbar,
     SCIGRAPHS_OT_quick_import_dialog,
     SCIGRAPHS_OT_osmnx_quick_import_dialog,
     SCIGRAPHS_OT_osmnx_quick_action_dialog,
     SCIGRAPHS_OT_city2graph_quick_action_dialog,
+    SCIGRAPHS_OT_open_subpanel,
     SCIGRAPHS_OT_panel_quick_dialog,
     SCIGRAPHS_OT_drag_quick_toolbar,
     SCIGRAPHS_OT_quick_toolbar_action,
@@ -1670,6 +1941,11 @@ def register():
             (_TOOLBAR_CITY2GRAPH, "City2Graph", ""),
         ],
         default=_TOOLBAR_SCIGRAPHS,
+    )
+    bpy.types.WindowManager.scigraphs_quick_toolbar_manual = bpy.props.BoolProperty(
+        name="SciGraphs Toolbar Manual Override",
+        description="When enabled, the navbar arrows pin the profile and ignore contextual auto-switching",
+        default=False,
     )
     bpy.types.WindowManager.scigraphs_quick_toolbar_x = bpy.props.IntProperty(
         name="SciGraphs Toolbar X",
@@ -1695,5 +1971,6 @@ def unregister():
 
     del bpy.types.WindowManager.scigraphs_quick_toolbar_y
     del bpy.types.WindowManager.scigraphs_quick_toolbar_x
+    del bpy.types.WindowManager.scigraphs_quick_toolbar_manual
     del bpy.types.WindowManager.scigraphs_active_quick_toolbar
     del bpy.types.WindowManager.scigraphs_show_quick_toolbar
