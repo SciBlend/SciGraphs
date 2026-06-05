@@ -26,8 +26,8 @@ exists (elevation applied, terrain created, etc.).
 | **Export AOI** | Export the area bbox to fetch a DEM externally (Copernicus, EarthData…) and re-enter it as a **Local GeoTIFF**. |
 
 ::: {.callout-important}
-OpenTopography requires an API key set in add-on preferences; Mapbox/MapTiler
-basemaps (below) require their own keys.
+OpenTopography requires an API key set in add-on preferences; the key-bound
+basemap providers below (Mapbox, MapTiler, Stadia/Stamen) require their own keys.
 :::
 
 ## Step 2 — 3D Positions
@@ -54,7 +54,7 @@ basemaps (below) require their own keys.
 
 | Control | Description |
 | --- | --- |
-| **Source** | Imagery source (OSM/ESRI tiles, **WMS**, Mapbox, MapTiler). |
+| **Source** | Imagery style, grouped by provider: **Esri** (Satellite, Streets, Topographic, Dark/Light Gray, Ocean, Hillshade, Terrain), **OpenStreetMap** (Standard, OpenTopoMap), **CARTO** (Voyager, Positron, Dark Matter), **Mapbox**, **MapTiler**, **Stadia/Stamen**, or a custom **WMS** layer. |
 | **WMS URL / Layer** | Endpoint and layer (WMS source). |
 | **Zoom** | Tile zoom level (tile sources). A live estimate warns before large downloads. |
 | **Bbox Padding** | Extra margin (legacy fallback when no DEM bbox is recorded). |

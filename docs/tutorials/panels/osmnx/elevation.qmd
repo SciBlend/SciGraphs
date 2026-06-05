@@ -71,9 +71,10 @@ route to see the difference.
 
 ## 6. Add a basemap
 
-In **Step 5 — Basemap Texture**, choose a **Source** (ESRI/OSM/Mapbox/MapTiler/WMS)
-and **Zoom**, then **Fetch & Apply** to drape satellite or map imagery over the
-terrain.
+In **Step 5 — Basemap Texture**, choose a **Source** — the dropdown is grouped by
+provider (Esri, OpenStreetMap, CARTO, Mapbox, MapTiler, Stadia/Stamen) plus a
+custom WMS option, each exposing several styles — and a **Zoom**, then
+**Fetch & Apply** to drape satellite or map imagery over the terrain.
 
 ![Satellite imagery draped over the La Paz terrain.](../../../assets/guides/osmnx/09-basemap.png)
 

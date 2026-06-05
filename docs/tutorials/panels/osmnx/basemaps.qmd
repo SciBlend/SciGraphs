@@ -5,8 +5,9 @@ title: "OSMnx · Basemaps & API textures (La Paz)"
 ::: {.lead}
 Drape satellite, street and WMS imagery over the **Avenida Naciones Unidas, La
 Paz** terrain. La Paz's dramatic relief makes each basemap texture
-fetched through the imagery APIs (ESRI, OpenStreetMap, Mapbox, MapTiler, WMS)
-read clearly across the slopes, so it is the reference case for this workflow.
+fetched through the imagery APIs (Esri, OpenStreetMap, CARTO, Mapbox, MapTiler,
+Stadia/Stamen, WMS) read clearly across the slopes, so it is the reference case
+for this workflow.
 :::
 
 This walkthrough focuses on **Step 5 — Basemap Texture** of the
@@ -20,8 +21,9 @@ This walkthrough focuses on **Step 5 — Basemap Texture** of the
   controls only appear once a terrain object is present.
 - Ensure Blender has internet access. The imagery APIs stream map tiles or a WMS
   image over the network.
-- Mapbox and MapTiler require their own API keys, set in add-on preferences. ESRI,
-  OpenStreetMap and most public WMS endpoints work without a key.
+- Mapbox, MapTiler and Stadia/Stamen require their own API keys, set in add-on
+  preferences. Esri, OpenStreetMap, CARTO and most public WMS endpoints work
+  without a key.
 
 ## 1. Why La Paz for basemaps
 
@@ -35,32 +37,52 @@ georeferenced and aligned with the streets.
 
 ## 2. Choose an imagery source
 
-Expand **Step 5 — Basemap Texture** and set **Source**:
+Expand **Step 5 — Basemap Texture** and set **Source**. The dropdown is grouped
+by provider; each API exposes several styles, so you can pick the exact look that
+suits the scene (satellite, streets, dark, light, topographic, ...).
+
+### No API key required
+
+| Provider | Styles | API key |
+| --- | --- | --- |
+| **Esri** | Satellite (Imagery), Streets, Topographic, Dark Gray Canvas, Light Gray Canvas, Ocean Base, Hillshade, Terrain Base | No |
+| **OpenStreetMap** | OSM Standard, OpenTopoMap | No |
+| **CARTO** | Voyager, Positron (Light), Dark Matter | No (fair-use) |
+
+### API key required (set in add-on preferences)
+
+| Provider | Styles | API key |
+| --- | --- | --- |
+| **Mapbox** | Satellite, Satellite Streets, Streets, Outdoors, Light, Dark | Mapbox token |
+| **MapTiler** | Satellite, Satellite Hybrid, Streets, Topographic, Outdoor, Basic, Winter, Ocean | MapTiler key |
+| **Stadia / Stamen** | Alidade Smooth (Light), Alidade Smooth Dark, Outdoors, Stamen Toner (B/W), Stamen Terrain, Stamen Watercolor | Stadia key |
+
+### Custom
 
 | Source | Imagery | API key |
 | --- | --- | --- |
-| **ESRI** | Esri World Imagery (satellite tiles) | No |
-| **OSM** | OpenStreetMap standard street tiles | No |
-| **MAPBOX** | Mapbox Satellite tiles | Yes |
-| **MAPTILER** | MapTiler Satellite tiles | Yes |
-| **WMS** | Any OGC WMS `GetMap` layer | Depends on server |
+| **Custom WMS** | Any OGC WMS `GetMap` layer | Depends on server |
 
-For a first pass, **ESRI** gives high-resolution satellite imagery with no key.
+For a first pass, **Esri · Satellite (Imagery)** gives high-resolution satellite
+imagery with no key. The minimal **CARTO** and **Esri** canvas styles (Positron,
+Dark Matter, Light/Dark Gray) work well as neutral backdrops for data overlays.
 
 ![Selecting an imagery source in the Basemap Texture step.](../../../assets/guides/osmnx/10-basemap-source.png)
 
 ::: {.callout-note}
-For **Mapbox** or **MapTiler**, set the matching key in add-on preferences. When a
-key-bound source is selected without a key, the panel shows a hint and the fetch
-is blocked until the key is provided.
+For key-bound providers (**Mapbox**, **MapTiler**, **Stadia/Stamen**), set the
+matching key in add-on preferences. When a key-bound source is selected without a
+key, the panel names the provider in a hint and the fetch is blocked until the key
+is provided.
 :::
 
 ## 3. Set zoom (tile sources)
 
-For tile sources (ESRI/OSM/Mapbox/MapTiler), set **Zoom**. Higher zoom means more
-detail and more tiles to download. A live tile-count estimate is shown so you can
-balance detail against download size before fetching; very high zoom over the 2 km
-radius is capped to protect against accidental large requests.
+For all tile sources (every provider except WMS), set **Zoom**. Higher zoom means
+more detail and more tiles to download. A live tile-count estimate is shown so you
+can balance detail against download size before fetching; very high zoom over the
+2 km radius is capped to protect against accidental large requests. Some styles
+have a lower native maximum zoom and are clamped automatically.
 
 ![The zoom control with the live tile-count estimate.](../../../assets/guides/osmnx/10-basemap-zoom.png)
 
@@ -90,9 +112,9 @@ onto the mesh.
 ## 6. Compare and swap textures
 
 Press **Clear** to remove the current basemap, then fetch a different source to
-compare them on the same relief — for example ESRI satellite versus an OSM street
-basemap versus a WMS orthophoto. Downloaded tiles are cached, so re-fetching the
-same source and zoom is fast.
+compare them on the same relief — for example Esri satellite versus a CARTO Dark
+Matter backdrop versus a Stamen Watercolor style versus a WMS orthophoto.
+Downloaded tiles are cached, so re-fetching the same source and zoom is fast.
 
 ![Comparing satellite and street basemaps on the same La Paz terrain.](../../../assets/guides/osmnx/10-basemap-compare.png)
 
