@@ -117,7 +117,7 @@ SCHEMA = {
             "clustering": {
                 "type": "object",
                 "properties": {
-                    "algorithm": {"type": "string", "default": "louvain", "enum": ["louvain", "leiden", "rn", "infomap", "label_prop"]},
+                    "algorithm": {"type": "string", "default": "rn", "enum": ["cpm", "infomap", "rb", "rn", "rnsc", "scluster", "uvcluster", "louvain", "leiden"]},
                     "resolution": {"type": "number", "default": 1.0},
                 }
             },
@@ -183,9 +183,18 @@ SCHEMA = {
             "type": "object",
             "required": ["id"],
             "properties": {
-                "id": {"type": "string", "description": "Operator bl_idname (e.g., scigraphs.apply_layout)"},
-                "props": {"type": "object", "description": "Operator properties to set"},
-                "scene_props": {"type": "object", "description": "Scene properties to set before calling"},
+                "id": {"type": "string", "description": "Operator bl_idname (e.g., scigraphs.apply_layout) or a registry shortcut"},
+                "props": {"type": "object", "description": "Operator keyword properties passed directly to the operator call"},
+                "scene_props": {
+                    "type": "object",
+                    "description": (
+                        "Scene properties to set before calling. Either a flat "
+                        "mapping applied to scene.scigraphs, or a mapping keyed "
+                        "by property group: scigraphs, city2graph, coloring, "
+                        "viz, repro, splitter. Example: "
+                        "{\"city2graph\": {\"prox_knn_k\": 8}, \"coloring\": {\"colormap\": \"magma\"}}"
+                    ),
+                },
             }
         },
         "default": []
@@ -223,7 +232,7 @@ class DatasetSpec:
 
 @dataclass
 class ClusteringSpec:
-    algorithm: str = "louvain"
+    algorithm: str = "rn"
     resolution: float = 1.0
 
 

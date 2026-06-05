@@ -1078,10 +1078,43 @@ class SCIGRAPHS_OT_city2graph_quick_action_dialog(bpy.types.Operator):
 
 
 class _PanelDrawProxy:
-    """Lightweight stand-in exposing a fixed layout to a Panel draw method."""
+    """Stand-in for a Panel instance during popup drawing.
 
-    def __init__(self, layout):
+    Exposes a fixed ``layout`` and delegates any other attribute lookup
+    (e.g. helper methods like ``_draw_database_ui`` or class attributes such as
+    ``bl_label``) to the originating Panel class, binding instance methods to
+    this proxy so ``self._draw_*`` calls inside the panel's ``draw`` keep
+    working when rendered from a popup.
+    """
+
+    def __init__(self, layout, panel_cls=None):
         self.layout = layout
+        self._panel_cls = panel_cls
+
+    def __getattr__(self, name):
+        panel_cls = self.__dict__.get("_panel_cls")
+        if panel_cls is None:
+            raise AttributeError(name)
+
+        # Inspect the raw descriptor across the MRO to tell instance methods
+        # (which must be bound to this proxy) from static/class methods and
+        # plain attributes (which are returned as-is).
+        raw = None
+        for klass in getattr(panel_cls, "__mro__", [panel_cls]):
+            if name in vars(klass):
+                raw = vars(klass)[name]
+                break
+
+        if isinstance(raw, staticmethod):
+            return raw.__func__
+        if isinstance(raw, classmethod):
+            return raw.__func__.__get__(panel_cls, type(panel_cls))
+
+        attr = getattr(panel_cls, name)
+        import types as _types
+        if isinstance(raw, _types.FunctionType):
+            return attr.__get__(self, type(self))
+        return attr
 
 
 _SCIGRAPHS_SUBPANELS = (
@@ -1138,7 +1171,10 @@ class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
         if self.subpanel not in _SUBPANEL_BY_KEY:
             self.report({'WARNING'}, f"Unknown subpanel: {self.subpanel}")
             return {'CANCELLED'}
-        return context.window_manager.invoke_popup(self, width=560)
+        # invoke_props_dialog re-runs draw() on every redraw, so conditional
+        # panel UI (e.g. the Data source switch) updates live. invoke_popup is
+        # static and would freeze the panel at its initial state.
+        return context.window_manager.invoke_props_dialog(self, width=560)
 
     def draw(self, context):
         layout = self.layout
@@ -1167,7 +1203,7 @@ class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
         if hasattr(panel_cls, "poll") and not panel_cls.poll(context):
             return
 
-        panel_cls.draw(_PanelDrawProxy(layout), context)
+        panel_cls.draw(_PanelDrawProxy(layout, panel_cls), context)
 
         for child_id in self._child_panels(panel_id):
             child_cls = getattr(bpy.types, child_id, None)
@@ -1181,15 +1217,15 @@ class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
         if hasattr(panel_cls, "poll") and not panel_cls.poll(context):
             layout.label(text="Not available in the current context.", icon='INFO')
             return
-        panel_cls.draw(_PanelDrawProxy(layout), context)
+        panel_cls.draw(_PanelDrawProxy(layout, panel_cls), context)
 
         for child_id in self._child_panels(panel_id):
-            child_cls = getattr(bpy.types, child_id, None)
-            if child_cls is None:
+            grandchild_cls = getattr(bpy.types, child_id, None)
+            if grandchild_cls is None:
                 continue
             sub = layout.box()
-            sub.label(text=getattr(child_cls, "bl_label", child_id))
-            self._draw_child_panel(context, sub, child_cls, child_id)
+            sub.label(text=getattr(grandchild_cls, "bl_label", child_id))
+            self._draw_child_panel(context, sub, grandchild_cls, child_id)
 
     @staticmethod
     def _child_panels(parent_id):

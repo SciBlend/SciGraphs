@@ -73,6 +73,8 @@ visualization, render, and export — from a short declarative JSON or YAML file
 
 Each run emits a canonical specification, a provenance manifest (with
 input/output hashes and timing), and an execution log, so the same seed and
-inputs reproduce the same result. See the
+inputs reproduce the same result. To author your own files, see
+**[Writing pipeline files](pipeline-schema.qmd)** for the full schema and the
+`ops` escape hatch that exposes every SciGraphs parameter. See also the
 **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)** and the
 **[reproducible-pipeline example](../examples/05-reproducible-pipeline.qmd)**.

@@ -9,6 +9,7 @@ from .executor import PipelineExecutor, ExecutionResult
 from .registry import OperatorRegistry, get_registry
 from .provenance import ProvenanceManifest, create_manifest, save_manifest
 from .determinism import set_deterministic_seed, get_seed_context, SeedContext
+from .reference import generate_reference_markdown, write_reference_markdown
 
 __all__ = [
     # Schema
@@ -33,4 +34,7 @@ __all__ = [
     'set_deterministic_seed',
     'get_seed_context',
     'SeedContext',
+    # Reference
+    'generate_reference_markdown',
+    'write_reference_markdown',
 ]

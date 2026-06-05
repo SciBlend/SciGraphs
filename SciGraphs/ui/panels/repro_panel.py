@@ -39,6 +39,7 @@ class SCIGRAPHS_PT_reproducibility(Panel):
         col = box.column(align=True)
         col.operator("scigraphs.export_pipeline_template", text="Export Template", icon='EXPORT')
         col.operator("scigraphs.export_current_repro_spec", text="Export Current Scene", icon='SCENE_DATA')
+        col.operator("scigraphs.export_repro_reference", text="Export Options Reference", icon='HELP')
 
         # Output folder
         layout.separator()

@@ -637,6 +637,83 @@ def get_registry() -> OperatorRegistry:
     return _registry
 
 
+# Scene property-group aliases. Maps a friendly pipeline group name to the
+# ``bpy.types.Scene`` attribute that holds the corresponding PointerProperty.
+# This lets pipelines expose every SciGraphs property group, not just
+# ``scene.scigraphs``.
+SCENE_PROPERTY_GROUPS: Dict[str, str] = {
+    "scigraphs": "scigraphs",
+    "city2graph": "city2graph",
+    "coloring": "scigraphs_coloring",
+    "viz": "scigraphs_viz",
+    "repro": "scigraphs_repro",
+    "splitter": "scigraphs_splitter",
+}
+
+
+def apply_scene_props(scene_props: Optional[Dict[str, Any]]) -> List[str]:
+    """Apply pipeline ``scene_props`` onto the matching scene property groups.
+
+    Two shapes are accepted:
+
+    * Flat ``{"prop": value, ...}`` is applied to ``scene.scigraphs`` for
+      backward compatibility.
+    * Nested ``{"scigraphs": {...}, "city2graph": {...}, "coloring": {...},
+      "viz": {...}, ...}`` applies each sub-mapping to the named group.
+
+    Args:
+        scene_props: Pipeline scene properties (flat or nested).
+
+    Returns:
+        List of human-readable warnings for properties that could not be set.
+    """
+    warnings: List[str] = []
+    if not scene_props:
+        return warnings
+
+    try:
+        import bpy
+    except ImportError:
+        return ["Blender not available; scene properties not applied"]
+
+    scene = getattr(bpy.context, "scene", None)
+    if scene is None:
+        return ["No active scene; scene properties not applied"]
+
+    is_nested = all(
+        isinstance(value, dict) and key in SCENE_PROPERTY_GROUPS
+        for key, value in scene_props.items()
+    ) and len(scene_props) > 0
+
+    if is_nested:
+        grouped = scene_props
+    else:
+        grouped = {"scigraphs": scene_props}
+
+    for group_name, values in grouped.items():
+        scene_attr = SCENE_PROPERTY_GROUPS.get(group_name)
+        if scene_attr is None:
+            warnings.append(f"Unknown scene property group: '{group_name}'")
+            continue
+        target = getattr(scene, scene_attr, None)
+        if target is None:
+            warnings.append(f"Scene property group not available: '{group_name}'")
+            continue
+        if not isinstance(values, dict):
+            warnings.append(f"Scene property group '{group_name}' expects an object")
+            continue
+        for key, value in values.items():
+            if not hasattr(target, key):
+                warnings.append(f"Unknown property '{group_name}.{key}'")
+                continue
+            try:
+                setattr(target, key, value)
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"Could not set '{group_name}.{key}': {exc}")
+
+    return warnings
+
+
 def call_operator(
     bl_idname: str,
     props: Optional[Dict[str, Any]] = None,
@@ -648,10 +725,13 @@ def call_operator(
     Args:
         bl_idname: Operator bl_idname (e.g., "scigraphs.apply_layout")
         props: Properties to pass to operator
-        scene_props: Scene properties to set before calling
+        scene_props: Scene properties to set before calling. Either a flat
+            mapping applied to ``scene.scigraphs``, or a nested mapping keyed by
+            property-group name (see :func:`apply_scene_props`).
 
     Returns:
-        Result dictionary with 'status' and optional 'error'
+        Result dictionary with 'status', optional 'error', and optional
+        'warnings' for scene properties that could not be set.
     """
     try:
         import bpy
@@ -661,16 +741,8 @@ def call_operator(
     props = props or {}
     scene_props = scene_props or {}
 
-    # Set scene properties if needed
-    if scene_props and hasattr(bpy.context, "scene"):
-        scigraphs_props = getattr(bpy.context.scene, "scigraphs", None)
-        if scigraphs_props:
-            for key, value in scene_props.items():
-                if hasattr(scigraphs_props, key):
-                    try:
-                        setattr(scigraphs_props, key, value)
-                    except Exception:
-                        pass  # Ignore property errors
+    # Set scene properties (flat or nested by property group).
+    prop_warnings = apply_scene_props(scene_props)
 
     # Get operator
     parts = bl_idname.split(".")
@@ -686,17 +758,17 @@ def call_operator(
     if op is None:
         return {"status": "error", "error": f"Operator not found: {bl_idname}"}
 
-    # Call operator
+    # Call operator directly (skip invoke dialogs used by UI operators).
     try:
-        result = op(**props)
+        result = op('EXEC_DEFAULT', **props)
         if result == {"FINISHED"}:
-            return {"status": "success"}
+            return {"status": "success", "warnings": prop_warnings}
         elif result == {"CANCELLED"}:
-            return {"status": "cancelled"}
+            return {"status": "cancelled", "warnings": prop_warnings}
         else:
-            return {"status": "unknown", "result": str(result)}
+            return {"status": "unknown", "result": str(result), "warnings": prop_warnings}
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": str(e), "warnings": prop_warnings}
 
 
 def prepare_operator_props(

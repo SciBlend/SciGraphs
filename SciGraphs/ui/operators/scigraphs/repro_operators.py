@@ -425,6 +425,34 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
             return {'CANCELLED'}
 
 
+class SCIGRAPHS_OT_ExportReproReference(Operator, ExportHelper):
+    """Generate a Markdown reference of every pipeline option"""
+    bl_idname = "scigraphs.export_repro_reference"
+    bl_label = "Export Options Reference"
+    bl_options = {'REGISTER'}
+
+    filename_ext = ".md"
+    filter_glob: StringProperty(
+        default="*.md",
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        from ....core.repro.reference import write_reference_markdown
+
+        filepath = self.filepath
+        if not filepath.endswith(".md"):
+            filepath = os.path.splitext(filepath)[0] + ".md"
+
+        try:
+            write_reference_markdown(filepath)
+            self.report({'INFO'}, f"Pipeline options reference written to: {filepath}")
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"Reference export failed: {e}")
+            return {'CANCELLED'}
+
+
 class SCIGRAPHS_OT_OpenArtifactsFolder(Operator):
     """Open the pipeline artifacts folder in file browser"""
     bl_idname = "scigraphs.open_artifacts_folder"
@@ -475,6 +503,7 @@ classes = (
     SCIGRAPHS_OT_ValidatePipeline,
     SCIGRAPHS_OT_ExportPipelineTemplate,
     SCIGRAPHS_OT_ExportCurrentReproSpec,
+    SCIGRAPHS_OT_ExportReproReference,
     SCIGRAPHS_OT_OpenArtifactsFolder,
 )
 

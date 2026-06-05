@@ -1,0 +1,190 @@
+---
+title: "Writing pipeline files"
+---
+
+::: {.lead}
+A SciGraphs pipeline is a declarative JSON or YAML file that replays an entire
+workflow - dataset, analysis, layout, visualization, render and export - with a
+fixed seed so results are reproducible. This page is the reference for authoring
+your own pipelines.
+:::
+
+Run a pipeline from the **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)**
+(Validate, then Run) or with the `scigraphs.run_pipeline` operator. Ready-to-run
+examples live in the repository under `examples/pipelines/`, and an
+auto-generated, exhaustive option list is at
+[`docs/reference/pipeline-options.md`](../reference/pipeline-options.md).
+
+## Top-level structure
+
+```json
+{
+  "meta":     { "title": "my_pipeline", "seed": 42 },
+  "dataset":  { "source": "osmnx", "method": "PLACE", "query": "Granada, Spain" },
+  "analysis": { "metrics": ["degree", "betweenness"] },
+  "layout":   { "algorithm": "YIFAN_HU", "scale": 5.0 },
+  "visual":   { "node_color": "betweenness", "node_size": "degree" },
+  "render":   { "engine": "CYCLES", "output": "figure.png" },
+  "exports":  { "graph": "network.gexf" },
+  "ops":      [ { "id": "scigraphs.setup_lighting" } ]
+}
+```
+
+Only `meta` is required. Every other stage is optional and runs in the order
+above. The `ops` stage runs after `visual` and before `render`.
+
+Paths beginning with `//` are resolved relative to the open `.blend` file.
+
+## `meta`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `title` | string | (required) | Pipeline identifier |
+| `seed` | integer | `42` | Global deterministic seed |
+| `output_dir` | string | `//repro/default` | Where artifacts are written |
+| `description` | string | `""` | Human-readable description |
+| `version` | string | `"1.0"` | Pipeline version |
+
+## `dataset`
+
+Choose one `source`. Each source uses a subset of the fields.
+
+| `source` | Required fields | Optional fields |
+| --- | --- | --- |
+| `osmnx` | `query` | `method` (`PLACE`/`BBOX`/`POINT`/`ADDRESS`/`POLYGON`), `network_type`, `simplify`, `cache`, `retain_all` |
+| `gexf` / `graphml` / `csv` | `filepath` | `auto_layout` |
+| `suitesparse` | `matrix_name` (e.g. `Grund/bayer09`) | - |
+| `sql` | - | `nodes_query`, `edges_query`, `connection_string` (the SQL profile is selected in the Data panel) |
+| `city2graph` | `query` or `bbox` | `bbox` is `[west, south, east, north]` |
+
+`network_type` is one of `drive`, `walk`, `bike`, `all`, `all_public`,
+`all_private`, `drive_service`.
+
+## `analysis`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `metrics` | array of string | `[]` | `degree`, `betweenness`, `closeness`, `eigenvector`, `clustering` |
+| `clustering.algorithm` | string | `rn` | `cpm`, `infomap`, `rb`, `rn`, `rnsc`, `scluster`, `uvcluster` (`louvain`/`leiden` are accepted and mapped to `rb`) |
+| `clustering.resolution` | number | `1.0` | Higher = more communities |
+| `normalize` | boolean | `true` | Normalize centrality values |
+
+Each metric is stored as a mesh attribute named `centrality_<metric>` (and
+`clustering` for the clustering coefficient). Community labels are stored on
+`cluster_id`. These attribute names are what you reference from `visual`.
+
+## `layout`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `algorithm` | string | `YIFAN_HU` | See the [Layout panel](../panels/scigraphs/layout.qmd) for the full list |
+| `scale` | number | `1.0` | Overall layout scale |
+| `iterations` | integer | `50` | Iteration count (algorithm dependent) |
+| `seed` | integer | `meta.seed` | Per-layout seed override |
+| `dimension` | integer | `3` | `2` or `3` |
+| `k` | number | - | Ideal edge length (maps to `sfdp_k` or `yifan_hu_spring_constant`) |
+| `gravity` | number | `1.0` | Maps to `fa2_gravity` (ForceAtlas2) or `gravity_strength` |
+| `scaling_ratio` | number | `2.0` | ForceAtlas2 scaling ratio |
+
+Algorithm-specific parameters beyond these (the dozens of `fa2_*`, `sfdp_*`,
+`igraph_*`, `graphviz_*` properties) are set through `ops` with nested
+`scene_props` (see below).
+
+## `visual`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `setup_geometry_nodes` | boolean | `true` | Build the Geometry Nodes visualization |
+| `node_color` | string | - | Attribute name to colour nodes by |
+| `node_size` | string | - | Attribute name to size nodes by |
+| `edge_width` | string | - | Attribute name to drive edge width |
+| `edge_color` | string | - | Attribute name for edge coloring |
+| `node_max_size` | number | `0.1` | Upper bound for node sizing |
+| `edge_max_width` | number | `0.02` | Upper bound for edge width |
+| `colormap` | string | `viridis` | Any SciGraphs colormap |
+| `edge_style` | string | - | `GEPHI_DEFAULT`, `CYTOSCAPE_BEZIER`, `YFILES_ORGANIC`, `GRAPHVIZ_SPLINE`, `TULIP_CURVED`, `CURVED_UNIFORM` |
+| `rendering_preset` | string | - | `SCIENTIFIC`, `PRESENTATION`, `PRINT`, `CUSTOM` |
+
+## `render`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `engine` | string | `CYCLES` | `CYCLES`, `BLENDER_EEVEE_NEXT`, `BLENDER_WORKBENCH` |
+| `resolution` | `[w, h]` | `[1920, 1080]` | Output resolution |
+| `samples` | integer | `128` | Render samples |
+| `camera` | string | - | Camera object name (active camera if omitted) |
+| `output` | string | `render.png` | Output filename (under `output_dir`) |
+| `transparent` | boolean | `false` | Transparent film |
+| `denoise` | boolean | `true` | Cycles denoising |
+
+## `exports`
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `graph` | string | Filename; format inferred from extension (`.gexf`, `.graphml`, `.json`, `.csv`) |
+| `positions` | string | Node positions CSV |
+| `statistics` | string | Statistics report |
+| `blend` | string | Save a `.blend` copy |
+
+## `ops`: the universal escape hatch
+
+Anything the typed stages do not cover is reachable through `ops`, an ordered
+list of operator calls. Each entry has:
+
+- `id`: an operator `bl_idname` (e.g. `scigraphs.apply_layout`) or a registry
+  shortcut (e.g. `layout`, `centrality`, `simplify`).
+- `props`: keyword arguments passed directly to the operator.
+- `scene_props`: scene state to set before the call.
+
+### Nested `scene_props` by property group
+
+`scene_props` may be **flat** (applied to `scene.scigraphs`) or **nested** by
+property group. This is what makes every parameter in SciGraphs reachable,
+including City2Graph, the coloring toolbar and the interactive visualization
+settings.
+
+```json
+{
+  "id": "scigraphs.generate_proximity_graph",
+  "scene_props": {
+    "city2graph": { "prox_graph_type": "KNN", "prox_knn_k": 8 },
+    "coloring":   { "colormap": "magma", "auto_range": true }
+  }
+}
+```
+
+| Group key | Scene property group |
+| --- | --- |
+| `scigraphs` | `scene.scigraphs` (graph, layout, OSMnx, splitter, edge style, text overlay) |
+| `city2graph` | `scene.city2graph` (morphology, proximity, mobility, metapaths) |
+| `coloring` | `scene.scigraphs_coloring` (coloring toolbar) |
+| `viz` | `scene.scigraphs_viz` (interactive node/edge sizing) |
+| `repro` | `scene.scigraphs_repro` |
+| `splitter` | `scene.scigraphs_splitter` |
+
+A flat `scene_props` (no group keys) is still applied to `scene.scigraphs` for
+backward compatibility.
+
+For the complete, always-current list of every property in every group, use the
+auto-generated reference: open the Reproducibility panel and click **Export
+Options Reference**, or read
+[`docs/reference/pipeline-options.md`](../reference/pipeline-options.md).
+
+## Run artifacts
+
+Each run writes, into `output_dir`:
+
+- `pipeline.normalized.json` - the fully resolved, canonical specification;
+- `run_manifest.json` - provenance with input/output hashes and timing;
+- `run.log` - the execution log, including any warnings.
+
+Together with `meta.seed`, these make a run reproducible.
+
+## Examples
+
+The `examples/pipelines/` directory contains complete pipelines covering nearly
+every feature: file/OSMnx/City2Graph/SuiteSparse/SQL sources, all analysis
+metrics, many layouts, topology operations, both render engines, and an
+`ops`-only pipeline that drives multiple property groups. See its `README.md`
+for a per-file summary, and the
+[reproducible-pipeline walkthrough](../examples/05-reproducible-pipeline.qmd).

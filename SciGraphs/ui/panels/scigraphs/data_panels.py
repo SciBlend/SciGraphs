@@ -21,8 +21,11 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         box = layout.box()
         box.label(text="Step 1: Select Data Source", icon='FILE_FOLDER')
         
-        # Data source toggle
-        row = box.row(align=True)
+        # Data source toggle. Disable property-split so each enum button keeps
+        # its label (with split on, the first button renders without text).
+        toggle_col = box.column(align=True)
+        toggle_col.use_property_split = False
+        row = toggle_col.row(align=True)
         row.prop_enum(props, "data_source", 'FILE')
         row.prop_enum(props, "data_source", 'DATABASE')
         row.prop_enum(props, "data_source", 'SUITESPARSE')

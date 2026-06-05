@@ -76,6 +76,11 @@ class PipelineExecutor:
             getattr(self.logger, level)(message)
             print(f"[SciGraphs Repro] {message}")
 
+    def _collect_warnings(self, res: Dict[str, Any], result: ExecutionResult) -> None:
+        """Append any scene-property warnings from an operator result."""
+        for warning in res.get("warnings", []) or []:
+            result.warnings.append(warning)
+
     def _prepare_output_dir(self, output_dir: str) -> str:
         """Prepare output directory, resolving // paths."""
         bpy = self._get_bpy()
@@ -226,68 +231,122 @@ class PipelineExecutor:
 
         try:
             if spec.source == "osmnx":
-                # Import OSMnx graph
+                # Import OSMnx graph. The operator reads everything from
+                # ``scene.scigraphs`` (osmnx_* properties live there).
                 scene_props = {
                     "osmnx_download_method": spec.method or "PLACE",
                     "osmnx_place_name": spec.query or "",
                     "osmnx_network_type": spec.network_type,
                     "osmnx_simplify": spec.simplify,
                     "osmnx_retain_all": spec.retain_all,
+                    "osmnx_use_cache": spec.cache,
                 }
                 res = call_operator("scigraphs.import_osm_graph", scene_props=scene_props)
+                self._collect_warnings(res, result)
                 if res["status"] == "error":
                     raise RuntimeError(res.get("error", "Unknown error"))
 
                 # Mark as network source
                 add_input(manifest, f"osmnx://{spec.query}", source="network", pinned=spec.cache)
 
-            elif spec.source in ("gexf", "graphml"):
-                # Import from file
+            elif spec.source in ("gexf", "graphml", "csv"):
+                # File-based import goes through scigraphs.create_graph, which
+                # reads the file path and column mapping from scene.scigraphs.
                 if not spec.filepath:
                     raise ValueError(f"filepath required for {spec.source} source")
+
+                resolved = bpy.path.abspath(spec.filepath)
+                if not os.path.isfile(resolved):
+                    raise FileNotFoundError(
+                        f"Dataset file not found: {resolved} "
+                        f"(from filepath '{spec.filepath}'). Provide an existing "
+                        f"file; example pipelines use placeholder paths."
+                    )
+                if spec.source == "graphml":
+                    raise ValueError(
+                        "GraphML files are not loadable via the file dataset "
+                        "source yet. Convert to GEXF, or load OSMnx GraphML "
+                        "through the OSMnx tab."
+                    )
+
                 scene_props = {
-                    "filepath": spec.filepath,
-                    "source_column": "0",
-                    "target_column": "1",
+                    "filepath": resolved,
                     "use_geospatial": False,
-                    "auto_layout_on_import": False,
+                    "auto_layout_on_import": bool(spec.auto_layout),
                 }
+                # CSV needs an explicit source/target column mapping; default to
+                # the first two columns when the spec does not override them.
+                if spec.source == "csv":
+                    scene_props.setdefault("source_column", "0")
+                    scene_props.setdefault("target_column", "1")
                 res = call_operator("scigraphs.create_graph", scene_props=scene_props)
+                self._collect_warnings(res, result)
                 if res["status"] == "error":
                     raise RuntimeError(res.get("error", "Unknown error"))
-                add_input(manifest, spec.filepath, source="file", pinned=True)
+                add_input(manifest, resolved, source="file", pinned=True)
 
             elif spec.source == "suitesparse":
-                # Import from SuiteSparse Matrix Collection
+                # Import from SuiteSparse Matrix Collection. The operator reads
+                # the matrix identifier from scene.scigraphs.suitesparse_id.
                 if not spec.matrix_name:
                     raise ValueError("matrix_name required for suitesparse source")
-                props = {"matrix_name": spec.matrix_name}
-                res = call_operator("scigraphs.import_suitesparse", props)
+                scene_props = {"suitesparse_id": spec.matrix_name}
+                res = call_operator("scigraphs.download_suitesparse", scene_props=scene_props)
+                self._collect_warnings(res, result)
                 if res["status"] == "error":
                     raise RuntimeError(res.get("error", "Unknown error"))
                 add_input(manifest, f"suitesparse://{spec.matrix_name}", source="network", pinned=True)
 
-            elif spec.source == "csv":
-                # Import from CSV
-                if not spec.filepath:
-                    raise ValueError("filepath required for csv source")
-                props = {"filepath": spec.filepath}
-                res = call_operator("scigraphs.import_csv", props)
-                if res["status"] == "error":
-                    raise RuntimeError(res.get("error", "Unknown error"))
-                add_input(manifest, spec.filepath, source="file", pinned=True)
-
             elif spec.source == "sql":
-                # Import from SQL database
-                props = {
-                    "connection_string": spec.connection_string or "",
-                    "nodes_query": spec.nodes_query or "",
-                    "edges_query": spec.edges_query or "",
-                }
-                res = call_operator("scigraphs.import_sql", props)
+                # Import from a configured SQL connection. The operator reads
+                # the query and connection from scene.scigraphs.
+                scene_props = {}
+                if spec.nodes_query:
+                    scene_props["sql_query"] = spec.nodes_query
+                elif spec.edges_query:
+                    scene_props["sql_query"] = spec.edges_query
+                res = call_operator(
+                    "scigraphs.create_graph_from_sql", scene_props=scene_props
+                )
+                self._collect_warnings(res, result)
                 if res["status"] == "error":
                     raise RuntimeError(res.get("error", "Unknown error"))
-                add_input(manifest, f"sql://{spec.connection_string}", source="network", pinned=False)
+                add_input(
+                    manifest,
+                    f"sql://{spec.connection_string or 'configured'}",
+                    source="network",
+                    pinned=False,
+                )
+
+            elif spec.source == "city2graph":
+                # City2Graph / Overture import. Use a place name when given,
+                # otherwise the bbox-based REST download.
+                if spec.query:
+                    scene_props = {"city2graph": {"geocode_place_name": spec.query}}
+                    op_id = "scigraphs.c2g_load_overture_place"
+                else:
+                    scene_props = {}
+                    if spec.bbox and len(spec.bbox) == 4:
+                        scene_props = {
+                            "city2graph": {
+                                "c2g_use_osmnx_bbox": False,
+                                "c2g_bbox_west": float(spec.bbox[0]),
+                                "c2g_bbox_south": float(spec.bbox[1]),
+                                "c2g_bbox_east": float(spec.bbox[2]),
+                                "c2g_bbox_north": float(spec.bbox[3]),
+                            }
+                        }
+                    op_id = "scigraphs.c2g_load_overture"
+                res = call_operator(op_id, scene_props=scene_props)
+                self._collect_warnings(res, result)
+                if res["status"] == "error":
+                    raise RuntimeError(res.get("error", "Unknown error"))
+                add_input(
+                    manifest,
+                    f"city2graph://{spec.query or spec.bbox}",
+                    source="network",
+                    pinned=False,
+                )
 
             else:
                 raise ValueError(f"Unknown dataset source: {spec.source}")
@@ -320,6 +379,8 @@ class PipelineExecutor:
             # the visual stage can resolve friendly names like "betweenness" to the
             # attribute that was actually produced.
             if spec.metrics:
+                # scigraphs.calculate_centrality supports these methods and
+                # stores the result on a mesh attribute named centrality_<method>.
                 method_map = {
                     "degree": "degree",
                     "in_degree": "degree",
@@ -335,15 +396,27 @@ class PipelineExecutor:
                     metric_lower = metric.lower()
                     method = method_map.get(metric_lower)
                     if method is None:
+                        # Plain clustering coefficient has its own operator.
+                        if metric_lower in ("clustering", "clustering_coefficient"):
+                            res = call_operator("scigraphs.calculate_clustering")
+                            self._collect_warnings(res, result)
+                            if res.get("status") == "error":
+                                result.warnings.append(
+                                    f"Clustering coefficient failed: {res.get('error')}"
+                                )
+                            else:
+                                self._metric_attributes["clustering"] = "clustering"
+                            continue
                         self._log(
                             f"Unsupported metric: {metric} (supported: "
-                            f"{', '.join(sorted(set(method_map.values())))})",
+                            f"{', '.join(sorted(set(method_map.values())))}, clustering)",
                             "warning",
                         )
                         result.warnings.append(f"Unsupported metric: {metric}")
                         continue
 
                     res = call_operator("scigraphs.calculate_centrality", {"method": method})
+                    self._collect_warnings(res, result)
                     if res.get("status") == "error":
                         result.warnings.append(f"Metric {metric} failed: {res.get('error')}")
                     else:
@@ -351,14 +424,31 @@ class PipelineExecutor:
                         self._metric_attributes[metric_lower] = attr_name
                         self._metric_attributes[method] = attr_name
 
-            # Clustering (community detection)
+            # Clustering (community detection). The operator reads algorithm,
+            # resolution and seed from scene.scigraphs; pass resolution there.
             if spec.clustering:
-                props = {"algorithm": spec.clustering.algorithm.lower()}
-                res = call_operator("scigraphs.apply_clustering", props)
+                # Map common modularity-based names onto the operator's set.
+                algo_aliases = {"louvain": "rb", "leiden": "rb", "label_prop": "rn"}
+                algo = spec.clustering.algorithm.lower()
+                algo = algo_aliases.get(algo, algo)
+                scene_props = {
+                    "clustering_algorithm": algo,
+                    "clustering_resolution": spec.clustering.resolution,
+                }
+                props = {
+                    "algorithm": algo,
+                    "resolution": spec.clustering.resolution,
+                }
+                res = call_operator(
+                    "scigraphs.apply_clustering", props, scene_props
+                )
+                self._collect_warnings(res, result)
                 if res.get("status") == "error":
                     result.warnings.append(f"Clustering failed: {res.get('error')}")
                 else:
-                    self._metric_attributes["community"] = "community"
+                    # apply_clustering stores community labels on cluster_id.
+                    self._metric_attributes["community"] = "cluster_id"
+                    self._metric_attributes["cluster_id"] = "cluster_id"
 
         except Exception as e:
             status = "error"
@@ -383,20 +473,44 @@ class PipelineExecutor:
         error = None
 
         try:
-            # Determine seed
+            # Determine seed (re-seed so the layout itself is deterministic).
             layout_seed = spec.seed if spec.seed is not None else global_seed
+            set_pipeline_seed(layout_seed)
+
+            # apply_layout reads algorithm/scale/iterations and all algorithm
+            # specific parameters from scene.scigraphs. Map the friendly typed
+            # fields onto the actual scene property names.
+            scene_props: Dict[str, Any] = {
+                "layout_algorithm": spec.algorithm,
+                "layout_scale": spec.scale,
+                "iterations": spec.iterations,
+            }
+
+            algo = (spec.algorithm or "").upper()
+            if spec.gravity is not None:
+                if "FORCEATLAS2" in algo or "FORCE_ATLAS2" in algo:
+                    scene_props["fa2_gravity"] = spec.gravity
+                else:
+                    scene_props["gravity_strength"] = spec.gravity
+            if spec.scaling_ratio is not None and (
+                "FORCEATLAS2" in algo or "FORCE_ATLAS2" in algo
+            ):
+                scene_props["fa2_scaling_ratio"] = spec.scaling_ratio
+            if spec.k is not None:
+                # Ideal edge length under several names depending on algorithm.
+                if "YIFAN" in algo:
+                    scene_props["yifan_hu_spring_constant"] = spec.k
+                else:
+                    scene_props["sfdp_k"] = spec.k
 
             props = {
                 "algorithm": spec.algorithm,
                 "scale": spec.scale,
                 "iterations": spec.iterations,
             }
-            if spec.k is not None:
-                props["k"] = spec.k
-            if spec.dimension == 2:
-                props["dim"] = 2
 
-            res = call_operator("scigraphs.apply_layout", props)
+            res = call_operator("scigraphs.apply_layout", props, scene_props)
+            self._collect_warnings(res, result)
             if res.get("status") == "error":
                 raise RuntimeError(res.get("error", "Unknown error"))
 
@@ -489,8 +603,39 @@ class PipelineExecutor:
             # Setup geometry nodes
             if spec.setup_geometry_nodes:
                 res = call_operator("scigraphs.setup_visualization")
+                self._collect_warnings(res, result)
                 if res.get("status") == "error":
                     result.warnings.append(f"Geometry nodes setup failed: {res.get('error')}")
+
+            # Apply node/edge size ranges onto the interactive viz settings.
+            # The viz tree exposes node_scale and edge_thickness as the upper
+            # bounds for attribute-driven sizing.
+            viz = getattr(bpy.context.scene, "scigraphs_viz", None)
+            if viz is not None:
+                size_map = {
+                    "node_scale": spec.node_max_size,
+                    "edge_thickness": spec.edge_max_width,
+                }
+                for attr_name, value in size_map.items():
+                    if value is not None and hasattr(viz, attr_name):
+                        try:
+                            setattr(viz, attr_name, value)
+                        except (TypeError, ValueError):
+                            result.warnings.append(
+                                f"Could not set viz.{attr_name}={value}"
+                            )
+
+            # Rendering preset (scientific/presentation/print).
+            if spec.rendering_preset:
+                res = call_operator(
+                    "scigraphs.apply_rendering_preset",
+                    {"preset": spec.rendering_preset},
+                )
+                self._collect_warnings(res, result)
+                if res.get("status") == "error":
+                    result.warnings.append(
+                        f"Rendering preset failed: {res.get('error')}"
+                    )
 
             # Node coloring (driven through the coloring toolbar settings +
             # the real ``scigraphs.color_apply`` operator).
@@ -514,6 +659,7 @@ class PipelineExecutor:
                             result.warnings.append(f"Unknown colormap: {spec.colormap}")
                         coloring.auto_range = True
                     res = call_operator("scigraphs.color_apply")
+                    self._collect_warnings(res, result)
                     if res.get("status") == "error":
                         result.warnings.append(f"Node coloring failed: {res.get('error')}")
 
@@ -527,10 +673,28 @@ class PipelineExecutor:
                 else:
                     self._apply_node_size_attribute(attr, result)
 
+            # Edge width by attribute (interactive geometry-nodes tree).
+            if spec.edge_width:
+                attr = self._resolve_visual_attribute(spec.edge_width)
+                if attr is None:
+                    result.warnings.append(
+                        f"Edge width attribute '{spec.edge_width}' not found on graph"
+                    )
+                else:
+                    viz = getattr(bpy.context.scene, "scigraphs_viz", None)
+                    if viz is not None and hasattr(viz, "edge_scale_attribute"):
+                        try:
+                            viz.edge_scale_attribute = attr
+                        except (TypeError, ValueError):
+                            result.warnings.append(
+                                f"Edge width attribute '{attr}' not selectable"
+                            )
+
             # Edge style
             if spec.edge_style:
                 props = {"preset": spec.edge_style}
                 res = call_operator("scigraphs.apply_edge_style_preset", props)
+                self._collect_warnings(res, result)
                 if res.get("status") == "error":
                     result.warnings.append(f"Edge style failed: {res.get('error')}")
 
@@ -558,6 +722,8 @@ class PipelineExecutor:
 
             try:
                 res = call_operator(op.id, op.props, op.scene_props)
+                for warning in res.get("warnings", []) or []:
+                    result.warnings.append(f"Op {op.id}: {warning}")
                 if res.get("status") == "error":
                     raise RuntimeError(res.get("error", "Unknown error"))
             except Exception as e:

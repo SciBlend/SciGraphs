@@ -41,6 +41,7 @@ website:
           - guide/architecture.qmd
           - guide/interface.qmd
           - guide/pipeline.qmd
+          - guide/pipeline-schema.qmd
       - section: "Panel Reference"
         contents:
           - panels/overview.qmd

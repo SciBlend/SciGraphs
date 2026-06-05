@@ -29,6 +29,7 @@ source is set to **Repro**.
 | --- | --- |
 | **Export Template** | Writes a starter pipeline file you can edit. |
 | **Export Current Scene** | Serializes the current graph and settings into a pipeline specification, capturing what you built interactively. |
+| **Export Options Reference** | Generates a Markdown reference of every option a pipeline can set, introspected from the live property groups, the schema and the operator registry. |
 
 ### Artifacts
 
@@ -41,6 +42,12 @@ When a graph is active, a **Current Graph** box reports its node/edge counts and
 source (OSMnx, geospatial, or custom).
 
 ## The pipeline specification
+
+For the complete schema, every field, the `ops` escape hatch and the nested
+`scene_props` format that exposes all SciGraphs parameters, see
+**[Writing pipeline files](../../guide/pipeline-schema.qmd)**. The exhaustive,
+auto-generated option list lives at
+[`docs/reference/pipeline-options.md`](../../reference/pipeline-options.md).
 
 A pipeline is a declarative description of the five workflow stages:
 
@@ -64,7 +71,8 @@ Each run emits:
 
 Together with the `meta.seed`, these guarantee that the same inputs reproduce
 the same result. Ready-to-run examples live in the repository under
-`examples/pipelines/`.
+`examples/pipelines/` (see its `README.md` for a per-file summary covering
+nearly every feature).
 
 ## Typical workflow
 
