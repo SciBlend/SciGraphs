@@ -46,9 +46,6 @@ ESRI_ATTRIBUTION = (
 CARTO_ATTRIBUTION = (
     '© OpenStreetMap contributors © CARTO'
 )
-STADIA_ATTRIBUTION = (
-    '© Stadia Maps © Stamen Design © OpenMapTiles © OpenStreetMap contributors'
-)
 
 
 def _esri_service(service: str) -> str:
@@ -60,21 +57,6 @@ def _esri_service(service: str) -> str:
 
 def _carto_style(style: str) -> str:
     return f'https://basemaps.cartocdn.com/{style}/{{z}}/{{x}}/{{y}}.png'
-
-
-def _mapbox_style(style: str) -> str:
-    return (
-        f'https://api.mapbox.com/styles/v1/mapbox/{style}/tiles/256/'
-        '{z}/{x}/{y}?access_token={key}'
-    )
-
-
-def _maptiler_map(map_id: str, ext: str = 'jpg') -> str:
-    return f'https://api.maptiler.com/maps/{map_id}/256/{{z}}/{{x}}/{{y}}.{ext}?key={{key}}'
-
-
-def _stadia_style(style: str, ext: str = 'png') -> str:
-    return f'https://tiles.stadiamaps.com/tiles/{style}/{{z}}/{{x}}/{{y}}.{ext}?api_key={{key}}'
 
 
 TILE_SOURCES: dict[str, dict] = {
@@ -189,172 +171,6 @@ TILE_SOURCES: dict[str, dict] = {
         'tile_size': 256, 'max_zoom': 20, 'needs_key': False,
         'key_pref': None, 'extension': 'png',
     },
-
-    # --- Mapbox (requires access token) -----------------------------------
-    'MAPBOX_SATELLITE': {
-        'name': 'Mapbox · Satellite',
-        'provider': 'Mapbox',
-        'url': _mapbox_style('satellite-v9'),
-        'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'mapbox_api_key', 'extension': 'jpg',
-    },
-    'MAPBOX_SATELLITE_STREETS': {
-        'name': 'Mapbox · Satellite Streets',
-        'provider': 'Mapbox',
-        'url': _mapbox_style('satellite-streets-v12'),
-        'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'mapbox_api_key', 'extension': 'jpg',
-    },
-    'MAPBOX_STREETS': {
-        'name': 'Mapbox · Streets',
-        'provider': 'Mapbox',
-        'url': _mapbox_style('streets-v12'),
-        'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'mapbox_api_key', 'extension': 'png',
-    },
-    'MAPBOX_OUTDOORS': {
-        'name': 'Mapbox · Outdoors',
-        'provider': 'Mapbox',
-        'url': _mapbox_style('outdoors-v12'),
-        'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'mapbox_api_key', 'extension': 'png',
-    },
-    'MAPBOX_LIGHT': {
-        'name': 'Mapbox · Light',
-        'provider': 'Mapbox',
-        'url': _mapbox_style('light-v11'),
-        'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'mapbox_api_key', 'extension': 'png',
-    },
-    'MAPBOX_DARK': {
-        'name': 'Mapbox · Dark',
-        'provider': 'Mapbox',
-        'url': _mapbox_style('dark-v11'),
-        'attribution': '© Mapbox © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'mapbox_api_key', 'extension': 'png',
-    },
-
-    # --- MapTiler (requires key, free tier) -------------------------------
-    'MAPTILER_SATELLITE': {
-        'name': 'MapTiler · Satellite',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('satellite', 'jpg'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'jpg',
-    },
-    'MAPTILER_HYBRID': {
-        'name': 'MapTiler · Satellite Hybrid',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('hybrid', 'jpg'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'jpg',
-    },
-    'MAPTILER_STREETS': {
-        'name': 'MapTiler · Streets',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('streets-v2', 'png'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'png',
-    },
-    'MAPTILER_TOPO': {
-        'name': 'MapTiler · Topographic',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('topo-v2', 'png'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'png',
-    },
-    'MAPTILER_OUTDOOR': {
-        'name': 'MapTiler · Outdoor',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('outdoor-v2', 'png'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'png',
-    },
-    'MAPTILER_BASIC': {
-        'name': 'MapTiler · Basic',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('basic-v2', 'png'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'png',
-    },
-    'MAPTILER_WINTER': {
-        'name': 'MapTiler · Winter',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('winter-v2', 'png'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'png',
-    },
-    'MAPTILER_OCEAN': {
-        'name': 'MapTiler · Ocean',
-        'provider': 'MapTiler',
-        'url': _maptiler_map('ocean', 'png'),
-        'attribution': '© MapTiler © OpenStreetMap',
-        'tile_size': 256, 'max_zoom': 22, 'needs_key': True,
-        'key_pref': 'maptiler_api_key', 'extension': 'png',
-    },
-
-    # --- Stadia Maps / Stamen (requires key, free tier) -------------------
-    'STADIA_ALIDADE_SMOOTH': {
-        'name': 'Stadia · Alidade Smooth (Light)',
-        'provider': 'Stadia',
-        'url': _stadia_style('alidade_smooth', 'png'),
-        'attribution': STADIA_ATTRIBUTION,
-        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
-        'key_pref': 'stadia_api_key', 'extension': 'png',
-    },
-    'STADIA_ALIDADE_SMOOTH_DARK': {
-        'name': 'Stadia · Alidade Smooth Dark',
-        'provider': 'Stadia',
-        'url': _stadia_style('alidade_smooth_dark', 'png'),
-        'attribution': STADIA_ATTRIBUTION,
-        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
-        'key_pref': 'stadia_api_key', 'extension': 'png',
-    },
-    'STADIA_OUTDOORS': {
-        'name': 'Stadia · Outdoors',
-        'provider': 'Stadia',
-        'url': _stadia_style('outdoors', 'png'),
-        'attribution': STADIA_ATTRIBUTION,
-        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
-        'key_pref': 'stadia_api_key', 'extension': 'png',
-    },
-    'STADIA_STAMEN_TONER': {
-        'name': 'Stadia · Stamen Toner (B/W)',
-        'provider': 'Stadia',
-        'url': _stadia_style('stamen_toner', 'png'),
-        'attribution': STADIA_ATTRIBUTION,
-        'tile_size': 256, 'max_zoom': 20, 'needs_key': True,
-        'key_pref': 'stadia_api_key', 'extension': 'png',
-    },
-    'STADIA_STAMEN_TERRAIN': {
-        'name': 'Stadia · Stamen Terrain',
-        'provider': 'Stadia',
-        'url': _stadia_style('stamen_terrain', 'png'),
-        'attribution': STADIA_ATTRIBUTION,
-        'tile_size': 256, 'max_zoom': 18, 'needs_key': True,
-        'key_pref': 'stadia_api_key', 'extension': 'png',
-    },
-    'STADIA_STAMEN_WATERCOLOR': {
-        'name': 'Stadia · Stamen Watercolor',
-        'provider': 'Stadia',
-        'url': _stadia_style('stamen_watercolor', 'jpg'),
-        'attribution': STADIA_ATTRIBUTION,
-        'tile_size': 256, 'max_zoom': 16, 'needs_key': True,
-        'key_pref': 'stadia_api_key', 'extension': 'jpg',
-    },
 }
 
 
@@ -362,8 +178,6 @@ TILE_SOURCES: dict[str, dict] = {
 #: saved before the catalog expansion keep working.
 _LEGACY_SOURCE_ALIASES: dict[str, str] = {
     'ESRI': 'ESRI_IMAGERY',
-    'MAPBOX': 'MAPBOX_SATELLITE',
-    'MAPTILER': 'MAPTILER_SATELLITE',
 }
 
 

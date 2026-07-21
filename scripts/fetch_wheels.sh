@@ -53,6 +53,7 @@ ${PIP} download "${MYSQL_REQ}" --dest ./wheels --only-binary=:all: \
 
 echo "Cleaning up unwanted wheels..."
 find ./wheels -type f -name 'numpy-*.whl' -print -delete || true
+find ./wheels -type f -name 'requests-*.whl' -print -delete || true
 find ./wheels -type f -name 'mysql_connector_python-*' ! -name '*py2.py3-none-any.whl' -print -delete || true
 
 TOTAL_WHEELS=$(find ./wheels -type f -name '*.whl' | wc -l)

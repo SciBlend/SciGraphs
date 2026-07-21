@@ -29,7 +29,6 @@ geographiclib>=2.0
 
 # OpenStreetMap network data (universal)
 osmnx>=2.0.0,<3.0.0
-requests>=2.31.0
 urllib3>=2.0.0
 charset-normalizer>=3.0.0
 idna>=3.0

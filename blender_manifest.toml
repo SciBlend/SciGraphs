@@ -47,7 +47,6 @@ wheels = [
   
   # OSMnx and HTTP dependencies (universal)
   "./wheels/osmnx-2.0.7-py3-none-any.whl",
-  "./wheels/requests-2.32.5-py3-none-any.whl",
   "./wheels/urllib3-2.6.0-py3-none-any.whl",
   "./wheels/idna-3.11-py3-none-any.whl",
   

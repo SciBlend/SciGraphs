@@ -246,9 +246,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         description="Service to use for downloading globe textures",
         items=[
             ('NASA', "NASA API", "NASA EPIC/Blue Marble imagery (free, requires API key)"),
-            ('MAPBOX', "Mapbox", "Mapbox satellite tiles (requires API key)"),
-            ('MAPTILER', "MapTiler", "MapTiler satellite tiles (free tier available)"),
-            ('STADIA', "Stadia Maps", "Stadia Maps tiles (free tier available)"),
             ('PROCEDURAL', "Procedural Only", "Generate textures procedurally (no API needed)"),
         ],
         default='NASA',
@@ -259,27 +256,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         description="API key for NASA Earth imagery. Get free key at: https://api.nasa.gov/",
         subtype='PASSWORD',
         default="DEMO_KEY",
-    )
-    
-    mapbox_api_key: StringProperty(
-        name="Mapbox Access Token",
-        description="Mapbox access token for satellite imagery. Get at: https://mapbox.com/",
-        subtype='PASSWORD',
-        default="",
-    )
-    
-    maptiler_api_key: StringProperty(
-        name="MapTiler API Key",
-        description="MapTiler API key for satellite tiles. Free tier at: https://maptiler.com/",
-        subtype='PASSWORD',
-        default="",
-    )
-    
-    stadia_api_key: StringProperty(
-        name="Stadia Maps API Key",
-        description="Stadia Maps API key. Free tier at: https://stadiamaps.com/",
-        subtype='PASSWORD',
-        default="",
     )
     
     # Database connection profiles
@@ -402,39 +378,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
             help_col = help_box.column(align=True)
             help_col.label(text="NASA provides free API keys with 1000 requests/hour")
             help_col.label(text="Default DEMO_KEY has lower limits but works for testing")
-            
-        elif self.globe_texture_provider == 'MAPBOX':
-            col.prop(self, "mapbox_api_key")
-            row = col.row(align=True)
-            row.operator("wm.url_open", text="Get Mapbox Token", icon='URL').url = "https://account.mapbox.com/access-tokens/"
-            
-            help_box = box.box()
-            help_box.scale_y = 0.7
-            help_col = help_box.column(align=True)
-            help_col.label(text="Mapbox offers high-quality satellite imagery")
-            help_col.label(text="Free tier: 200,000 tile requests/month")
-            
-        elif self.globe_texture_provider == 'MAPTILER':
-            col.prop(self, "maptiler_api_key")
-            row = col.row(align=True)
-            row.operator("wm.url_open", text="Get MapTiler Key", icon='URL').url = "https://cloud.maptiler.com/account/keys/"
-            
-            help_box = box.box()
-            help_box.scale_y = 0.7
-            help_col = help_box.column(align=True)
-            help_col.label(text="MapTiler offers satellite and terrain tiles")
-            help_col.label(text="Free tier available with registration")
-            
-        elif self.globe_texture_provider == 'STADIA':
-            col.prop(self, "stadia_api_key")
-            row = col.row(align=True)
-            row.operator("wm.url_open", text="Get Stadia Key", icon='URL').url = "https://client.stadiamaps.com/signup/"
-            
-            help_box = box.box()
-            help_box.scale_y = 0.7
-            help_col = help_box.column(align=True)
-            help_col.label(text="Stadia Maps offers various map styles")
-            help_col.label(text="Free tier: 200,000 tile requests/month")
             
         elif self.globe_texture_provider == 'PROCEDURAL':
             help_box = box.box()
