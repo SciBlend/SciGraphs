@@ -9,6 +9,7 @@ from . import tools
 from . import gizmos
 from . import coloring
 from . import modal_visual
+from . import gpu_preview
 
 
 def register():
@@ -22,10 +23,12 @@ def register():
     gizmos.register()
     coloring.register()
     modal_visual.register()
+    gpu_preview.register()
 
 
 def unregister():
     """Unregister all UI components."""
+    gpu_preview.unregister()
     modal_visual.unregister()
     coloring.unregister()
     gizmos.unregister()

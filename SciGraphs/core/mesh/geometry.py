@@ -871,14 +871,20 @@ def _split_edges_for_individual_curves(nodes, links, geo_socket, location, mesh=
     return split_edges.outputs['Mesh']
 
 
-def setup_geometry_nodes_visualization(obj):
+def setup_geometry_nodes_visualization(obj, selection_attr=None):
     """
     Sets up Geometry Nodes to add sphere instances on vertices
     and cylinder instances on edges for better visualization.
     
     For OSMnx graphs, only places spheres on intersection vertices (is_intersection=1),
     not on the intermediate curve points.
-    
+
+    ``selection_attr`` optionally restricts node instances to vertices where
+    that INT POINT attribute is non-zero (e.g. the GPU-preview visibility mask
+    ``scigraphs_visible``), so the visualization can be applied only to the
+    currently filtered subset. It is combined (logical AND) with the
+    ``is_intersection`` filter when both apply.
+
     This function is idempotent - it will reuse existing modifier/node_group if present.
     """
     # Check if modifier already exists
@@ -947,6 +953,7 @@ def setup_geometry_nodes_visualization(obj):
     links.new(mesh_to_points.outputs['Points'], instance_on_points.inputs['Points'])
     links.new(smooth_by_angle.outputs['Geometry'], instance_on_points.inputs['Instance'])
     
+    selection_socket = None
     if is_osmnx or has_intersection_attr:
         named_attr = nodes.new(type='GeometryNodeInputNamedAttribute')
         named_attr.data_type = 'INT'
@@ -960,15 +967,70 @@ def setup_geometry_nodes_visualization(obj):
         compare_node.location = (-400, 400)
         
         links.new(named_attr.outputs['Attribute'], compare_node.inputs['A'])
-        links.new(compare_node.outputs['Result'], instance_on_points.inputs['Selection'])
+        selection_socket = compare_node.outputs['Result']
+
+    # Optional: restrict instances to a filtered subset (e.g. GPU preview mask).
+    # Read the mask as FLOAT and compare > 0.5 (the FLOAT sockets of Compare are
+    # unambiguous by name, unlike the INT/BOOLEAN paths) so the Selection works
+    # reliably across Blender backends.
+    if selection_attr and selection_attr in obj.data.attributes:
+        sel_named = nodes.new(type='GeometryNodeInputNamedAttribute')
+        sel_named.data_type = 'FLOAT'
+        sel_named.inputs['Name'].default_value = selection_attr
+        sel_named.location = (-600, 560)
+
+        sel_compare = nodes.new(type='FunctionNodeCompare')
+        sel_compare.data_type = 'FLOAT'
+        sel_compare.operation = 'GREATER_THAN'
+        sel_compare.inputs['B'].default_value = 0.5
+        sel_compare.location = (-400, 560)
+        links.new(sel_named.outputs['Attribute'], sel_compare.inputs['A'])
+
+        if selection_socket is not None:
+            and_node = nodes.new(type='FunctionNodeBooleanMath')
+            and_node.operation = 'AND'
+            and_node.location = (-200, 480)
+            links.new(selection_socket, and_node.inputs[0])
+            links.new(sel_compare.outputs['Result'], and_node.inputs[1])
+            selection_socket = and_node.outputs['Boolean']
+        else:
+            selection_socket = sel_compare.outputs['Result']
+
+    if selection_socket is not None:
+        links.new(selection_socket, instance_on_points.inputs['Selection'])
     
     realize_instances = nodes.new(type='GeometryNodeRealizeInstances')
     realize_instances.location = (0, 200)
     links.new(instance_on_points.outputs['Instances'], realize_instances.inputs['Geometry'])
     
+    # When filtering to a subset, keep only edges whose *both* endpoints are
+    # visible. Reading the boolean mask as FLOAT and evaluating it on the EDGE
+    # domain averages the two endpoints (1.0 only when both are visible), so we
+    # delete edges whose average is below 1.0.
+    edge_input_geo = prepared_geo
+    if selection_attr and selection_attr in obj.data.attributes:
+        edge_vis = nodes.new(type='GeometryNodeInputNamedAttribute')
+        edge_vis.data_type = 'FLOAT'
+        edge_vis.inputs['Name'].default_value = selection_attr
+        edge_vis.location = (-1100, -150)
+
+        edge_cmp = nodes.new(type='FunctionNodeCompare')
+        edge_cmp.data_type = 'FLOAT'
+        edge_cmp.operation = 'LESS_THAN'
+        edge_cmp.inputs['B'].default_value = 0.999
+        edge_cmp.location = (-1000, -150)
+        links.new(edge_vis.outputs['Attribute'], edge_cmp.inputs['A'])
+
+        delete_edges = nodes.new(type='GeometryNodeDeleteGeometry')
+        delete_edges.domain = 'EDGE'
+        delete_edges.location = (-900, -100)
+        links.new(prepared_geo, delete_edges.inputs['Geometry'])
+        links.new(edge_cmp.outputs['Result'], delete_edges.inputs['Selection'])
+        edge_input_geo = delete_edges.outputs['Geometry']
+
     # Convert each graph edge to its own curve for better visualization
     edge_geo = _split_edges_for_individual_curves(
-        nodes, links, prepared_geo, (-800, -200), mesh=obj.data
+        nodes, links, edge_input_geo, (-800, -200), mesh=obj.data
     )
 
     mesh_to_curve = nodes.new(type='GeometryNodeMeshToCurve')

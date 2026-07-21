@@ -413,18 +413,94 @@ class SCIGRAPHS_OT_SetupVisualization(bpy.types.Operator):
     bl_idname = "scigraphs.setup_visualization"
     bl_label = "Setup Visualization"
     bl_description = "Add Geometry Nodes modifier for visual representation"
-    
-    def execute(self, context):
+    bl_options = {'REGISTER', 'UNDO'}
+
+    target: bpy.props.EnumProperty(
+        name="Apply To",
+        items=[
+            ('FULL', "Whole Graph",
+             "Instance visual nodes on every vertex of the imported graph"),
+            ('FILTERED', "Filtered Nodes Only",
+             "Instance visual nodes only on the nodes currently visible in the "
+             "GPU preview (attribute filter)"),
+        ],
+        default='FULL',
+    )
+
+    _filtered_count = 0
+    _total_count = 0
+
+    @staticmethod
+    def _get_preview():
+        try:
+            from ... import gpu_preview
+            return gpu_preview
+        except Exception:  # noqa: BLE001 - preview module is optional
+            return None
+
+    def invoke(self, context, event):
         obj = context.active_object
-        
         if not obj or "num_nodes" not in obj:
             self.report({'ERROR'}, "No graph object selected")
             return {'CANCELLED'}
-        
-        # Setup Geometry Nodes modifier
-        geometry.setup_geometry_nodes_visualization(obj)
-        
-        self.report({'INFO'}, "Geometry Nodes modifier added")
+
+        gpu_preview = self._get_preview()
+        has_filter = False
+        if gpu_preview is not None:
+            try:
+                mask, active = gpu_preview.compute_visible_mask(obj, context.scene)
+                if active:
+                    has_filter = True
+                    self._filtered_count = int(mask.sum())
+                    self._total_count = int(mask.size)
+            except Exception:  # noqa: BLE001 - fall back to full graph
+                has_filter = False
+
+        # Only ask when a filter is actually narrowing the visible set.
+        if has_filter:
+            return context.window_manager.invoke_props_dialog(self, width=360)
+
+        self.target = 'FULL'
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Apply the Geometry Nodes visual setup to:")
+        layout.prop(self, "target", expand=True)
+        if self.target == 'FILTERED':
+            box = layout.box()
+            box.label(
+                text=f"{self._filtered_count} of {self._total_count} nodes visible",
+                icon='FILTER',
+            )
+            box.label(text="Edges kept only between visible nodes", icon='INFO')
+
+    def execute(self, context):
+        obj = context.active_object
+
+        if not obj or "num_nodes" not in obj:
+            self.report({'ERROR'}, "No graph object selected")
+            return {'CANCELLED'}
+
+        selection_attr = None
+        if self.target == 'FILTERED':
+            gpu_preview = self._get_preview()
+            if gpu_preview is not None:
+                mask, active = gpu_preview.compute_visible_mask(obj, context.scene)
+                if active:
+                    selection_attr = gpu_preview.write_visibility_attribute(obj, mask)
+
+        geometry.setup_geometry_nodes_visualization(obj, selection_attr=selection_attr)
+
+        # Switch to the Geometry Nodes engine so the result is visible in the
+        # viewport (and hide the GPU preview which would otherwise overdraw it).
+        if hasattr(context.scene, "scigraphs_display_engine"):
+            context.scene.scigraphs_display_engine = 'GEOMETRY_NODES'
+
+        if selection_attr:
+            self.report({'INFO'}, "Geometry Nodes added on filtered nodes")
+        else:
+            self.report({'INFO'}, "Geometry Nodes modifier added")
         return {'FINISHED'}
 
 

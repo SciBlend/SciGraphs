@@ -5,6 +5,11 @@ import numpy as np
 from ....core import layout, geometry
 from ....properties.layout_properties import LAYOUT_PROPERTIES
 
+try:
+    from ... import gpu_preview
+except Exception:  # noqa: BLE001 - preview module is optional
+    gpu_preview = None
+
 
 LAYOUT_PARAMETER_NAMES = tuple(LAYOUT_PROPERTIES.keys())
 
@@ -378,8 +383,17 @@ class SCIGRAPHS_OT_ExecuteLayoutStep(bpy.types.Operator):
             # Update visualization if enabled
             if props.update_viewport:
                 geometry.update_node_positions_from_property(obj)
-                geometry.rebuild_edges(obj)
-                
+
+                # Live preview mode: with the GPU preview active we only push
+                # the new node positions and let the preview redraw. Edge
+                # topology does not change during a layout, so we skip the
+                # costly per-frame edge rebuild (and any Geometry Nodes work).
+                live_preview = gpu_preview is not None and gpu_preview.is_enabled()
+                if live_preview:
+                    gpu_preview.invalidate(obj)
+                else:
+                    geometry.rebuild_edges(obj)
+
                 # Force viewport update
                 for area in context.screen.areas:
                     if area.type == 'VIEW_3D':

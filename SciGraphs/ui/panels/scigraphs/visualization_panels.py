@@ -13,6 +13,7 @@ class SCIGRAPHS_PT_visualization(bpy.types.Panel):
     
     def draw(self, context):
         layout = self.layout
+        scene = context.scene
         obj = context.active_object
         
         if not obj or "num_nodes" not in obj:
@@ -21,6 +22,19 @@ class SCIGRAPHS_PT_visualization(bpy.types.Panel):
             box.label(text="Create a graph first in Data panel")
             return
         
+        # Display engine switch: GPU (fast preview) vs CPU (Geometry Nodes).
+        if hasattr(scene, "scigraphs_display_engine"):
+            box = layout.box()
+            box.label(text="Display Engine", icon='RESTRICT_VIEW_OFF')
+            row = box.row()
+            row.scale_y = 1.4
+            row.prop(scene, "scigraphs_display_engine", expand=True)
+            engine = scene.scigraphs_display_engine
+            if engine == 'GPU':
+                box.label(text="Fast viewport preview - not in final render", icon='INFO')
+            else:
+                box.label(text="Geometry Nodes - renderable in Cycles/EEVEE", icon='INFO')
+
         layout.label(text="Visual representation settings", icon='SHADING_RENDERED')
 
 
