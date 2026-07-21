@@ -3,7 +3,7 @@
 bl_info = {
     "name": "SciGraphs",
     "author": "José Marín",
-    "version": (1, 0, 0),
+    "version": (1, 0, 1),
     "blender": (5, 1, 0),
     "location": "3D View > Sidebar > SciGraphs",
     "description": "Create, visualize and analyze graphs from data.",

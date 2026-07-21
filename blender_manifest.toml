@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "scigraphs"
-version = "1.0.0"
+version = "1.0.1"
 name = "SciGraphs"
 tagline = "Graph Visualization and Analysis within Blender"
 maintainer = "José Marín <jose.marin-farina@uv.es>"

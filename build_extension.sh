@@ -201,7 +201,8 @@ case "$PLATFORM" in
                    echo "  Unknown platform '$PLATFORM', defaulting to linux_x64" ;;
 esac
 
-ZIP_FILE="dist/${EXTENSION_ID}-1.0.0-${ZIP_SUFFIX}.zip"
+EXTENSION_VERSION=$(grep -oP '^version\s*=\s*"\K[^"]+' blender_manifest.toml 2>/dev/null || echo "1.0.1")
+ZIP_FILE="dist/${EXTENSION_ID}-${EXTENSION_VERSION}-${ZIP_SUFFIX}.zip"
 if [ ! -f "$ZIP_FILE" ]; then
     echo "  Expected zip not found: $ZIP_FILE"
     echo "  Skipping auto-install."
