@@ -17,7 +17,9 @@ fail.
 
 from __future__ import annotations
 
-from typing import Iterable, List, Sequence, Tuple
+import math
+from dataclasses import dataclass
+from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -367,6 +369,277 @@ def sample_colormap(name: str, samples: int = 8, reverse: bool = False) -> np.nd
     return _resolve_rgba(name, norm)
 
 
+# ---------------------------------------------------------------------------
+# Normalization
+# ---------------------------------------------------------------------------
+
+# EnumProperty-ready description of every normalization mode.
+NORM_MODES: Tuple[Tuple[str, str, str], ...] = (
+    (
+        "LINEAR",
+        "Linear",
+        "Map the raw value range onto the colormap. Fast and faithful, but "
+        "heavy-tailed data (betweenness, degree, PageRank) collapses into the "
+        "bottom of the ramp",
+    ),
+    (
+        "LOG",
+        "Log10",
+        "Normalize log10(value). Spreads out multiplicative data. Zero and "
+        "negative samples are floored to a small epsilon and share the lowest "
+        "color",
+    ),
+    (
+        "RANK",
+        "Rank",
+        "Replace each value by its rank / (n-1) (histogram equalization). The "
+        "robust choice for skewed data: colors are spread uniformly across the "
+        "ramp no matter how extreme the tail",
+    ),
+    (
+        "QUANTILE",
+        "Quantile",
+        "Rank computed over the distinct values instead of the samples, so a "
+        "large block of identical values does not dominate the ramp",
+    ),
+)
+
+NORM_MODE_IDS: Tuple[str, ...] = tuple(mode[0] for mode in NORM_MODES)
+
+DEFAULT_NORM_MODE = "LINEAR"
+
+# Transforms that depend on the whole distribution instead of a single sample.
+# No shader math can express them, so the normalized result is baked into a
+# helper float attribute the material reads instead of the source attribute.
+BAKED_NORM_MODES: Tuple[str, ...] = ("RANK", "QUANTILE")
+
+# Suffix of the baked helper attribute written for BAKED_NORM_MODES.
+NORM_ATTRIBUTE_SUFFIX = "_scignorm"
+
+# log10 is undefined at 0 and below, so LOG floors every sample at ``eps`` and
+# zeros/negatives share the lowest color. How far below the data ``eps`` sits
+# matters: a fixed "three decades below the smallest positive sample" floor
+# handed 54% of the ramp to a dozen zeros. Solving gap / (gap + span) = f for
+# span = log10(hi) - log10(min_positive) instead gives
+# gap = f * span / (1 - f) decades, bounding the non-positive bucket at
+# ``_LOG_ZERO_RAMP_FRACTION`` of the ramp whatever the data span.
+_LOG_EPS_DECADES = 1e-3
+_LOG_EPS_FLOOR = 1e-30
+_LOG_ZERO_RAMP_FRACTION = 0.1
+_LOG_MIN_GAP_DECADES = 0.05
+
+
+@dataclass
+class NormalizationPlan:
+    """Bounds and parameters the shader needs to reproduce :func:`normalize_values`.
+
+    ``lo``/``hi`` are the post-transform ``Map Range`` bounds: raw units for
+    ``LINEAR``, log10 units for ``LOG``, ``(0.0, 1.0)`` for the baked modes.
+    ``data_lo``/``data_hi`` keep the bounds in raw data units for the UI.
+    """
+
+    mode: str = DEFAULT_NORM_MODE
+    lo: float = 0.0
+    hi: float = 1.0
+    eps: float = _LOG_EPS_FLOOR
+    gamma: float = 1.0
+    baked: bool = False
+    data_lo: float = 0.0
+    data_hi: float = 1.0
+
+
+def _as_float_array(values) -> np.ndarray:
+    """Coerce anything iterable (including generators) into a 1D float array."""
+    if isinstance(values, np.ndarray):
+        return values.astype(float, copy=False)
+    return np.asarray(list(values), dtype=float)
+
+
+def _effective_bounds(
+    arr: np.ndarray,
+    finite: np.ndarray,
+    vmin: Optional[float],
+    vmax: Optional[float],
+    clip_low_pct: float,
+    clip_high_pct: float,
+) -> Tuple[float, float]:
+    """Data bounds after optional percentile clipping.
+
+    The percentile pass runs only when a slider actually moved, so the default
+    path stays bit-for-bit identical to plain ``nanmin``/``nanmax`` rather than
+    relying on ``nanpercentile(x, 0) == nanmin(x)``.
+    """
+    low = float(clip_low_pct)
+    high = float(clip_high_pct)
+
+    if low > 0.0 or high < 100.0:
+        low = min(max(low, 0.0), 100.0)
+        high = min(max(high, 0.0), 100.0)
+        if high < low:
+            low, high = high, low
+        sample = arr[finite]
+        auto_lo = float(np.nanpercentile(sample, low))
+        auto_hi = float(np.nanpercentile(sample, high))
+    else:
+        auto_lo = float(np.nanmin(arr[finite]))
+        auto_hi = float(np.nanmax(arr[finite]))
+
+    lo = auto_lo if vmin is None else float(vmin)
+    hi = auto_hi if vmax is None else float(vmax)
+    if hi == lo:
+        hi = lo + 1e-9
+    return lo, hi
+
+
+def _log_epsilon(values: np.ndarray, upper: float) -> float:
+    """Floor applied before log10 (see the LOG notes above)."""
+    positive = values[values > 0.0]
+    if positive.size == 0:
+        return _LOG_EPS_FLOOR
+
+    pos_min = float(positive.min())
+    if not bool((values <= 0.0).any()):
+        # Nothing to floor: eps only has to stay under the data, never binding.
+        return max(pos_min * _LOG_EPS_DECADES, _LOG_EPS_FLOOR)
+
+    hi = max(float(upper), pos_min)
+    span = math.log10(hi) - math.log10(pos_min)
+    gap = span * _LOG_ZERO_RAMP_FRACTION / (1.0 - _LOG_ZERO_RAMP_FRACTION)
+    gap = max(gap, _LOG_MIN_GAP_DECADES)
+    return max(pos_min * (10.0 ** -gap), _LOG_EPS_FLOOR)
+
+
+def _average_ranks(values: np.ndarray) -> np.ndarray:
+    """Mid-rank of every sample, ties sharing their average rank.
+
+    Ordinal ranking (``argsort(argsort(x))``) gives two identical values two
+    different colors, which the shader cannot reproduce.
+    """
+    _uniq, inverse, counts = np.unique(values, return_inverse=True, return_counts=True)
+    cumulative = np.cumsum(counts)
+    starts = cumulative - counts
+    mid = (starts + cumulative - 1) * 0.5
+    return mid[inverse.ravel()]
+
+
+def normalize_values(
+    values: Iterable[float],
+    mode: str = DEFAULT_NORM_MODE,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    gamma: float = 1.0,
+    clip_low_pct: float = 0.0,
+    clip_high_pct: float = 100.0,
+) -> Tuple[np.ndarray, np.ndarray, NormalizationPlan]:
+    """Normalize ``values`` into ``[0, 1]``.
+
+    Returns ``(norm, finite_mask, plan)``, non-finite samples coming back as
+    ``NaN`` and ``False``. The shader mirrors this order: percentile clip,
+    ``vmin``/``vmax`` override, transform, gamma; colormap reversal happens at
+    sampling time, not here.
+    """
+    arr = _as_float_array(values)
+    mode = (mode or DEFAULT_NORM_MODE).upper()
+    if mode not in NORM_MODE_IDS:
+        mode = DEFAULT_NORM_MODE
+    try:
+        gamma = float(gamma)
+    except (TypeError, ValueError):
+        gamma = 1.0
+    if not math.isfinite(gamma) or gamma <= 0.0:
+        gamma = 1.0
+
+    baked = mode in BAKED_NORM_MODES
+
+    if arr.size == 0:
+        return (
+            np.zeros(0, dtype=float),
+            np.zeros(0, dtype=bool),
+            NormalizationPlan(mode=mode, gamma=gamma, baked=baked),
+        )
+
+    finite = np.isfinite(arr)
+    if not finite.any():
+        return (
+            np.full(arr.shape, np.nan, dtype=float),
+            finite,
+            NormalizationPlan(mode=mode, gamma=gamma, baked=baked),
+        )
+
+    data_lo, data_hi = _effective_bounds(
+        arr, finite, vmin, vmax, clip_low_pct, clip_high_pct
+    )
+
+    norm = np.full(arr.shape, np.nan, dtype=float)
+    work = np.clip(arr[finite], data_lo, data_hi)
+    eps = _LOG_EPS_FLOOR
+
+    if mode == "LOG":
+        eps = _log_epsilon(work, data_hi)
+        plan_lo = math.log10(max(data_lo, eps))
+        plan_hi = math.log10(max(data_hi, eps))
+        if plan_hi == plan_lo:
+            plan_hi = plan_lo + 1e-9
+        norm[finite] = (np.log10(np.maximum(work, eps)) - plan_lo) / (plan_hi - plan_lo)
+    elif mode == "RANK":
+        plan_lo, plan_hi = 0.0, 1.0
+        denom = float(work.size - 1) if work.size > 1 else 1.0
+        norm[finite] = _average_ranks(work) / denom
+    elif mode == "QUANTILE":
+        plan_lo, plan_hi = 0.0, 1.0
+        uniq, inverse = np.unique(work, return_inverse=True)
+        denom = float(uniq.size - 1) if uniq.size > 1 else 1.0
+        norm[finite] = inverse.ravel().astype(float) / denom
+    else:  # LINEAR
+        plan_lo, plan_hi = data_lo, data_hi
+        norm[finite] = (work - plan_lo) / (plan_hi - plan_lo)
+
+    norm[finite] = np.clip(norm[finite], 0.0, 1.0)
+
+    if gamma != 1.0:
+        norm[finite] = np.power(norm[finite], 1.0 / gamma)
+
+    plan = NormalizationPlan(
+        mode=mode,
+        lo=float(plan_lo),
+        hi=float(plan_hi),
+        eps=float(eps),
+        gamma=float(gamma),
+        baked=baked,
+        data_lo=float(data_lo),
+        data_hi=float(data_hi),
+    )
+    return norm, finite, plan
+
+
+def norm_to_rgba(
+    norm: Iterable[float],
+    cmap_name: str = "viridis",
+    reverse: bool = False,
+    finite: Optional[np.ndarray] = None,
+    nan_color: Sequence[float] = (0.30, 0.30, 0.30, 1.0),
+) -> np.ndarray:
+    """Map already-normalized ``[0, 1]`` values onto an ``(N, 4)`` RGBA array."""
+    arr = _as_float_array(norm)
+    if arr.size == 0:
+        return np.zeros((0, 4), dtype=float)
+
+    if finite is None:
+        finite = np.isfinite(arr)
+    if not finite.any():
+        result = np.zeros((arr.size, 4), dtype=float)
+        result[:] = nan_color
+        return result
+
+    work = np.where(finite, arr, 0.0)
+    if reverse:
+        work = 1.0 - work
+
+    rgba = _resolve_rgba(cmap_name, work)
+    rgba[~finite] = nan_color
+    return rgba
+
+
 def values_to_rgba(
     values: Iterable[float],
     cmap_name: str = "viridis",
@@ -374,13 +647,18 @@ def values_to_rgba(
     vmax: float | None = None,
     reverse: bool = False,
     nan_color: Sequence[float] = (0.30, 0.30, 0.30, 1.0),
+    norm_mode: str = DEFAULT_NORM_MODE,
+    gamma: float = 1.0,
+    clip_low_pct: float = 0.0,
+    clip_high_pct: float = 100.0,
 ) -> np.ndarray:
     """Map a sequence of floats to an ``(N, 4)`` RGBA array.
 
-    Non-finite values are mapped to ``nan_color`` instead of raising. Returns
-    an empty ``(0, 4)`` array when ``values`` is empty.
+    Non-finite values are mapped to ``nan_color`` instead of raising, and an
+    empty ``values`` gives an empty ``(0, 4)`` array. The defaults (``LINEAR``,
+    ``gamma=1``, no clip) reproduce the historical linear normalization.
     """
-    arr = np.asarray(list(values), dtype=float)
+    arr = _as_float_array(values)
     if arr.size == 0:
         return np.zeros((0, 4), dtype=float)
 
@@ -390,33 +668,31 @@ def values_to_rgba(
         result[:] = nan_color
         return result
 
-    cmin = float(np.nanmin(arr[finite])) if vmin is None else float(vmin)
-    cmax = float(np.nanmax(arr[finite])) if vmax is None else float(vmax)
-    if cmax == cmin:
-        cmax = cmin + 1e-9
-
-    norm = (arr - cmin) / (cmax - cmin)
-    norm = np.clip(norm, 0.0, 1.0)
-    if reverse:
-        norm = 1.0 - norm
-
-    rgba = _resolve_rgba(cmap_name, norm)
-    rgba[~finite] = nan_color
-    return rgba
+    norm, finite, _plan = normalize_values(
+        arr,
+        mode=norm_mode,
+        vmin=vmin,
+        vmax=vmax,
+        gamma=gamma,
+        clip_low_pct=clip_low_pct,
+        clip_high_pct=clip_high_pct,
+    )
+    return norm_to_rgba(norm, cmap_name, reverse, finite, nan_color)
 
 
 def normalize_range(
     values: Iterable[float],
     vmin: float | None = None,
     vmax: float | None = None,
+    clip_low_pct: float = 0.0,
+    clip_high_pct: float = 100.0,
 ) -> Tuple[float, float]:
-    """Compute the (vmin, vmax) pair used by ``values_to_rgba``.
+    """Compute the ``(vmin, vmax)`` pair used by ``values_to_rgba``.
 
-    Useful for the UI: shows the user the effective range that will be applied
-    when ``auto_range`` is on. Returns ``(0.0, 1.0)`` when no finite samples
-    are available.
+    Always in raw data units, whatever the normalization mode. Returns
+    ``(0.0, 1.0)`` when there is no finite sample.
     """
-    arr = np.asarray(list(values), dtype=float)
+    arr = _as_float_array(values)
     if arr.size == 0:
         return (0.0, 1.0)
 
@@ -424,11 +700,12 @@ def normalize_range(
     if not finite.any():
         return (0.0, 1.0)
 
-    cmin = float(np.nanmin(arr[finite])) if vmin is None else float(vmin)
-    cmax = float(np.nanmax(arr[finite])) if vmax is None else float(vmax)
-    if cmax == cmin:
-        cmax = cmin + 1e-9
-    return (cmin, cmax)
+    return _effective_bounds(arr, finite, vmin, vmax, clip_low_pct, clip_high_pct)
+
+
+def norm_mode_items_for_enum() -> List[Tuple[str, str, str]]:
+    """Return ``(identifier, label, description)`` tuples for an EnumProperty."""
+    return [(ident, label, description) for ident, label, description in NORM_MODES]
 
 
 # ---------------------------------------------------------------------------

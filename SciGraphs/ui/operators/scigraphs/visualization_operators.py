@@ -1,6 +1,7 @@
 # Visualization and appearance operators
 
 import bpy
+from mathutils import Vector
 from ....core import geometry
 from ....core.mesh.geometry import (
     DEFAULT_NODE_SIZE,
@@ -489,26 +490,43 @@ class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
         self.report({'INFO'}, f"Applied {lighting_type} lighting setup")
         return {'FINISHED'}
     
+    @staticmethod
+    def _aim_at(light_obj, target=(0.0, 0.0, 0.0)):
+        """Rotate a light so its -Z axis points from its location at ``target``.
+
+        Blender lights emit along local -Z, so a light created with the default
+        identity rotation always points straight down regardless of where it is
+        placed. This derives the euler that aims it at ``target`` instead.
+        """
+        direction = Vector(target) - light_obj.location
+        if direction.length_squared == 0.0:
+            return
+        light_obj.rotation_mode = 'XYZ'
+        light_obj.rotation_euler = direction.to_track_quat('-Z', 'Y').to_euler()
+
     def _create_three_point_lighting(self, context):
-        """Create classic 3-point lighting."""
+        """Create classic 3-point lighting, all three aimed at the origin."""
         # Key light
         bpy.ops.object.light_add(type='SUN', location=(5, -5, 8))
         key = context.active_object
         key.name = "SciGraphs_Light_Key"
         key.data.energy = 2.0
-        
+        self._aim_at(key)
+
         # Fill light
         bpy.ops.object.light_add(type='AREA', location=(-5, -3, 5))
         fill = context.active_object
         fill.name = "SciGraphs_Light_Fill"
         fill.data.energy = 0.5
-        
+        self._aim_at(fill)
+
         # Rim light
         bpy.ops.object.light_add(type='SPOT', location=(0, 5, 3))
         rim = context.active_object
         rim.name = "SciGraphs_Light_Rim"
         rim.data.energy = 1.0
-    
+        self._aim_at(rim)
+
     def _create_studio_lighting(self, context):
         """Create soft studio lighting."""
         bpy.ops.object.light_add(type='AREA', location=(0, 0, 10))

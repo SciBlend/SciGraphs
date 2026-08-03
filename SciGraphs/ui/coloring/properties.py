@@ -19,6 +19,7 @@ from bpy.types import PropertyGroup
 from ...core.coloring.colormaps import (
     QUICK_COLORMAPS,
     colormap_items_for_enum,
+    norm_mode_items_for_enum,
 )
 from ...core.coloring.attributes import (
     list_scalar_attributes,
@@ -66,6 +67,11 @@ _COLORMAP_ITEMS_CACHE = colormap_items_for_enum()
 
 def _colormap_enum_items(_self, _context):
     return _COLORMAP_ITEMS_CACHE
+
+
+# A static list (not a callback) is what lets color_norm carry a string default
+# and be assigned by name from a reproducibility spec.
+_NORM_MODE_ITEMS = norm_mode_items_for_enum()
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +126,41 @@ class SCIGRAPHS_PG_coloring(PropertyGroup):
         name="vmax",
         description="Upper bound of the value range mapped to the colormap",
         default=1.0,
+    )
+
+    color_norm: EnumProperty(
+        name="Normalization",
+        description="How attribute values are mapped onto 0..1 before the colormap",
+        items=_NORM_MODE_ITEMS,
+        default='LINEAR',
+    )
+
+    color_gamma: FloatProperty(
+        name="Gamma",
+        description="Exponent applied after normalization as norm ** (1 / gamma)",
+        min=0.01,
+        max=10.0,
+        soft_min=0.1,
+        soft_max=4.0,
+        default=1.0,
+    )
+
+    clip_low_pct: FloatProperty(
+        name="Clip Low %",
+        description="Percentile used as the lower bound instead of the minimum",
+        min=0.0,
+        max=100.0,
+        subtype='PERCENTAGE',
+        default=0.0,
+    )
+
+    clip_high_pct: FloatProperty(
+        name="Clip High %",
+        description="Percentile used as the upper bound instead of the maximum",
+        min=0.0,
+        max=100.0,
+        subtype='PERCENTAGE',
+        default=100.0,
     )
 
     opacity: FloatProperty(

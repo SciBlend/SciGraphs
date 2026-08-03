@@ -8,99 +8,182 @@ These typed sections cover the common workflow. Every field below is applied by 
 
 ### `meta`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `title` | string |  |  |
-| `seed` | integer | 42 |  |
-| `output_dir` | string | //repro/default |  |
-| `description` | string |  |  |
-| `version` | string | 1.0 |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `title` | string |  |  | Pipeline identifier |
+| `seed` | integer | 42 |  | Global random seed |
+| `output_dir` | string | //repro/default |  | Output directory (// = blend file relative) |
+| `clear_scene` | boolean | True |  | Delete existing objects before the first stage |
+| `description` | string |  |  | Human-readable description |
+| `version` | string | 1.0 |  | Pipeline version |
 
 ### `dataset`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `source` | string |  | osmnx, gexf, graphml, csv, suitesparse, sql, city2graph |
-| `method` | string |  | PLACE, BBOX, POINT, ADDRESS, POLYGON |
-| `query` | string |  |  |
-| `network_type` | string | drive | drive, walk, bike, all, all_public, all_private, drive_service |
-| `simplify` | boolean | True |  |
-| `cache` | boolean | True |  |
-| `retain_all` | boolean | False |  |
-| `filepath` | string |  |  |
-| `auto_layout` | boolean | True |  |
-| `connection_string` | string |  |  |
-| `nodes_query` | string |  |  |
-| `edges_query` | string |  |  |
-| `matrix_name` | string |  |  |
-| `bbox` | array |  |  |
-| `layers` | array |  |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `source` | string |  | osmnx, gexf, graphml, csv, suitesparse, sql, city2graph |  |
+| `method` | string |  | PLACE, BBOX, POINT, ADDRESS, POLYGON |  |
+| `query` | string |  |  |  |
+| `network_type` | string | drive | drive, walk, bike, all, all_public, all_private, drive_service |  |
+| `simplify` | boolean | True |  |  |
+| `cache` | boolean | True |  |  |
+| `retain_all` | boolean | False |  |  |
+| `filepath` | string |  |  |  |
+| `auto_layout` | boolean | True |  |  |
+| `connection_string` | string |  |  |  |
+| `nodes_query` | string |  |  |  |
+| `edges_query` | string |  |  |  |
+| `matrix_name` | string |  |  |  |
+| `bbox` | array |  |  |  |
+| `layers` | array |  |  |  |
 
 ### `analysis`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `metrics` | array | [] |  |
-| `clustering` | object |  |  |
-| `normalize` | boolean | True |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `metrics` | array | [] |  |  |
+| `clustering` | object |  |  |  |
+| `normalize` | boolean | True |  |  |
 
 #### `analysis.clustering`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `algorithm` | string | rn | cpm, infomap, rb, rn, rnsc, scluster, uvcluster, louvain, leiden |
-| `resolution` | number | 1.0 |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `algorithm` | string | infomap | cpm, infomap, rb, rnsc, scluster, uvcluster, louvain, leiden | rn is omitted: it does not terminate even on a 77-node graph |
+| `resolution` | number | 1.0 |  |  |
 
 ### `layout`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `algorithm` | string | YIFAN_HU | GRID, SPRING, SPRING_3D, FORCEATLAS2, IGRAPH_DRL_2D, IGRAPH_DH, IGRAPH_GRAPHOPT, CIRCLE_PACKING, FRUCHTERMAN_REINGOLD, KAMADA_KAWAI, YIFAN_HU, GRAPHVIZ_DOT, GRAPHVIZ_NEATO, GRAPHVIZ_FDP, GRAPHVIZ_SFDP, GRAPHVIZ_TWOPI, GRAPHVIZ_CIRCO, GRAPHVIZ_OSAGE, GRAPHVIZ_PATCHWORK, IGRAPH_DRL, IGRAPH_FR, IGRAPH_KK, IGRAPH_LGL, SPECTRAL, SPECTRAL_3D, CIRCULAR, SHELL, RANDOM, SPHERE, SPIRAL_3D, HELIX, CUBE, HIERARCHICAL_3D, MDS_3D, BIPARTITE_3D, FORCE_ATLAS2, SUGIYAMA, CIRCULAR_HIERARCHY |
-| `scale` | number | 1.0 |  |
-| `iterations` | integer | 50 |  |
-| `seed` | integer |  |  |
-| `dimension` | integer | 3 | 2, 3 |
-| `k` | number |  |  |
-| `gravity` | number | 1.0 |  |
-| `scaling_ratio` | number | 2.0 |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `algorithm` | string | YIFAN_HU | GRID, SPRING, SPRING_3D, FORCEATLAS2, IGRAPH_DRL_2D, IGRAPH_DH, IGRAPH_GRAPHOPT, CIRCLE_PACKING, FRUCHTERMAN_REINGOLD, KAMADA_KAWAI, YIFAN_HU, GRAPHVIZ_DOT, GRAPHVIZ_NEATO, GRAPHVIZ_FDP, GRAPHVIZ_SFDP, GRAPHVIZ_TWOPI, GRAPHVIZ_CIRCO, GRAPHVIZ_OSAGE, GRAPHVIZ_PATCHWORK, IGRAPH_DRL, IGRAPH_FR, IGRAPH_KK, IGRAPH_LGL, SPECTRAL, SPECTRAL_3D, CIRCULAR, SHELL, RANDOM, SPHERE, SPIRAL_3D, HELIX, CUBE, HIERARCHICAL_3D, MDS_3D, BIPARTITE_3D, FORCE_ATLAS2, SUGIYAMA, CIRCULAR_HIERARCHY |  |
+| `scale` | number | 1.0 |  |  |
+| `iterations` | integer | 50 |  |  |
+| `seed` | integer |  |  | Override meta.seed for layout only |
+| `dimension` | integer | 3 | 2, 3 |  |
+| `k` | number |  |  | Optimal distance between nodes |
+| `gravity` | number | 1.0 |  |  |
+| `scaling_ratio` | number | 2.0 |  |  |
 
 ### `visual`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `setup_geometry_nodes` | boolean | True |  |
-| `node_color` | string |  |  |
-| `edge_color` | string |  |  |
-| `node_size` | string |  |  |
-| `edge_width` | string |  |  |
-| `node_min_size` | number | 0.01 |  |
-| `node_max_size` | number | 0.1 |  |
-| `edge_min_width` | number | 0.002 |  |
-| `edge_max_width` | number | 0.02 |  |
-| `colormap` | string | viridis |  |
-| `rendering_preset` | string |  | SCIENTIFIC, PRESENTATION, PRINT, CUSTOM |
-| `edge_style` | string |  | GEPHI_DEFAULT, CYTOSCAPE_BEZIER, YFILES_ORGANIC, GRAPHVIZ_SPLINE, TULIP_CURVED, CURVED_UNIFORM |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `setup_geometry_nodes` | boolean | True |  |  |
+| `node_color` | string |  |  | Attribute name for node coloring |
+| `edge_color` | string |  |  | Attribute name for edge coloring |
+| `node_size` | string |  |  | Attribute name for node sizing |
+| `edge_width` | string |  |  | Attribute name for edge width |
+| `node_min_size` | number | 0.01 |  |  |
+| `node_max_size` | number | 0.1 |  |  |
+| `edge_min_width` | number | 0.002 |  |  |
+| `edge_max_width` | number | 0.02 |  |  |
+| `colormap` | string | viridis |  |  |
+| `rendering_preset` | string |  | BASIC, GLASS, METALLIC, EMISSION, SCIENTIFIC |  |
+| `edge_style` | string |  | GEPHI_DEFAULT, CYTOSCAPE_BEZIER, SCHEMATIC, BUNDLED_DENSE, FLOW_DIAGRAM, MINIMAL |  |
+| `color_norm` | string | LINEAR | LINEAR, LOG, RANK, QUANTILE | Value-to-color transform; RANK equalizes the histogram for skewed measures |
+| `color_gamma` | number | 1.0 |  | Applied after normalization as norm**(1/gamma); >1 brightens the low end |
+| `color_clip_percentile` | array | [0.0, 100.0] |  | Percentile clip before normalizing, e.g. [2, 98] |
+| `color_vmin` | number |  |  | Explicit lower bound; set with color_vmax to share a scale across figures |
+| `color_vmax` | number |  |  | Explicit upper bound |
+| `colormap_reverse` | boolean | False |  |  |
+| `color_opacity` | number | 1.0 |  |  |
+| `edge_base_color` | array |  |  | Flat RGBA for edges when nodes carry the colormap |
+| `node_glyph` | string |  | SPHERE, ICOSPHERE, CUBE, CONE, CYLINDER | Node primitive; ICOSPHERE is more uniform than SPHERE at low resolution |
+| `node_resolution` | integer |  |  | Segments of the node primitive; below ~12 the silhouette is visibly faceted |
+| `node_shade_smooth` | boolean | True |  | Smooth normals; turn off for CUBE/CONE/CYLINDER, whose hard edges get averaged away |
+| `edge_profile` | string | ROUND | ROUND, RIBBON | Cross-section swept along each edge |
+| `edge_resolution` | integer |  |  | Sides of the edge cross-section, not segments along the curve |
+| `node_radius` | number |  |  | Absolute node radius in world units |
+| `node_radius_rel` | number |  |  | Node radius as a fraction of the graph radius; overrides node_radius |
+| `edge_radius` | number |  |  | Absolute edge radius in world units |
+| `edge_radius_rel` | number |  |  | Edge radius as a fraction of the graph radius; overrides edge_radius |
+| `node_size_range` | array | [0.5, 3.0] |  | Multiplier range when node_size drives radius from an attribute |
+| `edge_width_range` | array | [0.5, 2.5] |  |  |
+| `material_roughness` | number |  |  | Principled BSDF roughness; the Blender default of 0.5 reads plasticky |
+| `material_metallic` | number |  |  |  |
+
+### `labels`
+
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `enabled` | boolean | True |  |  |
+| `source` | string | NODE_ID | NODE_ID, ATTRIBUTE | Label text: the node identifier, or the formatted value of `attribute` |
+| `attribute` | string |  |  | Attribute to print when source is ATTRIBUTE |
+| `max_count` | integer | 40 |  | Keep only the highest-ranked N labels |
+| `rank_by` | string | degree |  | Attribute deciding which labels survive max_count |
+| `min_value` | number |  |  | Drop labels whose rank_by value is below this; centrality attributes are normalized to [0,1] |
+| `font_size` | integer | 22 |  |  |
+| `size_mode` | string | ADAPTIVE | FIXED, PROPORTIONAL, ADAPTIVE |  |
+| `color` | array | [1.0, 1.0, 1.0] |  | Text RGB |
+| `occlusion` | boolean | True |  | Hide labels whose node is behind geometry |
+| `declutter` | boolean | True |  | Drop labels whose box would overlap a higher-ranked one |
+| `halo` | boolean | True |  | Draw a backing box behind the text |
+| `halo_color` | array | [0.0, 0.0, 0.0] |  |  |
+| `halo_alpha` | number | 0.55 |  |  |
+| `float_decimals` | integer | 2 |  |  |
+| `max_distance` | number | 0.0 |  | Drop labels further than this from the camera; 0 disables |
+
+### `world`
+
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `color` | array |  |  | Background RGB |
+| `strength` | number |  |  | Ambient light level |
+| `hdri` | string |  |  | Path to an equirectangular image for image-based lighting |
+| `hdri_rotation` | number | 0.0 |  | Degrees about Z |
+
+### `lighting`
+
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `sun_energy` | number | 3.0 |  |  |
+| `sun_angle` | number | 180.0 |  | Angular diameter in degrees; large values give soft, near-shadowless light |
+| `sun_rotation` | array | [0.9, 0.0, 0.7] |  | Euler XYZ in radians |
+| `replace` | boolean | False |  | Remove existing lights first; when false the sun is added only if the scene has none |
 
 ### `render`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `engine` | string | CYCLES | CYCLES, BLENDER_EEVEE_NEXT, BLENDER_WORKBENCH |
-| `resolution` | array | [1920, 1080] |  |
-| `samples` | integer | 128 |  |
-| `camera` | string |  |  |
-| `output` | string | render.png |  |
-| `transparent` | boolean | False |  |
-| `denoise` | boolean | True |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `engine` | string | CYCLES | CYCLES, BLENDER_EEVEE, BLENDER_WORKBENCH |  |
+| `resolution` | array | [1920, 1080] |  |  |
+| `samples` | integer | 128 |  |  |
+| `camera` | string |  |  | Camera object name |
+| `output` | string | render.png |  | Output filename |
+| `transparent` | boolean | False |  |  |
+| `denoise` | boolean | True |  |  |
+| `frame_camera` | boolean | True |  | Place and aim a camera so the graph fills the frame; a named `camera` takes precedence |
+| `camera_margin` | number | 1.15 |  | Fraction of the graph radius left as empty border |
+| `camera_direction` | array | [0.48, -0.72, 0.5] |  | Direction from graph center to camera; normalized on use |
+| `camera_lens` | number |  |  | Focal length in mm; the framing distance compensates automatically |
+| `camera_ortho` | boolean | False |  | Orthographic projection; node radius stays constant with depth |
+| `dof_fstop` | number |  |  | Depth of field at this f-number, focused on the framing distance |
+| `view_transform` | string |  |  | Standard, AgX, Filmic, Khronos PBR Neutral or Raw; use Standard for color-encoded figures |
+| `look` | string |  |  |  |
+| `exposure` | number |  |  | Stops |
+| `gamma` | number |  |  |  |
+| `filter_width` | number |  |  | Reconstruction filter width in px; the 1.5 default softens thin edges, 1.0 keeps them crisp |
+| `resolution_percentage` | integer |  |  | Render scale in percent; inherited from the startup file when unset |
+| `file_format` | string |  | PNG, OPEN_EXR, TIFF, JPEG |  |
+| `color_depth` | string |  | 8, 16, 32 | Bits per channel; 16 removes banding in smooth colormap gradients |
+| `dpi` | number |  |  | Pixel density metadata written into the image |
+| `adaptive_threshold` | number |  |  | Cycles noise target |
+| `max_bounces` | integer |  |  | Cycles light bounces; 3-4 is usually indistinguishable for mostly-diffuse figures |
+| `denoiser` | string |  | AUTO, OPENIMAGEDENOISE, OPTIX | Cycles denoiser; `denoise: true` alone picks a machine-dependent default |
+| `raytracing` | boolean |  |  | EEVEE Next screen-space GI; without it there is no indirect light |
+| `ambient_occlusion` | boolean |  |  | EEVEE Next fast GI in ambient-occlusion mode |
+| `ao_distance` | number |  |  | EEVEE Next fast GI distance; 0 means infinite |
+| `clamp_indirect` | number |  |  | EEVEE Next firefly control |
 
 ### `exports`
 
-| Field | Type | Default | Enum |
-| --- | --- | --- | --- |
-| `graph` | string |  |  |
-| `positions` | string |  |  |
-| `statistics` | string |  |  |
-| `blend` | string |  |  |
+| Field | Type | Default | Enum | Description |
+| --- | --- | --- | --- | --- |
+| `graph` | string |  |  | Export graph as GEXF/GraphML |
+| `positions` | string |  |  | Export node positions CSV |
+| `statistics` | string |  |  | Export statistics report |
+| `blend` | string |  |  | Save .blend file copy |
 
 ## Generic ops
 
@@ -171,4 +254,545 @@ The `ops` array calls any operator by `id` (a bl_idname or a registry shortcut),
 
 ## Scene property groups
 
-_Property-group tables require a running Blender session. Run the generator from inside Blender to include them._
+### `scigraphs` (`scene.scigraphs`)
+
+| Property | Type | Default | Enum values |
+| --- | --- | --- | --- |
+| `arrow_position` | FLOAT | 0.699999988079071 |  |
+| `arrow_size` | FLOAT | 0.15000000596046448 |  |
+| `attraction_strength` | FLOAT | 1.0 |  |
+| `auto_layout_on_import` | BOOLEAN | True |  |
+| `auto_stop_threshold` | FLOAT | 0.0 |  |
+| `barnes_hut_theta` | FLOAT | 1.2000000476837158 |  |
+| `centrality_method` | ENUM | degree | degree, betweenness, closeness, eigenvector |
+| `clustering_algorithm` | ENUM | rn | cpm, infomap, rb, rn, rnsc, scluster, uvcluster |
+| `clustering_resolution` | FLOAT | 1.0 |  |
+| `clustering_seed` | INT | 0 |  |
+| `clustering_threshold` | FLOAT | 1.0000000116860974e-07 |  |
+| `cooling_factor` | FLOAT | 0.949999988079071 |  |
+| `csv_delimiter` | ENUM | , | ,, ;, 	, |,   |
+| `data_source` | ENUM | FILE | FILE, DATABASE, SUITESPARSE, REPRO |
+| `db_profile_index` | ENUM |  |  |
+| `directed_centrality_method` | ENUM | pagerank | pagerank, hub_score, authority_score, in_degree, out_degree, katz |
+| `edge_auto_offset_parallel` | BOOLEAN | True |  |
+| `edge_bundle_adaptive_beta` | FLOAT | 0.0 |  |
+| `edge_bundle_company` | FLOAT | 0.0 |  |
+| `edge_bundle_compatibility_threshold` | FLOAT | 0.6000000238418579 |  |
+| `edge_bundle_density_opacity` | FLOAT | 0.0 |  |
+| `edge_bundle_iterations` | INT | 6 |  |
+| `edge_bundle_strength` | FLOAT | 0.6000000238418579 |  |
+| `edge_bundle_turn_limit` | FLOAT | 180.0 |  |
+| `edge_bundle_view_beta` | FLOAT | 0.0 |  |
+| `edge_curvature` | FLOAT | 0.30000001192092896 |  |
+| `edge_curve_direction` | ENUM | AUTO | AUTO, CLOCKWISE, COUNTER_CLOCKWISE, ALTERNATING |
+| `edge_distance` | FLOAT | 1.0 |  |
+| `edge_fdeb_cycles` | INT | 6 |  |
+| `edge_fdeb_radius` | FLOAT | 0.05000000074505806 |  |
+| `edge_fdeb_threshold` | FLOAT | 0.25 |  |
+| `edge_fdeb_visibility` | BOOLEAN | True |  |
+| `edge_heb_beta` | FLOAT | 0.8500000238418579 |  |
+| `edge_heb_fade_long` | FLOAT | 0.6000000238418579 |  |
+| `edge_heb_gradient` | ENUM | NODES | NONE, DIRECTION, NODES |
+| `edge_heb_remove_lca` | BOOLEAN | True |  |
+| `edge_mingle_min_gain` | FLOAT | 0.0 |  |
+| `edge_mingle_neighbours` | INT | 10 |  |
+| `edge_mingle_rounds` | INT | 4 |  |
+| `edge_orthogonal_style` | ENUM | CENTERED | HORIZONTAL_FIRST, VERTICAL_FIRST, SHORTEST, CENTERED |
+| `edge_parallel_offset` | FLOAT | 0.05000000074505806 |  |
+| `edge_resolution` | INT | 8 |  |
+| `edge_routed_avoid_nodes` | FLOAT | 0.0 |  |
+| `edge_routed_iterations` | INT | 4 |  |
+| `edge_routed_reinforce` | FLOAT | 0.5 |  |
+| `edge_routed_resolution` | INT | 128 |  |
+| `edge_sbeb_attraction` | FLOAT | 0.6000000238418579 |  |
+| `edge_sbeb_clusters` | INT | 16 |  |
+| `edge_sbeb_iterations` | INT | 5 |  |
+| `edge_sbeb_recluster` | BOOLEAN | False |  |
+| `edge_sbeb_resolution` | INT | 512 |  |
+| `edge_sbeb_smooth` | INT | 2 |  |
+| `edge_sbeb_threshold` | FLOAT | 0.10000000149011612 |  |
+| `edge_segments` | INT | 8 |  |
+| `edge_self_loop_radius` | FLOAT | 0.20000000298023224 |  |
+| `edge_style` | ENUM | GREAT_CIRCLE | STRAIGHT, GREAT_CIRCLE |
+| `edge_style_affect_existing` | BOOLEAN | True |  |
+| `edge_style_preserve_osmnx` | BOOLEAN | True |  |
+| `edge_style_preset` | ENUM | CUSTOM | CUSTOM, GEPHI_DEFAULT, CYTOSCAPE_BEZIER, SCHEMATIC, BUNDLED_DENSE, FLOW_DIAGRAM, MINIMAL |
+| `edge_style_type` | ENUM | STRAIGHT | STRAIGHT, CURVED, QUADRATIC, ARC, BUNDLED, HIERARCHICAL, FDEB, SBEB, ROUTED, MINGLE, TAPERED, ORTHOGONAL |
+| `edge_taper_end` | FLOAT | 0.30000001192092896 |  |
+| `edge_taper_start` | FLOAT | 1.0 |  |
+| `edge_thickness` | FLOAT | 0.0 |  |
+| `edge_thickness_multiplier` | FLOAT | 1.0 |  |
+| `execution_speed` | FLOAT | 0.009999999776482582 |  |
+| `export_filepath` | STRING |  |  |
+| `export_format` | ENUM | GRAPHML | GRAPHML, GEXF, JSON, CSV |
+| `export_include_attributes` | BOOLEAN | True |  |
+| `fa2_barnes_hut_optimize` | BOOLEAN | True |  |
+| `fa2_barnes_hut_theta` | FLOAT | 1.2000000476837158 |  |
+| `fa2_edge_weight_influence` | FLOAT | 1.0 |  |
+| `fa2_gravity` | FLOAT | 1.0 |  |
+| `fa2_jitter_tolerance` | FLOAT | 1.0 |  |
+| `fa2_lin_log_mode` | BOOLEAN | False |  |
+| `fa2_scaling_ratio` | FLOAT | 2.0 |  |
+| `fa2_strong_gravity` | BOOLEAN | False |  |
+| `feat_custom_tags` | STRING | building=yes |  |
+| `feat_limit` | INT | 10000 |  |
+| `feat_nodes_only` | BOOLEAN | False |  |
+| `feat_source` | ENUM | OVERTURE | OVERTURE, OSMNX |
+| `feat_type` | ENUM |  |  |
+| `filepath` | STRING |  |  |
+| `flow_animation_loop` | BOOLEAN | True |  |
+| `flow_animation_mode` | ENUM | CONTINUOUS | DISCRETE, CONTINUOUS |
+| `flow_animation_smoothness` | FLOAT | 2.0 |  |
+| `flow_animation_speed` | INT | 25 |  |
+| `flow_sink` | STRING | 1 |  |
+| `flow_source` | STRING | 0 |  |
+| `geocode_columns` | BOOLEAN | True |  |
+| `globe_bump_strength` | FLOAT | 0.10000000149011612 |  |
+| `globe_land_roughness` | FLOAT | 0.800000011920929 |  |
+| `globe_material` | ENUM | SIMPLE | SIMPLE, OCEAN, WIREFRAME, TOPOGRAPHIC, WORLD_MAP |
+| `globe_radius` | FLOAT | 5.0 |  |
+| `globe_subdivisions` | INT | 64 |  |
+| `globe_texture_resolution` | ENUM | 4K | 2K, 4K, 8K |
+| `globe_theme_api` | ENUM | NONE | NONE, NASA_BLUE_MARBLE, NASA_VIIRS, NATURAL_EARTH, URBAN_DARK, TOPOGRAPHIC_SHADED, DATA_OVERLAY |
+| `globe_water_roughness` | FLOAT | 0.20000000298023224 |  |
+| `globe_water_specular` | FLOAT | 0.800000011920929 |  |
+| `graphviz_circo_mindist` | FLOAT | 0.0 |  |
+| `graphviz_dimension` | ENUM | 2 | 2, 2Z, 3 |
+| `graphviz_dot_directed` | BOOLEAN | True |  |
+| `graphviz_dot_nodesep` | FLOAT | 0.0 |  |
+| `graphviz_dot_rankdir` | ENUM | TB | TB, BT, LR, RL |
+| `graphviz_dot_ranksep` | FLOAT | 0.0 |  |
+| `graphviz_dot_splines` | ENUM | false | false, true, line, polyline, ortho, curved |
+| `graphviz_edge_attrs` | STRING |  |  |
+| `graphviz_extra_graph_attrs` | STRING |  |  |
+| `graphviz_fdp_start` | STRING |  |  |
+| `graphviz_neato_maxiter` | INT | 0 |  |
+| `graphviz_neato_mode` | ENUM | DEFAULT | DEFAULT, major, KK, hier, ipsep |
+| `graphviz_neato_model` | ENUM | DEFAULT | DEFAULT, shortpath, circuit, subset, mds |
+| `graphviz_neato_start` | STRING |  |  |
+| `graphviz_node_attrs` | STRING |  |  |
+| `graphviz_osage_pack` | BOOLEAN | True |  |
+| `graphviz_osage_packmode` | ENUM | array | DEFAULT, node, clust, graph, array |
+| `graphviz_quiet` | BOOLEAN | True |  |
+| `graphviz_twopi_ranksep` | FLOAT | 0.0 |  |
+| `graphviz_twopi_root` | STRING |  |  |
+| `gravity_strength` | FLOAT | 0.10000000149011612 |  |
+| `has_temporal_data` | BOOLEAN | False |  |
+| `hierarchical_layer_height` | FLOAT | 1.0 |  |
+| `hierarchical_mode` | ENUM | out | out, in, all |
+| `igraph_dh_cool_fact` | FLOAT | 0.949999988079071 |  |
+| `igraph_dh_fineiter` | INT | 0 |  |
+| `igraph_dh_maxiter` | INT | 10 |  |
+| `igraph_dh_weight_border` | FLOAT | 0.0 |  |
+| `igraph_dh_weight_edge_crossings` | FLOAT | 1.0 |  |
+| `igraph_dh_weight_edge_lengths` | FLOAT | 1.0 |  |
+| `igraph_dh_weight_node_dist` | FLOAT | 1.0 |  |
+| `igraph_dh_weight_node_edge_dist` | FLOAT | 1.0 |  |
+| `igraph_drl_cooldown_attraction` | FLOAT | 1.0 |  |
+| `igraph_drl_cooldown_damping_mult` | FLOAT | 0.10000000149011612 |  |
+| `igraph_drl_cooldown_iterations` | INT | 200 |  |
+| `igraph_drl_cooldown_temperature` | FLOAT | 2000.0 |  |
+| `igraph_drl_crunch_attraction` | FLOAT | 1.0 |  |
+| `igraph_drl_crunch_damping_mult` | FLOAT | 0.25 |  |
+| `igraph_drl_crunch_iterations` | INT | 50 |  |
+| `igraph_drl_crunch_temperature` | FLOAT | 250.0 |  |
+| `igraph_drl_edge_cut` | FLOAT | 0.800000011920929 |  |
+| `igraph_drl_expansion_attraction` | FLOAT | 2.0 |  |
+| `igraph_drl_expansion_damping_mult` | FLOAT | 1.0 |  |
+| `igraph_drl_expansion_iterations` | INT | 200 |  |
+| `igraph_drl_expansion_temperature` | FLOAT | 2000.0 |  |
+| `igraph_drl_init_attraction` | FLOAT | 10.0 |  |
+| `igraph_drl_init_damping_mult` | FLOAT | 1.0 |  |
+| `igraph_drl_init_iterations` | INT | 0 |  |
+| `igraph_drl_init_temperature` | FLOAT | 2000.0 |  |
+| `igraph_drl_liquid_attraction` | FLOAT | 10.0 |  |
+| `igraph_drl_liquid_damping_mult` | FLOAT | 1.0 |  |
+| `igraph_drl_liquid_iterations` | INT | 200 |  |
+| `igraph_drl_liquid_temperature` | FLOAT | 2000.0 |  |
+| `igraph_drl_simmer_attraction` | FLOAT | 0.5 |  |
+| `igraph_drl_simmer_damping_mult` | FLOAT | 0.0 |  |
+| `igraph_drl_simmer_iterations` | INT | 100 |  |
+| `igraph_drl_simmer_temperature` | FLOAT | 250.0 |  |
+| `igraph_fr_area` | FLOAT | 0.0 |  |
+| `igraph_fr_coolexp` | FLOAT | 1.5 |  |
+| `igraph_fr_maxdelta` | FLOAT | 0.0 |  |
+| `igraph_fr_repulserad` | FLOAT | 0.0 |  |
+| `igraph_fr_start_temp` | FLOAT | 1.0 |  |
+| `igraph_graphopt_max_sa_movement` | FLOAT | 5.0 |  |
+| `igraph_graphopt_niter` | INT | 500 |  |
+| `igraph_graphopt_node_charge` | FLOAT | 0.0010000000474974513 |  |
+| `igraph_graphopt_node_mass` | FLOAT | 30.0 |  |
+| `igraph_graphopt_spring_constant` | FLOAT | 1.0 |  |
+| `igraph_graphopt_spring_length` | FLOAT | 0.0 |  |
+| `igraph_kk_epsilon` | FLOAT | 0.0 |  |
+| `igraph_kk_kkconst` | FLOAT | 0.0 |  |
+| `igraph_kk_maxiter` | INT | 0 |  |
+| `igraph_lgl_area` | FLOAT | 0.0 |  |
+| `igraph_lgl_cellsize` | FLOAT | 0.0 |  |
+| `igraph_lgl_coolexp` | FLOAT | 1.5 |  |
+| `igraph_lgl_maxdelta` | FLOAT | 0.0 |  |
+| `igraph_lgl_maxiter` | INT | 150 |  |
+| `igraph_lgl_repulserad` | FLOAT | 0.0 |  |
+| `initial_temperature` | FLOAT | 1.0 |  |
+| `is_directed` | BOOLEAN | False |  |
+| `iterations` | INT | 50 |  |
+| `iterations_per_frame` | INT | 5 |  |
+| `latitude_column` | ENUM |  |  |
+| `layout_algorithm` | ENUM | FORCEATLAS2 | GRID, SPRING, IGRAPH_DRL_2D, IGRAPH_DH, IGRAPH_GRAPHOPT, CIRCLE_PACKING, RANDOM, SPHERE, SPIRAL_3D, HELIX, CUBE, SPECTRAL_3D, MDS_3D, HIERARCHICAL_3D, BIPARTITE_3D, FORCEATLAS2, YIFAN_HU, IGRAPH_DRL, IGRAPH_FR, IGRAPH_KK, IGRAPH_LGL, SPRING_3D, GRAPHVIZ_DOT, GRAPHVIZ_NEATO, GRAPHVIZ_FDP, GRAPHVIZ_SFDP, GRAPHVIZ_TWOPI, GRAPHVIZ_CIRCO, GRAPHVIZ_OSAGE, GRAPHVIZ_PATCHWORK, SUGIYAMA, CIRCULAR_HIERARCHY |
+| `layout_scale` | FLOAT | 5.0 |  |
+| `lighting_setup` | ENUM | THREE_POINT | THREE_POINT, STUDIO, OUTDOOR |
+| `longitude_column` | ENUM |  |  |
+| `map_feature_type` | ENUM | COASTLINE | LAND, COASTLINE, LAND_OCEAN, BATHYMETRY, RIVERS_LAKES |
+| `map_resolution` | ENUM | 10m | 110m, 50m, 10m |
+| `mds_dissimilarity` | ENUM | euclidean | euclidean, precomputed |
+| `name` | STRING |  |  |
+| `node_attr_delimiter` | ENUM | 	 | 	, ,, ;,   |
+| `node_attr_filepath` | STRING |  |  |
+| `node_attr_has_header` | BOOLEAN | False |  |
+| `node_resolution` | INT | 10 |  |
+| `node_scale_multiplier` | FLOAT | 1.0 |  |
+| `node_shape` | ENUM | SPHERE | SPHERE, ICOSPHERE, CUBE, CONE, CYLINDER |
+| `node_size` | FLOAT | 0.019999999552965164 |  |
+| `osmnx_address` | STRING |  |  |
+| `osmnx_basemap_padding` | FLOAT | 0.05000000074505806 |  |
+| `osmnx_basemap_source` | ENUM | ESRI_IMAGERY | ESRI_IMAGERY, ESRI_STREET, ESRI_TOPO, ESRI_DARK_GRAY, ESRI_LIGHT_GRAY, ESRI_OCEAN, ESRI_HILLSHADE, ESRI_TERRAIN, OSM, OPENTOPOMAP, CARTO_VOYAGER, CARTO_POSITRON, CARTO_DARK_MATTER, WMS |
+| `osmnx_basemap_zoom` | INT | 16 |  |
+| `osmnx_bbox_east` | FLOAT | -3.5 |  |
+| `osmnx_bbox_north` | FLOAT | 40.5 |  |
+| `osmnx_bbox_south` | FLOAT | 40.29999923706055 |  |
+| `osmnx_bbox_west` | FLOAT | -3.9000000953674316 |  |
+| `osmnx_bearing_lat1` | FLOAT | 0.0 |  |
+| `osmnx_bearing_lat2` | FLOAT | 0.0 |  |
+| `osmnx_bearing_lon1` | FLOAT | 0.0 |  |
+| `osmnx_bearing_lon2` | FLOAT | 0.0 |  |
+| `osmnx_bearing_num_bins` | INT | 36 |  |
+| `osmnx_bearing_result` | FLOAT | 0.0 |  |
+| `osmnx_centrality_fast` | BOOLEAN | True |  |
+| `osmnx_centrality_kind` | ENUM | BETWEENNESS_NODE | BETWEENNESS_NODE, BETWEENNESS_EDGE, CLOSENESS |
+| `osmnx_centrality_weighted` | BOOLEAN | True |  |
+| `osmnx_color_attr_name` | STRING | betweenness |  |
+| `osmnx_color_target` | ENUM | NODES | NODES, EDGES |
+| `osmnx_colormap` | ENUM | viridis | viridis, plasma, magma, inferno, turbo, coolwarm, RdYlBu_r, YlGnBu, hot |
+| `osmnx_custom_filter_preset` | ENUM | NONE | NONE, RAIL, SUBWAY, TRAM, CYCLEWAY, FOOTWAY, WATERWAY, MOTORWAY, SERVICE, BUS_ONLY |
+| `osmnx_custom_filter_text` | STRING |  |  |
+| `osmnx_custom_tags` | STRING | building=yes |  |
+| `osmnx_dem_api_provider` | ENUM | open-elevation | open-elevation, opentopodata |
+| `osmnx_dem_api_resolution` | INT | 50 |  |
+| `osmnx_dem_api_workers` | INT | 5 |  |
+| `osmnx_dem_apply_to_nodes` | BOOLEAN | True |  |
+| `osmnx_dem_create_terrain` | BOOLEAN | True |  |
+| `osmnx_dem_filepath` | STRING |  |  |
+| `osmnx_dem_local_path` | STRING |  |  |
+| `osmnx_dem_padding` | FLOAT | 0.10000000149011612 |  |
+| `osmnx_dem_source` | ENUM | OPENTOPOGRAPHY | OPENTOPOGRAPHY, OPEN_ELEVATION, LOCAL_GEOTIFF |
+| `osmnx_dem_subdivision_levels` | INT | 6 |  |
+| `osmnx_dem_subsample` | INT | 2 |  |
+| `osmnx_dem_terrain_method` | ENUM | DISPLACE | DISPLACE, RAW_MESH |
+| `osmnx_dist_node_a` | STRING |  |  |
+| `osmnx_dist_node_b` | STRING |  |  |
+| `osmnx_dist_x1` | FLOAT | 0.0 |  |
+| `osmnx_dist_x2` | FLOAT | 0.0 |  |
+| `osmnx_dist_y1` | FLOAT | 0.0 |  |
+| `osmnx_dist_y2` | FLOAT | 0.0 |  |
+| `osmnx_distance` | INT | 1000 |  |
+| `osmnx_distance_result` | FLOAT | 0.0 |  |
+| `osmnx_download_method` | ENUM | PLACE | PLACE, MULTI_PLACE, POINT, ADDRESS, BBOX, POLYGON, XML |
+| `osmnx_elevation_offset` | FLOAT | 0.0 |  |
+| `osmnx_elevation_scale` | FLOAT | 1.0 |  |
+| `osmnx_export_filepath` | STRING |  |  |
+| `osmnx_export_format` | ENUM | GEOPACKAGE | GEOPACKAGE, OSM_XML, GRAPHML_GEPHI, SVG |
+| `osmnx_fallback_speed` | INT | 30 |  |
+| `osmnx_feature_type` | ENUM | BUILDING | BUILDING, AMENITY, AMENITY_METAPATH, LANDUSE, NATURAL, HIGHWAY, CUSTOM |
+| `osmnx_features_distance` | INT | 1000 |  |
+| `osmnx_features_place` | STRING |  |  |
+| `osmnx_geocode_address` | STRING |  |  |
+| `osmnx_graphml_path` | STRING |  |  |
+| `osmnx_impedance_alpha` | FLOAT | 5.0 |  |
+| `osmnx_interpolate_distance` | FLOAT | 50.0 |  |
+| `osmnx_iso_buffer` | FLOAT | 25.0 |  |
+| `osmnx_iso_center_node` | STRING |  |  |
+| `osmnx_iso_mode` | ENUM | BUFFER_UNION | CONVEX_HULL, BUFFER_UNION |
+| `osmnx_iso_travel_speed` | FLOAT | 4.5 |  |
+| `osmnx_iso_trip_times` | STRING | 5, 10, 15, 20 |  |
+| `osmnx_k_shortest` | INT | 3 |  |
+| `osmnx_latitude` | FLOAT | 40.41680145263672 |  |
+| `osmnx_longitude` | FLOAT | -3.7037999629974365 |  |
+| `osmnx_network_area` | FLOAT | 0.0 |  |
+| `osmnx_network_type` | ENUM | drive | drive, drive_service, walk, bike, all, all_public |
+| `osmnx_od_batch_cpus` | INT | 0 |  |
+| `osmnx_od_random_n` | INT | 10 |  |
+| `osmnx_path_weight` | ENUM | length | length, travel_time, elevation_impedance |
+| `osmnx_place_list` | STRING |  |  |
+| `osmnx_place_name` | STRING |  |  |
+| `osmnx_poi_snap_mode` | ENUM | ATTR_ONLY | ATTR_ONLY, MOVE_TO_NODE, ADD_CONNECTOR |
+| `osmnx_polygon_object` | STRING |  |  |
+| `osmnx_retain_all` | BOOLEAN | False |  |
+| `osmnx_retain_geometry` | BOOLEAN | True |  |
+| `osmnx_rose_bins` | INT | 36 |  |
+| `osmnx_rose_height_scale` | FLOAT | 1.0 |  |
+| `osmnx_rose_radius` | FLOAT | 2.0 |  |
+| `osmnx_sample_n` | INT | 20 |  |
+| `osmnx_scale` | FLOAT | 0.0010000000474974513 |  |
+| `osmnx_selected_edge_u` | STRING |  |  |
+| `osmnx_selected_edge_v` | STRING |  |  |
+| `osmnx_selected_node_id` | STRING |  |  |
+| `osmnx_shortest_path_source` | STRING |  |  |
+| `osmnx_shortest_path_target` | STRING |  |  |
+| `osmnx_simplification_tolerance` | FLOAT | 10.0 |  |
+| `osmnx_simplify` | BOOLEAN | True |  |
+| `osmnx_truncate_by_edge` | BOOLEAN | True |  |
+| `osmnx_truncate_distance` | FLOAT | 1000.0 |  |
+| `osmnx_which_result` | INT | 0 |  |
+| `osmnx_wms_layer` | STRING |  |  |
+| `osmnx_wms_url` | STRING |  |  |
+| `osmnx_xml_filepath` | STRING |  |  |
+| `pathfinding_algorithm` | ENUM | DIJKSTRA | DIJKSTRA, ASTAR, BELLMAN_FORD |
+| `pathfinding_source` | STRING | 0 |  |
+| `pathfinding_target` | STRING | 1 |  |
+| `remove_self_loops` | BOOLEAN | True |  |
+| `rendering_preset` | ENUM | BASIC | BASIC, GLASS, METALLIC, EMISSION, SCIENTIFIC |
+| `report_include_powerlaw` | BOOLEAN | True |  |
+| `repulsion_strength` | FLOAT | 1.0 |  |
+| `sfdp_beautify` | BOOLEAN | False |  |
+| `sfdp_dim` | ENUM | 2Z | 2, 2Z, 3 |
+| `sfdp_k` | FLOAT | 0.30000001192092896 |  |
+| `sfdp_levels` | INT | 0 |  |
+| `sfdp_maxiter` | INT | 600 |  |
+| `sfdp_overlap` | ENUM | scale | true, prism, scale, false |
+| `sfdp_overlap_scaling` | FLOAT | -4.0 |  |
+| `sfdp_quadtree` | ENUM | normal | normal, fast, none |
+| `sfdp_repulsive_force` | FLOAT | 1.0 |  |
+| `sfdp_smoothing` | ENUM | spring | none, triangle, spring, rng, power_dist |
+| `sfdp_z_method` | ENUM | SPECTRAL | SPECTRAL, DEGREE, BETWEENNESS, RANDOM |
+| `sfdp_z_scale` | FLOAT | 0.30000001192092896 |  |
+| `show_arrows` | BOOLEAN | False |  |
+| `show_forces` | BOOLEAN | False |  |
+| `show_globe` | BOOLEAN | True |  |
+| `show_hud_overlay` | BOOLEAN | True |  |
+| `source_column` | ENUM |  |  |
+| `spanning_algorithm` | ENUM | KRUSKAL | KRUSKAL, PRIM, MAXIMUM |
+| `spectral_weight_attr` | STRING |  |  |
+| `splitter_attribute` | ENUM |  |  |
+| `splitter_base_z` | FLOAT | 0.0 |  |
+| `splitter_center_layers` | BOOLEAN | False |  |
+| `splitter_centrality_bins` | INT | 3 |  |
+| `splitter_community_algorithm` | ENUM | RN | CPM, INFOMAP, RB, RN, RNSC, SCLUSTER, UVCLUSTER |
+| `splitter_community_resolution` | FLOAT | 1.0 |  |
+| `splitter_criterion` | ENUM | COMMUNITY | COMMUNITY, ATTRIBUTE, DEGREE, COMPONENT, CENTRALITY, CUSTOM |
+| `splitter_degree_bins` | INT | 3 |  |
+| `splitter_inter_layer_edges` | ENUM | STRAIGHT | STRAIGHT, CURVED, HIDE |
+| `splitter_layer_height` | FLOAT | 2.0 |  |
+| `splitter_layer_order` | ENUM | SIZE_DESC | SIZE_ASC, SIZE_DESC, VALUE_ASC, VALUE_DESC, ALPHA |
+| `splitter_preserve_xy` | BOOLEAN | True |  |
+| `splitter_scale_by_size` | BOOLEAN | False |  |
+| `sql_columns_cache` | STRING |  |  |
+| `sql_query` | STRING | SELECT source, target FROM edges |  |
+| `sql_query_status` | STRING |  |  |
+| `sql_row_count` | INT | 0 |  |
+| `suitesparse_giant_only` | BOOLEAN | True |  |
+| `suitesparse_id` | STRING | Grund/bayer09 |  |
+| `suitesparse_mode` | ENUM | BIPARTITE | BIPARTITE, SYMMETRIC |
+| `suitesparse_status` | STRING |  |  |
+| `target_column` | ENUM |  |  |
+| `terrain_offset_x` | FLOAT | 0.0 |  |
+| `terrain_offset_y` | FLOAT | 0.0 |  |
+| `terrain_offset_z` | FLOAT | 0.0 |  |
+| `terrain_opacity` | FLOAT | 1.0 |  |
+| `terrain_scale_xy` | FLOAT | 1.0 |  |
+| `text_attribute` | ENUM |  |  |
+| `text_auto_update` | BOOLEAN | False |  |
+| `text_auto_update_interval` | FLOAT | 0.5 |  |
+| `text_background_alpha` | FLOAT | 0.699999988079071 |  |
+| `text_background_color` | FLOAT | 0.0 |  |
+| `text_background_enabled` | BOOLEAN | True |  |
+| `text_color` | FLOAT | 0.0 |  |
+| `text_depth_occlusion` | BOOLEAN | True |  |
+| `text_filter_attribute` | ENUM |  |  |
+| `text_filter_enabled` | BOOLEAN | False |  |
+| `text_filter_operator` | ENUM | GREATER | GREATER, LESS, EQUAL, NOT_EQUAL, GREATER_EQUAL, LESS_EQUAL |
+| `text_filter_value` | FLOAT | 0.0 |  |
+| `text_float_decimals` | INT | 2 |  |
+| `text_font_custom` | STRING |  |  |
+| `text_font_source` | ENUM | SYSTEM | SYSTEM, CUSTOM |
+| `text_font_system` | ENUM |  |  |
+| `text_format_prefix` | STRING |  |  |
+| `text_format_suffix` | STRING |  |  |
+| `text_format_type` | ENUM | AUTO | AUTO, INTEGER, FLOAT, SCIENTIFIC, PERCENTAGE |
+| `text_max_distance` | FLOAT | 100.0 |  |
+| `text_overlay_enabled` | BOOLEAN | False |  |
+| `text_size_fixed` | INT | 14 |  |
+| `text_size_mode` | ENUM | ADAPTIVE | FIXED, PROPORTIONAL, ADAPTIVE |
+| `text_size_scale` | FLOAT | 1.0 |  |
+| `text_source` | ENUM | NODE_ID | NODE_ID, ATTRIBUTE |
+| `text_thousands_separator` | BOOLEAN | False |  |
+| `time_aggregation` | ENUM | ALL | ALL, YEAR, MONTH, RANGE |
+| `time_column` | ENUM |  |  |
+| `time_range_end` | STRING |  |  |
+| `time_range_start` | STRING |  |  |
+| `topology_analysis_mode` | ENUM | SURFACE | SURFACE |
+| `topology_show_faces` | BOOLEAN | False |  |
+| `topology_surface_type` | ENUM | PLANE | PLANE |
+| `traversal_algorithm` | ENUM | BFS | BFS, DFS |
+| `traversal_animation_loop` | BOOLEAN | True |  |
+| `traversal_animation_mode` | ENUM | DISCRETE | DISCRETE, CONTINUOUS |
+| `traversal_animation_smoothness` | FLOAT | 2.0 |  |
+| `traversal_animation_speed` | INT | 30 |  |
+| `traversal_start_mode` | ENUM | AUTO | AUTO, MANUAL |
+| `traversal_start_nodes` | STRING |  |  |
+| `update_viewport` | BOOLEAN | True |  |
+| `use_geospatial` | BOOLEAN | False |  |
+| `weight_column` | ENUM |  |  |
+| `yifan_hu_adaptive_cooling` | BOOLEAN | True |  |
+| `yifan_hu_spring_constant` | FLOAT | 0.30000001192092896 |  |
+| `yifan_hu_step_ratio` | FLOAT | 1.0 |  |
+
+### `city2graph` (`scene.city2graph`)
+
+| Property | Type | Default | Enum values |
+| --- | --- | --- | --- |
+| `c2g_area_method` | ENUM | FROM_OSMNX | FROM_OSMNX, PLACE, POINT, ADDRESS, BBOX, POLYGON |
+| `c2g_bbox_east` | FLOAT | -3.5 |  |
+| `c2g_bbox_north` | FLOAT | 40.5 |  |
+| `c2g_bbox_south` | FLOAT | 40.29999923706055 |  |
+| `c2g_bbox_west` | FLOAT | -3.9000000953674316 |  |
+| `c2g_data_source` | ENUM | OVERTURE | OVERTURE, FILE |
+| `c2g_export_format` | ENUM | JSON | JSON, GRAPHML |
+| `c2g_export_path` | STRING |  |  |
+| `c2g_graph_type` | ENUM | HOMOGENEOUS | HOMOGENEOUS, HETEROGENEOUS |
+| `c2g_gtfs_create_routes` | BOOLEAN | True |  |
+| `c2g_gtfs_create_stops` | BOOLEAN | True |  |
+| `c2g_gtfs_path` | STRING |  |  |
+| `c2g_gtfs_stop_size` | FLOAT | 0.05000000074505806 |  |
+| `c2g_overture_building` | BOOLEAN | True |  |
+| `c2g_overture_connector` | BOOLEAN | False |  |
+| `c2g_overture_land` | BOOLEAN | False |  |
+| `c2g_overture_limit` | INT | 10000 |  |
+| `c2g_overture_place` | BOOLEAN | False |  |
+| `c2g_overture_segment` | BOOLEAN | False |  |
+| `c2g_overture_water` | BOOLEAN | False |  |
+| `c2g_tessellation_segment` | FLOAT | 0.5 |  |
+| `c2g_tessellation_shrink` | FLOAT | 0.4000000059604645 |  |
+| `c2g_use_osmnx_bbox` | BOOLEAN | True |  |
+| `geocode_place_name` | STRING |  |  |
+| `graph_filter_center` | POINTER |  |  |
+| `graph_filter_threshold` | FLOAT | 1000.0 |  |
+| `graph_tool_action` | ENUM | REMOVE_ISOLATED | CLIP, FILTER, ISOCHRONE, REMOVE_ISOLATED |
+| `gtfs_calendar_end` | ENUM |  |  |
+| `gtfs_calendar_start` | ENUM |  |  |
+| `gtfs_od_directed` | BOOLEAN | False |  |
+| `gtfs_od_top_n` | INT | 10000 |  |
+| `isochrone_center_object` | POINTER |  |  |
+| `isochrone_threshold` | FLOAT | 300.0 |  |
+| `isochrone_weight_attr` | STRING | travel_time |  |
+| `metapath_amenities_object` | POINTER |  |  |
+| `metapath_amenity_limit` | INT | 100 |  |
+| `metapath_curve_thickness` | FLOAT | 0.00019999999494757503 |  |
+| `metapath_endpoint_type` | STRING | amenity |  |
+| `metapath_hops` | INT | 3 |  |
+| `metapath_k_neighbors` | INT | 1 |  |
+| `metapath_visualize_limit` | INT | 200 |  |
+| `metapath_weight_attr` | STRING | length |  |
+| `metapath_weight_min_threshold` | FLOAT | 0.0 |  |
+| `metapath_weight_threshold` | FLOAT | 1000.0 |  |
+| `morpho_center_lat` | FLOAT | 0.0 |  |
+| `morpho_center_lon` | FLOAT | 0.0 |  |
+| `morpho_clipping_buffer` | FLOAT | 300.0 |  |
+| `morpho_contiguity` | ENUM | QUEEN | QUEEN, ROOK |
+| `morpho_distance` | FLOAT | 500.0 |  |
+| `morpho_keep_buildings` | BOOLEAN | True |  |
+| `morpho_keep_segments` | BOOLEAN | False |  |
+| `morpho_rel_priv_priv` | BOOLEAN | True |  |
+| `morpho_rel_priv_pub` | BOOLEAN | True |  |
+| `morpho_rel_pub_pub` | BOOLEAN | True |  |
+| `morpho_use_center_from_osmnx` | BOOLEAN | True |  |
+| `name` | STRING |  |  |
+| `od_directed` | BOOLEAN | True |  |
+| `od_matrix_path` | STRING |  |  |
+| `od_matrix_type` | ENUM | EDGELIST | EDGELIST, ADJACENCY |
+| `od_source_col` | STRING | source |  |
+| `od_target_col` | STRING | target |  |
+| `od_threshold` | FLOAT | 0.0 |  |
+| `od_weight_col` | STRING | flow |  |
+| `od_zone_id_col` | STRING | zone_id |  |
+| `od_zones_object` | POINTER |  |  |
+| `prox_color_by_attribute` | BOOLEAN | True |  |
+| `prox_contiguity_predicate` | ENUM | INTERSECTS | INTERSECTS, TOUCHES |
+| `prox_contiguity_type` | ENUM | QUEEN | QUEEN, ROOK |
+| `prox_curve_thickness` | FLOAT | 0.00019999999494757503 |  |
+| `prox_dedup_tolerance` | FLOAT | 0.5 |  |
+| `prox_deduplicate` | BOOLEAN | True |  |
+| `prox_distance_metric` | ENUM | EUCLIDEAN | EUCLIDEAN, MANHATTAN, NETWORK |
+| `prox_feature_object` | POINTER |  |  |
+| `prox_graph_type` | ENUM | KNN | KNN, DELAUNAY, FIXED_RADIUS, WAXMAN, GABRIEL, RNG, EMST, CONTIGUITY |
+| `prox_group_predicate` | ENUM | COVERED_BY | COVERED_BY, WITHIN, INTERSECTS |
+| `prox_knn_k` | INT | 5 |  |
+| `prox_layer1_object` | POINTER |  |  |
+| `prox_layer2_object` | POINTER |  |  |
+| `prox_layer3_object` | POINTER |  |  |
+| `prox_multilayer_k` | INT | 1 |  |
+| `prox_multilayer_method` | ENUM | KNN | KNN, FIXED_RADIUS |
+| `prox_multilayer_radius` | FLOAT | 100.0 |  |
+| `prox_network_object` | POINTER |  |  |
+| `prox_points_object` | POINTER |  |  |
+| `prox_polygons_object` | POINTER |  |  |
+| `prox_radius` | FLOAT | 100.0 |  |
+| `prox_visualize_limit` | INT | 1000000 |  |
+| `prox_waxman_beta` | FLOAT | 0.5 |  |
+| `prox_waxman_r0` | FLOAT | 100.0 |  |
+| `prox_waxman_seed` | INT | 0 |  |
+
+### `coloring` (`scene.scigraphs_coloring`)
+
+| Property | Type | Default | Enum values |
+| --- | --- | --- | --- |
+| `attribute_enum` | ENUM |  |  |
+| `attribute_name` | STRING |  |  |
+| `auto_apply_on_chip` | BOOLEAN | True |  |
+| `auto_range` | BOOLEAN | True |  |
+| `auto_setup_material` | BOOLEAN | True |  |
+| `clip_high_pct` | FLOAT | 100.0 |  |
+| `clip_low_pct` | FLOAT | 0.0 |  |
+| `color_attribute_name` | STRING |  |  |
+| `color_domain` | ENUM | AUTO | AUTO, POINT, CORNER |
+| `color_gamma` | FLOAT | 1.0 |  |
+| `color_norm` | ENUM | LINEAR | LINEAR, LOG, RANK, QUANTILE |
+| `colormap` | ENUM |  |  |
+| `edge_color` | FLOAT | 0.0 |  |
+| `last_vmax` | FLOAT | 0.0 |  |
+| `last_vmin` | FLOAT | 0.0 |  |
+| `name` | STRING |  |  |
+| `nodes_only` | BOOLEAN | True |  |
+| `opacity` | FLOAT | 1.0 |  |
+| `reverse` | BOOLEAN | False |  |
+| `vmax` | FLOAT | 1.0 |  |
+| `vmin` | FLOAT | 0.0 |  |
+
+### `viz` (`scene.scigraphs_viz`)
+
+| Property | Type | Default | Enum values |
+| --- | --- | --- | --- |
+| `arrow_position` | FLOAT | 0.699999988079071 |  |
+| `arrow_size` | FLOAT | 0.15000000596046448 |  |
+| `edge_resolution` | INT | 8 |  |
+| `edge_scale_attribute` | ENUM |  |  |
+| `edge_thickness` | FLOAT | 0.004999999888241291 |  |
+| `edge_thickness_multiplier` | FLOAT | 1.0 |  |
+| `enable_filtering` | BOOLEAN | False |  |
+| `filter_attribute` | ENUM |  |  |
+| `filter_max` | FLOAT | 1.0 |  |
+| `filter_min` | FLOAT | 0.0 |  |
+| `name` | STRING |  |  |
+| `node_resolution` | INT | 10 |  |
+| `node_scale` | FLOAT | 0.019999999552965164 |  |
+| `node_scale_attribute` | ENUM |  |  |
+| `node_scale_multiplier` | FLOAT | 1.0 |  |
+| `node_shape` | ENUM | SPHERE | SPHERE, ICOSPHERE, CUBE, CONE, CYLINDER |
+| `show_arrows` | BOOLEAN | False |  |
+
+### `repro` (`scene.scigraphs_repro`)
+
+| Property | Type | Default | Enum values |
+| --- | --- | --- | --- |
+| `artifacts_path` | STRING | //repro/ |  |
+| `name` | STRING |  |  |
+| `pipeline_path` | STRING |  |  |

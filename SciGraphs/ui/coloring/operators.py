@@ -538,6 +538,24 @@ class SCIGRAPHS_OT_color_settings_dialog(bpy.types.Operator):
         sub.prop(props, "vmin")
         sub.prop(props, "vmax")
 
+        norm_box = layout.box()
+        norm_box.label(text="Normalization", icon='IPO_EASE_IN_OUT')
+        norm_box.prop(props, "color_norm", text="Mode")
+        if props.color_norm in {'RANK', 'QUANTILE'}:
+            norm_box.label(
+                text="Baked into a helper attribute so the render matches",
+                icon='INFO',
+            )
+        elif props.color_norm == 'LOG':
+            norm_box.label(
+                text="Zero and negative values share the lowest color",
+                icon='INFO',
+            )
+        norm_box.prop(props, "color_gamma", text="Gamma")
+        clip = norm_box.column(align=True)
+        clip.prop(props, "clip_low_pct", text="Clip Low %")
+        clip.prop(props, "clip_high_pct", text="Clip High %")
+
         out_box = layout.box()
         out_box.label(text="Output", icon='RENDER_RESULT')
         out_box.prop(props, "color_domain")

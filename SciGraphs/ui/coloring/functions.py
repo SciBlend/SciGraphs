@@ -24,10 +24,13 @@ from ...core.coloring.attributes import (
     values_for_color_domain,
 )
 from ...core.coloring.colormaps import (
+    NORM_ATTRIBUTE_SUFFIX,
     QUICK_COLORMAPS,
+    NormalizationPlan,
     colormap_exists,
+    norm_to_rgba,
+    normalize_values,
     sample_colormap,
-    values_to_rgba,
 )
 
 
@@ -193,6 +196,66 @@ def write_color_attribute(
     return True, color_name
 
 
+def normalized_attribute_name(attribute_name: str) -> str:
+    """Name of the helper attribute holding the baked normalized value."""
+    return f"{attribute_name}{NORM_ATTRIBUTE_SUFFIX}"
+
+
+def write_normalized_attribute(
+    obj,
+    helper_name: str,
+    domain: str,
+    norm: np.ndarray,
+) -> Tuple[bool, str]:
+    """Bake already-normalized ``[0, 1]`` values into a FLOAT mesh attribute.
+
+    RANK and QUANTILE depend on the whole distribution, so the shader cannot
+    recompute them from a single sample. Non-finite entries become ``0.0``.
+    """
+    mesh = obj.data
+    values = np.asarray(norm, dtype=float)
+    if values.size == 0:
+        return False, "No normalized values to bake"
+
+    existing = mesh.attributes.get(helper_name)
+    if existing is not None:
+        try:
+            mesh.attributes.remove(existing)
+        except RuntimeError:
+            return False, f"Could not replace helper attribute '{helper_name}'"
+
+    try:
+        attr = mesh.attributes.new(name=helper_name, type='FLOAT', domain=domain)
+    except RuntimeError as exc:
+        return False, f"Failed to create helper attribute: {exc}"
+
+    buffer = np.zeros(len(attr.data), dtype=np.float32)
+    count = min(buffer.size, values.size)
+    buffer[:count] = np.nan_to_num(
+        values[:count], nan=0.0, posinf=1.0, neginf=0.0
+    )
+    attr.data.foreach_set("value", buffer)
+
+    obj["scigraphs_norm_attribute"] = helper_name
+    return True, helper_name
+
+
+def remove_normalized_attribute(obj, helper_name: str) -> bool:
+    """Drop a previously baked helper attribute (no-op when absent)."""
+    if obj is None or obj.type != 'MESH' or not helper_name:
+        return False
+    existing = obj.data.attributes.get(helper_name)
+    if existing is None:
+        return False
+    try:
+        obj.data.attributes.remove(existing)
+    except RuntimeError:
+        return False
+    if obj.get("scigraphs_norm_attribute", "") == helper_name:
+        del obj["scigraphs_norm_attribute"]
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Material auto-setup
 # ---------------------------------------------------------------------------
@@ -252,19 +315,26 @@ def build_color_material(
     nodes_only: bool = False,
     edge_color: Optional[Sequence[float]] = None,
     intersection_attribute: str = "is_intersection",
+    plan: Optional[NormalizationPlan] = None,
+    value_attribute_name: Optional[str] = None,
 ) -> Optional[bpy.types.Material]:
     """Build (or refresh) a shader graph that maps a float attribute to color.
 
-    The shader reads ``source_attribute_name`` via ``ShaderNodeAttribute``,
-    normalises it via ``Map Range`` against the given ``vmin``/``vmax`` and
-    feeds the result into a ``ColorRamp`` whose stops match the requested
-    colormap. The output drives the Base Color of a Principled BSDF.
+    The graph must reproduce
+    :func:`~...core.coloring.colormaps.normalize_values` or the render
+    disagrees with the data: ``Map Range`` for ``LINEAR``,
+    ``log10(max(x, eps))`` in front of it for ``LOG``,
+    ``Math(POWER, 1 / gamma)`` after it for ``gamma``. ``RANK``/``QUANTILE``
+    depend on the whole distribution and are not shader math, so the caller
+    bakes them into the helper attribute named by ``value_attribute_name``,
+    read here through an identity ``Map Range``; ``plan=None`` falls back to a
+    linear ``vmin``/``vmax`` mapping.
 
-    Optional behaviour:
+    Optional behavior:
 
     * ``fallback_color_layer`` – name of an explicit FLOAT_COLOR attribute
       sampled in parallel and mixed in only when the source attribute is
-      missing on the rendered geometry (e.g. on Geometry Nodes-realised
+      missing on the rendered geometry (e.g. on Geometry Nodes-realized
       tubes whose custom data was stripped).
     * ``nodes_only`` – when True and the mesh exposes the
       ``intersection_attribute`` (e.g. ``is_intersection`` on OSMnx
@@ -276,8 +346,25 @@ def build_color_material(
     if obj is None:
         return None
 
-    if vmax == vmin:
-        vmax = vmin + 1e-9
+    if plan is None:
+        if vmax == vmin:
+            vmax = vmin + 1e-9
+        plan = NormalizationPlan(
+            mode='LINEAR',
+            lo=float(vmin),
+            hi=float(vmax),
+            data_lo=float(vmin),
+            data_hi=float(vmax),
+        )
+
+    plan_lo = float(plan.lo)
+    plan_hi = float(plan.hi)
+    if plan_hi == plan_lo:
+        plan_hi = plan_lo + 1e-9
+
+    # For RANK/QUANTILE the shader samples the baked helper; the raw attribute
+    # is still needed for the "present on this geometry?" test below.
+    value_attr = value_attribute_name or source_attribute_name
 
     mat_name = _AUTO_MATERIAL_NAME_TEMPLATE.format(obj=obj.name)
     mat = bpy.data.materials.get(mat_name)
@@ -299,19 +386,51 @@ def build_color_material(
     bsdf.location = (560, 0)
 
     attr_node = nodes.new("ShaderNodeAttribute")
-    attr_node.attribute_name = source_attribute_name
+    attr_node.attribute_name = value_attr
     attr_node.attribute_type = 'GEOMETRY'
-    attr_node.location = (-720, 60)
+    attr_node.location = (-1180, 60)
+
+    # --- transform: raw attribute -> Map Range input ----------------------
+    value_socket = attr_node.outputs['Fac']
+
+    if plan.mode == 'LOG':
+        floor_node = nodes.new("ShaderNodeMath")
+        floor_node.operation = 'MAXIMUM'
+        floor_node.label = "Log floor (eps)"
+        floor_node.location = (-980, 60)
+        floor_node.inputs[1].default_value = float(plan.eps)
+        links.new(value_socket, floor_node.inputs[0])
+
+        log_node = nodes.new("ShaderNodeMath")
+        log_node.operation = 'LOGARITHM'
+        log_node.label = "log10"
+        log_node.location = (-780, 60)
+        log_node.inputs[1].default_value = 10.0
+        links.new(floor_node.outputs['Value'], log_node.inputs[0])
+
+        value_socket = log_node.outputs['Value']
 
     map_range = nodes.new("ShaderNodeMapRange")
     map_range.data_type = 'FLOAT'
     map_range.interpolation_type = 'LINEAR'
     map_range.clamp = True
-    map_range.location = (-440, 60)
-    map_range.inputs['From Min'].default_value = float(vmin)
-    map_range.inputs['From Max'].default_value = float(vmax)
+    map_range.location = (-560, 60)
+    map_range.inputs['From Min'].default_value = plan_lo
+    map_range.inputs['From Max'].default_value = plan_hi
     map_range.inputs['To Min'].default_value = 0.0
     map_range.inputs['To Max'].default_value = 1.0
+    links.new(value_socket, map_range.inputs['Value'])
+
+    ramp_input_socket = map_range.outputs['Result']
+
+    if float(plan.gamma) != 1.0:
+        gamma_node = nodes.new("ShaderNodeMath")
+        gamma_node.operation = 'POWER'
+        gamma_node.label = "gamma"
+        gamma_node.location = (-360, 60)
+        gamma_node.inputs[1].default_value = 1.0 / float(plan.gamma)
+        links.new(map_range.outputs['Result'], gamma_node.inputs[0])
+        ramp_input_socket = gamma_node.outputs['Value']
 
     color_ramp = nodes.new("ShaderNodeValToRGB")
     color_ramp.location = (-180, 60)
@@ -319,8 +438,7 @@ def build_color_material(
     samples = sample_colormap(colormap, samples=_COLOR_RAMP_MAX_STOPS, reverse=reverse)
     _add_colorramp_stops(color_ramp.color_ramp, samples)
 
-    links.new(attr_node.outputs['Fac'], map_range.inputs['Value'])
-    links.new(map_range.outputs['Result'], color_ramp.inputs['Fac'])
+    links.new(ramp_input_socket, color_ramp.inputs['Fac'])
 
     # Build the path that ultimately feeds Base Color, optionally mixing in a
     # fallback color layer when the source attribute is missing.
@@ -332,11 +450,22 @@ def build_color_material(
         vc_node.attribute_type = 'GEOMETRY'
         vc_node.location = (-180, -200)
 
+        # Probe the raw source attribute, not the baked helper: a helper value
+        # of 0.0 is a legitimate rank-0 sample, not a missing attribute.
+        if value_attr == source_attribute_name:
+            probe_socket = attr_node.outputs['Fac']
+        else:
+            probe_node = nodes.new("ShaderNodeAttribute")
+            probe_node.attribute_name = source_attribute_name
+            probe_node.attribute_type = 'GEOMETRY'
+            probe_node.location = (-720, -200)
+            probe_socket = probe_node.outputs['Fac']
+
         is_missing = nodes.new("ShaderNodeMath")
         is_missing.operation = 'LESS_THAN'
         is_missing.location = (-440, -200)
         is_missing.inputs[1].default_value = 1e-6
-        links.new(attr_node.outputs['Fac'], is_missing.inputs[0])
+        links.new(probe_socket, is_missing.inputs[0])
 
         fallback_mix = nodes.new("ShaderNodeMixRGB")
         fallback_mix.blend_type = 'MIX'
@@ -391,10 +520,10 @@ SCIGRAPHS_NODE_MARKER_ATTR = "scigraphs_is_node"
 def _stamp_node_marker_after_realize(node_group, marker_name: str = SCIGRAPHS_NODE_MARKER_ATTR) -> bool:
     """Insert ``Store Named Attribute`` after every ``Realize Instances``.
 
-    Realised sphere geometry gets ``marker_name = 1`` on POINT, so the
+    Realized sphere geometry gets ``marker_name = 1`` on POINT, so the
     coloring shader can tell those vertices apart from edge-tube vertices,
     which inherit ``is_intersection`` from the source curve points and would
-    otherwise be coloured as if they were nodes.
+    otherwise be colored as if they were nodes.
     """
     if node_group is None:
         return False
@@ -471,10 +600,10 @@ def wire_color_into_visual_setup(obj, source_attribute_name: str, material: bpy.
     * Records the protected attribute on the object so future GN rebuilds do
       not strip it.
     * Sets the Material input on every ``GeometryNodeSetMaterial`` node in
-      the active visualisation tree.
+      the active visualization tree.
     * Bypasses any pre-existing ``GeometryNodeRemoveAttribute`` node whose
       Name matches the source attribute so it survives the pipeline.
-    * Stamps ``scigraphs_is_node = 1`` on realised sphere geometry so the
+    * Stamps ``scigraphs_is_node = 1`` on realized sphere geometry so the
       shader can gate by node-vs-tube without trusting ``is_intersection``,
       which otherwise leaks into the first tube vertex of every street.
 
@@ -509,7 +638,14 @@ def wire_color_into_visual_setup(obj, source_attribute_name: str, material: bpy.
                 current_name = getattr(name_input, "default_value", "") if name_input else ""
             except AttributeError:
                 continue
-            if current_name in {source_attribute_name, f"{source_attribute_name}_color"}:
+            protected = {
+                source_attribute_name,
+                f"{source_attribute_name}_color",
+                # The baked helper must survive too, or the shader reads
+                # nothing on realized geometry.
+                normalized_attribute_name(source_attribute_name),
+            }
+            if current_name in protected:
                 try:
                     geo_in = node.inputs['Geometry']
                     geo_out = node.outputs['Geometry']
@@ -612,18 +748,29 @@ def apply_coloring(context) -> Tuple[bool, str]:
     vmin = None if props.auto_range else float(props.vmin)
     vmax = None if props.auto_range else float(props.vmax)
 
-    color_domain = _select_color_domain(props, src_attr.domain, obj.data)
-    target_values = values_for_color_domain(
-        obj.data, src_attr.domain, source_values, color_domain
-    )
-    if target_values.size == 0:
-        return False, "Could not map attribute values to the chosen color domain"
-
-    rgba = values_to_rgba(
-        target_values,
-        cmap_name=props.colormap,
+    # Normalize the source values, then gather onto the color domain: the
+    # shader only ever sees the source attribute, so both paths must be the
+    # same function of a source sample or the render disagrees with the data.
+    norm_source, _finite_source, plan = normalize_values(
+        source_values,
+        mode=getattr(props, "color_norm", "LINEAR"),
         vmin=vmin,
         vmax=vmax,
+        gamma=getattr(props, "color_gamma", 1.0),
+        clip_low_pct=getattr(props, "clip_low_pct", 0.0),
+        clip_high_pct=getattr(props, "clip_high_pct", 100.0),
+    )
+
+    color_domain = _select_color_domain(props, src_attr.domain, obj.data)
+    norm_target = values_for_color_domain(
+        obj.data, src_attr.domain, norm_source, color_domain
+    )
+    if norm_target.size == 0:
+        return False, "Could not map attribute values to the chosen color domain"
+
+    rgba = norm_to_rgba(
+        norm_target,
+        cmap_name=props.colormap,
         reverse=props.reverse,
     )
     if props.opacity < 1.0:
@@ -636,15 +783,29 @@ def apply_coloring(context) -> Tuple[bool, str]:
     if not ok:
         return False, message
 
-    eff_vmin, eff_vmax = (vmin, vmax)
-    if eff_vmin is None or eff_vmax is None:
-        from ...core.coloring.colormaps import normalize_range
-        eff_vmin, eff_vmax = normalize_range(target_values)
-    props.last_vmin = float(eff_vmin)
-    props.last_vmax = float(eff_vmax)
+    # RANK/QUANTILE are not shader math -> bake the transformed value for the
+    # material. Other modes drop the helper so no stale value is picked up.
+    helper_name = normalized_attribute_name(attribute_name)
+    baked_attribute: Optional[str] = None
+    bake_warning = ""
+    if plan.baked:
+        baked_ok, baked_message = write_normalized_attribute(
+            obj, helper_name, src_attr.domain, norm_source
+        )
+        if baked_ok:
+            baked_attribute = helper_name
+        else:
+            bake_warning = f"  (!) {baked_message}"
+    else:
+        remove_normalized_attribute(obj, helper_name)
+
+    eff_vmin = float(plan.data_lo)
+    eff_vmax = float(plan.data_hi)
+    props.last_vmin = eff_vmin
+    props.last_vmax = eff_vmax
 
     if props.auto_setup_material:
-        # When the SciGraphs_Viz GN modifier is installed we mark realised
+        # When the SciGraphs_Viz GN modifier is installed we mark realized
         # sphere geometry with `scigraphs_is_node = 1`, so the shader gates
         # against that instead of `is_intersection`. The latter would also be
         # 1 on the tube vertex that closes against an intersection, which is
@@ -663,13 +824,17 @@ def apply_coloring(context) -> Tuple[bool, str]:
             nodes_only=bool(getattr(props, "nodes_only", False)),
             edge_color=tuple(getattr(props, "edge_color", (0.18, 0.18, 0.20, 1.0))),
             intersection_attribute=gate_attr,
+            plan=plan,
+            value_attribute_name=baked_attribute,
         )
         if material is not None:
             wire_color_into_visual_setup(obj, attribute_name, material)
 
+    mode_label = "" if plan.mode == "LINEAR" else f" [{plan.mode.lower()}]"
     return True, (
-        f"{attribute_name} -> {props.colormap}"
+        f"{attribute_name} -> {props.colormap}{mode_label}"
         f"  [{eff_vmin:.4g} … {eff_vmax:.4g}] on {color_domain.title()}"
+        f"{bake_warning}"
     )
 
 
@@ -679,6 +844,10 @@ def remove_coloring(context) -> Tuple[bool, str]:
     if obj is None:
         return False, "Active object is not a mesh"
 
+    helper_removed = remove_normalized_attribute(
+        obj, obj.get("scigraphs_norm_attribute", "") or ""
+    )
+
     color_name = obj.get("scigraphs_last_color_attribute", "") or ""
     if color_name and color_name in obj.data.color_attributes:
         try:
@@ -686,6 +855,8 @@ def remove_coloring(context) -> Tuple[bool, str]:
         except RuntimeError as exc:
             return False, f"Could not remove '{color_name}': {exc}"
         return True, f"Removed color attribute '{color_name}'"
+    if helper_removed:
+        return True, "Removed baked normalization attribute"
     return False, "No SciGraphs color attribute to remove"
 
 

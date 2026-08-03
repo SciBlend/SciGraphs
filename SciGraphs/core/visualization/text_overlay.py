@@ -340,7 +340,16 @@ def test_depth_occlusion(
     
     depsgraph = context.evaluated_depsgraph_get()
     camera_pos = camera.matrix_world.translation
-    
+
+    # Tolerance must clear the node's own glyph: the ray is aimed at the center
+    # of a sphere that really exists, so it hits the near surface one radius
+    # early. A fixed 0.1 only worked while glyphs kept the 0.02 default radius.
+    try:
+        glyph_radius = float(obj.get("scigraphs_node_size", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        glyph_radius = 0.0
+    tolerance = max(0.1, glyph_radius * 1.5)
+
     positions = get_node_positions_from_object(obj)
     
     for node in projected_nodes:
@@ -367,9 +376,7 @@ def test_depth_occlusion(
         
         if hit:
             hit_distance = (location - camera_pos).length
-            # Node is occluded if hit occurs before reaching the node
-            # Allow small tolerance for nodes at surface
-            tolerance = 0.1
+            # Node is occluded if the hit occurs before reaching the node
             node.occluded = hit_distance < (node_distance - tolerance)
         else:
             node.occluded = False

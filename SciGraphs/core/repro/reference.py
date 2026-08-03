@@ -82,14 +82,23 @@ def _group_table(group) -> List[str]:
 
 
 def _schema_section_table(section: Dict[str, Any]) -> List[str]:
-    """Build a Markdown table for one declarative schema section."""
+    """Build a Markdown table for one declarative schema section.
+
+    Pipes in descriptions are escaped so they do not break the table.
+    """
     props = section.get("properties", {})
-    lines = ["| Field | Type | Default | Enum |", "| --- | --- | --- | --- |"]
+    lines = [
+        "| Field | Type | Default | Enum | Description |",
+        "| --- | --- | --- | --- | --- |",
+    ]
     for key, definition in props.items():
         ptype = definition.get("type", "")
         default = definition.get("default", "")
         enum = ", ".join(str(v) for v in definition.get("enum", []))
-        lines.append(f"| `{key}` | {ptype} | {default} | {enum} |")
+        description = str(definition.get("description", "")).replace("|", "\\|")
+        lines.append(
+            f"| `{key}` | {ptype} | {default} | {enum} | {description} |"
+        )
     return lines
 
 
@@ -114,8 +123,11 @@ def generate_reference_markdown() -> str:
         "applied by the executor."
     )
     lines.append("")
+    # Order mirrors the executor's stage sequence. A section missing from this
+    # tuple is absent from the reference even though it validates and runs.
     for section_name in (
-        "meta", "dataset", "analysis", "layout", "visual", "render", "exports",
+        "meta", "dataset", "analysis", "layout", "visual", "labels",
+        "world", "lighting", "render", "exports",
     ):
         section = SCHEMA.get(section_name)
         if not section:

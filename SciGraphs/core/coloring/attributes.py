@@ -13,12 +13,27 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from .colormaps import NORM_ATTRIBUTE_SUFFIX
+
 
 # Scalar data types we know how to coerce into floats.
 SCALAR_DATA_TYPES = ("FLOAT", "INT", "INT8")
 
 # Domains that make sense to color a graph mesh (vertex, edge, face, corner).
 COLORABLE_DOMAINS = ("POINT", "EDGE", "CORNER", "FACE")
+
+# Attributes SciGraphs bakes itself: already-normalized derivatives of a real
+# attribute, so coloring by them would be a lossy round-trip.
+INTERNAL_ATTRIBUTE_SUFFIXES = (NORM_ATTRIBUTE_SUFFIX,)
+
+
+def is_internal_attribute(name: str) -> bool:
+    """True for attributes SciGraphs generates and hides from the UI."""
+    if not name:
+        return True
+    if name.startswith("."):
+        return True
+    return any(name.endswith(suffix) for suffix in INTERNAL_ATTRIBUTE_SUFFIXES)
 
 
 # ---------------------------------------------------------------------------
@@ -30,8 +45,10 @@ def list_scalar_attributes(mesh) -> List[Tuple[str, str, str]]:
 
     Internal Blender attributes (those starting with ``"."``) are filtered
     out: they are not user-facing data and are usually noise (``.position``,
-    ``.corner_vert`` ...). The order of the result follows the iteration order
-    of ``mesh.attributes`` so the UI can rely on it being stable across calls.
+    ``.corner_vert`` ...). So are the helper attributes SciGraphs bakes itself
+    (see :data:`INTERNAL_ATTRIBUTE_SUFFIXES`). The order of the result follows
+    the iteration order of ``mesh.attributes`` so the UI can rely on it being
+    stable across calls.
     """
     if mesh is None or not hasattr(mesh, "attributes"):
         return []
@@ -39,7 +56,7 @@ def list_scalar_attributes(mesh) -> List[Tuple[str, str, str]]:
     found: List[Tuple[str, str, str]] = []
     for attr in mesh.attributes:
         name = getattr(attr, "name", "")
-        if not name or name.startswith("."):
+        if is_internal_attribute(name):
             continue
         data_type = getattr(attr, "data_type", "")
         domain = getattr(attr, "domain", "")

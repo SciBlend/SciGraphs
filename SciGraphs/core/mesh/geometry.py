@@ -21,6 +21,12 @@ DEFAULT_NODE_ATTR_MULT = 1.0
 DEFAULT_EDGE_THICKNESS = 0.005
 DEFAULT_EDGE_RESOLUTION = 8
 DEFAULT_EDGE_ATTR_MULT = 1.0
+DEFAULT_NODE_SHADE_SMOOTH = True
+DEFAULT_EDGE_PROFILE = 'ROUND'  # 'ROUND' (circle) or 'RIBBON' (flat quad)
+
+# RIBBON profile height as a fraction of its width; kept above zero so Curve
+# to Mesh yields a non-degenerate strip.
+EDGE_RIBBON_ASPECT = 0.1
 
 NODE_SHAPE_INDEX_MAP = {
     'SPHERE': 0,
@@ -29,6 +35,8 @@ NODE_SHAPE_INDEX_MAP = {
     'CONE': 3,
     'CYLINDER': 4,
 }
+
+EDGE_PROFILE_VALUES = ('ROUND', 'RIBBON')
 
 
 def _ico_subdivisions_from_resolution(resolution: int) -> int:
@@ -57,19 +65,23 @@ def _apply_node_primitive_inputs(node, node_size: float, resolution: int) -> int
     written = 0
     inputs = node.inputs
 
+    # Compare ``bl_idname``, not ``node.type``: for a cube primitive ``type``
+    # is 'MESH_PRIMITIVE_CUBE', so 'GeometryNodeMeshCube' never matched.
+    idname = getattr(node, 'bl_idname', '')
+
     if 'Radius' in inputs:
         inputs['Radius'].default_value = node_size
         written += 1
     if 'Radius Bottom' in inputs:
         inputs['Radius Bottom'].default_value = node_size
         written += 1
-    if 'Radius Top' in inputs and node.type == 'GeometryNodeMeshCone':
+    if 'Radius Top' in inputs and idname == 'GeometryNodeMeshCone':
         inputs['Radius Top'].default_value = 0.0
         written += 1
     if 'Depth' in inputs:
         inputs['Depth'].default_value = node_size * 2.0
         written += 1
-    if 'Size' in inputs and node.type == 'GeometryNodeMeshCube':
+    if 'Size' in inputs and idname == 'GeometryNodeMeshCube':
         inputs['Size'].default_value = (node_size * 2.0,) * 3
         written += 1
 
@@ -131,15 +143,13 @@ def _add_smooth_by_angle_node(nodes, location):
 def _build_node_shape_switch(nodes, links, base_x: float, base_y: float,
                              node_size: float = DEFAULT_NODE_SIZE,
                              resolution: int = DEFAULT_NODE_RESOLUTION,
-                             shape_index: int = DEFAULT_NODE_SHAPE_INDEX):
+                             shape_index: int = DEFAULT_NODE_SHAPE_INDEX,
+                             shade_smooth: bool = DEFAULT_NODE_SHADE_SMOOTH):
     """Spawn the 5 node primitives, an Index Switch and a Smooth-by-Angle.
 
-    Returns ``(smooth_by_angle, primitives_dict)`` where the geometry coming
-    out of the smooth-by-angle node is what should be fed into ``Instance on
-    Points`` (already shape-selected and shaded).
-
-    The primitives are named so the Update Appearance operator can find and
-    re-tune them later without rebuilding the tree.
+    Returns ``(geometry_socket, primitives_dict)``, the socket to feed into
+    ``Instance on Points``. ``shade_smooth=False`` skips the Smooth by Angle
+    node, which averages every normal and turns faceted glyphs into blobs.
     """
     sphere = nodes.new('GeometryNodeMeshUVSphere')
     sphere.name = "SciGraphs_NodeSphere"
@@ -186,19 +196,56 @@ def _build_node_shape_switch(nodes, links, base_x: float, base_y: float,
     links.new(cone.outputs['Mesh'], shape_switch.inputs[4])
     links.new(cylinder.outputs['Mesh'], shape_switch.inputs[5])
 
-    smooth_by_angle = _add_smooth_by_angle_node(
-        nodes, location=(base_x + 460, base_y - 200)
-    )
-    links.new(shape_switch.outputs['Output'], smooth_by_angle.inputs['Geometry'])
+    smooth_by_angle = None
+    geo_socket = shape_switch.outputs['Output']
+    if shade_smooth:
+        smooth_by_angle = _add_smooth_by_angle_node(
+            nodes, location=(base_x + 460, base_y - 200)
+        )
+        links.new(geo_socket, smooth_by_angle.inputs['Geometry'])
+        geo_socket = smooth_by_angle.outputs['Geometry']
 
-    return smooth_by_angle, {
+    return geo_socket, {
         'sphere': sphere,
         'icosphere': ico,
         'cube': cube,
         'cone': cone,
         'cylinder': cylinder,
         'switch': shape_switch,
+        'smooth': smooth_by_angle,
     }
+
+
+def _build_edge_profile_node(nodes, thickness: float, resolution: int,
+                             profile: str, location):
+    """Create the curve used as the ``Curve to Mesh`` profile for edges.
+
+    ``'ROUND'`` is a circle (tubes), ``'RIBBON'`` a flat rectangle. Both are
+    named ``SciGraphs_EdgeProfile`` so Update Appearance keeps finding them.
+    """
+    profile = str(profile or DEFAULT_EDGE_PROFILE).upper()
+    if profile not in EDGE_PROFILE_VALUES:
+        profile = DEFAULT_EDGE_PROFILE
+
+    if profile == 'RIBBON':
+        quad = nodes.new(type='GeometryNodeCurvePrimitiveQuadrilateral')
+        quad.name = "SciGraphs_EdgeProfile"
+        quad.label = "Edge Profile (Ribbon)"
+        quad.mode = 'RECTANGLE'
+        width = max(float(thickness), 0.0) * 2.0
+        quad.inputs['Width'].default_value = width
+        quad.inputs['Height'].default_value = max(width * EDGE_RIBBON_ASPECT, 1e-6)
+        quad.location = location
+        return quad
+
+    circle = nodes.new(type='GeometryNodeCurvePrimitiveCircle')
+    circle.name = "SciGraphs_EdgeProfile"
+    circle.label = "Edge Profile"
+    circle.mode = 'RADIUS'
+    circle.inputs['Radius'].default_value = thickness
+    circle.inputs['Resolution'].default_value = max(3, int(resolution))
+    circle.location = location
+    return circle
 
 def create_graph_object(graph_data, is_directed=False, selected_attributes=None, remove_self_loops=True):
     """
@@ -871,6 +918,23 @@ def _split_edges_for_individual_curves(nodes, links, geo_socket, location, mesh=
     return split_edges.outputs['Mesh']
 
 
+def _get_slot0_material(obj):
+    """Return the object's slot-0 material, else the mesh's first, else ``None``."""
+    if obj is None:
+        return None
+
+    slots = getattr(obj, "material_slots", None)
+    if slots and len(slots) > 0 and slots[0].material is not None:
+        return slots[0].material
+
+    data = getattr(obj, "data", None)
+    materials = getattr(data, "materials", None)
+    if materials and len(materials) > 0:
+        return materials[0]
+
+    return None
+
+
 def setup_geometry_nodes_visualization(obj, selection_attr=None):
     """
     Sets up Geometry Nodes to add sphere instances on vertices
@@ -886,6 +950,13 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     ``is_intersection`` filter when both apply.
 
     This function is idempotent - it will reuse existing modifier/node_group if present.
+
+    Appearance is read from the object's custom properties so a rebuild
+    restores the same look: ``scigraphs_node_shape_index`` (0..4 = sphere,
+    icosphere, cube, cone, cylinder), ``scigraphs_node_resolution``,
+    ``scigraphs_node_size``, ``scigraphs_node_shade_smooth``,
+    ``scigraphs_edge_thickness``, ``scigraphs_edge_resolution`` and
+    ``scigraphs_edge_profile`` (``'ROUND'`` or ``'RIBBON'``).
     """
     # Check if modifier already exists
     mod = obj.modifiers.get("SciGraphs_Viz")
@@ -941,17 +1012,20 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
                                               DEFAULT_NODE_SHAPE_INDEX))))
     initial_size = float(obj.get("scigraphs_node_size", DEFAULT_NODE_SIZE))
     initial_res = int(obj.get("scigraphs_node_resolution", DEFAULT_NODE_RESOLUTION))
+    initial_shade_smooth = bool(obj.get("scigraphs_node_shade_smooth",
+                                        DEFAULT_NODE_SHADE_SMOOTH))
 
-    smooth_by_angle, _ = _build_node_shape_switch(
+    node_glyph_socket, _ = _build_node_shape_switch(
         nodes, links, base_x=-700, base_y=120,
         node_size=initial_size, resolution=initial_res, shape_index=initial_shape,
+        shade_smooth=initial_shade_smooth,
     )
 
-    # Instance the resulting (shape-selected, smooth-shaded) mesh on vertices
+    # Instance the resulting (shape-selected) mesh on vertices
     instance_on_points = nodes.new(type='GeometryNodeInstanceOnPoints')
     instance_on_points.location = (-200, 200)
     links.new(mesh_to_points.outputs['Points'], instance_on_points.inputs['Points'])
-    links.new(smooth_by_angle.outputs['Geometry'], instance_on_points.inputs['Instance'])
+    links.new(node_glyph_socket, instance_on_points.inputs['Instance'])
     
     selection_socket = None
     if is_osmnx or has_intersection_attr:
@@ -1039,20 +1113,21 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     
     initial_edge_thickness = float(obj.get("scigraphs_edge_thickness", DEFAULT_EDGE_THICKNESS))
     initial_edge_resolution = max(3, int(obj.get("scigraphs_edge_resolution", DEFAULT_EDGE_RESOLUTION)))
+    initial_edge_profile = obj.get("scigraphs_edge_profile", DEFAULT_EDGE_PROFILE)
 
-    curve_circle = nodes.new(type='GeometryNodeCurvePrimitiveCircle')
-    curve_circle.name = "SciGraphs_EdgeProfile"
-    curve_circle.label = "Edge Profile"
-    curve_circle.mode = 'RADIUS'
-    curve_circle.inputs['Radius'].default_value = initial_edge_thickness
-    curve_circle.inputs['Resolution'].default_value = initial_edge_resolution
-    curve_circle.location = (-600, -400)
-    
+    edge_profile_node = _build_edge_profile_node(
+        nodes,
+        thickness=initial_edge_thickness,
+        resolution=initial_edge_resolution,
+        profile=initial_edge_profile,
+        location=(-600, -400),
+    )
+
     # Convert curve to mesh with profile
     curve_to_mesh = nodes.new(type='GeometryNodeCurveToMesh')
     curve_to_mesh.location = (-200, -300)
     links.new(mesh_to_curve.outputs['Curve'], curve_to_mesh.inputs['Curve'])
-    links.new(curve_circle.outputs['Curve'], curve_to_mesh.inputs['Profile Curve'])
+    links.new(edge_profile_node.outputs['Curve'], curve_to_mesh.inputs['Profile Curve'])
     
     edge_geo_output = _strip_custom_attributes_from_geo(
         nodes, links, curve_to_mesh.outputs['Mesh'], obj.data, (100, -300)
@@ -1064,11 +1139,16 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     links.new(realize_instances.outputs['Geometry'], join_geometry.inputs['Geometry'])
     links.new(edge_geo_output, join_geometry.inputs['Geometry'])
     
-    # Set material
+    # Set material. An empty Set Material node is not a no-op: it overrides
+    # the object's slot-0 material with none, so re-feed the existing one.
     set_material = nodes.new(type='GeometryNodeSetMaterial')
     set_material.location = (600, 0)
     links.new(join_geometry.outputs['Geometry'], set_material.inputs['Geometry'])
-    
+
+    existing_material = _get_slot0_material(obj)
+    if existing_material is not None:
+        set_material.inputs['Material'].default_value = existing_material
+
     # Output
     links.new(set_material.outputs['Geometry'], group_output.inputs['Geometry'])
 
@@ -1117,10 +1197,15 @@ def update_node_positions_from_property(obj):
 def rebuild_edges(obj):
     """
     Rebuilds edges after updating vertex positions.
+
+    Deliberately a no-op for mesh-native objects (no ``edges_data``): there the
+    mesh edges *are* the topology, so there is nothing to restore after a
+    position-only update, and rebuilding from them would drop the curve
+    vertices an edge style has added.
     """
     if "edges_data" not in obj:
         return
-    
+
     # Parse edges
     edges_str = obj.get("edges_data", "")
     if not edges_str:
@@ -1882,6 +1967,32 @@ def _create_curved_edge(bm, node_verts, src, tgt, geom_coords, node_positions, s
 # INTERACTIVE GEOMETRY NODES VISUALIZATION SYSTEM
 # ============================================================================
 
+def set_nodes_modifier_input(mod, identifier, value):
+    """Write one Geometry Nodes modifier input by socket identifier.
+
+    ``mod[identifier] = value`` raises TypeError on Blender 5.2, so try
+    ``mod.properties.inputs[identifier]`` first and fall back for Blender 4.x.
+    Returns True when the value was written.
+    """
+    if mod is None:
+        return False
+
+    props = getattr(mod, "properties", None)
+    inputs = getattr(props, "inputs", None) if props is not None else None
+    if inputs is not None:
+        try:
+            inputs[identifier] = value
+            return True
+        except (KeyError, TypeError, AttributeError):
+            pass
+
+    try:
+        mod[identifier] = value
+        return True
+    except (KeyError, TypeError, AttributeError):
+        return False
+
+
 def update_geometry_nodes_parameters(obj):
     """
     Updates Geometry Nodes modifier parameters in real-time.
@@ -1925,17 +2036,11 @@ def update_geometry_nodes_parameters(obj):
         "Filter Attr": props.filter_attribute if props.filter_attribute != 'NONE' else "",
     }
     
-    # Apply values to modifier inputs using Blender 4.x API
+    # Apply values; sockets this tree does not expose are skipped silently
     for socket_name, value in param_values.items():
         if socket_name in socket_map:
-            identifier = socket_map[socket_name]
-            # In Blender 4.x, modifier inputs are accessed via the identifier
-            try:
-                mod[identifier] = value
-            except (KeyError, TypeError):
-                # Socket might not exist or type mismatch, skip silently
-                pass
-    
+            set_nodes_modifier_input(mod, socket_map[socket_name], value)
+
     # Force viewport update
     if obj.data:
         obj.data.update()
@@ -2413,6 +2518,80 @@ def setup_interactive_geometry_nodes(obj):
 # EDGE STYLE APPLICATION SYSTEM
 # ============================================================================
 
+# Attribute data-type -> (item field, component count).  Covers every
+# generic attribute Blender exposes so save/restore never touches a missing
+# field (e.g. FloatColorAttributeValue has ``.color``, not ``.value``).
+_ATTR_FIELDS = {
+    'FLOAT': ('value', 1),
+    'INT': ('value', 1),
+    'INT8': ('value', 1),
+    'BOOLEAN': ('value', 1),
+    'FLOAT2': ('vector', 2),
+    'FLOAT_VECTOR': ('vector', 3),
+    'FLOAT_COLOR': ('color', 4),
+    'BYTE_COLOR': ('color', 4),
+    'QUATERNION': ('value', 4),
+}
+
+# bmesh only exposes FLOAT/INT scalar layers here, so those two types are
+# restored through bmesh; everything else is re-applied on the mesh directly.
+_BMESH_RESTORED_TYPES = {'FLOAT', 'INT'}
+
+
+def _read_attr_item(item, data_type):
+    """Read one attribute value in a type-aware way.
+
+    Returns a scalar for FLOAT/INT/BOOLEAN or a tuple for vector/color types.
+    """
+    field, comps = _ATTR_FIELDS.get(data_type, ('value', 1))
+    val = getattr(item, field)
+    return tuple(val) if comps > 1 else val
+
+
+def _attr_default(data_type):
+    """Neutral default value used for vertices without saved data."""
+    field, comps = _ATTR_FIELDS.get(data_type, ('value', 1))
+    if comps == 1:
+        return 0
+    if field == 'color':
+        return (0.0, 0.0, 0.0, 1.0)
+    return tuple(0.0 for _ in range(comps))
+
+
+def _restore_extra_point_attrs(mesh, saved_point_attrs, num_nodes):
+    """Re-apply POINT attributes that bmesh cannot carry through a rebuild.
+
+    bmesh only rebuilds FLOAT/INT scalar layers, so color/vector/boolean
+    node attributes (e.g. node colors) would otherwise be dropped on every
+    edge-style application. Node vertices keep indices ``0..num_nodes-1``
+    after the rebuild (they are created first), so their values are restored
+    directly; intermediate curve vertices keep the neutral default.
+    """
+    for name, (dtype, values) in saved_point_attrs.items():
+        if dtype in _BMESH_RESTORED_TYPES:
+            continue
+
+        attr = mesh.attributes.get(name)
+        if attr is None:
+            try:
+                attr = mesh.attributes.new(name=name, type=dtype, domain='POINT')
+            except (RuntimeError, TypeError) as exc:
+                log(f"  WARNING: could not restore attribute '{name}': {exc}")
+                continue
+        elif attr.domain != 'POINT' or attr.data_type != dtype:
+            continue
+
+        field, comps = _ATTR_FIELDS.get(dtype, ('value', 1))
+        count = len(attr.data)
+        limit = min(num_nodes, count, len(values))
+        for i in range(limit):
+            val = values[i]
+            if comps > 1:
+                getattr(attr.data[i], field)[:] = val
+            else:
+                setattr(attr.data[i], field, val)
+
+
 def _save_custom_attributes(mesh, node_indices, has_intersection_attr):
     """
     Read all custom mesh attributes before a destructive bmesh rebuild.
@@ -2437,16 +2616,26 @@ def _save_custom_attributes(mesh, node_indices, has_intersection_attr):
             continue
         if attr.name in _SKIP_POINT or attr.name.startswith('.'):
             continue
+        if attr.data_type not in _ATTR_FIELDS:
+            continue
+        default = _attr_default(attr.data_type)
+        n_data = len(attr.data)
         values = []
         for old_idx in node_indices:
-            values.append(attr.data[old_idx].value if old_idx < len(attr.data) else 0)
+            if old_idx < n_data:
+                values.append(_read_attr_item(attr.data[old_idx], attr.data_type))
+            else:
+                values.append(default)
         point_attrs[attr.name] = (attr.data_type, values)
 
     edge_attrs = {}
     for attr in mesh.attributes:
         if attr.domain != 'EDGE' or attr.name.startswith('.'):
             continue
+        if attr.data_type not in _ATTR_FIELDS:
+            continue
 
+        dtype = attr.data_type
         values = {}
 
         if not has_intersection_attr:
@@ -2456,7 +2645,7 @@ def _save_custom_attributes(mesh, node_indices, has_intersection_attr):
                     key = (min(old_to_new[v1], old_to_new[v2]),
                            max(old_to_new[v1], old_to_new[v2]))
                     if key not in values:
-                        values[key] = attr.data[e.index].value
+                        values[key] = _read_attr_item(attr.data[e.index], dtype)
         else:
             adjacency = {}
             for e in mesh.edges:
@@ -2469,7 +2658,7 @@ def _save_custom_attributes(mesh, node_indices, has_intersection_attr):
                 for neighbour, first_edge_idx in adjacency.get(start_old, []):
                     if first_edge_idx in visited:
                         continue
-                    chain_val = attr.data[first_edge_idx].value
+                    chain_val = _read_attr_item(attr.data[first_edge_idx], dtype)
                     visited.add(first_edge_idx)
                     cur, prev = neighbour, start_old
                     while cur not in node_set:
@@ -2654,6 +2843,10 @@ def apply_edge_style_to_graph(obj, style_params: dict = None):
 
     bm.to_mesh(mesh)
     bm.free()
+
+    # bmesh only carries FLOAT/INT scalar layers; re-apply color/vector/bool
+    # node attributes (e.g. node colors) so styling does not wipe them.
+    _restore_extra_point_attrs(mesh, saved_point_attrs, num_nodes)
 
     obj["edge_style_applied"] = style_params['style_type']
     obj["num_mesh_verts"] = len(mesh.vertices)

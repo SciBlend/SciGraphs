@@ -6,12 +6,16 @@
 import datetime
 import json
 import logging
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .schema import PipelineSchema, DatasetSpec, AnalysisSpec, LayoutSpec, VisualSpec, RenderSpec, ExportsSpec, OpSpec
+from .schema import (
+    PipelineSchema, DatasetSpec, AnalysisSpec, LayoutSpec, VisualSpec,
+    LabelsSpec, WorldSpec, LightingSpec, RenderSpec, ExportsSpec, OpSpec,
+)
 from .parser import save_canonical, canonicalize_pipeline
 from .determinism import set_pipeline_seed, get_seed_context
 from .provenance import (
@@ -59,6 +63,9 @@ class PipelineExecutor:
         self._bpy = None
         # Friendly metric name -> actual mesh attribute produced by analysis.
         self._metric_attributes: Dict[str, str] = {}
+        # Configured as its own section, executed inside the render stage,
+        # where the camera is final.
+        self._pending_labels: Optional[LabelsSpec] = None
 
     def _get_bpy(self):
         """Lazy import of bpy."""
@@ -119,6 +126,9 @@ class PipelineExecutor:
         bpy = self._get_bpy()
 
         self._metric_attributes = {}
+        self._pending_labels = (
+            schema.labels if schema.labels and schema.labels.enabled else None
+        )
 
         result = ExecutionResult(
             success=False,
@@ -149,6 +159,11 @@ class PipelineExecutor:
 
         # Execute stages
         try:
+            # Start from an empty scene: leftovers from the startup file get
+            # rendered, or picked up as the active object.
+            if getattr(schema.meta, "clear_scene", True):
+                self._clear_scene(result)
+
             # Dataset stage
             if schema.dataset:
                 self._execute_dataset(schema.dataset, manifest, result)
@@ -170,6 +185,18 @@ class PipelineExecutor:
             # Visual stage
             if schema.visual:
                 self._execute_visual(schema.visual, manifest, result)
+                if result.errors and self.stop_on_error:
+                    raise RuntimeError(result.errors[-1])
+
+            # World stage
+            if schema.world:
+                self._execute_world(schema.world, manifest, result)
+                if result.errors and self.stop_on_error:
+                    raise RuntimeError(result.errors[-1])
+
+            # Lighting stage
+            if schema.lighting:
+                self._execute_lighting(schema.lighting, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
@@ -215,6 +242,552 @@ class PipelineExecutor:
         self._log(f"Pipeline {'completed successfully' if result.success else 'failed'}")
         return result
 
+    def _clear_scene(self, result: ExecutionResult) -> None:
+        """Remove every object, so the run starts from a known empty scene."""
+        bpy = self._get_bpy()
+        try:
+            removed = 0
+            for obj in list(bpy.data.objects):
+                bpy.data.objects.remove(obj, do_unlink=True)
+                removed += 1
+            if removed:
+                self._log(f"Cleared scene: {removed} object(s) removed")
+        except Exception as e:  # pragma: no cover - defensive
+            result.warnings.append(f"Scene clear failed: {e}")
+
+    def _apply_color_mapping(self, spec: VisualSpec, coloring, result: ExecutionResult) -> None:
+        """Normalization, explicit domain and ramp options.
+
+        `auto_range` must be off for `vmin`/`vmax` to reach the shader.
+        """
+        explicit = spec.color_vmin is not None or spec.color_vmax is not None
+        coloring.auto_range = not explicit
+        if spec.color_vmin is not None and hasattr(coloring, "vmin"):
+            coloring.vmin = float(spec.color_vmin)
+        if spec.color_vmax is not None and hasattr(coloring, "vmax"):
+            coloring.vmax = float(spec.color_vmax)
+
+        pairs = [
+            ("color_norm", spec.color_norm),
+            ("color_gamma", spec.color_gamma),
+            ("reverse", spec.colormap_reverse),
+            ("opacity", spec.color_opacity),
+        ]
+        clip = list(spec.color_clip_percentile or [0.0, 100.0])
+        if len(clip) == 2:
+            pairs += [("clip_low_pct", float(clip[0])),
+                      ("clip_high_pct", float(clip[1]))]
+        if spec.edge_base_color:
+            rgba = list(spec.edge_base_color)
+            while len(rgba) < 4:
+                rgba.append(1.0)
+            pairs.append(("edge_color", tuple(rgba[:4])))
+
+        for name, value in pairs:
+            if value is None:
+                continue
+            if not hasattr(coloring, name):
+                result.warnings.append(f"coloring.{name} unavailable on this build")
+                continue
+            try:
+                setattr(coloring, name, value)
+            except (TypeError, ValueError) as e:
+                result.warnings.append(f"coloring.{name}={value!r} rejected: {e}")
+
+    def _apply_glyph_settings(self, spec: VisualSpec, result: ExecutionResult) -> None:
+        """Stage glyph shape, resolution and radii on the graph object.
+
+        The node tree reads these as object custom properties at build time, so
+        they must be written before `setup_visualization` runs. The `_rel` radii
+        are fractions of the graph extent, resolved here against the bounds.
+        """
+        bpy = self._get_bpy()
+        obj = bpy.context.active_object
+        if obj is None or obj.type != 'MESH':
+            return
+
+        shape_index = {
+            "SPHERE": 0, "ICOSPHERE": 1, "CUBE": 2, "CONE": 3, "CYLINDER": 4,
+        }
+        if spec.node_glyph:
+            obj["scigraphs_node_shape_index"] = shape_index.get(spec.node_glyph, 0)
+        if spec.node_resolution is not None:
+            obj["scigraphs_node_resolution"] = int(spec.node_resolution)
+        if spec.edge_resolution is not None:
+            obj["scigraphs_edge_resolution"] = int(spec.edge_resolution)
+        obj["scigraphs_node_shade_smooth"] = bool(spec.node_shade_smooth)
+        obj["scigraphs_edge_profile"] = spec.edge_profile or "ROUND"
+
+        radius = None
+        if spec.node_radius_rel is not None or spec.edge_radius_rel is not None:
+            bounds = self._graph_bounds()
+            if bounds is None:
+                result.warnings.append(
+                    "Relative sizes need graph bounds; none available"
+                )
+            else:
+                radius = bounds[1]
+
+        node_r = spec.node_radius
+        if spec.node_radius_rel is not None and radius:
+            node_r = radius * float(spec.node_radius_rel)
+        if node_r is not None:
+            obj["scigraphs_node_size"] = float(node_r)
+
+        edge_r = spec.edge_radius
+        if spec.edge_radius_rel is not None and radius:
+            edge_r = radius * float(spec.edge_radius_rel)
+        if edge_r is not None:
+            obj["scigraphs_edge_thickness"] = float(edge_r)
+
+        if node_r is not None or edge_r is not None:
+            self._log(
+                "Glyph radii: node %s, edge %s"
+                % (f"{node_r:.4f}" if node_r else "-",
+                   f"{edge_r:.4f}" if edge_r else "-")
+            )
+
+    def _apply_material_overrides(self, spec: VisualSpec, obj, result: ExecutionResult) -> None:
+        """Roughness and metallic on the graph's Principled BSDF."""
+        materials = [s.material for s in obj.material_slots if s.material]
+        if not materials and obj.data.materials:
+            materials = [m for m in obj.data.materials if m]
+        if not materials:
+            result.warnings.append("No material to apply roughness/metallic to")
+            return
+        for material in materials:
+            if not material.use_nodes:
+                continue
+            bsdf = material.node_tree.nodes.get("Principled BSDF")
+            if bsdf is None:
+                continue
+            if spec.material_roughness is not None and "Roughness" in bsdf.inputs:
+                bsdf.inputs["Roughness"].default_value = float(spec.material_roughness)
+            if spec.material_metallic is not None and "Metallic" in bsdf.inputs:
+                bsdf.inputs["Metallic"].default_value = float(spec.material_metallic)
+
+    def _apply_render_quality(self, spec: RenderSpec, result: ExecutionResult) -> None:
+        """Color management, image format and engine-specific quality.
+
+        Every setting is hasattr-guarded: the EEVEE Next rewrite dropped many
+        property names, and an unsupported one warns rather than aborts.
+        """
+        bpy = self._get_bpy()
+        scene = bpy.context.scene
+
+        def _set(owner, name, value, label):
+            if value is None:
+                return
+            if not hasattr(owner, name):
+                result.warnings.append(f"{label} unsupported on this build")
+                return
+            try:
+                setattr(owner, name, value)
+            except Exception as e:
+                result.warnings.append(f"{label} rejected: {e}")
+
+        # -- color management. view_transform first: valid `look` values are
+        # scoped to it, so the reverse order rejects every look.
+        _set(scene.view_settings, "view_transform", spec.view_transform, "view_transform")
+        _set(scene.view_settings, "look", spec.look, "look")
+        _set(scene.view_settings, "exposure", spec.exposure, "exposure")
+        _set(scene.view_settings, "gamma", spec.gamma, "gamma")
+
+        # -- image
+        _set(scene.render, "resolution_percentage", spec.resolution_percentage, "resolution_percentage")
+        _set(scene.render.image_settings, "file_format", spec.file_format, "file_format")
+        _set(scene.render.image_settings, "color_depth", spec.color_depth, "color_depth")
+        if spec.dpi is not None:
+            _set(scene.render, "ppm_factor", float(spec.dpi), "dpi")
+
+        # -- reconstruction filter. The two properties are not aliased: Cycles
+        # ignores render.filter_size and reads cycles.filter_width (on 5.2).
+        if spec.filter_width is not None:
+            if spec.engine == "CYCLES":
+                _set(scene.cycles, "filter_width", float(spec.filter_width), "filter_width")
+            else:
+                _set(scene.render, "filter_size", float(spec.filter_width), "filter_width")
+
+        if spec.engine == "CYCLES":
+            _set(scene.cycles, "adaptive_threshold", spec.adaptive_threshold, "adaptive_threshold")
+            _set(scene.cycles, "max_bounces", spec.max_bounces, "max_bounces")
+            if spec.denoiser and spec.denoiser != "AUTO":
+                _set(scene.cycles, "denoiser", spec.denoiser, "denoiser")
+        elif spec.engine == "BLENDER_EEVEE":
+            # use_fast_gi does nothing with use_raytracing off, so enable the
+            # parent rather than silently no-op.
+            wants_gi = bool(spec.ambient_occlusion) or bool(spec.raytracing)
+            if wants_gi:
+                _set(scene.eevee, "use_raytracing", True, "raytracing")
+            elif spec.raytracing is not None:
+                _set(scene.eevee, "use_raytracing", bool(spec.raytracing), "raytracing")
+            if spec.ambient_occlusion:
+                _set(scene.eevee, "use_fast_gi", True, "ambient_occlusion")
+                _set(scene.eevee, "fast_gi_method", "AMBIENT_OCCLUSION_ONLY", "fast_gi_method")
+                _set(scene.eevee, "fast_gi_distance", spec.ao_distance, "ao_distance")
+            _set(scene.eevee, "clamp_surface_indirect", spec.clamp_indirect, "clamp_indirect")
+
+    def _execute_labels(self, spec, output_dir, manifest, result) -> None:
+        """Composite node labels over the render.
+
+        Calls `text_overlay` directly: `scigraphs.generate_text_overlay` polls
+        for an active object that background mode does not provide. Must run
+        after camera framing and before the render.
+        """
+        bpy = self._get_bpy()
+        self._log("Generating labels")
+        start_time = datetime.datetime.now(datetime.timezone.utc)
+        status, error = "success", None
+
+        try:
+            from ..visualization import text_overlay as overlay
+
+            if not getattr(overlay, "PIL_AVAILABLE", False):
+                result.warnings.append("Labels need Pillow, which is unavailable")
+                raise RuntimeError("Pillow unavailable")
+
+            obj = bpy.context.active_object
+            if obj is None or obj.type != 'MESH':
+                raise RuntimeError("No graph object to label")
+            scene = bpy.context.scene
+            camera = scene.camera
+            if camera is None:
+                raise RuntimeError("Labels need a camera")
+
+            resolution = (scene.render.resolution_x, scene.render.resolution_y)
+
+            settings = overlay.TextOverlaySettings(
+                size_mode=spec.size_mode,
+                fixed_size=int(spec.font_size),
+                size_scale=1.0,
+                max_distance=float(spec.max_distance or 0.0),
+                text_color=tuple(spec.color)[:3],
+                background_enabled=bool(spec.halo),
+                background_color=tuple(spec.halo_color)[:3],
+                background_alpha=float(spec.halo_alpha),
+                depth_occlusion=bool(spec.occlusion),
+                # Ranked in _rank_labels instead: the built-in filter is a
+                # single threshold, which does not carry across graphs.
+                filter_enabled=False,
+                filter_attribute="",
+                filter_operator="GREATER",
+                filter_value=0.0,
+                float_decimals=int(spec.float_decimals),
+            )
+
+            projected = overlay.project_nodes_to_screen(obj, camera, scene, resolution)
+            n_projected = len(projected)
+            projected = [p for p in projected if p.visible]
+            n_visible = len(projected)
+
+            if spec.occlusion:
+                # Takes a context, but only for evaluated_depsgraph_get(),
+                # which works in background mode.
+                projected = overlay.test_depth_occlusion(
+                    bpy.context, obj, projected, camera
+                ) or projected
+                projected = [p for p in projected if not p.occluded]
+
+            n_unoccluded = len(projected)
+            projected = self._rank_labels(projected, obj, spec, result)
+
+            # Report where labels were lost; four failures look alike.
+            self._log(
+                "Labels: %d projected, %d in frame, %d unoccluded, %d kept"
+                % (n_projected, n_visible, n_unoccluded, len(projected))
+            )
+
+            if not projected:
+                result.warnings.append(
+                    "No labels survived: %d projected, %d in frame, %d unoccluded"
+                    % (n_projected, n_visible, n_unoccluded)
+                )
+            else:
+                image_path = os.path.join(output_dir, "labels.png")
+                written = overlay.generate_text_image(
+                    projected, resolution, settings, camera, output_path=image_path
+                )
+                if not written:
+                    raise RuntimeError("Label image was not written")
+                if not overlay.setup_compositor_overlay(scene, written):
+                    raise RuntimeError("Could not wire the compositor overlay")
+                scene.render.use_compositing = True
+                add_output(manifest, written, "labels")
+                result.artifacts.append(written)
+                self._log(f"Labels: {len(projected)} placed")
+        except Exception as e:
+            status, error = "error", str(e)
+            result.errors.append(f"Labels failed: {e}")
+            self._log(f"Labels error: {e}", "error")
+
+        end_time = datetime.datetime.now(datetime.timezone.utc)
+        add_step(manifest, "labels", "generate_labels", start_time, end_time, status, error)
+
+    def _rank_labels(self, projected, obj, spec, result):
+        """Keep the highest-ranked labels, and only those above `min_value`."""
+        from ..visualization import text_overlay as overlay
+
+        attr = self._resolve_visual_attribute(spec.rank_by) or spec.rank_by
+        values = overlay.get_node_attribute_values(obj, attr) or {}
+        if not values:
+            result.warnings.append(
+                f"Label ranking attribute '{spec.rank_by}' not found; "
+                "labelling by camera distance instead"
+            )
+            ranked = sorted(projected, key=lambda p: p.distance)
+        else:
+            for node in projected:
+                node.attribute_value = values.get(node.name)
+            if spec.min_value is not None:
+                projected = [
+                    p for p in projected
+                    if p.attribute_value is not None
+                    and p.attribute_value >= float(spec.min_value)
+                ]
+            ranked = sorted(
+                projected,
+                key=lambda p: (p.attribute_value is None, -(p.attribute_value or 0.0)),
+            )
+
+        if spec.declutter:
+            ranked = self._declutter_labels(ranked, spec)
+
+        if spec.max_count and spec.max_count > 0:
+            ranked = ranked[: int(spec.max_count)]
+        return ranked
+
+    def _declutter_labels(self, ranked, spec):
+        """Drop labels whose box would overlap one already accepted.
+
+        Greedy in rank order; the overlay code itself has no collision pass and
+        just overdraws. Boxes are estimated wide rather than measured with
+        Pillow, which would mean loading the font a second time.
+        """
+        accepted = []
+        boxes = []
+        half_h = max(spec.font_size, 1) * 0.62
+        for node in ranked:
+            half_w = 0.30 * spec.font_size * max(len(node.name), 1)
+            box = (node.x - half_w, node.y - half_h,
+                   node.x + half_w, node.y + half_h)
+            if any(box[0] < b[2] and b[0] < box[2] and
+                   box[1] < b[3] and b[1] < box[3] for b in boxes):
+                continue
+            boxes.append(box)
+            accepted.append(node)
+        return accepted
+
+    def _execute_world(self, spec, manifest, result) -> None:
+        """Background color, ambient strength and optional HDRI."""
+        bpy = self._get_bpy()
+        self._log("Applying world")
+        start_time = datetime.datetime.now(datetime.timezone.utc)
+        status, error = "success", None
+
+        try:
+            world = bpy.context.scene.world
+            if world is None:
+                world = bpy.data.worlds.new("SciGraphsWorld")
+                bpy.context.scene.world = world
+            world.use_nodes = True
+            nodes, links = world.node_tree.nodes, world.node_tree.links
+
+            background = next(
+                (n for n in nodes if n.type == 'BACKGROUND'), None
+            )
+            if background is None:
+                background = nodes.new("ShaderNodeBackground")
+                output = next((n for n in nodes if n.type == 'OUTPUT_WORLD'), None)
+                if output is None:
+                    output = nodes.new("ShaderNodeOutputWorld")
+                links.new(background.outputs["Background"], output.inputs["Surface"])
+
+            if spec.color is not None:
+                rgb = list(spec.color)[:3]
+                while len(rgb) < 3:
+                    rgb.append(0.0)
+                background.inputs["Color"].default_value = (*rgb, 1.0)
+            if spec.strength is not None:
+                background.inputs["Strength"].default_value = float(spec.strength)
+
+            if spec.hdri:
+                path = bpy.path.abspath(spec.hdri)
+                if not os.path.isfile(path):
+                    result.warnings.append(f"HDRI not found: {path}")
+                else:
+                    env = nodes.new("ShaderNodeTexEnvironment")
+                    env.image = bpy.data.images.load(path, check_existing=True)
+                    mapping = nodes.new("ShaderNodeMapping")
+                    coord = nodes.new("ShaderNodeTexCoord")
+                    mapping.inputs["Rotation"].default_value[2] = math.radians(
+                        float(spec.hdri_rotation or 0.0)
+                    )
+                    links.new(coord.outputs["Generated"], mapping.inputs["Vector"])
+                    links.new(mapping.outputs["Vector"], env.inputs["Vector"])
+                    links.new(env.outputs["Color"], background.inputs["Color"])
+                    manifest_path = path
+                    add_input(manifest, manifest_path, "hdri")
+        except Exception as e:
+            status, error = "error", str(e)
+            result.errors.append(f"World failed: {e}")
+            self._log(f"World error: {e}", "error")
+
+        end_time = datetime.datetime.now(datetime.timezone.utc)
+        add_step(manifest, "world", "apply_world", start_time, end_time, status, error)
+
+    def _execute_lighting(self, spec, manifest, result) -> None:
+        """A single sun.
+
+        One light, not a rig: the add-on's three-point rigs put their fills at
+        fixed coordinates near the origin, which does nothing at graph scale.
+        """
+        bpy = self._get_bpy()
+        self._log("Applying lighting")
+        start_time = datetime.datetime.now(datetime.timezone.utc)
+        status, error = "success", None
+
+        try:
+            if spec.replace:
+                for obj in [o for o in bpy.data.objects if o.type == 'LIGHT']:
+                    bpy.data.objects.remove(obj, do_unlink=True)
+
+            existing = [o for o in bpy.data.objects if o.type == 'LIGHT']
+            if existing:
+                sun = existing[0]
+                if sun.data.type != 'SUN':
+                    sun.data.type = 'SUN'
+            else:
+                light_data = bpy.data.lights.new("SciGraphsKey", type='SUN')
+                sun = bpy.data.objects.new("SciGraphsKey", light_data)
+                bpy.context.scene.collection.objects.link(sun)
+
+            sun.data.energy = float(spec.sun_energy)
+            # `angle` is the angular diameter in radians, capped at pi (5.2);
+            # anything larger is silently reduced.
+            sun.data.angle = min(math.radians(float(spec.sun_angle)), math.pi)
+            sun.rotation_euler = tuple(spec.sun_rotation)[:3]
+            self._log(
+                f"Sun: energy {sun.data.energy:.2f}, "
+                f"angle {math.degrees(sun.data.angle):.1f} deg"
+            )
+        except Exception as e:
+            status, error = "error", str(e)
+            result.errors.append(f"Lighting failed: {e}")
+            self._log(f"Lighting error: {e}", "error")
+
+        end_time = datetime.datetime.now(datetime.timezone.utc)
+        add_step(manifest, "lighting", "apply_lighting", start_time, end_time, status, error)
+
+    def _graph_bounds(self):
+        """World-space (center, radius) over every mesh object, or None.
+
+        Evaluated geometry, so the glyphs and edges instanced by the Geometry
+        Nodes modifier count; the bare point cloud under-reports the extent.
+        """
+        import math
+
+        from mathutils import Vector
+
+        bpy = self._get_bpy()
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+
+        lo = [float("inf")] * 3
+        hi = [float("-inf")] * 3
+        found = False
+        for obj in bpy.data.objects:
+            if obj.type != 'MESH':
+                continue
+            evaluated = obj.evaluated_get(depsgraph)
+            for corner in evaluated.bound_box:
+                world = evaluated.matrix_world @ Vector(corner)
+                for axis in range(3):
+                    lo[axis] = min(lo[axis], world[axis])
+                    hi[axis] = max(hi[axis], world[axis])
+                found = True
+        if not found:
+            return None
+
+        center = [(lo[a] + hi[a]) * 0.5 for a in range(3)]
+        radius = 0.5 * math.sqrt(sum((hi[a] - lo[a]) ** 2 for a in range(3)))
+        return center, max(radius, 1e-6)
+
+    def _frame_camera(self, spec: RenderSpec, result: ExecutionResult) -> None:
+        """Place and aim a camera so the whole graph fits the frame."""
+        import math
+
+        from mathutils import Vector
+
+        bpy = self._get_bpy()
+
+        bounds = self._graph_bounds()
+        if bounds is None:
+            result.warnings.append("Nothing to frame; camera left as-is")
+            return
+        center, radius = bounds
+
+        cam_obj = bpy.context.scene.camera
+        if cam_obj is None or cam_obj.type != 'CAMERA':
+            cam_data = bpy.data.cameras.new("SciGraphsCamera")
+            cam_obj = bpy.data.objects.new("SciGraphsCamera", cam_data)
+            bpy.context.scene.collection.objects.link(cam_obj)
+            bpy.context.scene.camera = cam_obj
+
+        cam = cam_obj.data
+        if spec.camera_lens is not None:
+            cam.lens = float(spec.camera_lens)
+
+        # Fit the bounding sphere in the narrower of the two field angles, so
+        # the graph fits regardless of the aspect ratio.
+        sensor = cam.sensor_width or 36.0
+        half_angle = math.atan((sensor * 0.5) / max(cam.lens, 1e-6))
+        res_x = max(bpy.context.scene.render.resolution_x, 1)
+        res_y = max(bpy.context.scene.render.resolution_y, 1)
+        if res_y > res_x:
+            half_angle = math.atan(math.tan(half_angle) * res_x / res_y)
+        distance = (radius * float(spec.camera_margin)) / max(math.sin(half_angle), 1e-6)
+
+        direction = Vector(spec.camera_direction or [0.48, -0.72, 0.50])
+        if direction.length < 1e-9:
+            direction = Vector((0.48, -0.72, 0.50))
+        direction.normalize()
+
+        center_vec = Vector(center)
+        cam_obj.location = center_vec + direction * distance
+        # Blender cameras look down local -Z; track_to gives the aiming basis.
+        cam_obj.rotation_euler = (
+            (cam_obj.location - center_vec).to_track_quat('Z', 'Y').to_euler()
+        )
+
+        # Orthographic drops the near/far size falloff, so a node radius that
+        # encodes a value stays comparable across the frame.
+        if spec.camera_ortho:
+            cam.type = 'ORTHO'
+            cam.ortho_scale = 2.0 * radius * float(spec.camera_margin)
+        else:
+            cam.type = 'PERSP'
+
+        # Depth of field focused on the framing distance, so no focus object.
+        if spec.dof_fstop is not None:
+            cam.dof.use_dof = True
+            cam.dof.focus_distance = distance
+            cam.dof.aperture_fstop = float(spec.dof_fstop)
+        else:
+            cam.dof.use_dof = False
+
+        # Flush the transform: anything reading `camera.matrix_world` before
+        # the render (label projection) otherwise sees the pre-move matrix.
+        bpy.context.view_layer.update()
+
+        if not any(obj.type == 'LIGHT' for obj in bpy.data.objects):
+            light_data = bpy.data.lights.new("SciGraphsKey", type='SUN')
+            light_data.energy = 3.0
+            light = bpy.data.objects.new("SciGraphsKey", light_data)
+            bpy.context.scene.collection.objects.link(light)
+            light.rotation_euler = (0.9, 0.0, 0.7)
+            result.warnings.append("No light in scene; added a default sun")
+
+        self._log(f"Framed camera at distance {distance:.2f} (radius {radius:.2f})")
+
     def _execute_dataset(
         self,
         spec: DatasetSpec,
@@ -222,6 +795,7 @@ class PipelineExecutor:
         result: ExecutionResult,
     ) -> None:
         """Execute dataset loading stage."""
+        bpy = self._get_bpy()
         self._log(f"Loading dataset: {spec.source}")
         start_time = datetime.datetime.now(datetime.timezone.utc)
 
@@ -428,7 +1002,7 @@ class PipelineExecutor:
             # resolution and seed from scene.scigraphs; pass resolution there.
             if spec.clustering:
                 # Map common modularity-based names onto the operator's set.
-                algo_aliases = {"louvain": "rb", "leiden": "rb", "label_prop": "rn"}
+                algo_aliases = {"louvain": "rb", "leiden": "rb", "label_prop": "rb"}
                 algo = spec.clustering.algorithm.lower()
                 algo = algo_aliases.get(algo, algo)
                 scene_props = {
@@ -594,12 +1168,17 @@ class PipelineExecutor:
         result: ExecutionResult,
     ) -> None:
         """Execute visualization stage."""
+        bpy = self._get_bpy()
         self._log("Applying visual settings")
         start_time = datetime.datetime.now(datetime.timezone.utc)
         status = "success"
         error = None
 
         try:
+            # Glyph geometry and sizes are baked into the node tree when it is
+            # built, so they have to be staged on the object first.
+            self._apply_glyph_settings(spec, result)
+
             # Setup geometry nodes
             if spec.setup_geometry_nodes:
                 res = call_operator("scigraphs.setup_visualization")
@@ -657,11 +1236,18 @@ class PipelineExecutor:
                             coloring.colormap = spec.colormap
                         except (TypeError, ValueError):
                             result.warnings.append(f"Unknown colormap: {spec.colormap}")
-                        coloring.auto_range = True
+                        self._apply_color_mapping(spec, coloring, result)
                     res = call_operator("scigraphs.color_apply")
                     self._collect_warnings(res, result)
                     if res.get("status") == "error":
                         result.warnings.append(f"Node coloring failed: {res.get('error')}")
+
+            # After coloring: the material these override does not exist until
+            # color_apply has run.
+            if spec.material_roughness is not None or spec.material_metallic is not None:
+                obj = bpy.context.active_object
+                if obj is not None and obj.type == 'MESH':
+                    self._apply_material_overrides(spec, obj, result)
 
             # Node sizing by attribute (interactive geometry-nodes tree).
             if spec.node_size:
@@ -784,6 +1370,20 @@ class PipelineExecutor:
                     bpy.context.scene.camera = cam_obj
                 else:
                     result.warnings.append(f"Camera '{spec.camera}' not found")
+
+            self._apply_render_quality(spec, result)
+
+            # A named camera is an explicit choice and is left alone.
+            if getattr(spec, "frame_camera", True) and not spec.camera:
+                self._frame_camera(spec, result)
+
+            # Between framing and rendering: the projection needs the final
+            # camera matrix, and the composite must be wired before the render.
+            if self._pending_labels is not None:
+                self._execute_labels(
+                    self._pending_labels, output_dir, manifest, result
+                )
+                self._pending_labels = None
 
             # Render
             bpy.ops.render.render(write_still=True)
