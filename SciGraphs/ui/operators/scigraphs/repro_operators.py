@@ -497,9 +497,77 @@ class SCIGRAPHS_OT_OpenArtifactsFolder(Operator):
             return {'CANCELLED'}
 
 
+class SCIGRAPHS_OT_DropPipeline(Operator):
+    """Run a pipeline specification dropped into the viewport"""
+    bl_idname = "scigraphs.drop_pipeline"
+    bl_label = "Run Dropped Pipeline"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # SKIP_SAVE matters: without it Blender reuses the previous value, so a
+    # second drop would silently re-run the first file.
+    filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
+
+    # Deliberately not SCIGRAPHS_OT_RunPipeline. That operator's invoke()
+    # prefers the path stored in the panel over its own filepath, which is
+    # right for a button and wrong for a drop.
+
+    @classmethod
+    def poll(cls, context):
+        return context.area is not None and context.area.type == 'VIEW_3D'
+
+    def execute(self, context):
+        from ....core.repro import parse_pipeline, PipelineExecutor
+
+        path = self.filepath
+        if not path or not path.lower().endswith(('.json', '.yaml', '.yml')):
+            self.report({'ERROR'}, "Not a pipeline specification")
+            return {'CANCELLED'}
+        if not os.path.isfile(path):
+            self.report({'ERROR'}, f"File not found: {path}")
+            return {'CANCELLED'}
+
+        try:
+            schema, raw_dict, pipeline_hash = parse_pipeline(path)
+        except Exception as e:
+            self.report({'ERROR'}, f"Invalid specification: {e}")
+            return {'CANCELLED'}
+
+        executor = PipelineExecutor(stop_on_error=False, verbose=True)
+        result = executor.execute(schema, raw_dict, pipeline_hash)
+
+        for warning in result.warnings:
+            self.report({'WARNING'}, warning)
+
+        if not result.success:
+            detail = result.errors[0] if result.errors else "see the console"
+            self.report({'ERROR'}, f"Pipeline failed: {detail}")
+            return {'CANCELLED'}
+
+        self.report(
+            {'INFO'},
+            f"{schema.meta.title}: {len(result.artifacts)} artifacts in "
+            f"{result.output_dir}",
+        )
+        return {'FINISHED'}
+
+
+class SCIGRAPHS_FH_pipeline(bpy.types.FileHandler):
+    """Accept specifications dropped onto the 3D viewport."""
+    bl_idname = "SCIGRAPHS_FH_pipeline"
+    bl_label = "SciGraphs pipeline specification"
+    bl_import_operator = "scigraphs.drop_pipeline"
+    bl_file_extensions = ".json;.yaml;.yml"
+
+    @classmethod
+    def poll_drop(cls, context):
+        return context.area is not None and context.area.type == 'VIEW_3D'
+
+
 # Registration
 classes = (
     SCIGRAPHS_OT_RunPipeline,
+    SCIGRAPHS_OT_DropPipeline,
+    SCIGRAPHS_FH_pipeline,
     SCIGRAPHS_OT_ValidatePipeline,
     SCIGRAPHS_OT_ExportPipelineTemplate,
     SCIGRAPHS_OT_ExportCurrentReproSpec,
