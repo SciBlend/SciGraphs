@@ -12,6 +12,7 @@ import cmath
 import json
 import tempfile
 from ...repro.determinism import get_layout_seed
+from ..mesh_utils import mesh_edge_pairs
 
 # Module-level RNG for reproducible layouts
 _layout_rng = None
@@ -123,15 +124,17 @@ def _build_networkx_graph(obj):
     if edges_str:
         edges_flat = edges_str.split(",")
         edges_data = [(edges_flat[i], edges_flat[i+1]) for i in range(0, len(edges_flat), 2)]
+
+        node_to_idx = {node: i for i, node in enumerate(nodes_list)}
+
+        edge_indices = []
+        for src, tgt in edges_data:
+            if src in node_to_idx and tgt in node_to_idx:
+                edge_indices.append((node_to_idx[src], node_to_idx[tgt]))
     else:
-        edges_data = []
-
-    node_to_idx = {node: i for i, node in enumerate(nodes_list)}
-
-    edge_indices = []
-    for src, tgt in edges_data:
-        if src in node_to_idx and tgt in node_to_idx:
-            edge_indices.append((node_to_idx[src], node_to_idx[tgt]))
+        # Mesh-native object (see mesh_utils.mesh_edge_pairs): without this the
+        # graph comes out edgeless and the layout runs on isolated points.
+        edge_indices = mesh_edge_pairs(obj, num_nodes)
 
     G.add_edges_from(edge_indices)
     return G, num_nodes

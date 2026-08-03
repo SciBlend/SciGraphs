@@ -18,6 +18,21 @@ GRAPHVIZ_ENGINES = {
 GRAPHVIZ_DIMENSION_ENGINES = {'neato', 'fdp', 'sfdp'}
 
 
+UNSAFE_SFDP_SMOOTHING = {'spring', 'avg_dist', 'graph_dist', 'power_dist'}
+
+
+def _has_isolated_node(G):
+    """True if any node has no neighbour other than itself (degree 0 or self-loops only)."""
+    directed = G.is_directed()
+    for node in G.nodes():
+        linked = any(other != node for other in G.neighbors(node))
+        if not linked and directed:
+            linked = any(other != node for other in G.predecessors(node))
+        if not linked:
+            return True
+    return False
+
+
 def _graphviz_edges(G):
     """Return Graphviz-compatible edge indices for scigraphs-utils."""
     num_nodes = len(G.nodes())
@@ -134,6 +149,12 @@ def _scigraphs_utils_graphviz_layout(G, engine, iterations, scale, props=None, d
 
     num_nodes, edges = _graphviz_edges(G)
     attrs = _graphviz_default_attrs(engine, iterations, props, dimension=dimension)
+    if engine == 'sfdp' and attrs.get("smoothing") in UNSAFE_SFDP_SMOOTHING and _has_isolated_node(G):
+        print(
+            f"  Isolated node detected - sfdp smoothing '{attrs['smoothing']}' "
+            f"would abort Graphviz, falling back to 'none'"
+        )
+        attrs["smoothing"] = "none"
     node_attrs = _parse_graphviz_attrs(getattr(props, "graphviz_node_attrs", "") if props else "")
     edge_attrs = _parse_graphviz_attrs(getattr(props, "graphviz_edge_attrs", "") if props else "")
     directed = getattr(props, "graphviz_dot_directed", True) if engine == 'dot' and props else engine == 'dot'

@@ -31,6 +31,12 @@ def build_edge_mapping(obj):
     For OSMnx meshes a single graph edge may span several mesh edges because
     intermediate curve-point vertices are inserted between intersection nodes.
 
+    Reads only the legacy ``nodes_data``/``edges_data`` strings, with no
+    mesh-native fallback, and that is sufficient: every caller reaches this via
+    ``get_osmnx_graph``, which returns ``None`` unless ``obj["is_osmnx"]`` is
+    set, and the one function that sets it (``create_osmnx_graph_object``)
+    writes both strings. Mesh-native objects cannot get here.
+
     Returns:
         ``dict[(str, str), list[int]]`` – bidirectional mapping.
     """

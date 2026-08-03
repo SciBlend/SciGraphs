@@ -47,6 +47,12 @@ if [ ! -d "SciGraphs" ]; then
 fi
 cp -r SciGraphs/* "$BUILD_DIR/"
 
+# Optional components. Present in some working trees, absent from the build:
+# the add-on guards their import and runs without them.
+for optional in ui/gpu_render core/render; do
+    rm -rf "$BUILD_DIR/$optional"
+done
+
 if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
     echo "  Copying wheels referenced in manifest..."
     mkdir -p "$BUILD_DIR/wheels"
@@ -148,7 +154,8 @@ echo "[3/5] Building extension..."
 cd "$BUILD_DIR"
 mkdir -p ../dist
 
-"$BLENDER_CMD" --command extension build --source-dir . --output-dir ../dist --split-platforms
+env -u LD_LIBRARY_PATH -u LD_PRELOAD \
+    "$BLENDER_CMD" --command extension build --source-dir . --output-dir ../dist --split-platforms
 
 cd ..
 
@@ -168,6 +175,17 @@ fi
 
 echo ""
 echo "[4/5] Detecting Blender version..."
+
+
+if [ -z "$BLENDER_VERSION" ]; then
+    DETECTED_VER=$(env -u LD_LIBRARY_PATH -u LD_PRELOAD "$BLENDER_CMD" \
+        --factory-startup --version 2>/dev/null \
+        | grep -oP 'Blender \K[0-9]+\.[0-9]+' | head -1 || true)
+    if [ -n "$DETECTED_VER" ]; then
+        BLENDER_VERSION="$DETECTED_VER"
+        echo "  Detected running Blender: $BLENDER_VERSION"
+    fi
+fi
 
 # Read blender_version_min from manifest to find the right config folder
 if [ -z "$BLENDER_VERSION" ]; then

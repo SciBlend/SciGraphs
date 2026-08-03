@@ -1,76 +1,55 @@
-# Core module for SciGraphs addon
+# Core module for SciGraphs
 #
-# Subpackages re-exported at the top level for backward compatibility.
-# Consumers can use either:
-#   from ...core import analysis          (re-export, always works)
-#   from ...core.algorithms.analysis import X  (direct path)
+# Subpackages are re-exported at the top level for backward compatibility, but
+# they are imported LAZILY (PEP 562) rather than eagerly.
 
-from .algorithms import analysis
-from .algorithms import graph
-from .algorithms import network_flow
-from .algorithms import pathfinding
-from .algorithms import spanning
-from .algorithms import statistics
-from .algorithms import topology
+import importlib
 
-from .mesh import edge_styles
-from .mesh import geo_mesh
-from .mesh import geometry
-from .mesh import layout
-from .mesh import mesh_utils
+_LAZY = {
+    'analysis': '.algorithms.analysis',
+    'animation': '.visualization.animation',
+    'city2graph': '.city2graph',
+    'coloring': '.coloring',
+    'db_connector': '.data_io.db_connector',
+    'dem_download': '.geo.dem_download',
+    'dem_processor': '.geo.dem_processor',
+    'edge_styles': '.mesh.edge_styles',
+    'export_utils': '.data_io.export_utils',
+    'geo_mesh': '.mesh.geo_mesh',
+    'geometry': '.mesh.geometry',
+    'georaster': '.geo.georaster',
+    'geospatial': '.geo.geospatial',
+    'graph': '.algorithms.graph',
+    'importer': '.data_io.importer',
+    'layout': '.mesh.layout',
+    'mesh_utils': '.mesh.mesh_utils',
+    'network_flow': '.algorithms.network_flow',
+    'osmnx': '.osmnx',
+    'osmnx_analysis': '.osmnx.analysis',
+    'pathfinding': '.algorithms.pathfinding',
+    'repro': '.repro',
+    'spanning': '.algorithms.spanning',
+    'sql_importer': '.data_io.sql_importer',
+    'statistics': '.algorithms.statistics',
+    'suitesparse_importer': '.data_io.suitesparse_importer',
+    'terrain': '.geo.terrain',
+    'text_overlay': '.visualization.text_overlay',
+    'texture_api': '.geo.texture_api',
+    'topology': '.algorithms.topology',
+}
 
-from .geo import dem_download
-from .geo import dem_processor
-from .geo import georaster
-from .geo import geospatial
-from .geo import terrain
-from .geo import texture_api
+__all__ = list(_LAZY)
 
-from .data_io import db_connector
-from .data_io import export_utils
-from .data_io import importer
-from .data_io import sql_importer
-from .data_io import suitesparse_importer
 
-from .visualization import animation
-from .visualization import text_overlay
+def __getattr__(name):
+    """Import a re-exported subpackage on first access (PEP 562)."""
+    target = _LAZY.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = importlib.import_module(target, __name__)
+    globals()[name] = module          # subsequent lookups skip this hook
+    return module
 
-from .osmnx import analysis as osmnx_analysis
 
-from . import city2graph
-from . import osmnx
-from . import repro
-from . import coloring
-
-__all__ = [
-    'analysis',
-    'graph',
-    'network_flow',
-    'pathfinding',
-    'spanning',
-    'statistics',
-    'topology',
-    'edge_styles',
-    'geo_mesh',
-    'geometry',
-    'layout',
-    'mesh_utils',
-    'dem_download',
-    'dem_processor',
-    'georaster',
-    'geospatial',
-    'terrain',
-    'texture_api',
-    'db_connector',
-    'export_utils',
-    'importer',
-    'sql_importer',
-    'suitesparse_importer',
-    'animation',
-    'text_overlay',
-    'osmnx_analysis',
-    'city2graph',
-    'osmnx',
-    'repro',
-    'coloring',
-]
+def __dir__():
+    return sorted(set(globals()) | set(_LAZY))

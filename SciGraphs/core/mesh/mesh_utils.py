@@ -4,8 +4,79 @@
 # expand per-node values to per-vertex arrays (handling OSMnx curve vertices),
 # extract vertex positions, and collect/create mesh attributes.
 
+import json
+
 import numpy as np
 from ..algorithms.graph import GraphData
+
+
+def mesh_edge_pairs(obj, num_nodes):
+    """
+    Read edge vertex-index pairs straight from the mesh.
+
+    Graph objects come in two storage formats: legacy ones keep their topology
+    in the ``nodes_data``/``edges_data`` name strings, while mesh-native ones
+    (everything ``scripts/showcase/build_showcase.py`` writes) keep it in
+    ``mesh.edges`` and only record ``num_nodes``/``num_edges`` as properties.
+    This is the reader for the second kind.
+
+    Node vertices always occupy indices ``0..num_nodes-1``; anything past that
+    is curve geometry added by the edge styles, so those edges are skipped.
+
+    Returns:
+        list of ``[v0, v1]`` index pairs.
+    """
+    mesh = getattr(obj, "data", None)
+    if mesh is None or not hasattr(mesh, "edges") or len(mesh.edges) == 0:
+        return []
+
+    raw = np.empty(len(mesh.edges) * 2, dtype=np.int32)
+    mesh.edges.foreach_get("vertices", raw)
+    raw = raw.reshape(-1, 2)
+    keep = (raw[:, 0] < num_nodes) & (raw[:, 1] < num_nodes)
+    return raw[keep].tolist()
+
+
+def resolve_node_labels(obj, num_nodes):
+    """
+    Node identifiers in vertex order for an object with no ``nodes_data``.
+
+    Mesh-native objects store their names as a ``node_names`` JSON list, which
+    the mesh itself cannot supply.  Falls back to stringified vertex indices
+    when that property is missing, unparseable, the wrong length, or carries
+    duplicates -- :class:`GraphData` keys every lookup by node identity, so
+    non-unique labels would silently merge nodes.
+    """
+    raw = obj.get("node_names")
+    if raw:
+        try:
+            names = [str(n) for n in json.loads(raw)]
+        except (ValueError, TypeError):
+            names = None
+        if names is not None and len(names) == num_nodes and len(set(names)) == num_nodes:
+            return names
+
+    return [str(i) for i in range(num_nodes)]
+
+
+def _mesh_native_topology(obj, nodes_list):
+    """
+    Build ``(nodes, edges)`` for an object whose edges live in the mesh rather
+    than in ``edges_data``.  Edges are labelled with the same identifiers as
+    *nodes* so callers can keep using :attr:`GraphData.node_to_index`.
+    """
+    num_nodes = obj.get("num_nodes")
+    if num_nodes is None:
+        mesh = getattr(obj, "data", None)
+        num_nodes = len(nodes_list) or (len(mesh.vertices) if mesh is not None else 0)
+    num_nodes = int(num_nodes)
+
+    nodes = nodes_list
+    if len(nodes) != num_nodes or len(set(nodes)) != num_nodes:
+        nodes = resolve_node_labels(obj, num_nodes)
+
+    edges = [(nodes[v0], nodes[v1]) for v0, v1 in mesh_edge_pairs(obj, num_nodes)]
+    return nodes, edges
 
 
 def parse_graph_data(obj):
@@ -19,11 +90,12 @@ def parse_graph_data(obj):
     nodes = nodes_str.split(",") if nodes_str else []
 
     edges_str = obj.get("edges_data", "")
-    if edges_str:
-        edges_flat = edges_str.split(",")
-        edges = [(edges_flat[i], edges_flat[i + 1]) for i in range(0, len(edges_flat), 2)]
-    else:
-        edges = []
+    if not edges_str:
+        nodes, edges = _mesh_native_topology(obj, nodes)
+        return GraphData(nodes, edges, None)
+
+    edges_flat = edges_str.split(",")
+    edges = [(edges_flat[i], edges_flat[i + 1]) for i in range(0, len(edges_flat), 2)]
 
     return GraphData(nodes, edges, None)
 
@@ -47,7 +119,14 @@ def parse_graph_data_filtered(obj):
     if edges_str:
         edges_flat = edges_str.split(",")
         edges_list = [(edges_flat[i], edges_flat[i + 1]) for i in range(0, len(edges_flat), 2)]
+    elif "is_intersection" not in mesh.attributes:
+        # Mesh-native object: no name strings to filter, and no curve vertices
+        # to filter them against.  Read the topology out of the mesh instead.
+        nodes_list, edges_list = _mesh_native_topology(obj, nodes_list)
+        return GraphData(nodes=nodes_list, edges=edges_list)
     else:
+        # Marked-up OSMnx mesh with no stored edges: its real nodes are not the
+        # first num_nodes vertices, so mesh edges cannot be mapped back safely.
         edges_list = []
 
     if "is_intersection" in mesh.attributes:

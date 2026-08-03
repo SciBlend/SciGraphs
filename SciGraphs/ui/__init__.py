@@ -11,12 +11,13 @@ from . import gizmos
 from . import coloring
 from . import modal_visual
 
+# ImportError, not ModuleNotFoundError: `from . import x` on an absent submodule
+# falls back to an attribute lookup on the half-built package and raises the
+# base class.
 try:
     from . import gpu_render
-    GPU_RENDER_ERROR = None
-except ImportError as _exc:
+except ImportError:
     gpu_render = None
-    GPU_RENDER_ERROR = str(_exc)
 
 
 class SCIGRAPHS_PT_engine_missing(bpy.types.Panel):

@@ -12,14 +12,22 @@ bl_info = {
     "category": "3D View",
 }
 
-import bpy
-from bpy.app.handlers import persistent
 
-from . import preferences
-from . import properties
-from . import ui
-from . import core
-from . import utils
+try:
+    import bpy
+    from bpy.app.handlers import persistent
+except ModuleNotFoundError:  
+    bpy = None
+
+    def persistent(fn):
+        return fn
+
+if bpy is not None:
+    from . import preferences
+    from . import properties
+    from . import ui
+    from . import core
+    from . import utils
 
 
 @persistent

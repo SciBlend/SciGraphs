@@ -164,9 +164,12 @@ def _compute_layout_for_algorithm(G, num_nodes, algorithm, scale, props=None):
         return _spectral_layout_3d(G, scale)
     elif algorithm == 'MDS_3D':
         return _mds_layout_3d(G, scale)
+    elif algorithm == 'SPRING':
+        return _spring_layout_2d(G, iterations, scale)
+    elif algorithm == 'SPRING_3D':
+        return _spring_layout_3d(G, iterations, scale)
     else:
-        # Fallback to random
-        return _random_layout(num_nodes, scale)
+        return _compute_static_layout(G, algorithm, num_nodes, scale)
 
 def execute_layout_iteration(obj, algorithm='SPRING_3D', scale=5.0, current_frame=1,
                             repulsion=1.0, attraction=1.0, gravity=0.1,

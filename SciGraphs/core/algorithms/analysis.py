@@ -1,5 +1,12 @@
+import contextlib
+import random
+
 import numpy as np
 import networkx as nx
+
+# Fixed seed for the randomised community algorithms, so the same graph always
+# yields the same partition. See _seeded_igraph.
+COMMUNITY_SEED = 20240517
 
 def calculate_centrality(graph_data, method='degree'):
     """
@@ -125,17 +132,48 @@ def _ensure_pysurprise_bin_permissions(bin_dir):
     _BIN_PERMISSIONS_FIXED = True
 
 
-def detect_communities(graph_data, algorithm='rn'):
-    """
-    Detects communities using a pySurprise algorithm.
-    Falls back to networkx greedy_modularity if pysurprise is unavailable.
-    Returns a list of community IDs for each node.
-    """
-    num_nodes = len(graph_data.nodes)
-    edges_int, node_to_idx, idx_to_node = _build_edge_list(graph_data)
+@contextlib.contextmanager
+def _seeded_igraph(seed):
+    """Pin igraph's random source so community detection is reproducible.
 
-    if not edges_int:
-        return [0] * num_nodes
+    Several of these algorithms are randomised, and it shows whenever the graph
+    has no single best partition: a ring of communities, say, splits into arcs
+    that land somewhere different on every run. The structure found is equally
+    good each time, but downstream anything keyed to it -- a coarsening, a
+    hierarchy, a figure in a paper -- stops being reproducible.
+
+    igraph takes a generator object rather than a seed, and defaults to the
+    ``random`` module itself, so a private ``Random`` is installed for the call
+    and the default put back afterwards. Nothing else's random stream is
+    touched. A no-op when igraph is not installed; the pySurprise backends that
+    shell out to their own binaries are not covered by this.
+    """
+    try:
+        import igraph
+    except Exception:
+        yield
+        return
+    try:
+        igraph.set_random_number_generator(random.Random(seed))
+        yield
+    finally:
+        igraph.set_random_number_generator(random)
+
+
+def communities_from_edges(edges_int, num_nodes, algorithm='rn', timeout=300,
+                           seed=COMMUNITY_SEED):
+    """Community id per node for a plain integer edge list.
+
+    ``edges_int`` is a sequence of (u, v) with 0 <= u, v < num_nodes. Returns a
+    list of contiguous community ids, or None if every backend failed.
+
+    Kept separate from ``detect_communities`` so callers that already hold an
+    edge list -- notably the recursive coarsening in the GPU render, which runs
+    this on the community graph of the previous level -- do not have to
+    materialise a graph_data object per level.
+    """
+    if not edges_int or num_nodes <= 0:
+        return [0] * max(num_nodes, 0)
 
     if _pysurprise_available():
         try:
@@ -150,12 +188,11 @@ def detect_communities(graph_data, algorithm='rn'):
                 'scluster': ps_algo.scluster,
                 'uvcluster': ps_algo.uvcluster,
             }
-            func = algo_map.get(algorithm)
-            if func is None:
-                func = ps_algo.rn
+            func = algo_map.get(algorithm, ps_algo.rn)
 
             str_edges = [(str(u), str(v)) for u, v in edges_int]
-            partition_dict = func(str_edges, timeout=300)
+            with _seeded_igraph(seed):
+                partition_dict = func(str_edges, timeout=timeout)
 
             if not partition_dict:
                 raise RuntimeError(f"{algorithm} returned empty partition")
@@ -169,26 +206,42 @@ def detect_communities(graph_data, algorithm='rn'):
             # Remap arbitrary community IDs to contiguous 0..N-1
             unique_ids = sorted(set(cluster_ids))
             remap = {old: new for new, old in enumerate(unique_ids)}
-            cluster_ids = [remap[c] for c in cluster_ids]
-            return cluster_ids
+            return [remap[c] for c in cluster_ids]
         except Exception as e:
             print(f"pySurprise {algorithm} failed: {e}; falling back to networkx")
 
-    # Fallback: networkx greedy_modularity
     try:
         G = nx.Graph()
         G.add_nodes_from(range(num_nodes))
         G.add_edges_from(edges_int)
         from networkx.algorithms import community
-        communities = community.greedy_modularity_communities(G)
+        found = community.greedy_modularity_communities(G)
         node_community = {}
-        for comm_id, comm in enumerate(communities):
+        for comm_id, comm in enumerate(found):
             for node in comm:
                 node_community[node] = comm_id
         return [node_community.get(i, 0) for i in range(num_nodes)]
     except Exception as e:
-        print(f"Community detection failed: {e}")
+        print(f"networkx community detection failed: {e}")
+        return None
+
+
+def detect_communities(graph_data, algorithm='rn'):
+    """
+    Detects communities using a pySurprise algorithm.
+    Falls back to networkx greedy_modularity if pysurprise is unavailable.
+    Returns a list of community IDs for each node.
+    """
+    num_nodes = len(graph_data.nodes)
+    edges_int, node_to_idx, idx_to_node = _build_edge_list(graph_data)
+
+    if not edges_int:
         return [0] * num_nodes
+
+    # communities_from_edges already tries pySurprise then networkx; None means
+    # both were unavailable or failed, in which case everything is one group.
+    result = communities_from_edges(edges_int, num_nodes, algorithm)
+    return result if result is not None else [0] * num_nodes
 
 def calculate_shortest_paths(graph_data, source_idx=0):
     """

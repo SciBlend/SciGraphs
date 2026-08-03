@@ -566,7 +566,14 @@ def bundle_edges_fdeb(edges: List[Tuple[np.ndarray, np.ndarray]],
                 spring_force = (prev_point + next_point) / 2 - edge_points[i][p]
                 force += spring_force * 0.5
                 
-                # Attraction to compatible edges
+                # Attraction to compatible edges, as an offset to their
+                # compatibility-weighted mean rather than the sum over them.
+                # Summing makes the effective gain grow with the number of
+                # edges that pass the threshold, and past a few hundred the
+                # update overshoots and the points diverge; the mean keeps one
+                # step a convex combination whatever the edge count.
+                attraction = np.zeros(3)
+                total = 0.0
                 for j in range(num_edges):
                     if i == j:
                         continue
@@ -577,8 +584,11 @@ def bundle_edges_fdeb(edges: List[Tuple[np.ndarray, np.ndarray]],
                     
                     # Attract to corresponding point on edge j
                     other_point = edge_points[j][p]
-                    attraction = (other_point - edge_points[i][p]) * compat
-                    force += attraction * strength
+                    attraction += (other_point - edge_points[i][p]) * compat
+                    total += compat
+                
+                if total > 0.0:
+                    force += attraction * (strength / total)
                 
                 # Apply force
                 edge_points[i][p] += force * current_step
@@ -703,7 +713,14 @@ def compute_styled_edge_points(p0: np.ndarray, p1: np.ndarray,
         # Bundling requires all edges at once, handled separately
         return generate_curved_edge(p0, p1, curvature, segments,
                                     direction, edge_index, use_cubic=True)
-    
+
+    elif style_type == 'HIERARCHICAL':
+        # Hierarchical bundling routes an edge through the cluster tree, which
+        # this generator cannot see: it is handed one edge at a time and knows
+        # nothing about communities. It lives in the GPU engine only.
+        log("Hierarchical bundling is GPU-only, baking straight edges")
+        return generate_straight_edge(p0, p1, segments)
+
     else:
         log(f"Unknown edge style: {style_type}, using straight")
         return generate_straight_edge(p0, p1, segments)
