@@ -6,7 +6,7 @@ from ....core import layout, geometry
 from ....properties.layout_properties import LAYOUT_PROPERTIES
 
 try:
-    from ... import gpu_preview
+    from ... import gpu_render as gpu_preview
 except Exception:  # noqa: BLE001 - preview module is optional
     gpu_preview = None
 
@@ -390,7 +390,9 @@ class SCIGRAPHS_OT_ExecuteLayoutStep(bpy.types.Operator):
                 # costly per-frame edge rebuild (and any Geometry Nodes work).
                 live_preview = gpu_preview is not None and gpu_preview.is_enabled()
                 if live_preview:
-                    gpu_preview.invalidate(obj)
+                    # The geometry form: a layout moves the nodes, which is the
+                    # one change the batch and tree signatures cannot see.
+                    gpu_preview.invalidate_geometry(obj)
                 else:
                     geometry.rebuild_edges(obj)
 

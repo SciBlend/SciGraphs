@@ -34,6 +34,9 @@ docs/.quarto/
 .geocode_cache.json
 .naturalearth_cache/
 
+# Downloaded research datasets (see scripts/visibility/fetch_darus_5108.sh)
+data/
+
 # IDE
 .vscode/
 .idea/
@@ -60,3 +63,15 @@ images_ignore/*
 examples/*
 /.quarto/
 **/*.quarto_ipynb
+
+# Golden-image renders. The manifest under tests/golden/baseline/ IS committed --
+# it carries the fingerprints and tolerances, so a checkout can verify without
+# these. The PNGs are 32 MB and only exist to be looked at.
+tests/golden/_out/
+
+# Browser renderer test fixtures: 229 MB, of which one 1M-node payload is 212 MB.
+# Regenerable with web/static/render/dev/make_fixtures.py.
+web/*
+
+# Private engine history
+.git-private/

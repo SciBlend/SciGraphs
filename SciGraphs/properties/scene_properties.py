@@ -402,12 +402,11 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         items=[
             # === 2D LAYOUTS ===
             ('GRID', "Grid (2D)", "Arrange nodes in a 2D grid (instant)"),
-            ('SPRING', "Spring (2D - NetworkX)", "Force-directed 2D layout (slow)"),
-            ('FORCEATLAS2', "ForceAtlas2 (2D)", "Gephi's algorithm, requires optional fa2 package (medium)"),
+            ('SPRING', "Spring (2D - NetworkX)", "Force-directed 2D layout via NetworkX (fast: 76 ms on 240 nodes)"),
             ('IGRAPH_DRL_2D', "DrL (2D - igraph)", "Distributed Recursive Layout 2D, very fast for huge graphs (very fast)"),
             ('IGRAPH_DH', "Davidson-Harel (2D - igraph)", "Simulated annealing approach (medium)"),
             ('IGRAPH_GRAPHOPT', "Graphopt (2D - igraph)", "Energy-based optimization (fast)"),
-            ('CIRCLE_PACKING', "Circle Packing (2D - Koebe)", "Koebe theorem: tangent circles for planar graphs (medium)"),
+            ('CIRCLE_PACKING', "Circle Packing (2D - Koebe)", "Koebe theorem: tangent circles. Fast when planar; falls back to an iterative packing that took 97 s on 240 nodes when not"),
             
             # === 3D GEOMETRIC LAYOUTS ===
             ('RANDOM', "Random (3D)", "Distribute nodes randomly in 3D space (instant)"),
@@ -423,20 +422,24 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('BIPARTITE_3D', "Bipartite (3D)", "Two parallel planes for bipartite graphs (fast)"),
             
             # === 3D FORCE-DIRECTED LAYOUTS ===
-            ('YIFAN_HU', "Yifan Hu (3D)", "Scalable force-directed placement via bundled scigraphs-utils"),
+            # Dimensionality here is measured, not assumed: scripts/visibility/
+            # audit_layouts.sh runs each entry and reports the flatness of what
+            # comes back. Several of these labels used to disagree with it.
+            ('FORCEATLAS2', "ForceAtlas2 (3D)", "Gephi's algorithm (Jacomy et al. 2014), via networkx (medium)"),
+            ('YIFAN_HU', "Yifan Hu (2D + Z)", "Planar force-directed placement with a synthesized Z axis, via scigraphs-utils"),
             ('IGRAPH_DRL', "DrL (3D - igraph)", "Distributed Recursive Layout for huge graphs 100k+ (very fast)"),
             ('IGRAPH_FR', "Fruchterman-Reingold (3D - igraph)", "Classic force-directed in 3D (fast)"),
             ('IGRAPH_KK', "Kamada-Kawai (3D - igraph)", "Deterministic 3D layout, reproducible (medium)"),
-            ('IGRAPH_LGL', "LGL (3D - igraph)", "Large Graph Layout, optimized for massive graphs (fast)"),
-            ('SPRING_3D', "Spring (3D - NetworkX)", "Force-directed 3D layout (very slow)"),
+            ('IGRAPH_LGL', "LGL (2D - igraph)", "Large Graph Layout, optimized for massive graphs (fast)"),
+            ('SPRING_3D', "Spring (3D - NetworkX)", "Force-directed 3D layout via NetworkX (fast: 81 ms on 240 nodes)"),
 
             # === GRAPHVIZ LAYOUTS (scigraphs-utils) ===
             ('GRAPHVIZ_DOT', "Graphviz Dot (2D)", "Hierarchical layout via bundled scigraphs-utils"),
-            ('GRAPHVIZ_NEATO', "Graphviz Neato (2D/3D)", "Spring model layout via bundled scigraphs-utils"),
-            ('GRAPHVIZ_FDP', "Graphviz FDP (2D/3D)", "Force-directed placement via bundled scigraphs-utils"),
-            ('GRAPHVIZ_SFDP', "Graphviz SFDP (2D/3D)", "Scalable force-directed placement via bundled scigraphs-utils"),
+            ('GRAPHVIZ_NEATO', "Graphviz Neato (2D)", "Spring model layout via bundled scigraphs-utils"),
+            ('GRAPHVIZ_FDP', "Graphviz FDP (2D)", "Force-directed placement via bundled scigraphs-utils"),
+            ('GRAPHVIZ_SFDP', "Graphviz SFDP (2D)", "Scalable force-directed placement via bundled scigraphs-utils"),
             ('GRAPHVIZ_TWOPI', "Graphviz Twopi (2D)", "Radial layout via bundled scigraphs-utils"),
-            ('GRAPHVIZ_CIRCO', "Graphviz Circo (2D)", "Circular layout via bundled scigraphs-utils"),
+            ('GRAPHVIZ_CIRCO', "Graphviz Circo (2D)", "Circular layout via bundled scigraphs-utils (SLOW: 39 s on 240 nodes)"),
             ('GRAPHVIZ_OSAGE', "Graphviz Osage (2D)", "Cluster layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_PATCHWORK', "Graphviz Patchwork (2D)", "Patchwork layout via bundled scigraphs-utils"),
             
@@ -444,7 +447,12 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Hierarchical DAG layout, minimizes crossings (fast)"),
             ('CIRCULAR_HIERARCHY', "Circular Hierarchy (2D - Directed)", "Concentric circles from roots (fast)"),
         ],
-        default='YIFAN_HU',
+        # ForceAtlas2 rather than Yifan Hu, which was the default until it was
+        # found to abort Blender outright on a graph of a few hundred nodes
+        # (see the standalone repro in the tracker). A default that crashes is
+        # the worst possible default; this one is real 3D ForceAtlas2 and takes
+        # 111 ms where Yifan Hu took 992.
+        default='FORCEATLAS2',
     )
 
     iterations: IntProperty(

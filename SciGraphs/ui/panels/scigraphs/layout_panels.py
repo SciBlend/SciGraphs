@@ -18,7 +18,12 @@ class SCIGRAPHS_PT_layout(bpy.types.Panel):
         # Quick info and status
         if obj and "num_nodes" in obj:
             num_nodes = obj["num_nodes"]
-            num_edges = len(obj.get("edges_data", "").split(",")) // 2
+            # Both storage formats record num_edges, and for the legacy one it
+            # is exactly the number of edges_data pairs. Mesh-native objects
+            # have no edges_data at all, so deriving it there always showed 0.
+            num_edges = obj.get("num_edges")
+            if num_edges is None:
+                num_edges = len(obj.get("edges_data", "").split(",")) // 2
             
             box = layout.box()
             row = box.row(align=True)

@@ -171,6 +171,17 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             col.prop(props, "edge_orthogonal_style", text="Style")
             col.prop(props, "edge_segments", text="Segments")
         
+        # These route edges with something the mesh operator does not have.
+        # Hierarchical needs the cluster tree; the rest compute their control
+        # points in compute shaders. Baking any of them into the mesh would
+        # produce straight edges, so say so rather than silently do it.
+        if props.edge_style_type in ('HIERARCHICAL', 'FDEB', 'SBEB', 'ROUTED',
+                                    'MINGLE'):
+            layout.separator()
+            box = layout.box()
+            box.label(text="Available in GPU Preview only", icon='INFO')
+            box.label(text="Enable GPU Edge Styles to use this shape")
+
         # Bundling Settings
         if props.edge_style_type == 'BUNDLED':
             layout.separator()

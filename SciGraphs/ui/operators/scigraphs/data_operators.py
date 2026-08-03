@@ -433,8 +433,8 @@ class SCIGRAPHS_OT_SetupVisualization(bpy.types.Operator):
     @staticmethod
     def _get_preview():
         try:
-            from ... import gpu_preview
-            return gpu_preview
+            from ... import gpu_render
+            return gpu_render
         except Exception:  # noqa: BLE001 - preview module is optional
             return None
 

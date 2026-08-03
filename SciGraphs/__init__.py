@@ -16,7 +16,7 @@ bl_info = {
 try:
     import bpy
     from bpy.app.handlers import persistent
-except ModuleNotFoundError:  
+except ModuleNotFoundError:
     bpy = None
 
     def persistent(fn):
@@ -42,7 +42,7 @@ def register():
     preferences.register()
     properties.register()
     ui.register()
-    
+
     # Register load_post handler for auto-loading cached graphs
     if _on_file_loaded not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_on_file_loaded)

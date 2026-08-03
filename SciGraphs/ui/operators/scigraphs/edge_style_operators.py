@@ -12,6 +12,18 @@ from ....core import edge_styles
 from ....utils.logger import log
 
 
+# Edge-style preset identifiers, shared by the operator enum and its invoke().
+_PRESET_ITEMS = [
+    ('GEPHI_DEFAULT', "Gephi Default", ""),
+    ('CYTOSCAPE_BEZIER', "Cytoscape Bezier", ""),
+    ('SCHEMATIC', "Schematic", ""),
+    ('BUNDLED_DENSE', "Bundled (Dense)", ""),
+    ('FLOW_DIAGRAM', "Flow Diagram", ""),
+    ('MINIMAL', "Minimal", ""),
+]
+_PRESET_IDS = {item[0] for item in _PRESET_ITEMS}
+
+
 class SCIGRAPHS_OT_ApplyEdgeStyle(bpy.types.Operator):
     """Apply the selected edge style to the graph."""
     bl_idname = "scigraphs.apply_edge_style"
@@ -98,14 +110,7 @@ class SCIGRAPHS_OT_ApplyEdgeStylePreset(bpy.types.Operator):
     
     preset: EnumProperty(
         name="Preset",
-        items=[
-            ('GEPHI_DEFAULT', "Gephi Default", ""),
-            ('CYTOSCAPE_BEZIER', "Cytoscape Bezier", ""),
-            ('SCHEMATIC', "Schematic", ""),
-            ('BUNDLED_DENSE', "Bundled (Dense)", ""),
-            ('FLOW_DIAGRAM', "Flow Diagram", ""),
-            ('MINIMAL', "Minimal", ""),
-        ],
+        items=_PRESET_ITEMS,
         default='GEPHI_DEFAULT',
     )
     
@@ -116,8 +121,7 @@ class SCIGRAPHS_OT_ApplyEdgeStylePreset(bpy.types.Operator):
     
     def invoke(self, context, event):
         props = context.scene.scigraphs
-        valid_presets = {item.identifier for item in self.bl_rna.properties["preset"].enum_items}
-        self.preset = props.edge_style_preset if props.edge_style_preset in valid_presets else 'GEPHI_DEFAULT'
+        self.preset = props.edge_style_preset if props.edge_style_preset in _PRESET_IDS else 'GEPHI_DEFAULT'
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
