@@ -3,8 +3,7 @@
 One Blender process per spec, so a crash cannot affect the next one:
 
     env -u LD_LIBRARY_PATH blender -b --python scripts/repro/_run_one.py -- \
-        --spec examples/pipelines/06_suitesparse.json \
-        --base-dir examples \
+        --spec examples/pipelines/figures/fig1_flatfile_lesmiserables.json \
         --report /tmp/result.json
 
 The outcome goes to a JSON report rather than stdout, which Blender fills with

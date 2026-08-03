@@ -550,32 +550,11 @@ class PipelineExecutor:
             )
 
         if spec.declutter:
-            ranked = self._declutter_labels(ranked, spec)
+            ranked = overlay.declutter_labels(ranked, spec.font_size)
 
         if spec.max_count and spec.max_count > 0:
             ranked = ranked[: int(spec.max_count)]
         return ranked
-
-    def _declutter_labels(self, ranked, spec):
-        """Drop labels whose box would overlap one already accepted.
-
-        Greedy in rank order; the overlay code itself has no collision pass and
-        just overdraws. Boxes are estimated wide rather than measured with
-        Pillow, which would mean loading the font a second time.
-        """
-        accepted = []
-        boxes = []
-        half_h = max(spec.font_size, 1) * 0.62
-        for node in ranked:
-            half_w = 0.30 * spec.font_size * max(len(node.name), 1)
-            box = (node.x - half_w, node.y - half_h,
-                   node.x + half_w, node.y + half_h)
-            if any(box[0] < b[2] and b[0] < box[2] and
-                   box[1] < b[3] and b[1] < box[3] for b in boxes):
-                continue
-            boxes.append(box)
-            accepted.append(node)
-        return accepted
 
     def _execute_world(self, spec, manifest, result) -> None:
         """Background color, ambient strength and optional HDRI."""

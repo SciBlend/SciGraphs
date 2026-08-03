@@ -142,6 +142,15 @@ TEXT_OVERLAY_PROPERTIES = {
         default=True,
     ),
 
+    'text_declutter': BoolProperty(
+        name="Declutter",
+        description=(
+            "Drop labels that would overlap one already drawn. Labels are "
+            "otherwise overdrawn, which makes dense regions unreadable"
+        ),
+        default=True,
+    ),
+
     # --- Attribute Format Properties ---
 
     'text_format_type': EnumProperty(

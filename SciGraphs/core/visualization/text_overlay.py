@@ -384,6 +384,39 @@ def test_depth_occlusion(
     return projected_nodes
 
 
+def declutter_labels(
+    projected_nodes: List[ProjectedNode],
+    font_size: int,
+) -> List[ProjectedNode]:
+    """Drop labels whose box would overlap one already accepted.
+
+    The renderer has no collision pass and simply overdraws, so on a clustered
+    layout the densest region becomes stacked, unreadable text. Greedy in the
+    order it is given, so callers should sort by importance first: the first
+    label to claim a region of screen keeps it.
+
+    The box is estimated rather than measured. Asking Pillow for metrics here
+    would mean loading the font a second time and duplicating the per-node
+    logic in `calculate_text_size`; the estimate only has to be good enough to
+    keep neighbours apart, and it errs wide.
+    """
+    accepted: List[ProjectedNode] = []
+    boxes: List[Tuple[float, float, float, float]] = []
+    half_h = max(font_size, 1) * 0.62
+
+    for node in projected_nodes:
+        half_w = 0.30 * font_size * max(len(node.name), 1)
+        box = (node.x - half_w, node.y - half_h,
+               node.x + half_w, node.y + half_h)
+        if any(box[0] < b[2] and b[0] < box[2] and
+               box[1] < b[3] and b[1] < box[3] for b in boxes):
+            continue
+        boxes.append(box)
+        accepted.append(node)
+
+    return accepted
+
+
 def apply_distance_filter(
     projected_nodes: List[ProjectedNode],
     max_distance: float

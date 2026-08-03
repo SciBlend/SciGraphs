@@ -119,6 +119,13 @@ class SCIGRAPHS_OT_GenerateTextOverlay(bpy.types.Operator):
                 if node.name in attr_values:
                     node.name = repr(attr_values[node.name])
         
+        if getattr(props, "text_declutter", False):
+            before = len(projected)
+            projected = text_overlay.declutter_labels(
+                projected, settings.fixed_size
+            )
+            log(f"After declutter: {len(projected)} of {before} labels")
+
         image_path = text_overlay.generate_text_image(
             projected, resolution, settings, camera
         )

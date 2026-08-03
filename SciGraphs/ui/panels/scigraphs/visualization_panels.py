@@ -335,6 +335,7 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
         col = box.column(align=True)
         col.prop(props, "text_max_distance", text="Max Distance")
         col.prop(props, "text_depth_occlusion", text="Depth Occlusion")
+        col.prop(props, "text_declutter", text="Declutter")
         
         # Attribute Filter Section
         layout.separator()
