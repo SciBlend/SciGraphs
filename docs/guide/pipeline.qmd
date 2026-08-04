@@ -63,13 +63,38 @@ visualization, render, and export — from a short declarative JSON or YAML file
 
 ```json
 {
-  "meta": { "title": "complex_demo", "seed": 42 },
-  "dataset": { "source": "osmnx", "method": "PLACE", "query": "Burjassot, Valencia, Spain", "network_type": "drive" },
-  "analysis": { "metrics": ["degree", "betweenness"] },
-  "layout": { "algorithm": "YIFAN_HU", "scale": 8.0 },
-  "visual": { "node_color": "betweenness", "node_size": "degree", "colormap": "magma", "edge_style": "GEPHI_DEFAULT" }
+  "meta": {
+    "title": "burjassot_walk",
+    "seed": 42,
+    "output_dir": "//repro/burjassot_walk"
+  },
+  "dataset": {
+    "source": "osmnx",
+    "method": "PLACE",
+    "query": "Burjassot, Valencia, Spain",
+    "network_type": "walk"
+  },
+  "analysis": {
+    "metrics": ["degree", "betweenness"]
+  },
+  "visual": {
+    "node_color": "betweenness",
+    "colormap": "plasma",
+    "color_norm": "RANK",
+    "node_radius_rel": 0.004
+  },
+  "render": {
+    "engine": "CYCLES",
+    "samples": 64,
+    "output": "figure.png",
+    "view_transform": "Standard"
+  }
 }
 ```
+
+Note what is *not* there: no `layout` block. A street network arrives with real
+coordinates, and those coordinates are the data — a force-directed layout would
+throw the geography away. Layouts are for graphs with no positions of their own.
 
 Each run emits a canonical specification, a provenance manifest (with
 input/output hashes and timing), and an execution log, so the same seed and

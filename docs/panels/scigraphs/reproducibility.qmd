@@ -47,19 +47,58 @@ For the complete schema, every field, the `ops` escape hatch and the nested
 `scene_props` format that exposes all SciGraphs parameters, see
 **[Writing pipeline files](../../guide/pipeline-schema.qmd)**. The exhaustive,
 auto-generated option list lives at
-[`docs/reference/pipeline-options.md`](../../reference/pipeline-options.md).
+[pipeline options reference](../../reference/pipeline-options.qmd).
 
-A pipeline is a declarative description of the five workflow stages:
+A pipeline is a declarative description of the workflow, one block per stage.
+Only `meta` is required; the rest are optional and run in the order below.
 
 ```json
 {
-  "meta": { "title": "complex_demo", "seed": 42 },
-  "dataset": { "source": "osmnx", "method": "PLACE", "query": "Burjassot, Valencia, Spain", "network_type": "drive" },
-  "analysis": { "metrics": ["degree", "betweenness"] },
-  "layout": { "algorithm": "YIFAN_HU", "scale": 8.0 },
-  "visual": { "node_color": "betweenness", "node_size": "degree", "colormap": "magma", "edge_style": "GEPHI_DEFAULT" }
+  "meta": {
+    "title": "burjassot_walk",
+    "seed": 42,
+    "output_dir": "//repro/burjassot_walk"
+  },
+  "dataset": {
+    "source": "osmnx",
+    "method": "PLACE",
+    "query": "Burjassot, Valencia, Spain",
+    "network_type": "walk"
+  },
+  "analysis": {
+    "metrics": ["degree", "betweenness"]
+  },
+  "visual": {
+    "node_color": "betweenness",
+    "colormap": "plasma",
+    "color_norm": "RANK",
+    "node_radius_rel": 0.004,
+    "edge_radius_rel": 0.0014
+  },
+  "lighting": {
+    "sun_energy": 3.0,
+    "sun_angle": 180.0
+  },
+  "render": {
+    "engine": "CYCLES",
+    "samples": 64,
+    "output": "figure.png",
+    "view_transform": "Standard"
+  }
 }
 ```
+
+Two things in that example are deliberate and worth copying.
+
+There is **no `layout` block**. A street network arrives with real coordinates,
+and those coordinates are the data — running a force-directed layout over them
+would throw the geography away. Layouts are for graphs that have no positions of
+their own.
+
+`color_norm` is set to `RANK`. Betweenness on a road network concentrates on the
+few streets carrying through-traffic, so the default linear ramp would leave
+almost every node in the darkest colour of the map. Ranking spreads the ramp
+evenly whatever the distribution.
 
 ## Run artifacts
 
@@ -70,9 +109,7 @@ Each run emits:
 - an **execution log**.
 
 Together with the `meta.seed`, these guarantee that the same inputs reproduce
-the same result. Ready-to-run examples live in the repository under
-`examples/pipelines/` (see its `README.md` for a per-file summary covering
-nearly every feature).
+the same result.
 
 ## Typical workflow
 

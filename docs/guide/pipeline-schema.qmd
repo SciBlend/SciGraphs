@@ -9,11 +9,12 @@ fixed seed so results are reproducible. This page is the reference for authoring
 your own pipelines.
 :::
 
+{{< include ../reference/_skill-download.qmd >}}
+
 Run a pipeline from the **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)**
-(Validate, then Run) or with the `scigraphs.run_pipeline` operator. Ready-to-run
-examples live in the repository under `examples/pipelines/`, and an
+(Validate, then Run) or with the `scigraphs.run_pipeline` operator. An
 auto-generated, exhaustive option list is at
-[`docs/reference/pipeline-options.md`](../reference/pipeline-options.md).
+[pipeline options reference](../reference/pipeline-options.qmd).
 
 ## Top-level structure
 
@@ -23,7 +24,10 @@ auto-generated, exhaustive option list is at
   "dataset":  { "source": "osmnx", "method": "PLACE", "query": "Granada, Spain" },
   "analysis": { "metrics": ["degree", "betweenness"] },
   "layout":   { "algorithm": "YIFAN_HU", "scale": 5.0 },
-  "visual":   { "node_color": "betweenness", "node_size": "degree" },
+  "visual":   { "node_color": "betweenness", "color_norm": "RANK" },
+  "labels":   { "rank_by": "betweenness", "max_count": 20 },
+  "world":    { "color": [0.03, 0.03, 0.04], "strength": 1.0 },
+  "lighting": { "sun_energy": 3.0, "sun_angle": 180.0 },
   "render":   { "engine": "CYCLES", "output": "figure.png" },
   "exports":  { "graph": "network.gexf" },
   "ops":      [ { "id": "scigraphs.setup_lighting" } ]
@@ -31,9 +35,13 @@ auto-generated, exhaustive option list is at
 ```
 
 Only `meta` is required. Every other stage is optional and runs in the order
-above. The `ops` stage runs after `visual` and before `render`.
+above. The `ops` stage runs after `lighting` and before `render`; `labels` runs
+inside the render stage, after the camera is framed and before the image is
+produced, because it needs the final camera matrix.
 
-Paths beginning with `//` are resolved relative to the open `.blend` file.
+Paths beginning with `//` resolve against the folder holding the specification,
+so a specification and the data it references travel together and the whole
+folder can be moved without editing anything.
 
 ## `meta`
 
@@ -42,6 +50,7 @@ Paths beginning with `//` are resolved relative to the open `.blend` file.
 | `title` | string | (required) | Pipeline identifier |
 | `seed` | integer | `42` | Global deterministic seed |
 | `output_dir` | string | `//repro/default` | Where artifacts are written |
+| `clear_scene` | boolean | `true` | Delete every existing object first, so the run does not depend on what the startup file contained |
 | `description` | string | `""` | Human-readable description |
 | `version` | string | `"1.0"` | Pipeline version |
 
@@ -65,7 +74,7 @@ Choose one `source`. Each source uses a subset of the fields.
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `metrics` | array of string | `[]` | `degree`, `betweenness`, `closeness`, `eigenvector`, `clustering` |
-| `clustering.algorithm` | string | `rn` | `cpm`, `infomap`, `rb`, `rn`, `rnsc`, `scluster`, `uvcluster` (`louvain`/`leiden` are accepted and mapped to `rb`) |
+| `clustering.algorithm` | string | `infomap` | `cpm`, `infomap`, `rb`, `rnsc`, `scluster`, `uvcluster` (`louvain`/`leiden` are accepted and mapped to `rb`). `rn` was removed: it does not terminate even on a 77-node graph |
 | `clustering.resolution` | number | `1.0` | Higher = more communities |
 | `normalize` | boolean | `true` | Normalize centrality values |
 
@@ -102,20 +111,91 @@ Algorithm-specific parameters beyond these (the dozens of `fa2_*`, `sfdp_*`,
 | `node_max_size` | number | `0.1` | Upper bound for node sizing |
 | `edge_max_width` | number | `0.02` | Upper bound for edge width |
 | `colormap` | string | `viridis` | Any SciGraphs colormap |
-| `edge_style` | string | - | `GEPHI_DEFAULT`, `CYTOSCAPE_BEZIER`, `YFILES_ORGANIC`, `GRAPHVIZ_SPLINE`, `TULIP_CURVED`, `CURVED_UNIFORM` |
-| `rendering_preset` | string | - | `SCIENTIFIC`, `PRESENTATION`, `PRINT`, `CUSTOM` |
+| `edge_style` | string | - | `GEPHI_DEFAULT`, `CYTOSCAPE_BEZIER`, `SCHEMATIC`, `BUNDLED_DENSE`, `FLOW_DIAGRAM`, `MINIMAL` |
+| `rendering_preset` | string | - | `BASIC`, `GLASS`, `METALLIC`, `EMISSION`, `SCIENTIFIC` |
+
+### Color mapping
+
+`color_norm` is the field most worth knowing. A linear ramp over a heavy-tailed
+measure — betweenness, or degree on a scale-free graph — puts almost every node
+in the darkest bin, so the color channel carries little information. `RANK`
+equalizes the histogram and is the robust default for centrality; `LOG` keeps
+the shape of a smoothly varying quantity; `QUANTILE` ranks unique values rather
+than samples, which helps when many nodes tie. `color_vmin`/`color_vmax` pin an
+explicit domain so two figures share a scale, and contradict `RANK`, which
+derives its own.
+
+### Glyph geometry and size
+
+`node_radius_rel` and `edge_radius_rel` express radius as a fraction of the
+graph's own measured extent. Prefer them to the absolute forms, which are wrong
+at every scale but the one they were chosen for — a layout scaled to 50 units
+drawn with a 0.02 radius is subpixel at any framing. When both are given, the
+relative form wins.
+
+`node_glyph`, `node_resolution` and `edge_profile` choose the primitive. Below
+about twelve segments the silhouette is visibly faceted in print.
 
 ## `render`
 
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `engine` | string | `CYCLES` | `CYCLES`, `BLENDER_EEVEE_NEXT`, `BLENDER_WORKBENCH` |
+| `engine` | string | `CYCLES` | `CYCLES`, `BLENDER_EEVEE`, `BLENDER_WORKBENCH`. EEVEE Next reclaimed the plain identifier in Blender 5.x; `BLENDER_EEVEE_NEXT` is rejected |
 | `resolution` | `[w, h]` | `[1920, 1080]` | Output resolution |
 | `samples` | integer | `128` | Render samples |
 | `camera` | string | - | Camera object name (active camera if omitted) |
 | `output` | string | `render.png` | Output filename (under `output_dir`) |
 | `transparent` | boolean | `false` | Transparent film |
 | `denoise` | boolean | `true` | Cycles denoising |
+
+### Camera, color management and engine
+
+`frame_camera` places and aims a camera so the graph fills the frame; a named
+`camera` takes precedence. `camera_ortho` removes the near/far size falloff, so
+a node radius that encodes a value stays comparable across the frame.
+
+`view_transform` matters more than it looks. Blender's default is AgX, which
+tone-maps the image, so the rendered color of a node no longer equals the
+colormap entry for its value. Set `Standard` for anything color-quantitative.
+
+Engine-specific fields are ignored by the other engine. Two are easy to get
+wrong: `filter_width` defaults to 1.5 px and visibly softens thin edges, and
+EEVEE's `ambient_occlusion` does nothing without `raytracing`, since fast GI is
+a mode of the ray tracing pipeline — the executor enables the parent for you.
+
+## `labels`
+
+Node labels composited over the render, ranked and decluttered. Runs inside the
+render stage, after the camera is framed, because the projection needs the final
+matrix.
+
+Prefer `max_count` to `min_value`: the centrality attributes are normalized to
+[0,1], so a threshold that works on one graph is meaningless on the next, while
+a count is bounded whatever the size or distribution. `occlusion` hides labels
+whose node is behind geometry; `declutter` drops labels that would overlap a
+higher-ranked one, without which the renderer simply overdraws and dense regions
+become unreadable.
+
+## `world`
+
+Background `color`, ambient `strength`, and an optional `hdri`. Untouched by
+default, in which case the render inherits whatever world the startup file
+carried — exactly the kind of undeclared dependency a specification exists to
+remove.
+
+## `lighting`
+
+A single sun: `sun_energy`, `sun_angle`, `sun_rotation` and `replace`. One wide,
+soft key rather than a rig — the graph is convex-ish and self-shadowing costs
+more legibility than the modelling it buys. A large `sun_angle` gives
+near-shadowless light that still separates glyphs by their own shading gradient.
+
+::: {.callout-note}
+Every field of every section, with its type, default and enum values, is in the
+[pipeline options reference](../reference/pipeline-options.qmd), generated from
+the add-on itself. This page is about how to write a specification; that one is
+the exhaustive list.
+:::
 
 ## `exports`
 
@@ -168,7 +248,7 @@ backward compatibility.
 For the complete, always-current list of every property in every group, use the
 auto-generated reference: open the Reproducibility panel and click **Export
 Options Reference**, or read
-[`docs/reference/pipeline-options.md`](../reference/pipeline-options.md).
+[pipeline options reference](../reference/pipeline-options.qmd).
 
 ## Run artifacts
 
@@ -182,9 +262,7 @@ Together with `meta.seed`, these make a run reproducible.
 
 ## Examples
 
-The `examples/pipelines/` directory contains complete pipelines covering nearly
-every feature: file/OSMnx/City2Graph/SuiteSparse/SQL sources, all analysis
-metrics, many layouts, topology operations, both render engines, and an
-`ops`-only pipeline that drives multiple property groups. See its `README.md`
-for a per-file summary, and the
-[reproducible-pipeline walkthrough](../examples/05-reproducible-pipeline.qmd).
+Six complete, ready-to-run specifications — with their renders, and a note on
+the field each one exists to demonstrate — are in the
+[reproducible-pipeline example](../examples/05-reproducible-pipeline.qmd). You
+can drag any of them straight onto the Blender viewport from that page.

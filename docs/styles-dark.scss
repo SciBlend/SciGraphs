@@ -80,3 +80,42 @@ thead th {
   margin-left: 0.4rem;
   vertical-align: middle;
 }
+
+/* --- Pipeline gallery ------------------------------------------------- */
+
+.gallery-tagline {
+  font-size: 1.05rem;
+  opacity: 0.85;
+  margin: -0.4rem 0 1rem 0;
+}
+
+.gallery-figure {
+  border-radius: 6px;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.gallery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+
+
+
+
+.download-spec {
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  font-size: 0.92rem;
+  opacity: 0.85;
+}
+
+.download-spec:hover { text-decoration: underline; }
+
+

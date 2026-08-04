@@ -1,0 +1,816 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sciblend.github.io/SciGraphs/pipeline.schema.json",
+  "title": "SciGraphs pipeline specification",
+  "description": "A declarative description of a graph visualization workflow: ingest, analyse, lay out, style, light, render and export.",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Pipeline identifier"
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Global random seed",
+          "default": 42
+        },
+        "output_dir": {
+          "type": "string",
+          "description": "Output directory (// = blend file relative)",
+          "default": "//repro/default"
+        },
+        "clear_scene": {
+          "type": "boolean",
+          "description": "Delete existing objects before the first stage",
+          "default": true
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description",
+          "default": ""
+        },
+        "version": {
+          "type": "string",
+          "description": "Pipeline version",
+          "default": "1.0"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "osmnx",
+            "gexf",
+            "graphml",
+            "csv",
+            "suitesparse",
+            "sql",
+            "city2graph"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "PLACE",
+            "BBOX",
+            "POINT",
+            "ADDRESS",
+            "POLYGON"
+          ]
+        },
+        "query": {
+          "type": "string"
+        },
+        "network_type": {
+          "type": "string",
+          "enum": [
+            "drive",
+            "walk",
+            "bike",
+            "all",
+            "all_public",
+            "all_private",
+            "drive_service"
+          ],
+          "default": "drive"
+        },
+        "simplify": {
+          "type": "boolean",
+          "default": true
+        },
+        "cache": {
+          "type": "boolean",
+          "default": true
+        },
+        "retain_all": {
+          "type": "boolean",
+          "default": false
+        },
+        "filepath": {
+          "type": "string"
+        },
+        "auto_layout": {
+          "type": "boolean",
+          "default": true
+        },
+        "connection_string": {
+          "type": "string"
+        },
+        "nodes_query": {
+          "type": "string"
+        },
+        "edges_query": {
+          "type": "string"
+        },
+        "matrix_name": {
+          "type": "string"
+        },
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source"
+      ]
+    },
+    "analysis": {
+      "type": "object",
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "clustering": {
+          "type": "object",
+          "properties": {
+            "algorithm": {
+              "type": "string",
+              "enum": [
+                "cpm",
+                "infomap",
+                "rb",
+                "rnsc",
+                "scluster",
+                "uvcluster",
+                "louvain",
+                "leiden"
+              ],
+              "description": "rn is omitted: it does not terminate even on a 77-node graph",
+              "default": "infomap"
+            },
+            "resolution": {
+              "type": "number",
+              "default": 1.0
+            }
+          },
+          "additionalProperties": false
+        },
+        "normalize": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "GRID",
+            "SPRING",
+            "SPRING_3D",
+            "FORCEATLAS2",
+            "IGRAPH_DRL_2D",
+            "IGRAPH_DH",
+            "IGRAPH_GRAPHOPT",
+            "CIRCLE_PACKING",
+            "YIFAN_HU",
+            "GRAPHVIZ_DOT",
+            "GRAPHVIZ_NEATO",
+            "GRAPHVIZ_FDP",
+            "GRAPHVIZ_SFDP",
+            "GRAPHVIZ_TWOPI",
+            "GRAPHVIZ_CIRCO",
+            "GRAPHVIZ_OSAGE",
+            "GRAPHVIZ_PATCHWORK",
+            "IGRAPH_DRL",
+            "IGRAPH_FR",
+            "IGRAPH_KK",
+            "IGRAPH_LGL",
+            "SPECTRAL_3D",
+            "RANDOM",
+            "SPHERE",
+            "SPIRAL_3D",
+            "HELIX",
+            "CUBE",
+            "HIERARCHICAL_3D",
+            "MDS_3D",
+            "BIPARTITE_3D",
+            "SUGIYAMA",
+            "CIRCULAR_HIERARCHY"
+          ],
+          "default": "YIFAN_HU"
+        },
+        "scale": {
+          "type": "number",
+          "default": 1.0
+        },
+        "iterations": {
+          "type": "integer",
+          "default": 50
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Override meta.seed for layout only"
+        },
+        "dimension": {
+          "type": "integer",
+          "enum": [
+            2,
+            3
+          ],
+          "default": 3
+        },
+        "k": {
+          "type": "number",
+          "description": "Optimal distance between nodes"
+        },
+        "gravity": {
+          "type": "number",
+          "default": 1.0
+        },
+        "scaling_ratio": {
+          "type": "number",
+          "default": 2.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "visual": {
+      "type": "object",
+      "properties": {
+        "setup_geometry_nodes": {
+          "type": "boolean",
+          "default": true
+        },
+        "node_color": {
+          "type": "string",
+          "description": "Attribute name for node coloring"
+        },
+        "edge_color": {
+          "type": "string",
+          "description": "Attribute name for edge coloring"
+        },
+        "node_size": {
+          "type": "string",
+          "description": "Attribute name for node sizing"
+        },
+        "edge_width": {
+          "type": "string",
+          "description": "Attribute name for edge width"
+        },
+        "node_min_size": {
+          "type": "number",
+          "default": 0.01
+        },
+        "node_max_size": {
+          "type": "number",
+          "default": 0.1
+        },
+        "edge_min_width": {
+          "type": "number",
+          "default": 0.002
+        },
+        "edge_max_width": {
+          "type": "number",
+          "default": 0.02
+        },
+        "colormap": {
+          "type": "string",
+          "default": "viridis"
+        },
+        "rendering_preset": {
+          "type": "string",
+          "enum": [
+            "BASIC",
+            "GLASS",
+            "METALLIC",
+            "EMISSION",
+            "SCIENTIFIC"
+          ]
+        },
+        "edge_style": {
+          "type": "string",
+          "enum": [
+            "GEPHI_DEFAULT",
+            "CYTOSCAPE_BEZIER",
+            "SCHEMATIC",
+            "BUNDLED_DENSE",
+            "FLOW_DIAGRAM",
+            "MINIMAL"
+          ]
+        },
+        "color_norm": {
+          "type": "string",
+          "enum": [
+            "LINEAR",
+            "LOG",
+            "RANK",
+            "QUANTILE"
+          ],
+          "description": "Value-to-color transform; RANK equalizes the histogram for skewed measures",
+          "default": "LINEAR"
+        },
+        "color_gamma": {
+          "type": "number",
+          "description": "Applied after normalization as norm**(1/gamma); >1 brightens the low end",
+          "default": 1.0
+        },
+        "color_clip_percentile": {
+          "type": "array",
+          "description": "Percentile clip before normalizing, e.g. [2, 98]",
+          "default": [
+            0.0,
+            100.0
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "color_vmin": {
+          "type": "number",
+          "description": "Explicit lower bound; set with color_vmax to share a scale across figures"
+        },
+        "color_vmax": {
+          "type": "number",
+          "description": "Explicit upper bound"
+        },
+        "colormap_reverse": {
+          "type": "boolean",
+          "default": false
+        },
+        "color_opacity": {
+          "type": "number",
+          "default": 1.0
+        },
+        "edge_base_color": {
+          "type": "array",
+          "description": "Flat RGBA for edges when nodes carry the colormap",
+          "items": {
+            "type": "number"
+          }
+        },
+        "node_glyph": {
+          "type": "string",
+          "enum": [
+            "SPHERE",
+            "ICOSPHERE",
+            "CUBE",
+            "CONE",
+            "CYLINDER"
+          ],
+          "description": "Node primitive; ICOSPHERE is more uniform than SPHERE at low resolution"
+        },
+        "node_resolution": {
+          "type": "integer",
+          "description": "Segments of the node primitive; below ~12 the silhouette is visibly faceted"
+        },
+        "node_shade_smooth": {
+          "type": "boolean",
+          "description": "Smooth normals; turn off for CUBE/CONE/CYLINDER, whose hard edges get averaged away",
+          "default": true
+        },
+        "edge_profile": {
+          "type": "string",
+          "enum": [
+            "ROUND",
+            "RIBBON"
+          ],
+          "description": "Cross-section swept along each edge",
+          "default": "ROUND"
+        },
+        "edge_resolution": {
+          "type": "integer",
+          "description": "Sides of the edge cross-section, not segments along the curve"
+        },
+        "node_radius": {
+          "type": "number",
+          "description": "Absolute node radius in world units"
+        },
+        "node_radius_rel": {
+          "type": "number",
+          "description": "Node radius as a fraction of the graph radius; overrides node_radius"
+        },
+        "edge_radius": {
+          "type": "number",
+          "description": "Absolute edge radius in world units"
+        },
+        "edge_radius_rel": {
+          "type": "number",
+          "description": "Edge radius as a fraction of the graph radius; overrides edge_radius"
+        },
+        "node_size_range": {
+          "type": "array",
+          "description": "Multiplier range when node_size drives radius from an attribute",
+          "default": [
+            0.5,
+            3.0
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "edge_width_range": {
+          "type": "array",
+          "default": [
+            0.5,
+            2.5
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "material_roughness": {
+          "type": "number",
+          "description": "Principled BSDF roughness; the Blender default of 0.5 reads plasticky"
+        },
+        "material_metallic": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "NODE_ID",
+            "ATTRIBUTE"
+          ],
+          "description": "Label text: the node identifier, or the formatted value of `attribute`",
+          "default": "NODE_ID"
+        },
+        "attribute": {
+          "type": "string",
+          "description": "Attribute to print when source is ATTRIBUTE"
+        },
+        "max_count": {
+          "type": "integer",
+          "description": "Keep only the highest-ranked N labels",
+          "default": 40
+        },
+        "rank_by": {
+          "type": "string",
+          "description": "Attribute deciding which labels survive max_count",
+          "default": "degree"
+        },
+        "min_value": {
+          "type": "number",
+          "description": "Drop labels whose rank_by value is below this; centrality attributes are normalized to [0,1]"
+        },
+        "font_size": {
+          "type": "integer",
+          "default": 22
+        },
+        "size_mode": {
+          "type": "string",
+          "enum": [
+            "FIXED",
+            "PROPORTIONAL",
+            "ADAPTIVE"
+          ],
+          "default": "ADAPTIVE"
+        },
+        "color": {
+          "type": "array",
+          "description": "Text RGB",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "occlusion": {
+          "type": "boolean",
+          "description": "Hide labels whose node is behind geometry",
+          "default": true
+        },
+        "declutter": {
+          "type": "boolean",
+          "description": "Drop labels whose box would overlap a higher-ranked one",
+          "default": true
+        },
+        "halo": {
+          "type": "boolean",
+          "description": "Draw a backing box behind the text",
+          "default": true
+        },
+        "halo_color": {
+          "type": "array",
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "halo_alpha": {
+          "type": "number",
+          "default": 0.55
+        },
+        "float_decimals": {
+          "type": "integer",
+          "default": 2
+        },
+        "max_distance": {
+          "type": "number",
+          "description": "Drop labels further than this from the camera; 0 disables",
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "world": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": "array",
+          "description": "Background RGB",
+          "items": {
+            "type": "number"
+          }
+        },
+        "strength": {
+          "type": "number",
+          "description": "Ambient light level"
+        },
+        "hdri": {
+          "type": "string",
+          "description": "Path to an equirectangular image for image-based lighting"
+        },
+        "hdri_rotation": {
+          "type": "number",
+          "description": "Degrees about Z",
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "lighting": {
+      "type": "object",
+      "properties": {
+        "sun_energy": {
+          "type": "number",
+          "default": 3.0
+        },
+        "sun_angle": {
+          "type": "number",
+          "description": "Angular diameter in degrees; large values give soft, near-shadowless light",
+          "default": 180.0
+        },
+        "sun_rotation": {
+          "type": "array",
+          "description": "Euler XYZ in radians",
+          "default": [
+            0.9,
+            0.0,
+            0.7
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Remove existing lights first; when false the sun is added only if the scene has none",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "render": {
+      "type": "object",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": [
+            "CYCLES",
+            "BLENDER_EEVEE",
+            "BLENDER_WORKBENCH"
+          ],
+          "default": "CYCLES"
+        },
+        "resolution": {
+          "type": "array",
+          "default": [
+            1920,
+            1080
+          ],
+          "items": {
+            "type": "integer"
+          }
+        },
+        "samples": {
+          "type": "integer",
+          "default": 128
+        },
+        "camera": {
+          "type": "string",
+          "description": "Camera object name"
+        },
+        "output": {
+          "type": "string",
+          "description": "Output filename",
+          "default": "render.png"
+        },
+        "transparent": {
+          "type": "boolean",
+          "default": false
+        },
+        "denoise": {
+          "type": "boolean",
+          "default": true
+        },
+        "frame_camera": {
+          "type": "boolean",
+          "description": "Place and aim a camera so the graph fills the frame; a named `camera` takes precedence",
+          "default": true
+        },
+        "camera_margin": {
+          "type": "number",
+          "description": "Fraction of the graph radius left as empty border",
+          "default": 1.15
+        },
+        "camera_direction": {
+          "type": "array",
+          "description": "Direction from graph center to camera; normalized on use",
+          "default": [
+            0.48,
+            -0.72,
+            0.5
+          ],
+          "items": {
+            "type": "number"
+          }
+        },
+        "camera_lens": {
+          "type": "number",
+          "description": "Focal length in mm -- what Blender calls the camera lens. The framing distance compensates automatically"
+        },
+        "camera_ortho": {
+          "type": "boolean",
+          "description": "Orthographic projection; node radius stays constant with depth",
+          "default": false
+        },
+        "dof_fstop": {
+          "type": "number",
+          "description": "Depth of field: the aperture f-number, focused on the framing distance. There is no separate depth_of_field toggle -- setting this enables it"
+        },
+        "view_transform": {
+          "type": "string",
+          "description": "Standard, AgX, Filmic, Khronos PBR Neutral or Raw; use Standard for color-encoded figures"
+        },
+        "look": {
+          "type": "string"
+        },
+        "exposure": {
+          "type": "number",
+          "description": "Stops"
+        },
+        "gamma": {
+          "type": "number"
+        },
+        "filter_width": {
+          "type": "number",
+          "description": "Reconstruction filter width in px; the 1.5 default softens thin edges, 1.0 keeps them crisp"
+        },
+        "resolution_percentage": {
+          "type": "integer",
+          "description": "Render scale in percent; inherited from the startup file when unset"
+        },
+        "file_format": {
+          "type": "string",
+          "enum": [
+            "PNG",
+            "OPEN_EXR",
+            "TIFF",
+            "JPEG"
+          ]
+        },
+        "color_depth": {
+          "type": "string",
+          "enum": [
+            "8",
+            "16",
+            "32"
+          ],
+          "description": "Bits per channel; 16 removes banding in smooth colormap gradients"
+        },
+        "dpi": {
+          "type": "number",
+          "description": "Pixel density metadata written into the image"
+        },
+        "adaptive_threshold": {
+          "type": "number",
+          "description": "Cycles noise target"
+        },
+        "max_bounces": {
+          "type": "integer",
+          "description": "Cycles light bounces; 3-4 is usually indistinguishable for mostly-diffuse figures"
+        },
+        "denoiser": {
+          "type": "string",
+          "enum": [
+            "AUTO",
+            "OPENIMAGEDENOISE",
+            "OPTIX"
+          ],
+          "description": "Cycles denoiser; `denoise: true` alone picks a machine-dependent default"
+        },
+        "raytracing": {
+          "type": "boolean",
+          "description": "EEVEE Next screen-space GI; without it there is no indirect light"
+        },
+        "ambient_occlusion": {
+          "type": "boolean",
+          "description": "EEVEE Next fast GI in ambient-occlusion mode"
+        },
+        "ao_distance": {
+          "type": "number",
+          "description": "EEVEE Next fast GI distance; 0 means infinite"
+        },
+        "clamp_indirect": {
+          "type": "number",
+          "description": "EEVEE Next firefly control"
+        }
+      },
+      "additionalProperties": false
+    },
+    "exports": {
+      "type": "object",
+      "properties": {
+        "graph": {
+          "type": "string",
+          "description": "Export graph as GEXF/GraphML"
+        },
+        "positions": {
+          "type": "string",
+          "description": "Export node positions CSV"
+        },
+        "statistics": {
+          "type": "string",
+          "description": "Export statistics report"
+        },
+        "blend": {
+          "type": "string",
+          "description": "Save .blend file copy"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ops": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Operator bl_idname (e.g., scigraphs.apply_layout) or a registry shortcut"
+          },
+          "props": {
+            "type": "object",
+            "description": "Operator keyword properties passed directly to the operator call"
+          },
+          "scene_props": {
+            "type": "object",
+            "description": "Scene properties to set before calling. Either a flat mapping applied to scene.scigraphs, or a mapping keyed by property group: scigraphs, city2graph, coloring, viz, repro, splitter. Example: {\"city2graph\": {\"prox_knn_k\": 8}, \"coloring\": {\"colormap\": \"magma\"}}"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      }
+    }
+  },
+  "required": [
+    "meta"
+  ],
+  "additionalProperties": false
+}

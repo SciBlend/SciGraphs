@@ -1,6 +1,10 @@
 project:
   type: website
   output-dir: _site
+  resources:
+    # Served so an editor's $schema key and a model's constrained decoding can
+    # both point at a URL rather than a copy.
+    - reference/pipeline.schema.json
 
 website:
   title: "SciGraphs"
@@ -110,6 +114,9 @@ website:
           - examples/03-urban-terrain.qmd
           - examples/04-sparse-matrix.qmd
           - examples/05-reproducible-pipeline.qmd
+      - section: "Reference"
+        contents:
+          - reference/pipeline-options.qmd
   page-footer:
     left: "SciGraphs is released under the GPL-3.0-or-later license."
     right:

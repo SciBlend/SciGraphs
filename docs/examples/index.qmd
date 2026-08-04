@@ -15,7 +15,7 @@ the [Panel Reference](../panels/overview.qmd).
 | 2 | [A geospatial flow map on a globe](02-geospatial-globe.qmd) | Geocode nodes, project onto a 3D globe, and draw geodesic arcs (à la the refugee-flows figure). |
 | 3 | [An urban network on terrain](03-urban-terrain.qmd) | Download a street network with OSMnx, drape it onto DEM terrain, and add an amenity proximity graph (the Granada figure). |
 | 4 | [A sparse matrix from SuiteSparse](04-sparse-matrix.qmd) | Import a benchmark matrix, lay it out, and colour by eigenvector centrality. |
-| 5 | [A reproducible pipeline](05-reproducible-pipeline.qmd) | Capture a whole workflow in a declarative file and replay it with provenance. |
+| 5 | [A reproducible pipeline](05-reproducible-pipeline.qmd) | Capture a whole workflow in a declarative file, replay it with provenance, and drag a ready-to-run specification straight into Blender. |
 
 ::: {.callout-tip}
 If you are new to SciGraphs, start with example 1, then read

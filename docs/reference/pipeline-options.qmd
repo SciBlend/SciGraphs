@@ -1,4 +1,10 @@
-# SciGraphs pipeline options reference
+---
+title: "Pipeline options reference"
+---
+
+::: {.lead}
+Every option a pipeline specification can set. Generated from the add-on itself -- the schema for the declarative stages, the live RNA for the scene property groups -- so it cannot drift from the code the way a hand-maintained list does.
+:::
 
 Auto-generated reference of every option exposed to reproducible pipelines. Regenerate it from the Reproducibility panel (Export Options Reference) or via `SciGraphs.core.repro.reference.generate_reference_markdown()`.
 
@@ -56,7 +62,7 @@ These typed sections cover the common workflow. Every field below is applied by 
 
 | Field | Type | Default | Enum | Description |
 | --- | --- | --- | --- | --- |
-| `algorithm` | string | YIFAN_HU | GRID, SPRING, SPRING_3D, FORCEATLAS2, IGRAPH_DRL_2D, IGRAPH_DH, IGRAPH_GRAPHOPT, CIRCLE_PACKING, FRUCHTERMAN_REINGOLD, KAMADA_KAWAI, YIFAN_HU, GRAPHVIZ_DOT, GRAPHVIZ_NEATO, GRAPHVIZ_FDP, GRAPHVIZ_SFDP, GRAPHVIZ_TWOPI, GRAPHVIZ_CIRCO, GRAPHVIZ_OSAGE, GRAPHVIZ_PATCHWORK, IGRAPH_DRL, IGRAPH_FR, IGRAPH_KK, IGRAPH_LGL, SPECTRAL, SPECTRAL_3D, CIRCULAR, SHELL, RANDOM, SPHERE, SPIRAL_3D, HELIX, CUBE, HIERARCHICAL_3D, MDS_3D, BIPARTITE_3D, FORCE_ATLAS2, SUGIYAMA, CIRCULAR_HIERARCHY |  |
+| `algorithm` | string | YIFAN_HU | GRID, SPRING, SPRING_3D, FORCEATLAS2, IGRAPH_DRL_2D, IGRAPH_DH, IGRAPH_GRAPHOPT, CIRCLE_PACKING, YIFAN_HU, GRAPHVIZ_DOT, GRAPHVIZ_NEATO, GRAPHVIZ_FDP, GRAPHVIZ_SFDP, GRAPHVIZ_TWOPI, GRAPHVIZ_CIRCO, GRAPHVIZ_OSAGE, GRAPHVIZ_PATCHWORK, IGRAPH_DRL, IGRAPH_FR, IGRAPH_KK, IGRAPH_LGL, SPECTRAL_3D, RANDOM, SPHERE, SPIRAL_3D, HELIX, CUBE, HIERARCHICAL_3D, MDS_3D, BIPARTITE_3D, SUGIYAMA, CIRCULAR_HIERARCHY |  |
 | `scale` | number | 1.0 |  |  |
 | `iterations` | integer | 50 |  |  |
 | `seed` | integer |  |  | Override meta.seed for layout only |
@@ -156,9 +162,9 @@ These typed sections cover the common workflow. Every field below is applied by 
 | `frame_camera` | boolean | True |  | Place and aim a camera so the graph fills the frame; a named `camera` takes precedence |
 | `camera_margin` | number | 1.15 |  | Fraction of the graph radius left as empty border |
 | `camera_direction` | array | [0.48, -0.72, 0.5] |  | Direction from graph center to camera; normalized on use |
-| `camera_lens` | number |  |  | Focal length in mm; the framing distance compensates automatically |
+| `camera_lens` | number |  |  | Focal length in mm -- what Blender calls the camera lens. The framing distance compensates automatically |
 | `camera_ortho` | boolean | False |  | Orthographic projection; node radius stays constant with depth |
-| `dof_fstop` | number |  |  | Depth of field at this f-number, focused on the framing distance |
+| `dof_fstop` | number |  |  | Depth of field: the aperture f-number, focused on the framing distance. There is no separate depth_of_field toggle -- setting this enables it |
 | `view_transform` | string |  |  | Standard, AgX, Filmic, Khronos PBR Neutral or Raw; use Standard for color-encoded figures |
 | `look` | string |  |  |  |
 | `exposure` | number |  |  | Stops |
@@ -606,6 +612,7 @@ The `ops` array calls any operator by `id` (a bl_idname or a registry shortcut),
 | `text_background_color` | FLOAT | 0.0 |  |
 | `text_background_enabled` | BOOLEAN | True |  |
 | `text_color` | FLOAT | 0.0 |  |
+| `text_declutter` | BOOLEAN | True |  |
 | `text_depth_occlusion` | BOOLEAN | True |  |
 | `text_filter_attribute` | ENUM |  |  |
 | `text_filter_enabled` | BOOLEAN | False |  |
