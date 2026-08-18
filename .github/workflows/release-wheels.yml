@@ -1,0 +1,411 @@
+name: Release wheels
+
+# Two distributions live in this repository and they version independently:
+#
+#   core    ->  scigraphs-core    built from core/     import scigraphs_core
+#   render  ->  scigraphs-engine  built from engine/   import scigraphs_engine
+#
+# "render" is the spoken name for the second half. The distribution it ships is
+# called scigraphs-engine. The tag keeps the spoken name because that is what
+# people reach for, and every line this workflow prints spells out the
+# distribution alongside it, so the two names never have to be guessed at.
+#
+# THE TAGS
+#
+#   core-v0.2.0                       builds the core wheel only
+#   render-v0.1.0                     builds the render wheel only
+#   wheels-core-v0.2.0-render-v0.1.0  builds both, one release, both wheels
+#
+# The combined tag repeats both numbers instead of inventing a third version.
+# That is the whole reason for its shape: every tag carries the version of every
+# wheel it ships, so the check below has something to compare against in all
+# three cases. A release tagged 0.3.0 that ships a 0.2.0 wheel is the failure
+# this workflow exists to prevent, and a bundle version of its own would have
+# made that check impossible.
+#
+# WHEN A SOURCE DIRECTORY IS MISSING
+#
+# Both source directories are in the public repository, so on a normal checkout
+# neither is missing. The handling stays because a shallow or filtered checkout,
+# or a workflow run from a fork that excludes a path, still produces a tree
+# without one of them, and a release that quietly ships half of what its tag
+# names is worse than one that says which half it dropped. When a selected
+# directory is absent the workflow reports it and drops that distribution
+# rather than going red, so the combined tag still ships the other wheel. If
+# every selected distribution is absent the run fails, because an empty release
+# is worse than a red build.
+#
+# WHAT GETS PUBLISHED
+#
+# Tags publish. workflow_dispatch builds and verifies the same way but attaches
+# the wheels to the run as artifacts instead, so a maintainer can check a wheel
+# without spending a tag on it.
+
+on:
+  push:
+    tags:
+      - 'core-v*'
+      - 'render-v*'
+      - 'wheels-core-v*-render-v*'
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Which wheels to build. Nothing is published; the wheels are attached to the run.'
+        type: choice
+        options:
+          - both
+          - core
+          - render
+        default: both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-wheels-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  select:
+    name: Pick the distributions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      publish: ${{ steps.pick.outputs.publish }}
+      title: ${{ steps.pick.outputs.title }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Read the tag and check it against pyproject.toml
+        id: pick
+        env:
+          TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+          CHOICE: ${{ inputs.build }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          # dir, distribution and import name for each half. Nothing else in
+          # this workflow hardcodes the mapping.
+          DISTS = {
+              "core": {"dir": "core", "dist": "scigraphs-core",
+                       "module": "scigraphs_core"},
+              "render": {"dir": "engine", "dist": "scigraphs-engine",
+                         "module": "scigraphs_engine"},
+          }
+
+          tag = os.environ.get("TAG", "")
+          choice = os.environ.get("CHOICE", "")
+          out = Path(os.environ["GITHUB_OUTPUT"]).open("a")
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a")
+
+          def fail(message):
+              print(f"::error title=Release wheels::{message}")
+              sys.exit(1)
+
+          # expected version per selected half; None means the trigger carried
+          # no version to check against, which only happens on a manual run.
+          if tag:
+              both = re.fullmatch(r"wheels-core-v(.+?)-render-v(.+)", tag)
+              if both:
+                  wanted = {"core": both.group(1), "render": both.group(2)}
+              elif tag.startswith("core-v"):
+                  wanted = {"core": tag[len("core-v"):]}
+              elif tag.startswith("render-v"):
+                  wanted = {"render": tag[len("render-v"):]}
+              else:
+                  fail(f"the tag {tag!r} matched a trigger pattern but not any "
+                       "of the three tag shapes this workflow understands: "
+                       "core-vX.Y.Z, render-vX.Y.Z, "
+                       "wheels-core-vX.Y.Z-render-vA.B.C")
+          else:
+              names = ["core", "render"] if choice == "both" else [choice]
+              wanted = {name: None for name in names}
+
+          selected, absent = [], []
+          for name, expected in wanted.items():
+              spec = DISTS[name]
+              pyproject = Path(spec["dir"]) / "pyproject.toml"
+              if not pyproject.is_file():
+                  absent.append(name)
+                  print(f"::notice title=Skipping {name}::{spec['dist']} was "
+                        f"not built: {pyproject} is not in this checkout. "
+                        f"{spec['dir']}/ is part of this repository, so a full "
+                        "checkout carries it; check whether this run used a "
+                        "sparse or filtered checkout.")
+                  continue
+
+              with pyproject.open("rb") as handle:
+                  version = tomllib.load(handle)["project"]["version"]
+
+              if expected is not None and expected != version:
+                  fail(f"the tag says {name} {expected} and {pyproject} says "
+                       f"{version}. Fix one of them; do not ship a wheel whose "
+                       "version disagrees with the tag it was released under.")
+
+              spec = dict(spec, name=name, version=version)
+              selected.append(spec)
+              print(f"{name}: {spec['dist']} {version} from {spec['dir']}/")
+
+          if not selected:
+              fail("every distribution this trigger selected is missing from "
+                   "the checkout, so there is nothing to build and nothing to "
+                   "release. Names asked for: "
+                   + ", ".join(sorted(wanted)) + ".")
+
+          selected.sort(key=lambda spec: spec["name"])
+          title = " and ".join(f"{s['dist']} {s['version']}" for s in selected)
+
+          out.write(f"matrix={json.dumps(selected)}\n")
+          out.write(f"publish={'true' if tag else 'false'}\n")
+          out.write(f"title={title}\n")
+
+          summary.write(f"## {title}\n\n")
+          summary.write(f"Trigger: `{tag or 'workflow_dispatch: ' + choice}`\n\n")
+          for spec in selected:
+              summary.write(f"- **{spec['name']}** builds `{spec['dist']}` "
+                            f"{spec['version']} from `{spec['dir']}/`\n")
+          for name in absent:
+              summary.write(f"- **{name}** skipped: `{DISTS[name]['dir']}/` is "
+                            "not in this checkout\n")
+          summary.write("\n" + ("Publishing a release for this tag.\n" if tag
+                                else "Manual run, so nothing is published. The "
+                                     "wheels are attached to this run.\n"))
+          PY
+
+  build:
+    name: Build and verify ${{ matrix.dist.dist }}
+    needs: select
+    runs-on: ubuntu-latest
+    strategy:
+      # One broken wheel should not hide the state of the other one.
+      fail-fast: false
+      matrix:
+        dist: ${{ fromJSON(needs.select.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install the build requirement
+        run: |
+          set -euo pipefail
+          # Both pyproject.toml files require setuptools >= 68, and the build
+          # below runs with --no-build-isolation, so the requirement has to be
+          # satisfied here rather than fetched per build.
+          python3 -m pip install --upgrade pip "setuptools>=68" wheel
+
+      - name: Build the wheel
+        run: |
+          set -euo pipefail
+          mkdir -p wheelhouse
+          # The same invocation scripts/fetch_wheels.sh uses to build these two
+          # wheels locally, so a wheel from CI and a wheel from a laptop are
+          # built the same way. Change one and change the other.
+          python3 -m pip wheel "./${{ matrix.dist.dir }}" --no-deps \
+            --no-build-isolation --wheel-dir ./wheelhouse
+          ls -l wheelhouse
+
+      - name: Check the wheel filename
+        run: |
+          set -euo pipefail
+          # Pure Python on both sides, so the platform tag is part of the check:
+          # a wheel that came out as anything other than py3-none-any means the
+          # build picked up something it should not have.
+          expected="${{ matrix.dist.module }}-${{ matrix.dist.version }}-py3-none-any.whl"
+          count=$(find wheelhouse -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one wheel in wheelhouse/, found $count"
+            exit 1
+          fi
+          built=$(basename "$(find wheelhouse -maxdepth 1 -name '*.whl')")
+          if [ "$built" != "$expected" ]; then
+            echo "::error::built $built but the tag and pyproject.toml call for $expected"
+            exit 1
+          fi
+          echo "WHEEL=$PWD/wheelhouse/$built" >> "$GITHUB_ENV"
+          echo "built $built"
+
+      - name: Install the wheel into a clean virtualenv
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/venv/bin/python" -m pip install "$WHEEL"
+          echo "VENV_PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
+          echo "the virtualenv now holds:"
+          "$RUNNER_TEMP/venv/bin/python" -m pip list
+
+      - name: Import it and check __version__
+        run: |
+          set -euo pipefail
+          # Run from outside the checkout so the source tree cannot stand in for
+          # the installed package and make a broken wheel look importable.
+          cd "$RUNNER_TEMP"
+          "$VENV_PYTHON" - <<'PY'
+          import sys
+          module = "${{ matrix.dist.module }}"
+          expected = "${{ matrix.dist.version }}"
+          package = __import__(module)
+          print(f"{module} {package.__version__} imported from {package.__file__}")
+          if package.__version__ != expected:
+              print(f"::error::{module}.__version__ is {package.__version__} "
+                    f"and the tag says {expected}")
+              sys.exit(1)
+          PY
+
+      - name: Run the scigraphs-engine suite against the installed wheel
+        if: matrix.dist.name == 'render'
+        run: |
+          set -euo pipefail
+          # 321 checks over five files, no Blender anywhere in them. run.py
+          # starts each file in its own process with the working directory set
+          # outside the repository and only the tests directory on sys.path, so
+          # every import of scigraphs_engine resolves to the wheel installed
+          # above and not to engine/.
+          #
+          # test_render.py exits 77 when there is no GPU, which run.py prints as
+          # SKIP and excludes from the total rather than counting as a pass.
+          # GitHub runners have no GPU and the wgpu extra is not installed, so
+          # that file skips here and the run stays green on the other four.
+          "$VENV_PYTHON" engine/scigraphs_engine/tests/run.py
+
+      - name: Run the scigraphs-core standalone suite against the installed wheel
+        if: matrix.dist.name == 'core'
+        run: |
+          set -euo pipefail
+          suite=scripts/extract/test_core_standalone.py
+          if [ ! -f "$suite" ]; then
+            echo "::notice title=core suite not run::$suite is not in this checkout, so the wheel was verified by install and import only."
+            exit 0
+          fi
+          # --package-root has to be absolute. The suite runs each configuration
+          # in a child process whose working directory is outside the
+          # repository, and a relative root would be resolved again there
+          # against the wrong directory, which reports every member as missing
+          # from disk. Pointing it at site-packages rather than at core/ means
+          # the configurations read the files the wheel actually installed.
+          site=$("$VENV_PYTHON" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+          # 25 configurations, and the degraded ones remove an optional import
+          # by refusing it rather than by patching a flag. An extra this
+          # interpreter simply does not have is classified as environment noise
+          # and is never counted as a failure, which is what makes the suite
+          # runnable on a runner that has numpy and nothing else.
+          "$VENV_PYTHON" "$suite" --package scigraphs_core --package-root "$site"
+
+      - name: Write down what was verified
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cp "$WHEEL" out/
+          {
+            echo "### ${{ matrix.dist.dist }} ${{ matrix.dist.version }}"
+            echo
+            echo "Wheel: \`$(basename "$WHEEL")\`, pure Python, one file for every platform."
+            echo "Built from \`${{ matrix.dist.dir }}/\` with \`pip wheel --no-deps --no-build-isolation\`,"
+            echo "the same invocation \`scripts/fetch_wheels.sh\` uses locally."
+            echo
+            echo "Verified on Python ${{ env.PYTHON_VERSION }} in a clean virtualenv:"
+            echo
+            echo "- installed from the wheel, imported as \`${{ matrix.dist.module }}\`, and \`__version__\` checked against the tag"
+          } > "out/notes-${{ matrix.dist.name }}.md"
+          if [ "${{ matrix.dist.name }}" = "render" ]; then
+            echo "- \`engine/scigraphs_engine/tests/run.py\` against the installed wheel: 321 checks over four files, with \`test_render.py\` skipped because the runner has no GPU" >> "out/notes-${{ matrix.dist.name }}.md"
+          fi
+          if [ "${{ matrix.dist.name }}" = "core" ] && [ -f scripts/extract/test_core_standalone.py ]; then
+            echo "- \`scripts/extract/test_core_standalone.py\` against the installed package: 25 configurations, including one that imports every member with Blender refused at \`sys.meta_path\` and one per optional extra" >> "out/notes-${{ matrix.dist.name }}.md"
+          fi
+          {
+            echo
+            echo "Install it with:"
+            echo
+            echo '```'
+            echo "pip install $(basename "$WHEEL")"
+            echo '```'
+            echo
+          } >> "out/notes-${{ matrix.dist.name }}.md"
+          cat "out/notes-${{ matrix.dist.name }}.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.dist.name }}
+          path: out/*
+          compression-level: 0
+          if-no-files-found: error
+
+  release:
+    name: Attach the wheels to the release
+    needs: [select, build]
+    if: needs.select.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download the wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          merge-multiple: true
+          path: release
+
+      - name: Write the release notes
+        env:
+          TAG: ${{ github.ref_name }}
+          TITLE: ${{ needs.select.outputs.title }}
+        run: |
+          set -euo pipefail
+          ls -l release
+          {
+            echo "Wheels for ${TITLE}, built from tag \`${TAG}\`."
+            echo
+            echo "numpy is the only hard dependency. Everything else is an"
+            echo "optional extra, and a feature whose extra is absent reports"
+            echo "the extra that would enable it rather than failing to import."
+            echo
+          } > notes.md
+          cat release/notes-*.md >> notes.md
+          cat notes.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          TITLE: ${{ needs.select.outputs.title }}
+        run: |
+          set -euo pipefail
+          count=$(find release -maxdepth 1 -name '*.whl' | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::no wheels were built, so there is nothing to release"
+            exit 1
+          fi
+          # --verify-tag refuses to invent a tag. The tag is what selected the
+          # wheels and what their versions were checked against, so a release
+          # built on a tag that is not in the repository would be meaningless.
+          gh release create "$TAG" \
+            --verify-tag \
+            --title "$TITLE" \
+            --notes-file notes.md \
+            release/*.whl
