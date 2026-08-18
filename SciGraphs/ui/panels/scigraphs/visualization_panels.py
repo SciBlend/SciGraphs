@@ -164,10 +164,9 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             col.prop(props, "edge_orthogonal_style", text="Style")
             col.prop(props, "edge_segments", text="Segments")
         
-        # These route edges with something the mesh operator does not have.
-        # Hierarchical needs the cluster tree; the rest compute their control
-        # points in compute shaders. Baking any of them into the mesh would
-        # produce straight edges, so say so rather than silently do it.
+        # These need something the mesh operator lacks: Hierarchical the cluster
+        # tree, the rest a compute shader. Baking any of them would give straight
+        # edges, so say so rather than silently do it.
         if props.edge_style_type in ('HIERARCHICAL', 'FDEB', 'SBEB', 'ROUTED',
                                     'MINGLE'):
             layout.separator()

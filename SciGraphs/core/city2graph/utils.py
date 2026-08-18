@@ -1,17 +1,11 @@
-"""Blender mesh to GeoDataFrame conversion, plus thin wrappers over city2graph.
-
-The wrapped city2graph functions need version 0.3.1 or newer and return None
-when the library is missing.
-"""
+"""Blender mesh to GeoDataFrame conversion, plus thin wrappers over city2graph 0.3.1 or newer, which return None when the library is missing."""
 import bpy
 import bmesh
 from scigraphs_core.logger import log
 
 
 def _copy_projection_metadata(src, dst):
-    """Copy the projection-defining custom properties between objects, so a
-    derived object still produces real lat/lon through ``blender_to_geopandas``.
-    """
+    """Copy the projection-defining custom properties, so a derived object still produces real lat/lon through ``blender_to_geopandas``."""
     keys = (
         "c2g_center_lat", "c2g_center_lon", "c2g_scale",
         "osmnx_center_lat", "osmnx_center_lon", "osmnx_scale",
@@ -23,13 +17,7 @@ def _copy_projection_metadata(src, dst):
 
 
 def mesh_to_centroids(obj, name=None, collection_name=None):
-    """Create a point-only mesh with one vertex per feature centroid.
-
-    Every connected component of ``obj`` gives one centroid: a face island for
-    polygons, an edge chain for line strings, a lone vertex for points. The new
-    object inherits the source's projection metadata, so proximity graphs,
-    morphological graphs and lat/lon export stay aligned.
-    """
+    """Create a point-only mesh with one vertex per feature centroid, one per connected component. The new object inherits the source's projection metadata, so proximity graphs, morphological graphs and lat/lon export stay aligned."""
     if obj is None or obj.type != 'MESH' or not obj.data:
         log("mesh_to_centroids: invalid mesh object")
         return None
@@ -111,12 +99,7 @@ def mesh_to_centroids(obj, name=None, collection_name=None):
 
 def gdf_to_blender_mesh(gdf, name="C2G_Features", collection_name=None, osmnx_obj=None,
                         ref_obj=None):
-    """Convert a GeoDataFrame to Blender mesh object(s), returned as a list.
-
-    ``ref_obj`` supplies the projection to align against, in either key family:
-    ``osmnx_*`` from an OSMnx import or ``c2g_*`` from a city2graph or Overture
-    object. ``osmnx_obj`` is its old name, kept for existing callers.
-    """
+    """Convert a GeoDataFrame to Blender mesh object(s), returned as a list. ``ref_obj`` supplies the projection to align against, in either the ``osmnx_*`` or ``c2g_*`` key family; ``osmnx_obj`` is its old name, kept for existing callers."""
     from shapely.geometry import Point, LineString, Polygon, MultiPolygon, MultiLineString
     from ..mesh.geometry import _latlon_to_local_3d
     from ..mesh.geo_mesh import _resolve_projection_metadata
@@ -129,9 +112,8 @@ def gdf_to_blender_mesh(gdf, name="C2G_Features", collection_name=None, osmnx_ob
     center_lon = None
     scale = 0.001
 
-    # Either key family is accepted. Requiring `is_osmnx` and the `osmnx_*` keys
-    # made a c2g_* reference fall through to the data's own bounds, and the
-    # object then drifted away from everything anchored to that reference.
+    # Either key family. Requiring `is_osmnx` made a c2g_* reference fall through
+    # to the data's own bounds, drifting away from that reference.
     reference = ref_obj if ref_obj is not None else osmnx_obj
     if reference is not None:
         center_lat, center_lon, scale = _resolve_projection_metadata(reference)
@@ -162,10 +144,8 @@ def gdf_to_blender_mesh(gdf, name="C2G_Features", collection_name=None, osmnx_ob
     created_objects = []
     bm = bmesh.new()
 
-    # Do not share vertices across features. Where two buildings touch,
-    # ``bm.faces.new`` raises "face would overlap existing edge" and the second
-    # face is lost. A fresh set of verts per polygon or linestring costs some
-    # mesh weight and guarantees one polygon out per polygon part in.
+    # Do not share vertices across features: where two buildings touch,
+    # ``bm.faces.new`` raises "face would overlap existing edge" and loses one.
     for idx, row in gdf.iterrows():
         geom = row.geometry
 
@@ -236,10 +216,8 @@ def gdf_to_blender_mesh(gdf, name="C2G_Features", collection_name=None, osmnx_ob
         obj["c2g_center_lon"] = center_lon
         obj["c2g_scale"] = scale
 
-        # Cache the source GeoDataFrame on the object as a base64 pickle. It is
-        # what morphology and tessellation read later, and it avoids the mesh
-        # round-trip, which loses face and edge information for degenerate
-        # polygons.
+        # Cache the source frame as a base64 pickle: morphology and tessellation
+        # read it, avoiding a mesh round-trip that loses degenerate polygons.
         try:
             import pickle
             import base64
@@ -262,12 +240,9 @@ def gdf_to_blender_mesh(gdf, name="C2G_Features", collection_name=None, osmnx_ob
 def blender_to_geopandas(obj, crs="EPSG:4326"):
     """Convert a Blender mesh object to a GeoDataFrame.
 
-    The geometry kind follows the mesh contents: one Polygon per face, else one
-    LineString per connected edge chain, else one Point per vertex. The object's
-    projection metadata (``c2g_center_lat/lon/scale`` or ``osmnx_*``) maps local
-    coordinates back to lon/lat in ``crs``. Missing metadata still yields a
-    frame, with a warning logged, so the caller can judge whether it is usable.
-    """
+    Geometry follows the mesh contents: one Polygon per face, else one LineString
+    per edge chain, else one Point per vertex. ``c2g_center_lat/lon/scale`` or
+    ``osmnx_*`` maps back to lon/lat; missing metadata still yields a frame."""
     import geopandas as gpd
     from shapely.geometry import Point, LineString, Polygon
     from ..mesh.geometry import _local_3d_to_latlon
@@ -276,8 +251,7 @@ def blender_to_geopandas(obj, crs="EPSG:4326"):
         log("Invalid object: must be a mesh object")
         return None
 
-    # Fast path: an object built from a real GeoDataFrame carries a pickled
-    # copy that kept the exact geometry types and attributes.
+    # Fast path: a pickled copy with the exact geometry types and attributes.
     cached = obj.get("_c2g_gdf_pickle")
     if cached:
         try:
@@ -354,7 +328,6 @@ def blender_to_geopandas(obj, crs="EPSG:4326"):
             return (a, b) if a < b else (b, a)
 
         def walk_chain(start, neighbor):
-            """Walk along a chain starting from ``start`` going to ``neighbor``."""
             chain = [start, neighbor]
             visited_edges.add(edge_key(start, neighbor))
             prev, current = start, neighbor
@@ -443,9 +416,7 @@ def extract_graph_from_blender(obj):
 
 
 def gdf_to_nx(nodes=None, edges=None, keep_geom=True, multigraph=False, directed=False):
-    """Convert node and edge GeoDataFrames to a NetworkX graph. For a
-    heterogeneous graph, ``nodes`` and ``edges`` take a dict, not a frame.
-    """
+    """Convert node and edge GeoDataFrames to a NetworkX graph; a heterogeneous graph takes dicts for ``nodes`` and ``edges``, not frames."""
     from scigraphs_core.city2graph.get_c2g import get_city2graph
     c2g = get_city2graph()
     if c2g is None:
@@ -462,9 +433,7 @@ def gdf_to_nx(nodes=None, edges=None, keep_geom=True, multigraph=False, directed
 
 
 def nx_to_gdf(G, nodes=True, edges=True):
-    """Convert a NetworkX graph to ``(nodes_gdf, edges_gdf)``, or to a single
-    frame when only one of ``nodes`` and ``edges`` is asked for.
-    """
+    """Convert a NetworkX graph to ``(nodes_gdf, edges_gdf)``, or one frame when only ``nodes`` or only ``edges`` is asked for."""
     from scigraphs_core.city2graph.get_c2g import get_city2graph
     c2g = get_city2graph()
     if c2g is None:
@@ -480,9 +449,7 @@ def nx_to_gdf(G, nodes=True, edges=True):
 
 
 def filter_graph_by_distance(graph, center, threshold, nodes=None, edges=None):
-    """Keep only the graph elements within ``threshold`` of ``center``, measured
-    in CRS units: meters for a projected graph, degrees for a geographic one.
-    """
+    """Keep the graph elements within ``threshold`` of ``center``, in CRS units: meters for a projected graph, degrees for a geographic one."""
     from scigraphs_core.city2graph.get_c2g import get_city2graph
     c2g = get_city2graph()
     if c2g is None:
@@ -500,9 +467,7 @@ def filter_graph_by_distance(graph, center, threshold, nodes=None, edges=None):
 
 
 def create_isochrone(graph, center, threshold, weight="length"):
-    """Return the polygon reachable from ``center`` within a travel cost
-    ``threshold``, read in the units of the ``weight`` edge attribute.
-    """
+    """Return the polygon reachable from ``center`` within travel cost ``threshold``, in the units of the ``weight`` edge attribute."""
     from scigraphs_core.city2graph.get_c2g import get_city2graph
     c2g = get_city2graph()
     if c2g is None:
@@ -556,9 +521,7 @@ def remove_isolated_components(graph, nodes=None, edges=None):
 
 
 def validate_gdf(nodes_gdf=None, edges_gdf=None, allow_empty=True):
-    """Validate node and edge GeoDataFrames, returning ``(validated_nodes,
-    validated_edges, is_hetero)``; ``is_hetero`` says whether they were dicts.
-    """
+    """Validate node and edge GeoDataFrames, returning ``(validated_nodes, validated_edges, is_hetero)``; ``is_hetero`` says whether they were dicts."""
     from scigraphs_core.city2graph.get_c2g import get_city2graph
     c2g = get_city2graph()
     if c2g is None:

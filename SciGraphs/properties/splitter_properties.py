@@ -128,7 +128,6 @@ SPLITTER_PROPERTIES = {
         max=100.0,
     ),
 
-    # Visualization Options
     'show_forces': BoolProperty(
         name="Show Forces",
         description="Visualize force vectors during execution",
@@ -236,7 +235,6 @@ SPLITTER_PROPERTIES = {
         default='degree',
     ),
 
-    # Directed graph specific centrality
     'directed_centrality_method': EnumProperty(
         name="Directed Centrality",
         description="Centrality metrics specific to directed graphs",
@@ -251,7 +249,6 @@ SPLITTER_PROPERTIES = {
         default='pagerank',
     ),
 
-    # Flow animation settings
     'flow_animation_mode': EnumProperty(
         name="Animation Mode",
         description="How the flow propagates through the graph",
@@ -284,7 +281,6 @@ SPLITTER_PROPERTIES = {
         max=10.0,
     ),
 
-    # Traversal animation settings
     'traversal_algorithm': EnumProperty(
         name="Algorithm",
         description="Graph traversal algorithm to use",
@@ -381,7 +377,6 @@ SPLITTER_PROPERTIES = {
         max=1e-2,
     ),
 
-    # Pathfinding properties
     'pathfinding_source': StringProperty(
         name="Source Node",
         description="Source node index for pathfinding",
@@ -405,7 +400,6 @@ SPLITTER_PROPERTIES = {
         default='DIJKSTRA',
     ),
 
-    # Spanning tree properties
     'spanning_algorithm': EnumProperty(
         name="Algorithm",
         description="Spanning tree algorithm",
@@ -417,7 +411,6 @@ SPLITTER_PROPERTIES = {
         default='KRUSKAL',
     ),
 
-    # Network flow properties
     'flow_source': StringProperty(
         name="Source Node",
         description="Source node for flow",
@@ -430,7 +423,6 @@ SPLITTER_PROPERTIES = {
         default="1",
     ),
 
-    # Rendering properties
     'rendering_preset': EnumProperty(
         name="Preset",
         description="Rendering preset",
@@ -455,7 +447,6 @@ SPLITTER_PROPERTIES = {
         default='THREE_POINT',
     ),
 
-    # Export properties
     'export_filepath': StringProperty(
         name="Export Path",
         description="Path for export file",
@@ -480,7 +471,6 @@ SPLITTER_PROPERTIES = {
         default=True,
     ),
 
-    # Report properties
     'report_include_powerlaw': BoolProperty(
         name="Power Law Analysis",
         description="Include power law fitting in report",

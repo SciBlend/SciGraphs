@@ -17,7 +17,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        # Step 1: Select Data Source
         box = layout.box()
         box.label(text="Step 1: Select Data Source", icon='FILE_FOLDER')
         
@@ -57,7 +56,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         
         # SuiteSparse and reproducible pipelines have their own streamlined flows.
         if props.data_source not in {'SUITESPARSE', 'REPRO'}:
-            # Step 2: Define edges
             layout.separator()
             box = layout.box()
             box.label(text="Step 2: Define Graph Structure", icon='OUTLINER')
@@ -81,7 +79,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
                 box.separator()
                 self._draw_attribute_checklist(box, props)
             
-            # Step 3: Create graph
             layout.separator()
             box = layout.box()
             box.label(text="Step 3: Create Graph Object", icon='MESH_DATA')
@@ -103,13 +100,11 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
             else:
                 row.operator("scigraphs.create_graph_from_sql", text="Create Graph", icon='ADD')
         
-        # Import Node Attributes (requires existing graph)
         obj = context.active_object
         if obj is not None and obj.type == 'MESH' and "num_nodes" in obj:
             layout.separator()
             self._draw_node_attribute_import(layout, props, obj)
 
-        # Step 4: Setup visualization
         if props.data_source == 'REPRO':
             return
 
@@ -122,7 +117,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         row.operator("scigraphs.setup_visualization", text="Setup Visual", icon='SHADING_RENDERED')
     
     def _draw_attribute_checklist(self, box, props):
-        """Draw the column attribute checklist for selecting which columns to import."""
         try:
             source_idx = int(props.source_column)
         except (ValueError, TypeError):
@@ -174,7 +168,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         footer.label(text=f"{selected_count} of {len(attribute_columns)} columns selected")
     
     def _draw_node_attribute_import(self, layout, props, obj):
-        """Draw the section for importing external vertex-only attribute files."""
         box = layout.box()
         box.label(text="Import Node Attributes", icon='SPREADSHEET')
         
@@ -199,7 +192,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         hint.label(text="Format: node_name <sep> value(s). Missing nodes get NaN.")
 
     def _draw_suitesparse_ui(self, box, props):
-        """Draw the SuiteSparse Matrix Collection import UI."""
         col = box.column(align=True)
         
         col.label(text="Matrix Identifier:", icon='URL')
@@ -249,7 +241,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
             status_box.label(text=props.suitesparse_status, icon='INFO')
 
     def _draw_repro_ui(self, context, box):
-        """Draw reproducible pipeline import controls inside the Data panel."""
         repro = context.scene.scigraphs_repro
 
         col = box.column(align=True)
@@ -283,7 +274,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
             info.label(text=f"Edges: {obj.get('num_edges', 'N/A')}")
     
     def _draw_database_ui(self, box, props):
-        """Draw the database import UI."""
         from ....preferences import get_preferences
         prefs = get_preferences()
         

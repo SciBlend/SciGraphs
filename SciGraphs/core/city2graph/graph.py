@@ -4,11 +4,7 @@ from . import utils
 
 
 def export_to_graphml(obj, filepath):
-    """Export a Blender graph object to GraphML.
-
-    List and tuple attributes are stringified first, since GraphML has no type
-    for them. Returns True on success.
-    """
+    """Export a Blender graph object to GraphML; list and tuple attributes are stringified first, since GraphML has no type for them. True on success."""
     try:
         import networkx as nx
         
@@ -228,7 +224,6 @@ def get_external_loader_script():
 
 
 def save_external_loader_script(filepath):
-    """Write the external loader script to ``filepath``. True on success."""
     try:
         with open(filepath, 'w') as f:
             f.write(EXTERNAL_LOADER_SCRIPT)

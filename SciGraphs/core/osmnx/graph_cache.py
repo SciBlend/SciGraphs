@@ -1,17 +1,10 @@
-# In-memory cache of NetworkX graphs, keyed by Blender object metadata, shared
-# by the operators and the rest of core.
+# In-memory cache of NetworkX graphs, keyed by Blender object metadata.
 
 import uuid
 
 
 def get_osmnx_graph(obj):
-    """Find the NetworkX graph behind a Blender object, or None.
-
-    Tries the in-memory cache by graph_id, then by object name, then by
-    matching node count, before falling back to the on-disk GraphML cache. The
-    node-count match is a guess and will pick the wrong graph if two networks
-    happen to have the same size.
-    """
+    """Find the NetworkX graph behind a Blender object, or None. Tries the in-memory cache by graph_id, then object name, then node count, then the on-disk GraphML cache; the node-count match picks the wrong graph when two networks are the same size."""
     if obj is None or not obj.get("is_osmnx", False):
         return None
 
@@ -134,11 +127,7 @@ def store_osmnx_graph(obj, G):
 
 
 def restore_all_graphs_from_cache():
-    """Load every OSMnx graph in the scene from the disk cache.
-
-    Belongs on a bpy.app.handlers.load_post handler: graph data has to be there
-    the moment a .blend opens, since nothing in the file itself holds it.
-    """
+    """Load every OSMnx graph in the scene from the disk cache. Belongs on a bpy.app.handlers.load_post handler: nothing in the .blend holds graph data, so it must be there the moment the file opens."""
     import bpy
     from ...core import importer
     from scigraphs_core.logger import log

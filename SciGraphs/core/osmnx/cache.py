@@ -1,8 +1,4 @@
-"""On-disk GraphML cache for OSMnx graphs, so they survive a Blender restart.
-
-Filenames are derived from the query and network type, which means two objects
-built from the same query share one cache entry.
-"""
+"""On-disk GraphML cache for OSMnx graphs. Filenames come from the query and network type, so two objects built from the same query share one entry."""
 
 import os
 import re
@@ -39,9 +35,7 @@ def ensure_cache_directory():
 
 
 def sanitize_filename(name):
-    """Make a string usable as a filename: reserved characters and whitespace
-    become underscores, and the result is cut to 100 characters.
-    """
+    """Make a string usable as a filename: reserved characters and whitespace become underscores, cut to 100 characters."""
     name = re.sub(r'[<>:"/\\|?*]', '_', name)
     name = re.sub(r'[\s,]+', '_', name)
     name = re.sub(r'_+', '_', name)
@@ -52,11 +46,7 @@ def sanitize_filename(name):
 
 
 def generate_cache_filename(obj):
-    """Cache filename for an object, from its query name and network type.
-
-    None for anything that is not an OSMnx object. Objects with no stored query
-    name fall back to the object name, so renaming one orphans its cache entry.
-    """
+    """Cache filename for an object, from its query name and network type. None for a non-OSMnx object; with no stored query name it falls back to the object name, so renaming orphans the entry."""
     if not obj or not obj.get("is_osmnx", False):
         return None
 
@@ -85,11 +75,7 @@ def get_cache_filepath(obj):
 
 
 def save_graph_to_cache(obj, G):
-    """Write a graph to the object's cache slot.
-
-    Returns (success, filepath or None, message); the message is meant for the
-    operator to report.
-    """
+    """Write a graph to the object's cache slot, returning (success, filepath or None, message) with the message meant for the operator to report."""
     if not obj or not G:
         return False, None, "Invalid object or graph"
     

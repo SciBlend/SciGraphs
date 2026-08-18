@@ -7,7 +7,6 @@ from bpy.props import StringProperty, IntProperty
 
 
 class SCIGRAPHS_OT_ViewCachedGraphs(bpy.types.Operator):
-    """View and manage cached OSMnx graphs."""
     bl_idname = "scigraphs.osmnx_view_cached_graphs"
     bl_label = "Manage Cached Graphs"
     bl_description = "View and delete cached OSMnx graphs"
@@ -78,7 +77,6 @@ class SCIGRAPHS_OT_ViewCachedGraphs(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_DeleteCachedGraph(bpy.types.Operator):
-    """Delete a cached OSMnx graph."""
     bl_idname = "scigraphs.osmnx_delete_cached_graph"
     bl_label = "Delete Cached Graph"
     bl_description = "Delete this cached graph file"
@@ -117,7 +115,6 @@ class SCIGRAPHS_OT_DeleteCachedGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ClearCache(bpy.types.Operator):
-    """Clear all cached OSMnx graphs."""
     bl_idname = "scigraphs.osmnx_clear_cache"
     bl_label = "Clear All Cache"
     bl_description = "Delete all cached OSMnx graphs"
@@ -149,7 +146,6 @@ class SCIGRAPHS_OT_ClearCache(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OpenCacheDirectory(bpy.types.Operator):
-    """Open the cache directory in file browser."""
     bl_idname = "scigraphs.osmnx_open_cache_directory"
     bl_label = "Open Cache Directory"
     bl_description = "Open the cache directory in your system's file browser"
@@ -181,7 +177,6 @@ class SCIGRAPHS_OT_OpenCacheDirectory(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_LoadFromCache(bpy.types.Operator):
-    """Load an OSMnx graph from cache."""
     bl_idname = "scigraphs.osmnx_load_from_cache"
     bl_label = "Load from Cache"
     bl_description = "Load this cached graph into the scene"

@@ -1,9 +1,8 @@
 """EEVEE render path for SciGraphs graphs (Geometry Nodes, not the GPU preview).
 
-Requires `scene.scigraphs_display_engine = 'GEOMETRY_NODES'`. GPU preview and
-EEVEE are mutually exclusive. See `frame_camera`, `color_graph`, `PRESETS`.
+Requires `scene.scigraphs_display_engine = 'GEOMETRY_NODES'`; the GPU preview and
+EEVEE are mutually exclusive.
 
-    render.eevee(obj, "/tmp/figures/knn.png")
     render.eevee(obj, "/tmp/out.png", color_attribute="node_betweenness",
                  clip_high_pct=98, look='blueprint')
 """
@@ -27,7 +26,7 @@ def _material_name(obj):
     return f"{obj.name}_SciGraphsEEVEE"
 
 
-# Views — TOP_DOWN yields rotation_euler (0,0,0): +X right, +Y up (north up).
+# TOP_DOWN yields rotation_euler (0,0,0): +X right, +Y up (north up).
 TOP_DOWN = (0.0, 0.0, 1.0)
 OBLIQUE = (0.42, -0.70, 0.58)
 
@@ -37,7 +36,11 @@ VIEWS = {
 }
 
 
-# Looks: colormap must not approach the backdrop at either end (clipping).
+# Looks: a preset's colormap may not approach its own backdrop at either end.
+# Measured by rendering a 100-node lattice on each backdrop and counting nodes
+# that clip: magma on near-black 'ink' put its worst node 4/765 from the
+# background, turbo on mid-gray 'terrain' scored 52/765. That rules magma and
+# inferno out of the dark looks and the pale-ended maps out of 'paper'.
 # relief = terrain colors with low-sun lamps (azimuth/elevation).
 PRESETS = {
     'slate': {
@@ -113,10 +116,8 @@ EDGE_RATIO_MIN = 0.05
 
 
 def node_cloud(obj):
-    """Node positions in object space.
-
-    Prefers `node_positions`, else `is_intersection` (OSMnx street meshes), else
-    all vertices. Returns `(positions, source)`.
+    """Node positions in object space as `(positions, source)`, preferring
+    `node_positions`, else `is_intersection` (OSMnx street meshes), else all vertices.
     """
     import numpy as np
 
@@ -171,10 +172,10 @@ def measure(obj):
 
 def autoscale_geometry(obj, node_fraction=NODE_FRACTION, node_resolution=16,
                        edge_resolution=8, edge_ratio=None, verbose=True):
-    """Size GN glyphs from median NN; write object props and rebuild the tree.
+    """Size GN glyphs from median nearest-neighbor distance and rebuild the tree.
 
-    Object props (`scigraphs_node_size`, etc.) are authoritative; scene viz
-    knobs are best-effort (clamped / sockets may be missing).
+    The object props it writes are authoritative; the scene viz knobs are best
+    effort, since they clamp and their sockets may be missing.
     """
     measurements, source = measure(obj)
     if measurements is None:
@@ -228,9 +229,8 @@ def autoscale_geometry(obj, node_fraction=NODE_FRACTION, node_resolution=16,
 
 
 def geometry_nodes(obj, rebuild=True):
-    """Switch to Geometry Nodes path; rebuild SciGraphs_Viz when sizes change.
-
-    Also sets `show_render` (apply_display_engine only touches show_viewport).
+    """Switch to the Geometry Nodes path, rebuilding SciGraphs_Viz when sizes
+    change, and set `show_render`, which `apply_display_engine` leaves alone.
     """
     scene = bpy.context.scene
     graphs.activate(obj)
@@ -292,10 +292,10 @@ def color_graph(obj, attribute, colormap="viridis", reverse=False, norm=None,
                 gamma=None, vmin=None, vmax=None, clip_low_pct=None,
                 clip_high_pct=None, nodes_only=None, edge_color=None,
                 verbose=True):
-    """Map a mesh attribute through a colormap for EEVEE.
+    """Map a mesh attribute through a colormap for EEVEE, returning its name or None.
 
-    POINT: nodes_only gates tubes to edge_color. EDGE: gate off; values are
-    promoted to points. Prefer clip_*_pct for heavy-tailed attrs. Returns name or None.
+    On POINT, nodes_only gates tubes to edge_color; on EDGE the gate is off and
+    values are promoted to points. Prefer clip_*_pct for heavy-tailed attributes.
     """
     domain = attribute_domain(obj, attribute)
     if domain is None:
@@ -382,9 +382,10 @@ def _color_attribute(obj):
 
 
 def material(obj, color=(0.55, 0.60, 0.68), roughness=0.42, metallic=0.0):
-    """Ensure a material; never overwrite a non-owned slot-0 (color_apply).
+    """Ensure a material, never overwriting a slot 0 this module does not own.
 
-    Uses Attribute node (survives Realize Instances), not Vertex Color.
+    Reads the color layer through an Attribute node, not Vertex Color, because
+    only the former survives Realize Instances.
     """
     existing = None
     if obj.data.materials and obj.data.materials[0] is not None:
@@ -462,10 +463,10 @@ def sun_direction(azimuth_deg, elevation_deg):
 
 def light_rig(center, diagonal, key=2.1, fill=0.55, rim=0.75, softness=6.0,
               azimuth=None, elevation=None):
-    """Create/update three named SUN lamps (irradiance; scale-independent).
+    """Create or update three named SUN lamps (irradiance, so scale-independent).
 
-    Default portrait key; pass azimuth+elevation for hillshade (e.g. 315/22).
-    Energies ~2.1/0.55/0.75 avoid clipping under Standard view transform.
+    Pass azimuth and elevation for hillshade, e.g. 315/22. Energies near
+    2.1/0.55/0.75 avoid clipping under the Standard view transform.
     """
     from mathutils import Vector
 
@@ -511,9 +512,8 @@ def light_rig(center, diagonal, key=2.1, fill=0.55, rim=0.75, softness=6.0,
 
 def world(background=(0.055, 0.060, 0.075), ambient=(0.42, 0.45, 0.52),
           ambient_strength=0.45):
-    """World with separate camera backdrop vs lighting (Light Path / Is Camera Ray).
-
-    Avoids film_transparent. EEVEE supports this split on the world.
+    """World that splits the camera backdrop from the lighting through Light Path
+    / Is Camera Ray, so no film_transparent pass is needed.
     """
     wld = bpy.data.worlds.get(WORLD_NAME) or bpy.data.worlds.new(WORLD_NAME)
     wld.use_nodes = True
@@ -637,10 +637,10 @@ FRAME_MARGIN = 1.06
 def frame_camera(obj, direction=None, margin=FRAME_MARGIN, lens=50.0,
                  projection=None, view='TOP', pushback=1.0, ground=None,
                  verbose=False):
-    """Frame camera for EEVEE: default orthographic top-down with correct padding.
+    """Frame the camera for EEVEE, orthographic top-down by default.
 
-    Sets camera type before fit. Re-solves ortho_scale from node_cloud padding.
-    Levels roll for straight-down (else north can flip). ground= clamps to terrain.
+    Roll is leveled for a straight-down view, which otherwise flips north, and
+    `ground` clamps the ortho frame to the terrain's coverage.
     """
     from mathutils import Vector
 
@@ -733,9 +733,10 @@ def frame_camera(obj, direction=None, margin=FRAME_MARGIN, lens=50.0,
 
 def eevee_settings(scene, samples=32, shadows=True, raytracing=False,
                    ao_distance=None):
-    """Set EEVEE Next (5.x) props via guarded setattr; old 4.x names raise.
+    """Set EEVEE Next (5.x) properties through a guarded setattr, since the 4.x names raise.
 
-    Bound fast_gi_distance to a few node radii or AO muddies the whole graph.
+    Keep `ao_distance` down to a few node radii or ambient occlusion muddies the
+    whole graph.
     """
     def _set(target, name, value):
         if hasattr(target, name):
@@ -789,10 +790,10 @@ def eevee(obj, filename, resolution=(1000, 750), samples=32,
           edge_color=None,
           key=None, fill=None, rim=None,
           azimuth=None, elevation=None, softness=None):
-    """Render graph with EEVEE; return output path.
+    """Render the graph with EEVEE and return the output path.
 
-    Default view_transform is Standard (AgX desaturates colormap ends).
-    color_attribute runs after GN rebuild. isolate/hide as in preview.render.
+    view_transform defaults to Standard because AgX desaturates the ends of a
+    colormap. `isolate` and `hide` work as in `preview.render`.
     """
     scene = bpy.context.scene
     path = pathlib.Path(filename)
@@ -918,7 +919,7 @@ def _luminance(path):
 
 
 def relief_contrast(path):
-    """Luminance std/spread (0–255) of a ground-only frame; use with hide=."""
+    """Luminance std and spread, on a 0 to 255 scale, of a ground-only frame."""
     import numpy as np
 
     try:
@@ -932,9 +933,8 @@ def relief_contrast(path):
 
 
 def differing_fraction(path, reference, threshold=24, sign='any'):
-    """Fraction of pixels differing from reference (graph vs ground-only).
-
-    sign='brighter' excludes shadows under low sun. Prefer shrink=False for compares.
+    """Fraction of pixels differing from a reference frame; sign='brighter'
+    excludes shadows cast by a low sun.
     """
     import numpy as np
 

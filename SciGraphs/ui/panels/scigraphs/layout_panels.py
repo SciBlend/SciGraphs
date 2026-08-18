@@ -329,7 +329,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         col.prop(props, "cooling_factor", text="Cooling Factor")
     
     def _draw_fa2(self, layout, props):
-        """ForceAtlas2 parameters."""
         box = layout.box()
         box.label(text="ForceAtlas2 Settings", icon='FORCE_FORCE')
         
@@ -348,7 +347,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         col.prop(props, "fa2_edge_weight_influence")
     
     def _draw_igraph_fr(self, layout, props):
-        """Fruchterman-Reingold parameters."""
         box = layout.box()
         box.label(text="Fruchterman-Reingold Settings", icon='FORCE_LENNARDJONES')
         
@@ -367,7 +365,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         col.prop(props, "igraph_fr_repulserad")
     
     def _draw_igraph_kk(self, layout, props):
-        """Kamada-Kawai parameters."""
         box = layout.box()
         box.label(text="Kamada-Kawai Settings", icon='DRIVER_DISTANCE')
         
@@ -404,7 +401,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
             col.prop(props, f"igraph_drl_{phase}_damping_mult")
     
     def _draw_igraph_lgl(self, layout, props):
-        """LGL parameters."""
         box = layout.box()
         box.label(text="LGL Settings", icon='STICKY_UVS_LOC')
         
@@ -417,7 +413,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         col.prop(props, "igraph_lgl_cellsize")
     
     def _draw_igraph_dh(self, layout, props):
-        """Davidson-Harel parameters."""
         box = layout.box()
         box.label(text="Davidson-Harel Settings", icon='FORCE_HARMONIC')
         
@@ -436,7 +431,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         col.prop(props, "igraph_dh_weight_node_edge_dist")
     
     def _draw_igraph_graphopt(self, layout, props):
-        """GraphOpt parameters."""
         box = layout.box()
         box.label(text="GraphOpt Settings", icon='GRAPH')
         
@@ -450,7 +444,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
 
 
     def _draw_yifan_hu(self, layout, props):
-        """Yifan Hu / sfdp parameters."""
         box = layout.box()
         box.label(text="Yifan Hu (sfdp) Settings", icon='FORCE_VORTEX')
         
@@ -496,7 +489,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         self._draw_graphviz_advanced_attrs(box, props)
 
     def _draw_graphviz(self, layout, props, algo):
-        """Graphviz/scigraphs-utils parameters."""
         engine = algo.replace('GRAPHVIZ_', '').lower()
         box = layout.box()
         box.label(text=f"Graphviz {engine} Settings", icon='GRAPH')
@@ -572,7 +564,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         self._draw_graphviz_advanced_attrs(box, props)
 
     def _draw_graphviz_advanced_attrs(self, box, props):
-        """Draw pass-through Graphviz attribute fields."""
         box.separator()
         adv_box = box.box()
         adv_box.label(text="Advanced Graphviz Attributes", icon='SETTINGS')

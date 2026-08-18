@@ -18,7 +18,6 @@ def _fit_attribute_values(values, target_length, default=0.0):
 
 
 class SCIGRAPHS_OT_CalculateCentrality(bpy.types.Operator):
-    """Calculate node centrality metrics."""
     bl_idname = "scigraphs.calculate_centrality"
     bl_label = "Calculate Centrality"
     bl_description = "Calculate node centrality and store as attribute"
@@ -71,7 +70,6 @@ class SCIGRAPHS_OT_CalculateCentrality(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateClustering(bpy.types.Operator):
-    """Calculate clustering coefficient for nodes."""
     bl_idname = "scigraphs.calculate_clustering"
     bl_label = "Calculate Clustering"
     bl_description = "Calculate clustering coefficient for nodes"
@@ -106,7 +104,6 @@ class SCIGRAPHS_OT_CalculateClustering(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ApplyClustering(bpy.types.Operator):
-    """Apply community detection algorithm."""
     bl_idname = "scigraphs.apply_clustering"
     bl_label = "Apply Clustering"
     bl_description = "Apply clustering algorithm to detect communities"
@@ -190,7 +187,6 @@ class SCIGRAPHS_OT_ApplyClustering(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateDirectedCentrality(bpy.types.Operator):
-    """Calculate centrality metrics for directed graphs."""
     bl_idname = "scigraphs.calculate_directed_centrality"
     bl_label = "Calculate Directed Centrality"
     bl_description = "Calculate centrality metrics for directed graphs"
@@ -230,7 +226,6 @@ class SCIGRAPHS_OT_CalculateDirectedCentrality(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_DetectPatterns(bpy.types.Operator):
-    """Detect structural patterns in directed graphs."""
     bl_idname = "scigraphs.detect_patterns"
     bl_label = "Detect Graph Patterns"
     bl_description = "Detect structural patterns (DAG, cycles, connectivity)"
@@ -267,7 +262,6 @@ class SCIGRAPHS_OT_DetectPatterns(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AnalyzeFlow(bpy.types.Operator):
-    """Analyze flow structure in directed graphs."""
     bl_idname = "scigraphs.analyze_flow"
     bl_label = "Analyze Flow Structure"
     bl_description = "Identify sources, sinks, and bottlenecks"
@@ -320,7 +314,6 @@ class SCIGRAPHS_OT_AnalyzeFlow(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FindSCCs(bpy.types.Operator):
-    """Find strongly connected components."""
     bl_idname = "scigraphs.find_sccs"
     bl_label = "Find Strong Components"
     bl_description = "Find strongly connected components (cycles)"
@@ -363,7 +356,6 @@ class SCIGRAPHS_OT_FindSCCs(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AnimateFlow(bpy.types.Operator):
-    """Create flow propagation animation."""
     bl_idname = "scigraphs.animate_flow"
     bl_label = "Animate Flow"
     bl_description = "Create flow animation showing propagation through the directed graph"

@@ -8,8 +8,8 @@ from scigraphs_core.logger import log
 from scigraphs_core.repro.determinism import get_geometry_seed
 
 
-# Default appearance, shared by the SciGraphs_Viz Geometry Nodes builders and
-# the SCIGRAPHS_OT_UpdateAppearance dialog so the two cannot disagree.
+# Default appearance, shared by the SciGraphs_Viz builders and the
+# SCIGRAPHS_OT_UpdateAppearance dialog so the two cannot disagree.
 
 DEFAULT_NODE_SIZE = 0.02
 DEFAULT_NODE_RESOLUTION = 10
@@ -21,8 +21,8 @@ DEFAULT_EDGE_ATTR_MULT = 1.0
 DEFAULT_NODE_SHADE_SMOOTH = True
 DEFAULT_EDGE_PROFILE = 'ROUND'  # 'ROUND' (circle) or 'RIBBON' (flat quad)
 
-# RIBBON profile height as a fraction of its width; kept above zero so Curve
-# to Mesh yields a non-degenerate strip.
+# RIBBON height as a fraction of width; above zero so Curve to Mesh yields
+# a non-degenerate strip.
 EDGE_RIBBON_ASPECT = 0.1
 
 NODE_SHAPE_INDEX_MAP = {
@@ -37,20 +37,12 @@ EDGE_PROFILE_VALUES = ('ROUND', 'RIBBON')
 
 
 def _ico_subdivisions_from_resolution(resolution: int) -> int:
-    """Map the shared resolution slider onto an icosphere ``Subdivisions``.
-
-    Subdivisions grows the triangle count exponentially, so the linear
-    resolution is squeezed into [1, 5] to keep density comparable without
-    tanking the viewport.
-    """
+    """Map the resolution slider onto icosphere ``Subdivisions``, squeezed into [1, 5] because subdivisions grow the triangle count exponentially."""
     return max(1, min(5, max(1, int(resolution) // 4)))
 
 
 def _apply_node_primitive_inputs(node, node_size: float, resolution: int) -> int:
-    """Write ``node_size`` and ``resolution`` into a primitive node.
-
-    Returns the number of sockets written; each primitive takes a different set.
-    """
+    """Write ``node_size`` and ``resolution`` into a primitive node, returning the number of sockets written."""
     if node is None:
         return 0
 
@@ -96,11 +88,8 @@ def _apply_node_primitive_inputs(node, node_size: float, resolution: int) -> int
 def _add_smooth_by_angle_node(nodes, location):
     """Create the Smooth by Angle node, falling back to Set Shade Smooth.
 
-    Blender 4.x and 5.x ship Smooth by Angle as an Essentials asset rather than
-    a built-in node, so ``GeometryNodeSetSmoothByAngle`` raises RuntimeError
-    when the identifier is missing. At Angle=180 with Ignore Sharpness the
-    asset matches ``GeometryNodeSetShadeSmooth``.
-    """
+    Blender 4.x and 5.x ship it as an Essentials asset, so the identifier raises
+    RuntimeError; at Angle=180 with Ignore Sharpness the fallback matches."""
     smooth = None
     for ident in ('GeometryNodeSetSmoothByAngle',):
         try:
@@ -117,7 +106,7 @@ def _add_smooth_by_angle_node(nodes, location):
     smooth.location = location
 
     if 'Angle' in smooth.inputs:
-        smooth.inputs['Angle'].default_value = math.pi  # 180°
+        smooth.inputs['Angle'].default_value = math.pi
     if 'Ignore Sharpness' in smooth.inputs:
         smooth.inputs['Ignore Sharpness'].default_value = True
     if 'Shade Smooth' in smooth.inputs:
@@ -131,12 +120,7 @@ def _build_node_shape_switch(nodes, links, base_x: float, base_y: float,
                              resolution: int = DEFAULT_NODE_RESOLUTION,
                              shape_index: int = DEFAULT_NODE_SHAPE_INDEX,
                              shade_smooth: bool = DEFAULT_NODE_SHADE_SMOOTH):
-    """Spawn the 5 node primitives, an Index Switch and a Smooth by Angle.
-
-    Returns ``(geometry_socket, primitives_dict)``, the socket to feed into
-    Instance on Points. ``shade_smooth=False`` skips the Smooth by Angle node,
-    which averages every normal and turns faceted glyphs into blobs.
-    """
+    """Spawn the 5 primitives, an Index Switch and a Smooth by Angle, returning ``(geometry_socket, primitives_dict)``. ``shade_smooth=False`` skips the smoothing, which averages every normal and blobs faceted glyphs."""
     sphere = nodes.new('GeometryNodeMeshUVSphere')
     sphere.name = "SciGraphs_NodeSphere"
     sphere.label = "Node Sphere"
@@ -204,11 +188,7 @@ def _build_node_shape_switch(nodes, links, base_x: float, base_y: float,
 
 def _build_edge_profile_node(nodes, thickness: float, resolution: int,
                              profile: str, location):
-    """Create the curve used as the ``Curve to Mesh`` profile for edges.
-
-    ``'ROUND'`` is a circle (tubes), ``'RIBBON'`` a flat rectangle. Both are
-    named ``SciGraphs_EdgeProfile`` so Update Appearance keeps finding them.
-    """
+    """Create the edge profile curve, named ``SciGraphs_EdgeProfile`` so Update Appearance keeps finding it."""
     profile = str(profile or DEFAULT_EDGE_PROFILE).upper()
     if profile not in EDGE_PROFILE_VALUES:
         profile = DEFAULT_EDGE_PROFILE
@@ -234,10 +214,7 @@ def _build_edge_profile_node(nodes, thickness: float, resolution: int,
     return circle
 
 def create_graph_object(graph_data, is_directed=False, selected_attributes=None, remove_self_loops=True):
-    """Build a mesh whose vertices are graph nodes and whose edges are links.
-
-    ``selected_attributes=None`` imports every numeric column.
-    """
+    """Build a mesh whose vertices are graph nodes and whose edges are links; ``selected_attributes=None`` imports every numeric column."""
     import time
     start_time = time.time()
     
@@ -249,7 +226,6 @@ def create_graph_object(graph_data, is_directed=False, selected_attributes=None,
     rng = np.random.RandomState(geom_seed)
     
     if hasattr(graph_data, 'node_coordinates') and graph_data.node_coordinates:
-        # Use provided coordinates (e.g. from SuiteSparse _coord.mtx)
         initial_positions = np.zeros((num_nodes, 3))
         coords_used = 0
         for i, node in enumerate(graph_data.nodes):
@@ -368,8 +344,7 @@ def create_graph_object(graph_data, is_directed=False, selected_attributes=None,
         import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_attributes)
         log(f"  Attributes imported in {time.time() - attr_start:.2f}s")
     
-    # Geometry Nodes visualization is applied separately, by the panel's
-    # Setup Visualization button.
+    # Geometry Nodes visualization is applied separately, by the panel.
     
     log(f"Total graph creation time: {time.time() - start_time:.2f}s")
     
@@ -380,9 +355,7 @@ def import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_
 
     Each numeric column becomes ``edge_{column}`` on the edge domain plus
     ``vertex_{column}_sum``/``_mean``/``_min``/``_max``/``_count`` on the
-    vertices. ``edge_df_indices`` maps a mesh edge index back to its dataframe
-    row; ``selected_attributes`` restricts which columns are considered.
-    """
+    vertices. ``edge_df_indices`` maps a mesh edge index back to its row."""
     import json
     
     df = graph_data.dataframe
@@ -461,7 +434,6 @@ def import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_
 
 
 def _create_edge_attribute(mesh, col_name, col_data, edge_df_indices):
-    """Create edge attribute from column data."""
     attr_name = f"edge_{col_name}"
     if attr_name in mesh.attributes:
         return
@@ -538,12 +510,7 @@ def _create_vertex_attributes_from_column(mesh, obj, df, col_name, source_col, t
 
 
 def import_node_attributes_from_file(obj, filepath, delimiter='\t', has_header=False):
-    """Import vertex-only attributes from a file onto an existing graph.
-
-    Node identifier in the first column, values in the rest. Nodes present in
-    the graph but absent from the file get ``float('nan')``, so callers can
-    tell missing data from zero. Returns (attributes_imported, nodes_matched).
-    """
+    """Import vertex-only attributes: identifier in column 1, values in the rest. Nodes absent from the file get ``float('nan')``, distinguishing missing data from zero. Returns (attributes_imported, nodes_matched)."""
     import json
 
     if obj is None or obj.type != 'MESH':
@@ -615,9 +582,8 @@ def import_node_attributes_from_file(obj, filepath, delimiter='\t', has_header=F
     return attrs_imported, len(nodes_matched)
 
 
-# Legacy per-type socket indexes for Blender <= 3.x. From 4.0 on, both
-# GeometryNode*NamedAttribute nodes expose a single socket by name whatever
-# the data_type, so the name is tried first and these are the fallback.
+# Legacy per-type socket indexes for Blender <= 3.x; 4.0 on exposes one
+# socket by name, so these are only the fallback.
 _GN_STORE_VALUE_INDEX = {
     'FLOAT': 4,
     'INT': 7,
@@ -636,7 +602,6 @@ _GN_ATTR_OUTPUT_INDEX = {
 
 
 def _gn_attribute_output_socket(read_node, gn_type):
-    """Return the value output of a GeometryNodeInputNamedAttribute."""
     if "Attribute" in read_node.outputs:
         return read_node.outputs["Attribute"]
     idx = _GN_ATTR_OUTPUT_INDEX.get(gn_type, 0)
@@ -646,7 +611,6 @@ def _gn_attribute_output_socket(read_node, gn_type):
 
 
 def _gn_store_value_input(store_node, gn_type):
-    """Return the value input of a GeometryNodeStoreNamedAttribute."""
     if "Value" in store_node.inputs:
         return store_node.inputs["Value"]
     idx = _GN_STORE_VALUE_INDEX.get(gn_type, 3)
@@ -675,15 +639,9 @@ _BUILTIN_ATTRS = {
 
 
 def _strip_custom_attributes_from_geo(nodes, links, geo_socket, mesh, base_location):
-    """Strip every custom attribute from the geometry on ``geo_socket``.
-
-    Returns the resulting socket, or the original when there is nothing to
-    remove. Without this, node values (centrality, community, imported columns)
-    bleed into the edge tubes through Mesh-to-Curve: the first and last tube
-    segment inherit the connected node vertex's values.
-    """
-    # ``obj["scigraphs_color_attr"] = "<name>"`` keeps one attribute alive
-    # through the pipeline, along with its ``<name>_color`` FLOAT_COLOR layer.
+    """Strip every custom attribute from ``geo_socket``. Without this, node values bleed into the edge tubes through Mesh-to-Curve: the first and last tube segment inherit the node vertex's values."""
+    # ``obj["scigraphs_color_attr"] = "<name>"`` keeps one attribute alive,
+    # along with its ``<name>_color`` FLOAT_COLOR layer.
     obj_for_attrs = getattr(mesh, "id_data", None)
     keep_names = set()
     color_attr = None
@@ -721,13 +679,7 @@ def _strip_custom_attributes_from_geo(nodes, links, geo_socket, mesh, base_locat
 
 
 def _promote_edge_attributes_to_point(nodes, links, geo_socket, mesh):
-    """Re-domain EDGE attributes to POINT so they survive Mesh-to-Curve.
-
-    Each EDGE attribute gets an InputNamedAttribute / StoreNamedAttribute pair:
-    read on the edge domain, written back on the point domain, where Blender
-    averages the connected edges per vertex. Returns the resulting socket, or
-    the original when there are no edge attributes.
-    """
+    """Re-domain EDGE attributes to POINT so they survive Mesh-to-Curve, via an InputNamedAttribute / StoreNamedAttribute pair each. Returns the resulting socket."""
     _BUILTIN_EDGE = {'.edge_verts', 'sharp_edge', 'crease_edge', 'material_index'}
 
     edge_attrs = [
@@ -783,16 +735,9 @@ def _promote_edge_attributes_to_point(nodes, links, geo_socket, mesh):
 def _split_edges_for_individual_curves(nodes, links, geo_socket, location, mesh=None):
     """Duplicate shared edge vertices before Mesh-to-Curve, when needed.
 
-    Mesh to Curve merges connected mesh edges into longer splines, which would
-    render tubes running straight through intermediate nodes.
-
-    On OSMnx-style meshes, where ``is_intersection`` is present, each street is
-    a chain of curve points and intersections have degree >= 3. Mesh to Curve
-    already breaks splines at any vertex whose degree is not 2, so splitting
-    here would only open visible gaps between consecutive curve points; skip
-    it. Everywhere else every vertex is a node and degree-2 chains would merge
-    into one tube, so keep the global Split Edges.
-    """
+    Mesh to Curve merges connected edges into one spline, so tubes would run
+    through intermediate nodes. On OSMnx meshes (``is_intersection`` present) it
+    already breaks at any vertex of degree != 2, so splitting only opens gaps."""
     if mesh is not None and "is_intersection" in mesh.attributes:
         log("  Skipping Split Edges: 'is_intersection' present, keeping streets continuous")
         return geo_socket
@@ -828,19 +773,14 @@ def _get_slot0_material(obj):
 def setup_geometry_nodes_visualization(obj, selection_attr=None):
     """Build the SciGraphs_Viz tree: glyphs on the vertices, tubes on the edges.
 
-    On an OSMnx graph the glyphs go only on ``is_intersection=1`` vertices, not
-    on the intermediate curve points. ``selection_attr`` narrows them further
-    to vertices where that INT POINT attribute is non-zero, ANDed with the
-    intersection filter when both apply. Reusing an existing modifier and node
-    group makes this idempotent.
-
-    Appearance comes from the object's custom properties, so a rebuild restores
-    the same look: ``scigraphs_node_shape_index`` (0..4 = sphere, icosphere,
-    cube, cone, cylinder), ``scigraphs_node_resolution``,
+    Idempotent. On an OSMnx graph glyphs go only on ``is_intersection=1``
+    vertices; ``selection_attr`` narrows them to vertices where that INT POINT
+    attribute is non-zero. Appearance is read back from the object's custom
+    properties, whose names are fixed: ``scigraphs_node_shape_index`` (0..4 =
+    sphere, icosphere, cube, cone, cylinder), ``scigraphs_node_resolution``,
     ``scigraphs_node_size``, ``scigraphs_node_shade_smooth``,
-    ``scigraphs_edge_thickness``, ``scigraphs_edge_resolution`` and
-    ``scigraphs_edge_profile`` (``'ROUND'`` or ``'RIBBON'``).
-    """
+    ``scigraphs_edge_thickness``, ``scigraphs_edge_resolution``,
+    ``scigraphs_edge_profile``."""
     mod = obj.modifiers.get("SciGraphs_Viz")
     
     if mod is None:
@@ -877,8 +817,7 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     mesh_to_points.location = (-600, 200)
     links.new(prepared_geo, mesh_to_points.inputs['Mesh'])
 
-    # The primitives sit behind an Index Switch so Update Appearance can swap
-    # shapes without rebuilding the tree.
+    # Index Switch behind the primitives lets Update Appearance swap shapes.
     initial_shape = max(0, min(4, int(obj.get("scigraphs_node_shape_index",
                                               DEFAULT_NODE_SHAPE_INDEX))))
     initial_size = float(obj.get("scigraphs_node_size", DEFAULT_NODE_SIZE))
@@ -913,9 +852,8 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
         links.new(named_attr.outputs['Attribute'], compare_node.inputs['A'])
         selection_socket = compare_node.outputs['Result']
 
-    # The mask is read as FLOAT and compared > 0.5: the FLOAT sockets of
-    # Compare are unambiguous by name, unlike the INT/BOOLEAN paths, so the
-    # Selection behaves the same across Blender backends.
+    # Read the mask as FLOAT and compare > 0.5: Compare's FLOAT sockets are
+    # unambiguous by name, unlike its INT/BOOLEAN paths.
     if selection_attr and selection_attr in obj.data.attributes:
         sel_named = nodes.new(type='GeometryNodeInputNamedAttribute')
         sel_named.data_type = 'FLOAT'
@@ -946,9 +884,8 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     realize_instances.location = (0, 200)
     links.new(instance_on_points.outputs['Instances'], realize_instances.inputs['Geometry'])
     
-    # Keep only edges with both endpoints visible. On the EDGE domain the
-    # FLOAT mask averages its two endpoints, reaching 1.0 only when both are
-    # visible, so anything below that is deleted.
+    # On the EDGE domain the FLOAT mask averages its two endpoints, reaching
+    # 1.0 only when both are visible, so anything below that is deleted.
     edge_input_geo = prepared_geo
     if selection_attr and selection_attr in obj.data.attributes:
         edge_vis = nodes.new(type='GeometryNodeInputNamedAttribute')
@@ -1051,12 +988,7 @@ def update_node_positions_from_property(obj):
     obj.data.update()
     
 def rebuild_edges(obj):
-    """Rebuild edges from ``edges_data`` after a position update.
-
-    Deliberately a no-op for mesh-native objects, which carry no ``edges_data``:
-    there the mesh edges are the topology, and rebuilding would drop the curve
-    vertices an edge style has added.
-    """
+    """Rebuild edges from ``edges_data`` after a position update. A no-op for mesh-native objects, which carry no ``edges_data``: there the mesh edges are the topology, and rebuilding would drop an edge style's vertices."""
     if "edges_data" not in obj:
         return
 
@@ -1101,12 +1033,7 @@ def rebuild_edges(obj):
 def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_CIRCLE',
                                    is_directed=False, selected_attributes=None,
                                    remove_self_loops=True):
-    """Create a graph object positioned on the globe.
-
-    ``positions_3d`` maps node name to [x, y, z]. ``edge_style`` is 'STRAIGHT'
-    or 'GREAT_CIRCLE'; great circles add intermediate arc vertices, marked
-    ``is_real_node=0`` so they are not drawn as nodes.
-    """
+    """Create a graph object on the globe from ``positions_3d`` (node name -> [x, y, z]). ``edge_style='GREAT_CIRCLE'`` adds arc vertices marked ``is_real_node=0`` so they are not drawn as nodes."""
     from ..geo import geospatial
     import time
     
@@ -1130,7 +1057,7 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
         if node_str in positions_3d:
             pos = positions_3d[node_str]
             v = bm.verts.new(pos)
-            v[is_node_layer] = 1  # Mark as real node
+            v[is_node_layer] = 1
             verts.append(v)
             node_to_vert[node] = v
             node_to_index[node] = i
@@ -1170,7 +1097,7 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
                     
                     for point in arc_points[1:-1]:
                         arc_v = bm.verts.new(point)
-                        arc_v[is_node_layer] = 0  # Mark as curve point, NOT a real node
+                        arc_v[is_node_layer] = 0
                         arc_verts.append(arc_v)
                     
                     arc_verts.append(node_to_vert[tgt])
@@ -1245,7 +1172,6 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
                 non_null_count = converted.notna().sum()
                 total_count = len(df[col])
                 
-                # If at least 50% of values are numeric, include it
                 if total_count > 0 and (non_null_count / total_count) > 0.5:
                     numeric_cols.append(col)
             except:
@@ -1338,8 +1264,7 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
     source_col_name = getattr(graph_data, 'source_column_name', df.columns[0])
     target_col_name = getattr(graph_data, 'target_column_name', df.columns[1])
     
-    # Only the "real" nodes (is_real_node=1) have vertices here; arc points
-    # do not.
+    # Only is_real_node=1 vertices; arc points do not appear here.
     node_to_idx = {}
     nodes_data = obj.get("nodes_data", "")
     if nodes_data:
@@ -1442,9 +1367,7 @@ def create_osmnx_graph_object(graph_data, edge_geometries, scale=0.001, retain_g
     """Create a graph object from OSMnx data, with curved street geometries.
 
     ``edge_geometries`` maps (u, v) to the (lat, lon) points along that street.
-    ``scale`` converts meters to Blender units; ``retain_geometry=False`` draws
-    straight edges instead of following the street.
-    """
+    ``scale`` is meters to Blender units; ``retain_geometry=False`` draws straight."""
     import time
     start_time = time.time()
     
@@ -1466,7 +1389,7 @@ def create_osmnx_graph_object(graph_data, edge_geometries, scale=0.001, retain_g
         if node_id in node_positions:
             pos = node_positions[node_id]
             v = bm.verts.new(pos)
-            v[is_intersection_layer] = 1  # Mark as real intersection
+            v[is_intersection_layer] = 1
             node_verts[node_id] = v
     
     bm.verts.ensure_lookup_table()
@@ -1499,7 +1422,7 @@ def create_osmnx_graph_object(graph_data, edge_geometries, scale=0.001, retain_g
             try:
                 bm.edges.new([node_verts[src], node_verts[tgt]])
             except ValueError:
-                pass  # Edge already exists
+                pass
         
         edges_created += 1
         
@@ -1520,12 +1443,11 @@ def create_osmnx_graph_object(graph_data, edge_geometries, scale=0.001, retain_g
     obj["num_edges"] = num_edges
     obj["is_osmnx"] = True
     obj["scale"] = scale
-    obj["num_mesh_verts"] = len(mesh.vertices)  # Total vertices including curve points
+    obj["num_mesh_verts"] = len(mesh.vertices)  # includes curve points
     obj["osmnx_center_lat"] = center_lat
     obj["osmnx_center_lon"] = center_lon
-    # OSMnx graphs are MultiDiGraphs by construction: oneway and turn
-    # restrictions are encoded as directed edges. Mark the object so the
-    # directed panels, arrows and algorithms match the graph in the cache.
+    # OSMnx graphs are MultiDiGraphs (oneway and turn restrictions are directed
+    # edges), so mark the object to match the cached graph.
     obj["is_directed"] = bool(getattr(graph_data, "is_directed", True))
     
     obj["nodes_data"] = ",".join(str(n) for n in graph_data.nodes)
@@ -1546,11 +1468,7 @@ def create_osmnx_graph_object(graph_data, edge_geometries, scale=0.001, retain_g
 
 
 def _convert_osmnx_coords_to_3d(node_coordinates, scale):
-    """Project a node_id -> (lat, lon) mapping onto local 3D positions.
-
-    Equirectangular projection centered on the network centroid. ``scale`` is
-    meters to Blender units. Returns (positions, center_lat, center_lon).
-    """
+    """Project node_id -> (lat, lon) onto local 3D positions, equirectangular about the network centroid. ``scale`` is meters to Blender units. Returns (positions, center_lat, center_lon)."""
     if not node_coordinates:
         return {}, 0.0, 0.0
     
@@ -1572,7 +1490,7 @@ def _convert_osmnx_coords_to_3d(node_coordinates, scale):
         
         x = x_m * scale
         y = y_m * scale
-        z = 0.0  # Flat projection (could add elevation later)
+        z = 0.0
         
         positions[node_id] = (x, y, z)
     
@@ -1619,11 +1537,7 @@ def _local_3d_to_latlon(x, y, center_lat, center_lon, scale):
 
 
 def _create_curved_edge(bm, node_verts, src, tgt, geom_coords, node_positions, scale, is_intersection_layer):
-    """Create an edge that follows the street's (lat, lon) geometry.
-
-    Intermediate vertices are marked ``is_intersection=0``. With fewer than two
-    geometry points a straight edge is created instead.
-    """
+    """Create an edge following the street's (lat, lon) geometry; intermediate vertices are marked ``is_intersection=0``, and fewer than two points falls back to straight."""
     if len(geom_coords) < 2:
         try:
             bm.edges.new([node_verts[src], node_verts[tgt]])
@@ -1636,7 +1550,6 @@ def _create_curved_edge(bm, node_verts, src, tgt, geom_coords, node_positions, s
         center_x = sum(p[0] for p in all_coords) / len(all_coords)
         center_y = sum(p[1] for p in all_coords) / len(all_coords)
         
-        # Approximate, but good enough over a local area.
         sample_node = list(node_positions.keys())[0]
         sample_lat, sample_lon = list(geom_coords)[0] if geom_coords else (0, 0)
     
@@ -1661,7 +1574,7 @@ def _create_curved_edge(bm, node_verts, src, tgt, geom_coords, node_positions, s
         adjusted_pos = (pos[0] + offset_x, pos[1] + offset_y, pos[2])
         
         new_vert = bm.verts.new(adjusted_pos)
-        new_vert[is_intersection_layer] = 0  # Not a real intersection
+        new_vert[is_intersection_layer] = 0
         
         try:
             bm.edges.new([prev_vert, new_vert])
@@ -1681,9 +1594,7 @@ def set_nodes_modifier_input(mod, identifier, value):
     """Write one Geometry Nodes modifier input by socket identifier.
 
     ``mod[identifier] = value`` raises TypeError on Blender 5.2, so try
-    ``mod.properties.inputs[identifier]`` first and fall back for Blender 4.x.
-    Returns True when the value was written.
-    """
+    ``mod.properties.inputs[identifier]`` first, then fall back for 4.x."""
     if mod is None:
         return False
 
@@ -1738,7 +1649,6 @@ def update_geometry_nodes_parameters(obj):
         "Filter Attr": props.filter_attribute if props.filter_attribute != 'NONE' else "",
     }
     
-    # Apply values; sockets this tree does not expose are skipped silently
     for socket_name, value in param_values.items():
         if socket_name in socket_map:
             set_nodes_modifier_input(mod, socket_map[socket_name], value)
@@ -1753,11 +1663,7 @@ def update_geometry_nodes_parameters(obj):
 
 
 def setup_interactive_geometry_nodes(obj):
-    """Build the interactive Geometry Nodes tree, driven from the UI panel.
-
-    Its exposed inputs cover node shape, attribute-driven node scale and edge
-    thickness, direction arrows, and live filtering by attribute range.
-    """
+    """Build the interactive Geometry Nodes tree driven from the UI panel: node shape, attribute-driven scale and thickness, direction arrows, live range filtering."""
     mod = obj.modifiers.get("SciGraphs_Viz")
     if mod is None:
         mod = obj.modifiers.new(name="SciGraphs_Viz", type='NODES')
@@ -1858,7 +1764,7 @@ def setup_interactive_geometry_nodes(obj):
     sphere = nodes.new('GeometryNodeMeshUVSphere')
     sphere.name = "SciGraphs_NodeSphere"
     sphere.location = (-900, 100)
-    sphere.inputs['Radius'].default_value = 1.0  # Base radius, scaled by instance
+    sphere.inputs['Radius'].default_value = 1.0
     links.new(group_in.outputs['Node Resolution'], sphere.inputs['Segments'])
     links.new(group_in.outputs['Node Resolution'], sphere.inputs['Rings'])
 
@@ -1898,11 +1804,11 @@ def setup_interactive_geometry_nodes(obj):
         shape_switch.index_switch_items.new()
 
     links.new(group_in.outputs['Node Shape'], shape_switch.inputs['Index'])
-    links.new(sphere.outputs['Mesh'], shape_switch.inputs[1])       # 0 = Sphere
-    links.new(ico_sphere.outputs['Mesh'], shape_switch.inputs[2])   # 1 = Icosphere
-    links.new(cube.outputs['Mesh'], shape_switch.inputs[3])         # 2 = Cube
-    links.new(cone.outputs['Mesh'], shape_switch.inputs[4])         # 3 = Cone
-    links.new(cylinder.outputs['Mesh'], shape_switch.inputs[5])     # 4 = Cylinder
+    links.new(sphere.outputs['Mesh'], shape_switch.inputs[1])
+    links.new(ico_sphere.outputs['Mesh'], shape_switch.inputs[2])
+    links.new(cube.outputs['Mesh'], shape_switch.inputs[3])
+    links.new(cone.outputs['Mesh'], shape_switch.inputs[4])
+    links.new(cylinder.outputs['Mesh'], shape_switch.inputs[5])
 
     smooth_by_angle = _add_smooth_by_angle_node(nodes, location=(-420, 0))
     links.new(shape_switch.outputs['Output'], smooth_by_angle.inputs['Geometry'])
@@ -1973,7 +1879,7 @@ def setup_interactive_geometry_nodes(obj):
     filter_switch = nodes.new('GeometryNodeSwitch')
     filter_switch.input_type = 'BOOLEAN'
     filter_switch.location = (0, 700)
-    filter_switch.inputs['False'].default_value = True  # No filtering = show all
+    filter_switch.inputs['False'].default_value = True
     links.new(group_in.outputs['Filter Enable'], filter_switch.inputs['Switch'])
     links.new(bool_and.outputs['Boolean'], filter_switch.inputs['True'])
     
@@ -2134,9 +2040,8 @@ def setup_interactive_geometry_nodes(obj):
 
 
 
-# Attribute data type -> (item field, component count). Covers every generic
-# attribute Blender exposes, so save/restore never reads a missing field:
-# FloatColorAttributeValue has ``.color``, not ``.value``.
+# Attribute data type -> (item field, component count); the field differs per
+# type, e.g. FloatColorAttributeValue has ``.color``, not ``.value``.
 _ATTR_FIELDS = {
     'FLOAT': ('value', 1),
     'INT': ('value', 1),
@@ -2162,7 +2067,6 @@ def _read_attr_item(item, data_type):
 
 
 def _attr_default(data_type):
-    """Neutral default value used for vertices without saved data."""
     field, comps = _ATTR_FIELDS.get(data_type, ('value', 1))
     if comps == 1:
         return 0
@@ -2172,13 +2076,7 @@ def _attr_default(data_type):
 
 
 def _restore_extra_point_attrs(mesh, saved_point_attrs, num_nodes):
-    """Re-apply POINT attributes that bmesh cannot carry through a rebuild.
-
-    bmesh rebuilds only FLOAT/INT scalar layers, so color, vector and boolean
-    node attributes would otherwise be lost on every edge-style application.
-    Node vertices are created first and keep indices 0..num_nodes-1, so their
-    values are restored by index; curve vertices keep the neutral default.
-    """
+    """Re-apply the POINT color, vector and boolean attributes, which bmesh cannot carry through a rebuild. Node vertices keep indices 0..num_nodes-1 and are restored by index; curve vertices keep the neutral default."""
     for name, (dtype, values) in saved_point_attrs.items():
         if dtype in _BMESH_RESTORED_TYPES:
             continue
@@ -2205,13 +2103,7 @@ def _restore_extra_point_attrs(mesh, saved_point_attrs, num_nodes):
 
 
 def _save_custom_attributes(mesh, node_indices, has_intersection_attr):
-    """Read all custom mesh attributes before a destructive bmesh rebuild.
-
-    POINT attributes are saved by new vertex position, following
-    ``node_indices``. EDGE attributes are keyed by canonical node pair, so they
-    survive onto any edge topology. Returns (point_attrs, edge_attrs), each a
-    dict of {name: (data_type, values)}.
-    """
+    """Read all custom mesh attributes before a destructive bmesh rebuild: POINT by new vertex position following ``node_indices``, EDGE by canonical node pair so they survive any edge topology. Returns (point_attrs, edge_attrs), each {name: (data_type, values)}."""
     old_to_new = {old: new for new, old in enumerate(node_indices)}
     node_set = set(node_indices)
 
@@ -2313,7 +2205,6 @@ def _create_bmesh_layers(bm, point_attrs, edge_attrs):
 
 
 def _set_edge_attrs(edge, edge_key, edge_layers, edge_attrs):
-    """Write the saved attribute values onto a single bmesh edge."""
     for attr_name, layer in edge_layers.items():
         values_map = edge_attrs[attr_name][1]
         if edge_key in values_map:
@@ -2321,13 +2212,7 @@ def _set_edge_attrs(edge, edge_key, edge_layers, edge_attrs):
 
 
 def apply_edge_style_to_graph(obj, style_params: dict = None):
-    """Restyle a graph's edges by rebuilding its mesh geometry.
-
-    Reads the node positions (``is_intersection=1`` vertices), saves every
-    custom vertex and edge attribute, rebuilds in the chosen style, then puts
-    the attributes back. ``style_params`` falls back to the scene properties
-    when None. True on success.
-    """
+    """Restyle a graph's edges by rebuilding its mesh geometry, saving every custom vertex and edge attribute and putting them back. ``style_params`` falls back to the scene properties when None."""
     from scigraphs_core.mesh import edge_styles
 
     if obj is None or obj.type != 'MESH':
@@ -2434,7 +2319,6 @@ def apply_edge_style_to_graph(obj, style_params: dict = None):
     bm.to_mesh(mesh)
     bm.free()
 
-    # bmesh carries only FLOAT/INT layers; put the rest back by hand.
     _restore_extra_point_attrs(mesh, saved_point_attrs, num_nodes)
 
     obj["edge_style_applied"] = style_params['style_type']
@@ -2455,12 +2339,7 @@ _VIZ_REBUILD_HOOKS = []
 
 
 def register_viz_rebuild_hook(callback):
-    """Subscribe ``callback(obj)`` to the post-rebuild notification.
-
-    Hooks fire once the SciGraphs_Viz tree has been regenerated, which is how
-    the coloring toolbar reapplies its patches against the fresh tree. Keep
-    them cheap and exception-safe.
-    """
+    """Subscribe ``callback(obj)`` to fire once SciGraphs_Viz has been regenerated, which is how the coloring toolbar reapplies its patches. Keep hooks cheap and exception-safe."""
     if callback not in _VIZ_REBUILD_HOOKS:
         _VIZ_REBUILD_HOOKS.append(callback)
 
@@ -2479,12 +2358,7 @@ def _notify_viz_rebuild(obj):
 
 
 def _rebuild_visualization_if_present(obj):
-    """Rebuild the SciGraphs_Viz Geometry Nodes tree if there is one.
-
-    A full rebuild rather than incremental patching, so the ``is_intersection``
-    filter and the attribute-stripping chain both match the current attribute
-    set. Call after anything that changes which attributes the mesh carries.
-    """
+    """Rebuild the SciGraphs_Viz tree whole rather than patching it, so the ``is_intersection`` filter and the attribute-stripping chain match the current attribute set."""
     mod = obj.modifiers.get("SciGraphs_Viz")
     if not mod or not mod.node_group:
         return
@@ -2503,7 +2377,6 @@ def _rebuild_visualization_if_present(obj):
 
 def _apply_styled_edges(bm, verts, edges, positions, params, parallel_groups,
                         is_int_layer, edge_layers, saved_edge_attrs):
-    """Write the non-bundled styled edges into the bmesh."""
     from scigraphs_core.mesh import edge_styles as es
 
     style_type = params['style_type']
@@ -2565,7 +2438,6 @@ def _apply_styled_edges(bm, verts, edges, positions, params, parallel_groups,
 
 def _apply_bundled_edges(bm, verts, edges, positions, params, is_int_layer,
                          edge_layers, saved_edge_attrs):
-    """Write force-directed bundled edges into the bmesh."""
     from scigraphs_core.mesh import edge_styles as es
 
     edge_points = [(positions[src], positions[tgt]) for src, tgt in edges]

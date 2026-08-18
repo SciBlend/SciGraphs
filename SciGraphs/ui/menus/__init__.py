@@ -1,5 +1,4 @@
-# SciGraphs Viewport Menus
-# Quick actions for the active graph - no complex inputs needed.
+# Quick viewport actions for the active graph; no complex inputs needed.
 
 import bpy
 

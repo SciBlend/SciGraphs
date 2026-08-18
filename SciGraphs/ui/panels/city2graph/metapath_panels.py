@@ -1,9 +1,7 @@
-"""
-Metapath analysis panels for heterogeneous graphs.
+"""Metapath analysis panels for heterogeneous graphs.
 
 Follows the city2graph workflow: amenities plus a street dual graph, then
-``bridge_nodes``, then ``add_metapaths``. Shared inputs sit in the root panel
-and each materialization strategy gets its own subpanel.
+``bridge_nodes``, then ``add_metapaths``.
 """
 
 import bpy

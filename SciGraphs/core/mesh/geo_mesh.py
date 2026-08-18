@@ -1,5 +1,4 @@
-# GeoDataFrames to Blender mesh and curve objects, for both the OSMnx feature
-# operators and the city2graph proximity operators.
+# GeoDataFrames to Blender mesh and curve objects, for the OSMnx and city2graph operators.
 
 import bpy
 import bmesh
@@ -8,11 +7,7 @@ from scigraphs_core.logger import log
 
 
 def _resolve_projection_metadata(obj):
-    """Return the (center_lat, center_lon, scale) projection metadata of an object.
-
-    OSMnx objects store it under ``osmnx_*`` keys, Overture/city2graph objects
-    under ``c2g_*``. Either is accepted.
-    """
+    """Return the (center_lat, center_lon, scale) projection metadata, from either the ``osmnx_*`` or the ``c2g_*`` keys."""
     center_lat = obj.get("osmnx_center_lat")
     center_lon = obj.get("osmnx_center_lon")
     scale = obj.get("osmnx_scale")
@@ -29,11 +24,7 @@ def _resolve_projection_metadata(obj):
 
 
 def create_feature_mesh_from_gdf(gdf, name="OSM_Features", separate_by_type=False, osmnx_obj=None):
-    """Create Blender mesh objects from a GeoDataFrame, one per feature group.
-
-    ``separate_by_type`` groups by the ``building`` column. Without ``osmnx_obj``
-    to align coordinate systems, lon/lat are used unprojected.
-    """
+    """Create Blender mesh objects from a GeoDataFrame, one per feature group. ``separate_by_type`` groups by the ``building`` column; without ``osmnx_obj`` to align against, lon/lat are used unprojected."""
     from shapely.geometry import Point, LineString, Polygon, MultiPolygon, MultiLineString
 
     if gdf is None or len(gdf) == 0:
@@ -129,11 +120,7 @@ def _numeric_columns(gdf, skip=()):
 
 
 def _as_float(values, row_pos):
-    """One value from a column list as a float, with 0.0 for anything unusable.
-
-    ``values`` is None when the layer or relation does not carry the column,
-    which in a heterograph is normal rather than an error.
-    """
+    """One value from a column list as a float, 0.0 for anything unusable. ``values`` is None when the layer or relation lacks the column, normal in a heterograph."""
     if values is None or row_pos >= len(values):
         return 0.0
     value = values[row_pos]
@@ -145,11 +132,7 @@ def _as_float(values, row_pos):
 
 
 def _edge_endpoint_indices(edges_gdf, nodes_gdf):
-    """Map each edge to a (src_idx, tgt_idx) pair of positional node indices.
-
-    Reads the edge MultiIndex (source_id, target_id) against the node index.
-    The result is aligned with ``edges_gdf`` rows; unresolvable rows are None.
-    """
+    """Map each edge to a (src_idx, tgt_idx) pair of positional node indices, reading the edge MultiIndex against the node index. Aligned with ``edges_gdf`` rows; unresolvable rows are None."""
     import pandas as pd
 
     id_to_pos = {node_id: i for i, node_id in enumerate(nodes_gdf.index)}
@@ -168,13 +151,10 @@ def create_native_graph_from_gdfs(nodes_gdf, edges_gdf, name, ref_obj,
                                    markers=None, node_attr_skip=(), edge_attr_skip=()):
     """Materialize a city2graph result as a native SciGraphs MESH graph, or None.
 
-    One mesh object: vertices are nodes, mesh edges are graph edges. Writes the
-    markers the native coloring and setup pipeline expects (num_nodes,
-    num_edges, nodes_data, edges_data, node_positions, is_directed), and every
-    numeric GeoDataFrame column as a scalar mesh attribute, POINT for nodes and
-    EDGE for edges. ``ref_obj`` supplies the projection so the result overlays
-    the source network.
-    """
+    Vertices are nodes, mesh edges are graph edges. Writes the markers the native
+    pipeline expects (num_nodes, num_edges, nodes_data, edges_data,
+    node_positions, is_directed) plus every numeric column as a mesh attribute,
+    POINT for nodes and EDGE for edges. ``ref_obj`` supplies the projection."""
     from shapely.geometry import Point
 
     if nodes_gdf is None or len(nodes_gdf) == 0:
@@ -188,13 +168,10 @@ def create_native_graph_from_gdfs(nodes_gdf, edges_gdf, name, ref_obj,
     if nodes_gdf.crs and str(nodes_gdf.crs).upper() != "EPSG:4326":
         nodes_4326 = nodes_gdf.to_crs("EPSG:4326")
 
-    # One position per row, whatever the geometry. `_edge_endpoint_indices`
-    # resolves endpoints against the *positional* index of nodes_gdf, so
-    # dropping a row here would silently renumber every edge after it. Polygons
-    # are the case that bites: `od_matrix_to_graph()` returns zones, and
-    # collapsing those to the origin gave an object with the right num_nodes and
-    # num_edges that rendered as an empty frame. Representative point, not
-    # centroid, because a centroid can land outside a concave or multi-part zone.
+    # One position per row, whatever the geometry: endpoints resolve against the
+    # positional index, so dropping a row here silently renumbers every later edge
+    # and the object renders as an empty frame. Representative point, not centroid,
+    # which can land outside a concave or multi-part zone.
     positions = []
     degenerate = 0
     for geom in nodes_4326.geometry:
@@ -312,13 +289,10 @@ def _write_edge_attributes(obj, edges_gdf, created_edge_rows, skip=()):
 def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, markers=None):
     """Materialize a heterogeneous city2graph result as a native MESH graph, or None.
 
-    All node layers become vertices of one mesh and all relations become mesh
-    edges, tagged with ``layer_id`` (POINT) and ``edge_type_id`` (EDGE) so the
-    native coloring pipeline can color by layer or by relation type.
-
-    ``nodes_dict`` maps layer_name to a nodes GeoDataFrame; ``edges_dict`` maps
-    (src_layer, relation, tgt_layer) to an edges GeoDataFrame.
-    """
+    Every layer becomes vertices of one mesh and every relation becomes mesh edges,
+    tagged ``layer_id`` (POINT) and ``edge_type_id`` (EDGE) so coloring can key on
+    either. ``nodes_dict`` maps layer_name to a frame, ``edges_dict`` maps
+    (src_layer, relation, tgt_layer) to a frame."""
     from shapely.geometry import Point
 
     if not nodes_dict:
@@ -334,9 +308,8 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
     layer_id_map = {name_: i for i, name_ in enumerate(layer_names)}
     node_index = {}
 
-    # Union of numeric columns over all layers, so a heterograph can be colored
-    # by a measurement and not only by layer. A column present in one layer and
-    # absent in another is normal; the absent side reads 0.0.
+    # Union of numeric columns over all layers, so coloring is not limited to
+    # layer identity; a column missing from one layer reads 0.0 there.
     node_columns = []
     for layer_gdf in nodes_dict.values():
         for col in _numeric_columns(layer_gdf):
@@ -464,11 +437,7 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
 
 
 def create_curves_from_gdf(edges_gdf, name, feature_obj, thickness=0.0002, limit=1000):
-    """Create a Blender curve object from LineString edges, or None if none drawn.
-
-    ``thickness`` is the bevel depth; ``limit`` caps how many edges are drawn.
-    ``feature_obj`` supplies the projection.
-    """
+    """Create a Blender curve object from LineString edges, or None if none drawn. ``thickness`` is the bevel depth, ``limit`` caps how many edges are drawn, ``feature_obj`` supplies the projection."""
     from shapely.geometry import LineString
 
     if edges_gdf is None or len(edges_gdf) == 0:

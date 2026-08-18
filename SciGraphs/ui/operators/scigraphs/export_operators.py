@@ -6,7 +6,6 @@ from scigraphs_core.mesh.mesh_utils import parse_graph_data_filtered, collect_me
 
 
 class SCIGRAPHS_OT_ExportGraph(bpy.types.Operator):
-    """Export graph to various formats."""
     bl_idname = "scigraphs.export_graph"
     bl_label = "Export Graph"
     bl_description = "Export graph data to selected format"
@@ -60,7 +59,6 @@ class SCIGRAPHS_OT_ExportGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ExportPositions(bpy.types.Operator):
-    """Export node positions to CSV."""
     bl_idname = "scigraphs.export_positions"
     bl_label = "Export Positions"
     bl_description = "Export node positions to CSV file"
@@ -92,7 +90,6 @@ class SCIGRAPHS_OT_ExportPositions(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GenerateStatisticsReport(bpy.types.Operator):
-    """Generate comprehensive statistics report."""
     bl_idname = "scigraphs.generate_statistics_report"
     bl_label = "Generate Statistics Report"
     bl_description = "Generate text report with all graph statistics"
@@ -134,7 +131,6 @@ class SCIGRAPHS_OT_GenerateStatisticsReport(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ExportGEXF(bpy.types.Operator):
-    """Export graph to GEXF format."""
     bl_idname = "scigraphs.export_gexf"
     bl_label = "Export to GEXF"
     bl_description = "Export graph to GEXF format"
@@ -169,7 +165,6 @@ class SCIGRAPHS_OT_ExportGEXF(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ExportGraphML(bpy.types.Operator):
-    """Export graph to GraphML format."""
     bl_idname = "scigraphs.export_graphml"
     bl_label = "Export to GraphML"
     bl_description = "Export graph to GraphML format"
@@ -204,7 +199,6 @@ class SCIGRAPHS_OT_ExportGraphML(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ExportPajek(bpy.types.Operator):
-    """Export graph to Pajek NET format."""
     bl_idname = "scigraphs.export_pajek"
     bl_label = "Export to Pajek"
     bl_description = "Export graph to Pajek NET format"
@@ -238,7 +232,6 @@ class SCIGRAPHS_OT_ExportPajek(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ExportJSON(bpy.types.Operator):
-    """Export graph to JSON format."""
     bl_idname = "scigraphs.export_json"
     bl_label = "Export to JSON"
     bl_description = "Export graph to JSON format"
@@ -273,7 +266,6 @@ class SCIGRAPHS_OT_ExportJSON(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateGlobalStatistics(bpy.types.Operator):
-    """Calculate and display global graph statistics."""
     bl_idname = "scigraphs.calculate_global_statistics"
     bl_label = "Calculate Global Statistics"
     bl_description = "Calculate global graph metrics and store in object properties"

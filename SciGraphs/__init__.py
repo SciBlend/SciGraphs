@@ -1,9 +1,7 @@
-# SciGraphs
-
 bl_info = {
     "name": "SciGraphs",
     "author": "José Marín",
-    "version": (1, 0, 1),
+    "version": (1, 1, 0),
     "blender": (5, 1, 0),
     "location": "3D View > Sidebar > SciGraphs",
     "description": "Create, visualize and analyze graphs from data.",
@@ -13,10 +11,8 @@ bl_info = {
 }
 
 
-# Put scigraphs_core within reach before any submodule imports from it. It is
-# a separate distribution: installed as a wheel in the normal case, resolved
-# from <repo>/core in a checkout. See _locate_core for the two-case search and
-# why there is no vendored third case.
+# scigraphs_core is a separate distribution: a wheel in the normal case, and
+# <repo>/core in a checkout. Put it within reach before any submodule imports.
 from . import _locate_core as _locate_core_module
 
 _locate_core_module.locate()
@@ -34,12 +30,8 @@ if bpy is not None:
     from . import preferences
     from . import properties
     from . import ui
-    # Still the subpackage, not the wheel. The analysis half moved out to
-    # `scigraphs_core`, but twenty-one modules stayed here because their job is
-    # Blender: building meshes, projecting terrain, driving the scene, replaying
-    # a pipeline. Binding the wheel under this name would shadow them, and
-    # `from .core.osmnx.graph_cache import ...` below would then resolve through
-    # the file system to a package the attribute no longer describes.
+    # The subpackage, not the wheel: twenty-one Blender-side modules still live
+    # here, and binding the wheel under this name would shadow them.
     from . import core
     from . import utils
 
@@ -57,7 +49,6 @@ def register():
     properties.register()
     ui.register()
 
-    # Register load_post handler for auto-loading cached graphs
     if _on_file_loaded not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_on_file_loaded)
 
@@ -67,15 +58,13 @@ def unregister():
     properties.unregister()
     preferences.unregister()
 
-    # Drop any active GTFS DuckDB connection so we don't leak file
-    # handles when the add-on is reloaded or disabled.
+    # Drop the active GTFS DuckDB connection or reloading leaks file handles.
     try:
         from .core.city2graph import transportation as _transportation
         _transportation.clear_active_gtfs()
     except Exception:  # noqa: BLE001
         pass
 
-    # Unregister load_post handler
     if _on_file_loaded in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_on_file_loaded)
 

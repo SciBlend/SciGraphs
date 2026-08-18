@@ -32,11 +32,7 @@ def save_geocode_cache(cache: Dict[str, Tuple[float, float]]):
         print(f"Warning: Could not save geocode cache: {e}")
 
 def detect_geospatial_columns(df: pd.DataFrame) -> Tuple[Optional[str], Optional[str]]:
-    """Guess the latitude and longitude columns from their names.
-
-    Returns (None, None) unless both are found. Note that bare 'x' and 'y'
-    count as longitude and latitude, so a plain scatter dataset can match.
-    """
+    """Guess the latitude and longitude columns from their names, (None, None) unless both are found. Bare 'x' and 'y' count, so a plain scatter dataset can match."""
     lat_patterns = ['lat', 'latitude', 'y', 'coord_y']
     lon_patterns = ['lon', 'long', 'longitude', 'x', 'coord_x']
     
@@ -61,11 +57,7 @@ def detect_geospatial_columns(df: pd.DataFrame) -> Tuple[Optional[str], Optional
     return None, None
 
 def detect_country_columns(df: pd.DataFrame) -> bool:
-    """Report whether the dataframe has a column of country names.
-
-    A name match alone is not enough: at least two of the first 20 distinct
-    values must also look like countries.
-    """
+    """Report whether the dataframe has a column of country names. A name match alone is not enough: at least two of the first 20 distinct values must look like countries."""
     country_patterns = ['country', 'nation', 'territory', 'origin', 'destination']
 
     known_countries = [
@@ -104,11 +96,7 @@ def detect_temporal_columns(df: pd.DataFrame) -> Optional[str]:
     return None
 
 def geocode_locations(location_names: List[str], use_cache: bool = True) -> Dict[str, Tuple[float, float]]:
-    """Geocode place names to {name: (lat, lon)} through Nominatim.
-
-    Results are cached on disk. Names that fail to resolve are left out of the
-    returned dict rather than mapped to a default.
-    """
+    """Geocode place names to {name: (lat, lon)} through Nominatim, cached on disk. Names that fail to resolve are left out rather than mapped to a default."""
     try:
         from geopy.geocoders import Nominatim
         from geopy.exc import GeocoderTimedOut, GeocoderServiceError
@@ -169,10 +157,7 @@ def calculate_sphere_positions(
     lat_lon_dict: Dict[str, Tuple[float, float]], 
     radius: float = 5.0
 ) -> Dict[str, np.ndarray]:
-    """Place named (lat, lon) pairs on a sphere as [x, y, z] arrays.
-
-    Z is up and the prime meridian runs along +X, matching the globe mesh.
-    """
+    """Place named (lat, lon) pairs on a sphere as [x, y, z] arrays: Z up, prime meridian along +X, matching the globe mesh."""
     positions = {}
     
     for node_name, (lat, lon) in lat_lon_dict.items():
@@ -199,8 +184,7 @@ def generate_great_circle_points(
     dot_product = np.clip(np.dot(p1, p2), -1.0, 1.0)
     angle = np.arccos(dot_product)
     
-    # Below this angle sin(angle) is small enough that the slerp weights blow
-    # up, so interpolate along the chord instead.
+    # Below this angle the slerp weights blow up, so interpolate along the chord.
     if angle < 0.01:
         t = np.linspace(0, 1, num_segments + 1)[:, np.newaxis]
         return pos1 + t * (pos2 - pos1)
@@ -230,11 +214,7 @@ def filter_temporal_data(
 ) -> pd.DataFrame:
     """Filter rows by period and collapse them to one row per group.
 
-    aggregation is 'ALL', 'YEAR', 'MONTH' or 'RANGE'. start and end apply to
-    'RANGE' and are read as months when they contain a hyphen ("2019-04") and
-    as years otherwise. weight_col, if given, is summed; without it duplicate
-    rows are dropped.
-    """
+    `aggregation` is 'ALL', 'YEAR', 'MONTH' or 'RANGE'; `start`/`end` apply to 'RANGE' and read as months when hyphenated ("2019-04"), else as years. `weight_col` is summed if given, otherwise duplicates are dropped."""
     df_copy = df.copy()
 
     if pd.api.types.is_numeric_dtype(df_copy[time_col]):
@@ -304,15 +284,10 @@ def create_globe_mesh(
 ) -> bpy.types.Object:
     """Build an Earth globe as a UV sphere with the requested material.
 
-    The UVs are equirectangular so a satellite texture lands where it belongs:
-    U (0 to 1) is longitude (-180 to +180), V is latitude (-90 to +90).
-
-    subdivisions runs 16 to 512. material_style is 'SIMPLE', 'OCEAN',
-    'WIREFRAME', 'TOPOGRAPHIC' or 'WORLD_MAP'; map_resolution ('110m', '50m',
-    '10m') and feature_type ('LAND', 'COASTLINE', ...) apply to 'WORLD_MAP'
-    only. A globe_theme other than 'NONE' fetches a texture at
-    texture_resolution ('2K', '4K', '8K') and overrides material_style.
-    """
+    UVs are equirectangular so a satellite texture lands where it belongs: U is
+    longitude (-180 to +180), V latitude (-90 to +90). `material_style` is 'SIMPLE',
+    'OCEAN', 'WIREFRAME', 'TOPOGRAPHIC' or 'WORLD_MAP', and a `globe_theme` other
+    than 'NONE' fetches a texture and overrides it."""
     ring_count = max(16, subdivisions // 2)
     
     bpy.ops.mesh.primitive_uv_sphere_add(
@@ -355,10 +330,7 @@ def create_globe_mesh(
 
 
 def _ensure_equirectangular_uv(globe_obj: bpy.types.Object, radius: float):
-    """Recompute the globe's UVs from vertex positions, so U is longitude and
-    V is latitude exactly. Satellite imagery only lines up with the geographic
-    data if the mapping is exactly equirectangular.
-    """
+    """Recompute the globe's UVs from vertex positions: satellite imagery lines up with the geographic data only if the mapping is exactly equirectangular."""
     import math
     
     mesh = globe_obj.data
@@ -392,12 +364,7 @@ def _ensure_equirectangular_uv(globe_obj: bpy.types.Object, radius: float):
 
 
 def _fix_uv_seam(mesh):
-    """Unwrap faces that straddle the 180 degree meridian.
-
-    Where U jumps from 1 back to 0 the face otherwise stretches the whole
-    texture backwards across the globe. Faces spanning more than half the U
-    range get their low corners pushed past 1.0 instead.
-    """
+    """Unwrap faces straddling the 180 degree meridian, where U jumps from 1 back to 0 and the face otherwise stretches the whole texture backwards across the globe."""
     uv_layer = mesh.uv_layers.active.data
     
     for poly in mesh.polygons:
@@ -557,10 +524,7 @@ def _create_topographic_material(nodes, links, output_node):
 
 
 def _create_world_map_material(nodes, links, output_node):
-    """Color land against ocean from the mesh's 'is_land' vertex attribute.
-
-    _compute_land_ocean_attribute must have run first, or it is all ocean.
-    """
+    """Color land against ocean from the mesh's 'is_land' vertex attribute; _compute_land_ocean_attribute must have run first, or it is all ocean."""
     attr_node = nodes.new(type='ShaderNodeAttribute')
     attr_node.location = (-400, 0)
     attr_node.attribute_name = 'is_land'
@@ -593,13 +557,7 @@ def _create_textured_pbr_material(
     bump_strength: float,
     globe_obj: bpy.types.Object
 ) -> bpy.types.Material:
-    """Build a Principled BSDF globe material around a downloaded texture.
-
-    Separate land and water roughness need the 'is_land' attribute on
-    globe_obj; without it both fall back to their average. The NASA_VIIRS theme
-    drives emission from the same image so the night lights glow, and
-    bump_strength above zero derives relief from its luminance.
-    """
+    """Build a Principled BSDF globe material around a downloaded texture. Separate land and water roughness need 'is_land' on globe_obj, else both average; NASA_VIIRS drives emission from the same image, and bump_strength derives relief from luminance."""
     from . import texture_api
     
     texture_path, material_hints = texture_api.get_texture_for_globe(
@@ -709,11 +667,7 @@ def _create_textured_pbr_material(
 def _compute_land_ocean_attribute(globe_obj: bpy.types.Object, radius: float, map_resolution: str = '110m', feature_type: str = 'COASTLINE'):
     """Write an 'is_land' float attribute per globe vertex, 1.0 on land.
 
-    Point-in-polygon against Natural Earth shapefiles, downloaded and cached on
-    first use. map_resolution is '110m', '50m' or '10m'; feature_type is 'LAND',
-    'COASTLINE', 'LAND_OCEAN', 'BATHYMETRY' or 'RIVERS_LAKES', and anything else
-    falls through to admin-0 country borders.
-    """
+    Point-in-polygon against Natural Earth shapefiles, cached on first use. `feature_type` is 'LAND', 'COASTLINE', 'LAND_OCEAN', 'BATHYMETRY' or 'RIVERS_LAKES'; anything else falls through to admin-0 country borders."""
     import geopandas as gpd
     from shapely.geometry import Point
     import math

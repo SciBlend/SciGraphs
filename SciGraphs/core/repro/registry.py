@@ -31,40 +31,31 @@ class OperatorRegistry:
         self._initialized = False
 
     def register(self, adapter: OperatorAdapter) -> None:
-        """Register an operator adapter."""
         self._adapters[adapter.bl_idname] = adapter
         if adapter.category not in self._by_category:
             self._by_category[adapter.category] = []
         self._by_category[adapter.category].append(adapter.bl_idname)
 
     def register_shortcut(self, short_name: str, bl_idname: str) -> None:
-        """Register a shortcut name for an operator."""
         self._shortcuts[short_name] = bl_idname
 
     def get(self, bl_idname: str) -> Optional[OperatorAdapter]:
-        """Get adapter by bl_idname or shortcut."""
         if bl_idname in self._shortcuts:
             bl_idname = self._shortcuts[bl_idname]
         return self._adapters.get(bl_idname)
 
     def get_by_category(self, category: str) -> List[OperatorAdapter]:
-        """Get all adapters in a category."""
         ids = self._by_category.get(category, [])
         return [self._adapters[id] for id in ids]
 
     def list_all(self) -> List[str]:
-        """List all registered operator bl_idnames."""
         return list(self._adapters.keys())
 
     def list_categories(self) -> List[str]:
-        """List all categories."""
         return list(self._by_category.keys())
 
     def resolve_operator(self, spec: str) -> Tuple[str, bool]:
-        """Resolve a bl_idname, shortcut or bpy.ops path.
-
-        Returns (resolved_bl_idname, has_adapter).
-        """
+        """Resolve a bl_idname, shortcut or bpy.ops path to (resolved_bl_idname, has_adapter)."""
         if spec in self._shortcuts:
             return self._shortcuts[spec], True
 
@@ -78,7 +69,6 @@ class OperatorRegistry:
         return spec, False
 
     def initialize(self) -> None:
-        """Initialize the registry with default adapters."""
         if self._initialized:
             return
         self._initialized = True
@@ -541,7 +531,6 @@ class OperatorRegistry:
 
     def _register_shortcuts(self) -> None:
         shortcuts = {
-            # Datasets
             "import_osmnx": "scigraphs.import_osm_graph",
             "osmnx": "scigraphs.import_osm_graph",
             "create_graph": "scigraphs.create_graph",
@@ -549,7 +538,6 @@ class OperatorRegistry:
             "sql": "scigraphs.create_graph_from_sql",
             "overture": "scigraphs.c2g_load_overture",
             "c2g_place": "scigraphs.c2g_load_overture_place",
-            # Analysis
             "centrality": "scigraphs.calculate_centrality",
             "clustering": "scigraphs.apply_clustering",
             "communities": "scigraphs.apply_clustering",
@@ -557,26 +545,22 @@ class OperatorRegistry:
             "patterns": "scigraphs.detect_patterns",
             "flow": "scigraphs.analyze_flow",
             "stats": "scigraphs.calculate_global_statistics",
-            # Layout
             "layout": "scigraphs.apply_layout",
             "layout_step": "scigraphs.execute_layout_step",
             "reset_layout": "scigraphs.reset_layout",
             "splitter": "scigraphs.network_splitter_3d",
-            # Visual
             "setup_vis": "scigraphs.setup_visualization",
             "appearance": "scigraphs.update_appearance",
             "preset": "scigraphs.apply_rendering_preset",
             "lighting": "scigraphs.setup_lighting",
             "edge_style": "scigraphs.apply_edge_style_preset",
             "text_overlay": "scigraphs.generate_text_overlay",
-            # Topology
             "planarity": "scigraphs.check_planarity",
             "genus": "scigraphs.calculate_genus",
             "faces": "scigraphs.compute_faces",
             "crossings": "scigraphs.validate_crossings",
             "surface": "scigraphs.visualize_surface",
             "dual": "scigraphs.create_dual_graph",
-            # OSMnx
             "osmnx_centrality": "scigraphs.osmnx_centrality",
             "shortest_path": "scigraphs.osmnx_shortest_path",
             "isochrones": "scigraphs.osmnx_isochrones",
@@ -587,14 +571,12 @@ class OperatorRegistry:
             "consolidate": "scigraphs.osmnx_consolidate",
             "osmnx_stats": "scigraphs.osmnx_basic_stats",
             "orientation": "scigraphs.osmnx_orientation_entropy",
-            # Export
             "export": "scigraphs.export_graph",
             "export_positions": "scigraphs.export_positions",
             "export_stats": "scigraphs.generate_statistics_report",
             "export_gexf": "scigraphs.export_gexf",
             "export_graphml": "scigraphs.export_graphml",
             "osmnx_export": "scigraphs.osmnx_export",
-            # Render
             "render": "render.render",
         }
         for short, full in shortcuts.items():
@@ -602,7 +584,6 @@ class OperatorRegistry:
 
 
 def get_registry() -> OperatorRegistry:
-    """Get the global operator registry instance."""
     global _registry
     if _registry is None:
         _registry = OperatorRegistry()
@@ -610,8 +591,7 @@ def get_registry() -> OperatorRegistry:
     return _registry
 
 
-# Friendly pipeline group name -> the ``bpy.types.Scene`` attribute holding that
-# PointerProperty, so a pipeline can reach every group, not just scene.scigraphs.
+# Pipeline group name -> the Scene attribute holding that PointerProperty.
 SCENE_PROPERTY_GROUPS: Dict[str, str] = {
     "scigraphs": "scigraphs",
     "city2graph": "city2graph",
@@ -625,10 +605,8 @@ SCENE_PROPERTY_GROUPS: Dict[str, str] = {
 def apply_scene_props(scene_props: Optional[Dict[str, Any]]) -> List[str]:
     """Apply pipeline ``scene_props`` onto the matching scene property groups.
 
-    A flat mapping goes to ``scene.scigraphs``; a mapping keyed by group name
-    goes to each named group. Returns one warning per property that would not
-    set.
-    """
+    A flat mapping goes to ``scene.scigraphs``, a mapping keyed by group name to
+    each named group. Returns one warning per property that would not set."""
     warnings: List[str] = []
     if not scene_props:
         return warnings
@@ -683,10 +661,8 @@ def call_operator(
 ) -> Dict[str, Any]:
     """Call a Blender operator with the given properties.
 
-    ``scene_props`` is either flat, applied to ``scene.scigraphs``, or keyed by
-    property-group name (see :func:`apply_scene_props`). Returns a dict with
-    'status', plus 'error' and 'warnings' when there are any.
-    """
+    ``scene_props`` is flat or keyed by property-group name (see
+    :func:`apply_scene_props`). Returns 'status', plus 'error' and 'warnings'."""
     try:
         import bpy
     except ImportError:

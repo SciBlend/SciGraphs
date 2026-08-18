@@ -1,6 +1,6 @@
 """Terrain, buildings, and imagery context under a notebook graph.
 
-Display geometry only — not analysis data. Projects through the same anchor as
+Display geometry only, not analysis data. Projects through the same anchor as
 the graph (`graphs.anchor()`); mismatched anchors are what `check_alignment()` catches.
 """
 
@@ -43,7 +43,7 @@ def _link(obj, coll):
 
 
 def frame(ref):
-    """(center_lat, center_lon, scale) from an anchor or geo object. Raises if missing."""
+    """(center_lat, center_lon, scale) from an anchor or geo object, raising if missing."""
     if isinstance(ref, (tuple, list)) and len(ref) == 3:
         return float(ref[0]), float(ref[1]), float(ref[2])
     if ref is None:
@@ -89,7 +89,7 @@ def bounds_around(center, radius_m):
 # --------------------------------------------------------------------------
 
 def _number(value):
-    """Float from an OSM tag value, or None. Takes leading number; rejects non-positive."""
+    """Leading positive number in an OSM tag value, or None."""
     if value is None:
         return None
     try:
@@ -118,7 +118,7 @@ def _number(value):
 
 
 def _tagged_height(row, meters_per_level):
-    """Height (m) from OSM tags, or None. Prefer explicit height over levels."""
+    """Height in meters from OSM tags, preferring explicit height over levels, or None."""
     for key in ("height", "building:height", "est_height"):
         meters = _number(row.get(key) if hasattr(row, "get") else None)
         if meters:
@@ -154,7 +154,7 @@ def height_report(gdf, meters_per_level=METERS_PER_LEVEL):
 
 
 def _resolve_default(gdf, default_height, meters_per_level, minimum_tagged=20):
-    """Height for untagged footprints. `"auto"` = median of tagged, else FALLBACK."""
+    """Height for untagged footprints, where `"auto"` takes the median of the tagged."""
     if default_height is None:
         default_height = "auto"
     if default_height != "auto":
@@ -227,7 +227,7 @@ def buildings(source, ref, radius_m=None, default_height="auto",
               meters_per_level=METERS_PER_LEVEL, vertical_scale=1.0,
               terrain=None, base_m=0.0, jitter=0.0, tags=None,
               name="Context_Buildings", coll=COLLECTION, verbose=True):
-    """Extrude footprints against `ref`. One mesh; optional terrain sampling for Z."""
+    """Extrude footprints against `ref` into one mesh, optionally sampling terrain for Z."""
     from shapely.geometry import MultiPolygon
 
     gdf = _footprint_gdf(source, radius_m=radius_m, tags=tags)
@@ -381,8 +381,8 @@ def _build(grid, bounds, ref, vertical_scale, name, coll, kind, provenance):
                 "resolution": None, "nodata": None, "transform": None,
                 "source": provenance}
 
-    # create_terrain_mesh links into bpy.context.collection; after clear_scene()
-    # that can be None — restore the view layer root first.
+    # create_terrain_mesh links into bpy.context.collection, which clear_scene()
+    # can leave None, so restore the view layer root first.
     if bpy.context.collection is None:
         view_layer = bpy.context.view_layer
         view_layer.active_layer_collection = view_layer.layer_collection
@@ -453,7 +453,7 @@ class _capture:
 
 
 def probe_elevation_api(api="open-elevation", timeout=10.0):
-    """Cheap up/down check. Returns (ok, seconds, detail); not a speed estimate."""
+    """Cheap up/down check returning (ok, seconds, detail), which is not a speed estimate."""
     import requests
 
     started = time.time()
@@ -477,7 +477,7 @@ def terrain(center, radius_m, ref, source="flat", api="open-elevation",
             name="Context_Terrain", coll=COLLECTION, verbose=True):
     """Ground surface: `flat` (default), `dem`, or `auto` (dem with flat fallback).
 
-    Probes first; rejected DEM batches are interpolated — count stored as
+    Rejected DEM batches are interpolated, with the count stored as
     `scigraphs_dem_failed_batches`. Optional `imagery=` drapes last.
     """
     import numpy as np
@@ -571,10 +571,11 @@ def is_real_elevation(obj):
 
 def settle(objects, plane_z=0.0, clearance_m=CLEARANCE_M, scale=0.001,
            reference="terrain", verbose=True):
-    """Translate context in Z so reference top clears the graph plane by clearance_m.
+    """Translate context in Z so the reference top clears the graph plane by clearance_m.
 
-    `reference="terrain"` measures ground (buildings may cross the plane);
-    `"all"` measures tallest roof (outliers pull everything down). One shared offset.
+    One shared offset. `reference="terrain"` measures the ground, so buildings
+    may cross the plane; `"all"` measures the tallest roof, so outliers pull
+    everything down.
     """
     objects = [o for o in objects if o is not None]
     if not objects:
@@ -631,7 +632,7 @@ def _set(node, socket, value):
 
 
 def material(kind, name=None):
-    """Matte Principled material for one context kind. Cached by name."""
+    """Matte Principled material for one context kind, cached by name."""
     spec = _PALETTE.get(kind, _PALETTE["ground"])
     name = name or f"SGNB_Context_{kind}"
     mat = bpy.data.materials.get(name)
@@ -749,7 +750,7 @@ def hypsometric(surface, stops=HYPSOMETRIC, roughness=0.94, floor=None,
 
 
 def style_context(objects, kind=None, shade_smooth=False, keep_imagery=True):
-    """Assign palette materials. Skips draped/hypsometric surfaces unless keep_imagery=False."""
+    """Assign palette materials, skipping draped surfaces unless keep_imagery=False."""
     if objects is None:
         return []
     if not isinstance(objects, (list, tuple, set)):
@@ -828,7 +829,7 @@ def imagery_sources(verbose=True):
 
 
 def imagery_cache_dir():
-    """($TMPDIR/scigraphs_basemaps, file_count, bytes). Survives kernel restart, not reboot."""
+    """($TMPDIR/scigraphs_basemaps, file_count, bytes), surviving a restart, not a reboot."""
     import os
 
     root = _imagery_module()._default_cache_dir()
@@ -845,7 +846,7 @@ def imagery_cache_dir():
 
 
 def clear_imagery_cache():
-    """Delete every cached tile. Returns files removed."""
+    """Delete every cached tile and return the number of files removed."""
     return _imagery_module().clear_cache()
 
 
@@ -859,7 +860,7 @@ def _tile_range(bounds, zoom):
 
 
 def imagery_estimate(bounds, source="ESRI_IMAGERY", zoom=17, verbose=True):
-    """Pre-flight tile cost. Clamps to source max_zoom; flags over MAX_TILES."""
+    """Pre-flight tile cost, clamped to the source max_zoom and flagged over MAX_TILES."""
     import os
 
     sg_imagery = _imagery_module()
@@ -908,7 +909,7 @@ def imagery_estimate(bounds, source="ESRI_IMAGERY", zoom=17, verbose=True):
 
 
 def _project_uv(terrain_obj, metadata):
-    """Per-vertex UVs from geographic projection. Falls back if UI operator missing."""
+    """Per-vertex UVs from the geographic projection, falling back without the UI operator."""
     import contextlib
     import io as _io
 
@@ -1278,7 +1279,7 @@ def align_surface(surface, graph_obj, verbose=True):
 
 def check_alignment(graph_obj, context_objs, offset_tolerance=0.05,
                     coverage_minimum=0.95, verbose=True):
-    """XY center-offset and coverage checks. Terrain can pass at wrong origin; check buildings."""
+    """XY center-offset and coverage checks; terrain can pass at the wrong origin."""
     if not isinstance(context_objs, (list, tuple)):
         context_objs = [context_objs]
 
@@ -1351,7 +1352,7 @@ def add_context(graph_obj, center, radius_m, ref, buildings_gdf=None,
                 clearance_m=CLEARANCE_M, reference="terrain",
                 imagery=None, imagery_zoom=17, imagery_brightness=1.0,
                 verbose=True):
-    """Terrain → buildings → style → imagery → settle. Order matters (style clears mats)."""
+    """Terrain, buildings, style, imagery, then settle, in that order: style clears materials."""
     _center_lat, _center_lon, scale = frame(ref)
 
     surface = terrain(center, radius_m, ref, source=terrain_source, api=api,

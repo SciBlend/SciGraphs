@@ -58,7 +58,6 @@ def _download_overture_from_bbox(context, bbox, feature_type, custom_tags, opera
 
 
 class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
-    """Download OSM features from a place."""
     bl_idname = "scigraphs.osmnx_features_place"
     bl_label = "Features from Place"
     bl_description = "Download buildings/POIs from a named place"
@@ -181,7 +180,6 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
-    """Download OSM features near a point."""
     bl_idname = "scigraphs.osmnx_features_point"
     bl_label = "Features from Point"
     bl_description = "Download features within distance of a point"
@@ -319,7 +317,6 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
-    """Download OSM features in bounding box."""
     bl_idname = "scigraphs.osmnx_features_bbox"
     bl_label = "Features from BBox"
     bl_description = "Download features within a bounding box"
@@ -404,7 +401,6 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
-    """Download OSM features around a postal address."""
     bl_idname = "scigraphs.osmnx_features_address"
     bl_label = "Features from Address"
     bl_description = "Download features within a radius of a geocoded address"
@@ -488,7 +484,6 @@ class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
-    """Download OSM features inside a user-selected polygon object."""
     bl_idname = "scigraphs.osmnx_features_polygon"
     bl_label = "Features from Polygon"
     bl_description = "Download features inside a Blender mesh polygon (vertices as lon/lat)"
@@ -576,7 +571,6 @@ class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FeaturesFromXML(bpy.types.Operator):
-    """Download OSM features from a local .osm XML file."""
     bl_idname = "scigraphs.osmnx_features_xml"
     bl_label = "Features from XML"
     bl_description = "Parse features from a local .osm XML file"
@@ -636,7 +630,6 @@ class SCIGRAPHS_OT_FeaturesFromXML(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
-    """Snap every POI point in a feature mesh to the nearest OSMnx graph node."""
     bl_idname = "scigraphs.osmnx_snap_pois"
     bl_label = "Snap POIs to Nearest Nodes"
     bl_description = "Attach each POI to its nearest graph node (attribute / move / connector)"
@@ -724,7 +717,6 @@ class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
 
             snapped += 1
 
-        # Optional connector mesh.
         if mode == 'ADD_CONNECTOR' and connectors:
             cmesh = bpy.data.meshes.new(f"{obj.name}_connectors")
             verts = []

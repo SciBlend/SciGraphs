@@ -1,4 +1,1 @@
-"""Pipeline executor, registry and reference generator: these drive a live scene.
-
-The Blender-free half lives in `scigraphs_core.repro`.
-"""
+"""Pipeline executor, registry and reference generator; all drive a live scene."""

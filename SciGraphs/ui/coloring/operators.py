@@ -30,7 +30,6 @@ def _tag_3d_views(context):
 # --- Toolbar visibility / switching -----------------------------------------
 
 class SCIGRAPHS_OT_color_toggle_toolbar(bpy.types.Operator):
-    """Show or hide the floating coloring toolbar."""
     bl_idname = "scigraphs.color_toggle_toolbar"
     bl_label = "Toggle SciGraphs Color Toolbar"
     bl_description = "Show or hide the floating coloring toolbar at the top of the 3D view"
@@ -45,7 +44,6 @@ class SCIGRAPHS_OT_color_toggle_toolbar(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_show_toolbar(bpy.types.Operator):
-    """Force-show the floating coloring toolbar."""
     bl_idname = "scigraphs.color_show_toolbar"
     bl_label = "Show SciGraphs Color Toolbar"
     bl_description = "Make sure the floating coloring toolbar is visible"
@@ -59,7 +57,6 @@ class SCIGRAPHS_OT_color_show_toolbar(bpy.types.Operator):
 # --- Drag handle ------------------------------------------------------------
 
 class SCIGRAPHS_OT_color_drag_toolbar(bpy.types.Operator):
-    """Drag the floating coloring toolbar."""
     bl_idname = "scigraphs.color_drag_toolbar"
     bl_label = "Move SciGraphs Color Toolbar"
     bl_description = "Drag to reposition the floating coloring toolbar"
@@ -120,7 +117,6 @@ class SCIGRAPHS_OT_color_drag_toolbar(bpy.types.Operator):
 # --- Apply / refresh / colormap chips ---------------------------------------
 
 class SCIGRAPHS_OT_color_apply(bpy.types.Operator):
-    """Apply the current coloring settings to the active mesh."""
     bl_idname = "scigraphs.color_apply"
     bl_label = "Apply Coloring"
     bl_description = "Map the selected attribute to vertex colors using the current colormap"
@@ -141,7 +137,6 @@ class SCIGRAPHS_OT_color_apply(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_refresh_range(bpy.types.Operator):
-    """Refresh ``vmin``/``vmax`` from the currently selected attribute."""
     bl_idname = "scigraphs.color_refresh_range"
     bl_label = "Refresh Color Range"
     bl_description = "Recalculate vmin/vmax from the selected attribute and re-apply if requested"
@@ -193,7 +188,6 @@ class SCIGRAPHS_OT_color_refresh_range(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_set_colormap(bpy.types.Operator):
-    """Pick a colormap (from a chip or the popup) and optionally apply it."""
     bl_idname = "scigraphs.color_set_colormap"
     bl_label = "Set Colormap"
     bl_description = "Switch to the chosen colormap and re-apply when configured to do so"
@@ -248,7 +242,6 @@ class SCIGRAPHS_OT_color_set_colormap(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_toggle_reverse(bpy.types.Operator):
-    """Toggle the ``reverse`` flag and re-apply the current colormap."""
     bl_idname = "scigraphs.color_toggle_reverse"
     bl_label = "Reverse Colormap"
     bl_description = "Flip the colormap orientation and re-apply"
@@ -275,7 +268,6 @@ class SCIGRAPHS_OT_color_toggle_reverse(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_cycle_attribute(bpy.types.Operator):
-    """Cycle through the scalar attributes of the active mesh."""
     bl_idname = "scigraphs.color_cycle_attribute"
     bl_label = "Cycle Attribute"
     bl_description = "Switch to the next scalar attribute on the active mesh and re-apply"
@@ -324,7 +316,6 @@ class SCIGRAPHS_OT_color_cycle_attribute(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_set_attribute(bpy.types.Operator):
-    """Set the active scalar attribute by name and re-apply coloring."""
     bl_idname = "scigraphs.color_set_attribute"
     bl_label = "Set Coloring Attribute"
     bl_description = "Switch the coloring toolbar to a specific scalar attribute"
@@ -376,7 +367,6 @@ class SCIGRAPHS_OT_color_set_attribute(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_color_pick_attribute(bpy.types.Operator):
-    """Open a popup menu to choose the scalar attribute to color with."""
     bl_idname = "scigraphs.color_pick_attribute"
     bl_label = "Pick Coloring Attribute"
     bl_description = "Open a menu listing every scalar attribute on the active mesh"
@@ -426,7 +416,6 @@ class SCIGRAPHS_MT_color_attribute_menu(bpy.types.Menu):
 
 
 class SCIGRAPHS_OT_color_remove(bpy.types.Operator):
-    """Remove the last color attribute written by the toolbar."""
     bl_idname = "scigraphs.color_remove"
     bl_label = "Remove Coloring"
     bl_description = "Remove the most recent color attribute created by the coloring toolbar"
@@ -449,7 +438,6 @@ class SCIGRAPHS_OT_color_remove(bpy.types.Operator):
 # --- Settings popup ---------------------------------------------------------
 
 class SCIGRAPHS_OT_color_settings_dialog(bpy.types.Operator):
-    """Open a popup with the full coloring configuration (attribute, colormap, range, ...)."""
     bl_idname = "scigraphs.color_settings_dialog"
     bl_label = "Coloring Settings"
     bl_description = "Configure attribute, colormap, range, opacity, and material auto-setup"

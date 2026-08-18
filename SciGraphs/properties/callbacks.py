@@ -2,7 +2,6 @@
 
 
 def get_column_items(self, context):
-    """Dynamic enum callback for column selection."""
     items = []
 
     if not hasattr(context.scene, 'scigraphs'):
@@ -32,7 +31,6 @@ def get_column_items(self, context):
 
 
 def get_db_profile_items(self, context):
-    """Dynamic enum callback for database profile selection."""
     items = []
 
     from ..preferences import get_preferences
@@ -67,7 +65,6 @@ def get_attribute_items(self, context):
 
 
 def get_system_fonts(self, context):
-    """Get available system fonts."""
     import os
     items = []
 

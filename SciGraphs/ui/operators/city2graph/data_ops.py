@@ -23,7 +23,6 @@ def _flatten_result_objects(result):
 
 
 class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
-    """Download urban features as polygons/lines from Overture Maps."""
     bl_idname = "scigraphs.c2g_load_overture"
     bl_label = "Get as Polygons"
     bl_description = (
@@ -76,7 +75,6 @@ class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
-    """Download POIs/places as native points from Overture Maps."""
     bl_idname = "scigraphs.c2g_load_overture_points"
     bl_label = "Get as Points"
     bl_description = (
@@ -141,7 +139,6 @@ class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_ConvertToCentroids(bpy.types.Operator):
-    """Reduce the active polygon/line object to its representative points."""
     bl_idname = "scigraphs.c2g_convert_to_centroids"
     bl_label = "Convert Selected to Centroids"
     bl_description = (
@@ -165,7 +162,6 @@ class SCIGRAPHS_OT_C2G_ConvertToCentroids(bpy.types.Operator):
             return {'CANCELLED'}
 
         centroid_obj["c2g_point_source"] = obj.name
-        # Activate the new object so the user sees the result immediately.
         bpy.ops.object.select_all(action='DESELECT')
         centroid_obj.select_set(True)
         context.view_layer.objects.active = centroid_obj
@@ -179,7 +175,6 @@ class SCIGRAPHS_OT_C2G_ConvertToCentroids(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_ImportGTFS(bpy.types.Operator):
-    """Import GTFS transit data."""
     bl_idname = "scigraphs.c2g_import_gtfs"
     bl_label = "Import GTFS Data"
     bl_description = "Import GTFS transit feed from zip file"
@@ -208,9 +203,8 @@ class SCIGRAPHS_OT_C2G_ImportGTFS(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to load GTFS data")
             return {'CANCELLED'}
 
-        # Blender id-properties cannot store a DuckDBPyConnection, so
-        # the connection itself lives in a module-level cache while the
-        # scene only stores plain metadata that the panels poll.
+        # Blender id-properties cannot store a DuckDBPyConnection, so it lives
+        # in a module cache and the scene keeps only metadata the panels poll.
         transportation.set_active_gtfs(gtfs_data, filepath=self.filepath)
 
         try:
@@ -240,8 +234,7 @@ class SCIGRAPHS_OT_C2G_ImportGTFS(bpy.types.Operator):
                     from datetime import datetime, timedelta
                     s_dt = datetime.strptime(str(s), "%Y%m%d")
                     e_dt = datetime.strptime(str(e), "%Y%m%d")
-                    # Cap at 366 days so the dropdown stays usable on
-                    # multi-year feeds.
+                    # Cap at 366 days so the dropdown stays usable.
                     span = min((e_dt - s_dt).days, 366)
                     dates = [
                         (s_dt + timedelta(days=i)).strftime("%Y%m%d")
@@ -265,7 +258,6 @@ class SCIGRAPHS_OT_C2G_ImportGTFS(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_VisualizeGTFS(bpy.types.Operator):
-    """Visualize GTFS network."""
     bl_idname = "scigraphs.c2g_visualize_gtfs"
     bl_label = "Visualize GTFS Network"
     bl_description = "Create 3D visualization of GTFS transit network"
@@ -305,7 +297,6 @@ class SCIGRAPHS_OT_C2G_VisualizeGTFS(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_LoadFromFile(bpy.types.Operator):
-    """Load urban data from file."""
     bl_idname = "scigraphs.c2g_load_file"
     bl_label = "Load from File"
     bl_description = "Load urban data from GeoJSON or Shapefile"
@@ -347,7 +338,6 @@ class SCIGRAPHS_OT_C2G_LoadFromFile(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_GeocodeBoundaries(bpy.types.Operator):
-    """Geocode a place name to obtain its polygon boundary."""
     bl_idname = "scigraphs.c2g_geocode_boundaries"
     bl_label = "Geocode Boundaries"
     bl_description = "Resolve a place name (e.g. 'Liverpool, UK') to a polygon boundary"
@@ -394,7 +384,6 @@ class SCIGRAPHS_OT_C2G_GeocodeBoundaries(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_LoadOverturePlaceName(bpy.types.Operator):
-    """Download Overture data using city2graph API with a place name."""
     bl_idname = "scigraphs.c2g_load_overture_place"
     bl_label = "Download via Place Name"
     bl_description = "Download Overture Maps data using city2graph CLI with place name geocoding"
@@ -446,7 +435,6 @@ class SCIGRAPHS_OT_C2G_LoadOverturePlaceName(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_ProcessSegments(bpy.types.Operator):
-    """Process Overture segments: split at connectors, extract barriers."""
     bl_idname = "scigraphs.c2g_process_segments"
     bl_label = "Process Overture Segments"
     bl_description = "Split segments by connectors and optionally extract barriers"
@@ -504,7 +492,6 @@ class SCIGRAPHS_OT_C2G_ProcessSegments(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_ExportGraph(bpy.types.Operator):
-    """Export graph to JSON/GraphML."""
     bl_idname = "scigraphs.c2g_export_graph"
     bl_label = "Export Graph"
     bl_description = "Export graph to JSON or GraphML for external GNN training"
@@ -557,7 +544,6 @@ class SCIGRAPHS_OT_C2G_ExportGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_SaveLoaderScript(bpy.types.Operator):
-    """Save PyG loader script."""
     bl_idname = "scigraphs.c2g_save_loader_script"
     bl_label = "Save PyG Loader Script"
     bl_description = "Save Python script for loading exports in PyTorch Geometric"

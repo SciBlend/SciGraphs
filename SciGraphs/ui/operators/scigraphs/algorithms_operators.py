@@ -8,7 +8,6 @@ from scigraphs_core.visualization.animation import update_traversal_activation
 
 
 class SCIGRAPHS_OT_AnimateTraversal(bpy.types.Operator):
-    """Create animation showing graph traversal (BFS or DFS)."""
     bl_idname = "scigraphs.animate_traversal"
     bl_label = "Animate Traversal"
     bl_description = "Create animation showing graph traversal (BFS or DFS)"
@@ -126,7 +125,6 @@ class SCIGRAPHS_OT_AnimateTraversal(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FindShortestPath(bpy.types.Operator):
-    """Find shortest path between two nodes using Dijkstra."""
     bl_idname = "scigraphs.find_shortest_path"
     bl_label = "Find Shortest Path"
     bl_description = "Find shortest path between source and target nodes"
@@ -182,7 +180,6 @@ class SCIGRAPHS_OT_FindShortestPath(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeMST(bpy.types.Operator):
-    """Compute Minimum Spanning Tree."""
     bl_idname = "scigraphs.compute_mst"
     bl_label = "Compute MST"
     bl_description = "Compute Minimum Spanning Tree using selected algorithm"
@@ -215,7 +212,6 @@ class SCIGRAPHS_OT_ComputeMST(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeMaxFlow(bpy.types.Operator):
-    """Compute maximum flow in network."""
     bl_idname = "scigraphs.compute_max_flow"
     bl_label = "Compute Max Flow"
     bl_description = "Compute maximum flow from source to sink"
@@ -250,7 +246,6 @@ class SCIGRAPHS_OT_ComputeMaxFlow(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeMinCut(bpy.types.Operator):
-    """Compute minimum cut in network."""
     bl_idname = "scigraphs.compute_min_cut"
     bl_label = "Compute Min Cut"
     bl_description = "Find minimum cut separating source from sink"

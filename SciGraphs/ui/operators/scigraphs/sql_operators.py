@@ -8,7 +8,6 @@ from ...view_utils import focus_graph_in_top_view
 
 
 class SCIGRAPHS_OT_LoadSQLColumns(bpy.types.Operator):
-    """Execute SQL query to load column names."""
     bl_idname = "scigraphs.load_sql_columns"
     bl_label = "Load Columns from Query"
     bl_description = "Execute the SQL query to retrieve column names"
@@ -54,7 +53,6 @@ class SCIGRAPHS_OT_LoadSQLColumns(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_PreviewSQLQuery(bpy.types.Operator):
-    """Preview the results of the SQL query."""
     bl_idname = "scigraphs.preview_sql_query"
     bl_label = "Preview Query"
     bl_description = "Execute the query and preview the first few rows"
@@ -114,7 +112,6 @@ class SCIGRAPHS_OT_PreviewSQLQuery(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CreateGraphFromSQL(bpy.types.Operator):
-    """Create a graph from SQL query results."""
     bl_idname = "scigraphs.create_graph_from_sql"
     bl_label = "Create Graph from SQL"
     bl_description = "Execute the SQL query and create a graph visualization"
@@ -200,7 +197,6 @@ class SCIGRAPHS_OT_CreateGraphFromSQL(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TestSQLConnection(bpy.types.Operator):
-    """Test the selected database connection from the Data panel."""
     bl_idname = "scigraphs.test_sql_connection"
     bl_label = "Test Connection"
     bl_description = "Test if the database connection works"
@@ -240,7 +236,6 @@ class SCIGRAPHS_OT_TestSQLConnection(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OpenDBPreferences(bpy.types.Operator):
-    """Open addon preferences to configure database connections."""
     bl_idname = "scigraphs.open_db_preferences"
     bl_label = "Configure Databases"
     bl_description = "Open addon preferences to add or edit database connections"

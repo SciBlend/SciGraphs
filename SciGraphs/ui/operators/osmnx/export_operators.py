@@ -93,7 +93,6 @@ def _save_graph_svg(G, filepath):
 
 
 class SCIGRAPHS_OT_OSMnxExport(bpy.types.Operator):
-    """Export the OSMnx graph to a GIS-interchange format."""
     bl_idname = "scigraphs.osmnx_export"
     bl_label = "Export Graph"
     bl_description = "Export the current OSMnx graph to GeoPackage / OSM XML / Gephi GraphML / SVG"

@@ -11,8 +11,7 @@ from . import coloring
 from . import modal_visual
 
 # ImportError, not ModuleNotFoundError: `from . import x` on an absent submodule
-# falls back to an attribute lookup on the half-built package and raises the
-# base class.
+# falls back to an attribute lookup and raises the base class.
 try:
     from . import gpu_render
 except ImportError:
@@ -20,11 +19,7 @@ except ImportError:
 
 
 class SCIGRAPHS_PT_engine_missing(bpy.types.Panel):
-    """Stands in for the GPU preview when the render engine is not installed.
-
-    Not an error dialog: everything else still works, and the message belongs
-    in the panel the user came looking for.
-    """
+    """Stand in for the GPU preview when the render engine is not installed."""
 
     bl_label = "GPU Render Engine"
     bl_idname = "SCIGRAPHS_PT_engine_missing"
@@ -52,7 +47,6 @@ class SCIGRAPHS_PT_engine_missing(bpy.types.Panel):
 
 
 def register():
-    """Register all UI components."""
     operators.register()
     panels.register()
     menus.register()
@@ -69,7 +63,6 @@ def register():
 
 
 def unregister():
-    """Unregister all UI components."""
     if gpu_render is not None:
         gpu_render.unregister()
     else:

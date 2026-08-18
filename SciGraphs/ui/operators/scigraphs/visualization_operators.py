@@ -16,7 +16,6 @@ from ....core.mesh.geometry import (
 
 
 class SCIGRAPHS_OT_UpdateAppearance(bpy.types.Operator):
-    """Update visual appearance of graph."""
     bl_idname = "scigraphs.update_appearance"
     bl_label = "Update Appearance"
     bl_description = "Update the visual appearance of the graph"
@@ -308,7 +307,6 @@ class SCIGRAPHS_OT_UpdateAppearance(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
-    """Apply rendering preset (materials, lighting)."""
     bl_idname = "scigraphs.apply_rendering_preset"
     bl_label = "Apply Rendering Preset"
     bl_description = "Apply pre-configured rendering settings"
@@ -355,7 +353,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
         return {'FINISHED'}
     
     def _apply_basic_preset(self, obj, context):
-        """Apply basic Principled BSDF material."""
         if not obj.data.materials:
             mat = bpy.data.materials.new(name="SciGraphs_Basic")
             mat.use_nodes = True
@@ -369,7 +366,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
             bsdf.inputs['Roughness'].default_value = 0.5
     
     def _apply_glass_preset(self, obj, context):
-        """Apply glass/transparent material."""
         if not obj.data.materials:
             mat = bpy.data.materials.new(name="SciGraphs_Glass")
             mat.use_nodes = True
@@ -391,7 +387,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
                 bsdf.inputs['IOR'].default_value = 1.45
     
     def _apply_metallic_preset(self, obj, context):
-        """Apply metallic material."""
         if not obj.data.materials:
             mat = bpy.data.materials.new(name="SciGraphs_Metallic")
             mat.use_nodes = True
@@ -405,7 +400,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
             bsdf.inputs['Roughness'].default_value = 0.2
     
     def _apply_emission_preset(self, obj, context):
-        """Apply emission material (glowing)."""
         if not obj.data.materials:
             mat = bpy.data.materials.new(name="SciGraphs_Emission")
             mat.use_nodes = True
@@ -425,7 +419,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
                 bsdf.inputs['Emission Strength'].default_value = 2.0
     
     def _apply_scientific_preset(self, obj, context):
-        """Apply clean scientific visualization material."""
         if not obj.data.materials:
             mat = bpy.data.materials.new(name="SciGraphs_Scientific")
             mat.use_nodes = True
@@ -445,7 +438,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
-    """Setup lighting for visualization."""
     bl_idname = "scigraphs.setup_lighting"
     bl_label = "Setup Lighting"
     bl_description = "Add lights for better visualization"
@@ -517,7 +509,6 @@ class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
         self._aim_at(rim)
 
     def _create_studio_lighting(self, context):
-        """Create soft studio lighting."""
         bpy.ops.object.light_add(type='AREA', location=(0, 0, 10))
         light = context.active_object
         light.name = "SciGraphs_Light_Top"
@@ -525,7 +516,6 @@ class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
         light.data.size = 10.0
     
     def _create_outdoor_lighting(self, context):
-        """Create outdoor-style lighting."""
         bpy.ops.object.light_add(type='SUN', location=(0, 0, 10))
         sun = context.active_object
         sun.name = "SciGraphs_Light_Sun"

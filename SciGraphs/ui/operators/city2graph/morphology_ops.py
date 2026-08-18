@@ -2,7 +2,6 @@ import bpy
 
 
 class SCIGRAPHS_OT_C2G_GenerateTessellation(bpy.types.Operator):
-    """Generate urban tessellation."""
     bl_idname = "scigraphs.c2g_generate_tessellation"
     bl_label = "Generate Tessellation"
     bl_description = "Create Voronoi tessellation from building footprints"
@@ -46,7 +45,6 @@ class SCIGRAPHS_OT_C2G_GenerateTessellation(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_MorphologicalGraph(bpy.types.Operator):
-    """Create morphological graph."""
     bl_idname = "scigraphs.c2g_morphological_graph"
     bl_label = "Morphological Graph"
     bl_description = "Generate graph connecting buildings to streets (private-to-public)"
@@ -173,7 +171,6 @@ class SCIGRAPHS_OT_C2G_MorphologicalGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_SegmentsToGraph(bpy.types.Operator):
-    """Convert Overture segments directly into a NetworkX graph."""
     bl_idname = "scigraphs.c2g_segments_to_graph"
     bl_label = "Segments to Graph"
     bl_description = "Convert processed Overture road segments to a graph"

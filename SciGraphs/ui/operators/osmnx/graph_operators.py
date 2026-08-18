@@ -87,7 +87,6 @@ OSMNX_CRS_PRESET_VALUES = {
 
 
 class SCIGRAPHS_OT_ProjectGraph(bpy.types.Operator):
-    """Project OSMnx graph to specified CRS or UTM."""
     bl_idname = "scigraphs.osmnx_project_graph"
     bl_label = "Project to CRS"
     bl_description = "Reproject graph to specified CRS or local UTM coordinate system"
@@ -162,7 +161,6 @@ class SCIGRAPHS_OT_ProjectGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AddEdgeLengths(bpy.types.Operator):
-    """Add length attribute to all edges."""
     bl_idname = "scigraphs.osmnx_add_edge_lengths"
     bl_label = "Add Edge Lengths"
     bl_description = "Calculate and add length attribute to all edges"
@@ -197,7 +195,6 @@ class SCIGRAPHS_OT_AddEdgeLengths(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AddEdgeBearings(bpy.types.Operator):
-    """Add bearing attribute (compass direction) to all edges."""
     bl_idname = "scigraphs.osmnx_add_edge_bearings"
     bl_label = "Add Edge Bearings"
     bl_description = "Calculate street orientation (0-360 degrees) for all edges"
@@ -241,7 +238,6 @@ class SCIGRAPHS_OT_AddEdgeBearings(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AddEdgeSpeeds(bpy.types.Operator):
-    """Add speed estimates to all edges based on road type."""
     bl_idname = "scigraphs.osmnx_add_edge_speeds"
     bl_label = "Add Edge Speeds"
     bl_description = "Estimate travel speeds based on road type and OSM data"
@@ -294,7 +290,6 @@ class SCIGRAPHS_OT_AddEdgeSpeeds(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AddEdgeTravelTimes(bpy.types.Operator):
-    """Add travel time to all edges based on length and speed."""
     bl_idname = "scigraphs.osmnx_add_travel_times"
     bl_label = "Add Travel Times"
     bl_description = "Calculate travel time for each edge (requires speeds)"
@@ -369,7 +364,6 @@ class SCIGRAPHS_OT_AddEdgeTravelTimes(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateBasicStats(bpy.types.Operator):
-    """Calculate basic network statistics."""
     bl_idname = "scigraphs.osmnx_basic_stats"
     bl_label = "Calculate Basic Stats"
     bl_description = "Calculate node count, edge count, total length, circuity, etc."
@@ -414,7 +408,6 @@ class SCIGRAPHS_OT_CalculateBasicStats(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_EstimateNetworkArea(bpy.types.Operator):
-    """Estimate the area covered by the network."""
     bl_idname = "scigraphs.osmnx_estimate_area"
     bl_label = "Estimate Area"
     bl_description = "Calculate convex hull area of the network"
@@ -447,7 +440,6 @@ class SCIGRAPHS_OT_EstimateNetworkArea(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ConvertToUndirected(bpy.types.Operator):
-    """Convert directed graph to undirected."""
     bl_idname = "scigraphs.osmnx_to_undirected"
     bl_label = "Convert to Undirected"
     bl_description = "Convert MultiDiGraph to undirected MultiGraph"
@@ -486,7 +478,6 @@ class SCIGRAPHS_OT_ConvertToUndirected(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ConvertToDiGraph(bpy.types.Operator):
-    """Convert MultiDiGraph to simple DiGraph."""
     bl_idname = "scigraphs.osmnx_to_digraph"
     bl_label = "Convert to DiGraph"
     bl_description = "Convert to simple DiGraph by selecting minimum weight edges"
@@ -529,7 +520,6 @@ class SCIGRAPHS_OT_ConvertToDiGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SimplifyGraph(bpy.types.Operator):
-    """Simplify graph by removing interstitial nodes."""
     bl_idname = "scigraphs.osmnx_simplify"
     bl_label = "Simplify Graph"
     bl_description = "Remove nodes that are not intersections"
@@ -583,7 +573,6 @@ class SCIGRAPHS_OT_SimplifyGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ConsolidateIntersections(bpy.types.Operator):
-    """Consolidate nearby intersections into single nodes."""
     bl_idname = "scigraphs.osmnx_consolidate"
     bl_label = "Consolidate Intersections"
     bl_description = "Merge nearby intersections within tolerance distance"
@@ -670,7 +659,6 @@ class SCIGRAPHS_OT_ConsolidateIntersections(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TruncateBBox(bpy.types.Operator):
-    """Truncate graph to bounding box."""
     bl_idname = "scigraphs.osmnx_truncate_bbox"
     bl_label = "Truncate to BBox"
     bl_description = "Remove nodes outside bounding box"
@@ -715,7 +703,6 @@ class SCIGRAPHS_OT_TruncateBBox(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_LargestComponent(bpy.types.Operator):
-    """Extract largest connected component."""
     bl_idname = "scigraphs.osmnx_largest_component"
     bl_label = "Largest Component"
     bl_description = "Keep only the largest connected component"
@@ -762,7 +749,6 @@ class SCIGRAPHS_OT_LargestComponent(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GeocodeAddress(bpy.types.Operator):
-    """Geocode address to coordinates."""
     bl_idname = "scigraphs.osmnx_geocode"
     bl_label = "Geocode Address"
     bl_description = "Convert address to latitude/longitude coordinates"
@@ -801,7 +787,6 @@ class SCIGRAPHS_OT_GeocodeAddress(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OrientationEntropy(bpy.types.Operator):
-    """Calculate orientation entropy of street network."""
     bl_idname = "scigraphs.osmnx_orientation_entropy"
     bl_label = "Orientation Entropy"
     bl_description = "Calculate Shannon entropy of street orientations"
@@ -835,7 +820,6 @@ class SCIGRAPHS_OT_OrientationEntropy(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateCircuity(bpy.types.Operator):
-    """Calculate average circuity of street network."""
     bl_idname = "scigraphs.osmnx_circuity"
     bl_label = "Calculate Circuity"
     bl_description = "Calculate ratio of network distance to straight-line distance"
@@ -874,7 +858,6 @@ class SCIGRAPHS_OT_CalculateCircuity(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateBearingPoints(bpy.types.Operator):
-    """Calculate bearing between two coordinate points."""
     bl_idname = "scigraphs.osmnx_calculate_bearing_points"
     bl_label = "Calculate Bearing"
     bl_description = "Calculate compass bearing between two lat/lon points"
@@ -903,7 +886,6 @@ class SCIGRAPHS_OT_CalculateBearingPoints(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BearingsDistribution(bpy.types.Operator):
-    """Calculate bearing distribution histogram."""
     bl_idname = "scigraphs.osmnx_bearings_distribution"
     bl_label = "Bearing Distribution"
     bl_description = "Calculate distribution of edge bearings in bins"
@@ -942,7 +924,6 @@ class SCIGRAPHS_OT_BearingsDistribution(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalcEuclidean(bpy.types.Operator):
-    """Calculate Euclidean distance between two points."""
     bl_idname = "scigraphs.osmnx_calc_euclidean"
     bl_label = "Euclidean Distance"
     bl_description = "Calculate Euclidean distance between two points"
@@ -971,7 +952,6 @@ class SCIGRAPHS_OT_CalcEuclidean(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalcGreatCircle(bpy.types.Operator):
-    """Calculate great circle distance between two points."""
     bl_idname = "scigraphs.osmnx_calc_great_circle"
     bl_label = "Great Circle Distance"
     bl_description = "Calculate great circle (haversine) distance between two lat/lon points"
@@ -1001,7 +981,6 @@ class SCIGRAPHS_OT_CalcGreatCircle(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GraphToGDFs(bpy.types.Operator):
-    """Convert graph to GeoDataFrames."""
     bl_idname = "scigraphs.osmnx_graph_to_gdfs"
     bl_label = "Graph to GeoDataFrames"
     bl_description = "Export graph as node and edge GeoDataFrames (saved as files)"
@@ -1070,7 +1049,6 @@ class SCIGRAPHS_OT_GraphToGDFs(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GDFsToGraph(bpy.types.Operator):
-    """Convert GeoDataFrames to graph."""
     bl_idname = "scigraphs.osmnx_gdfs_to_graph"
     bl_label = "GeoDataFrames to Graph"
     bl_description = "Import graph from node and edge GeoDataFrame files"

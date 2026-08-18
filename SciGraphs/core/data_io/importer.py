@@ -8,7 +8,6 @@ GRAPH_FILE_EXTENSIONS = {'.gexf'}
 
 
 def _file_extension(filepath):
-    """Return the normalized extension for a local filepath."""
     import os
     return os.path.splitext(str(filepath or ''))[1].lower()
 
@@ -19,7 +18,6 @@ def is_graph_file(filepath):
 
 
 def _networkx_graph_to_edge_dataframe(G):
-    """Convert a NetworkX graph into an edge table compatible with CSV import."""
     rows = []
 
     for u, v, data in G.edges(data=True):
@@ -103,10 +101,7 @@ def load_native_graph_file(filepath):
 
 
 def load_graph_from_file(filepath, source_col, target_col, delimiter=','):
-    """Load a CSV or native graph file into GraphData.
-
-    source_col and target_col are column indices, not names.
-    """
+    """Load a CSV or native graph file into GraphData; source_col and target_col are column indices, not names."""
     if not filepath:
         return None
 
@@ -190,11 +185,9 @@ def load_geospatial_graph(
 ):
     """Load a CSV into GraphData carrying node coordinates and edge weights.
 
-    All the *_col arguments are column indices. Coordinates come from lat_col
-    and lon_col when both are given, otherwise from geocoding the node names
-    when geocode_mode is set. Temporal filtering runs before edges are read, so
-    time_agg ('ALL', 'YEAR', 'MONTH', 'RANGE') changes which nodes exist at all.
-    """
+    All *_col arguments are column indices. Coordinates come from lat_col/lon_col,
+    else from geocoding names when geocode_mode is set. Temporal filtering runs first,
+    so time_agg ('ALL', 'YEAR', 'MONTH', 'RANGE') changes which nodes exist."""
     from ..geo import geospatial
     
     if not filepath:
@@ -254,9 +247,7 @@ def load_geospatial_graph(
             lon_col_name = df.columns[lon_col]
 
             for node in nodes:
-                # First row mentioning the node wins, whether as source or
-                # target, so a node with conflicting coordinates gets one of
-                # them arbitrarily.
+                # First row mentioning the node wins; conflicts resolve arbitrarily.
                 mask = (df[source_col_name] == node) | (df[target_col_name] == node)
                 if mask.any():
                     row = df[mask].iloc[0]
@@ -297,13 +288,8 @@ def load_geospatial_graph(
     return graph_data
 
 
-# ============================================================================
-# OSMnx IMPORT FUNCTIONS
-# ============================================================================
-
-# Overpass "[key~'value']" filters for infrastructure OSMnx has no network_type
-# for. The keys must stay in sync with the osmnx_custom_filter_preset enum in
-# scene properties.
+# Overpass filters for infrastructure OSMnx has no network_type for; the keys
+# must match the osmnx_custom_filter_preset enum in scene properties.
 OSMNX_CUSTOM_FILTER_PRESETS = {
     'NONE': None,
     'RAIL': '["railway"~"rail|subway|tram|light_rail|monorail|narrow_gauge"]',
@@ -342,21 +328,12 @@ def load_osmnx_graph(
 ):
     """Download an OSM street network. Returns (GraphData, edge_geometries).
 
-    method picks both the OSMnx call and which arguments matter:
-
-        'PLACE'        ox.graph_from_place(place_name)
-        'MULTI_PLACE'  ox.graph_from_place(place_list)
-        'POINT'        ox.graph_from_point((latitude, longitude), distance)
-        'ADDRESS'      ox.graph_from_address(address, distance)
-        'BBOX'         ox.graph_from_bbox(bbox_north/south/east/west)
-        'POLYGON'      ox.graph_from_polygon(polygon), a shapely geometry
-        'XML'          ox.graph_from_xml(xml_filepath), a local .osm file
-
-    distance is a radius in meters. custom_filter takes an Overpass string or
-    a key of OSMNX_CUSTOM_FILTER_PRESETS and, when set, replaces network_type.
-    which_result is 1-indexed and disambiguates PLACE geocoding. Errors give
-    (None, None).
-    """
+    ``method`` picks both the OSMnx call and which arguments matter: 'PLACE' and
+    'MULTI_PLACE' (place_name / place_list), 'POINT' (latitude, longitude, distance),
+    'ADDRESS' (address, distance), 'BBOX' (bbox_north/south/east/west), 'POLYGON'
+    (a shapely geometry), 'XML' (a local .osm file). distance is a radius in meters,
+    custom_filter takes an Overpass string or an OSMNX_CUSTOM_FILTER_PRESETS key and
+    replaces network_type, and which_result is 1-indexed. Errors give (None, None)."""
     import time
     start_time = time.time()
 
@@ -449,7 +426,6 @@ def load_osmnx_graph(
 
 
 def _osmnx_graph_from_place(ox, place, which_result=None, **kwargs):
-    """Download graph by place name or list of places."""
     try:
         call_kwargs = dict(kwargs)
         if which_result is not None:
@@ -462,7 +438,6 @@ def _osmnx_graph_from_place(ox, place, which_result=None, **kwargs):
 
 
 def _osmnx_graph_from_point(ox, latitude, longitude, distance, **kwargs):
-    """Download graph around a point."""
     try:
         G = ox.graph_from_point(
             (latitude, longitude),
@@ -476,7 +451,6 @@ def _osmnx_graph_from_point(ox, latitude, longitude, distance, **kwargs):
 
 
 def _osmnx_graph_from_address(ox, address, distance, **kwargs):
-    """Download graph around an address."""
     try:
         G = ox.graph_from_address(
             address,
@@ -492,10 +466,9 @@ def _osmnx_graph_from_address(ox, address, distance, **kwargs):
 def _osmnx_graph_from_bbox(ox, north, south, east, west, **kwargs):
     """Download a graph inside a bounding box, ordering the tuple per version.
 
-    OSMnx 1.x wants (north, south, east, west); 2.x wants (west, south, east,
-    north). Get it wrong and the polygon spans a hemisphere, so Overpass splits
-    the request into thousands of sub-queries instead of failing outright.
-    """
+    OSMnx 1.x wants (north, south, east, west), 2.x wants (west, south, east, north);
+    get it wrong and the polygon spans a hemisphere, so Overpass splits it into
+    thousands of sub-queries instead of failing."""
     try:
         version = getattr(ox, "__version__", "1.0")
         major = int(str(version).split(".")[0])
@@ -514,7 +487,6 @@ def _osmnx_graph_from_bbox(ox, north, south, east, west, **kwargs):
 
 
 def _osmnx_graph_from_polygon(ox, polygon, **kwargs):
-    """Download graph inside a shapely polygon."""
     try:
         G = ox.graph_from_polygon(polygon, **kwargs)
         return G
@@ -524,11 +496,7 @@ def _osmnx_graph_from_polygon(ox, polygon, **kwargs):
 
 
 def _osmnx_graph_from_xml(ox, xml_filepath, simplify=True):
-    """Load a graph from a local OSM XML file.
-
-    graph_from_xml accepts only simplify: network_type, truncate_by_edge,
-    retain_all and custom_filter mean nothing to a file already downloaded.
-    """
+    """Load a graph from a local OSM XML file. graph_from_xml accepts only simplify: network_type, truncate_by_edge, retain_all and custom_filter mean nothing to an already-downloaded file."""
     try:
         import os
         if not xml_filepath or not os.path.exists(xml_filepath):
@@ -542,11 +510,7 @@ def _osmnx_graph_from_xml(ox, xml_filepath, simplify=True):
 
 
 def osmnx_to_graph_data(G, retain_geometry=True):
-    """Convert an OSMnx MultiDiGraph to GraphData plus per-edge geometries.
-
-    Coordinates come out as (lat, lon) throughout, including the geometries,
-    which OSMnx itself stores the other way round.
-    """
+    """Convert an OSMnx MultiDiGraph to GraphData plus per-edge geometries, with coordinates as (lat, lon) throughout, including the geometries, which OSMnx itself stores the other way round."""
     import osmnx as ox
     
     nodes_gdf = ox.graph_to_gdfs(G, nodes=True, edges=False)
@@ -584,8 +548,7 @@ def osmnx_to_graph_data(G, retain_geometry=True):
     graph_data.node_coordinates = node_coordinates
     graph_data.edge_lengths = edge_lengths
     graph_data.is_osmnx = True
-    # Pathfinding builds its DiGraph from this flag, and export_utils uses it to
-    # write edgedefault="directed" in GraphML.
+    # Pathfinding builds its DiGraph from this flag; GraphML export reads it too.
     graph_data.is_directed = bool(getattr(G, "is_directed", lambda: True)())
 
     graph_data.osmnx_graph = G

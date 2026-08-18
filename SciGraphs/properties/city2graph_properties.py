@@ -637,10 +637,9 @@ class City2GraphProperties(bpy.types.PropertyGroup):
     )
 
     # --- Relation toggles for the morphological graph ---
-    # All three on takes the fast path through c2g.morphological_graph, which
-    # builds one coherent heterogeneous graph. Any of them off and the operator
-    # calls the individual c2g functions instead, one Blender object per active
-    # relation type.
+    # All three on takes the fast path through c2g.morphological_graph, one
+    # coherent heterogeneous graph. Any of them off and the operator calls the
+    # individual c2g functions, one Blender object per active relation type.
 
     morpho_rel_priv_priv: BoolProperty(
         name="Private ↔ Private",
@@ -726,7 +725,6 @@ class City2GraphProperties(bpy.types.PropertyGroup):
         soft_max=200000,
     )
     
-    # --- Overture download types ---
     
     c2g_overture_connector: BoolProperty(
         name="Connectors",
@@ -734,7 +732,6 @@ class City2GraphProperties(bpy.types.PropertyGroup):
         default=False,
     )
     
-    # --- Graph tools ---
     
     graph_tool_action: EnumProperty(
         name="Action",

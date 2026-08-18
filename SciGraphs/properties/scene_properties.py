@@ -39,7 +39,6 @@ class CSVColumnItem(bpy.types.PropertyGroup):
 class SciGraphsProperties(bpy.types.PropertyGroup):
     """Properties to store the state of the SciGraphs addon."""
     
-    # Data source selection
     data_source: EnumProperty(
         name="Data Source",
         description="Source of graph data",
@@ -95,7 +94,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         subtype='FILE_PATH',
     )
     
-    # SuiteSparse properties
     suitesparse_id: StringProperty(
         name="Matrix ID",
         description="SuiteSparse matrix identifier: 'Group/Name' (e.g. Grund/bayer09) or full URL",
@@ -134,7 +132,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=',',
     )
     
-    # SQL Database properties
     db_profile_index: EnumProperty(
         name="Database Connection",
         description="Select a database connection profile",
@@ -190,7 +187,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=True,
     )
     
-    # Geospatial properties
     use_geospatial: BoolProperty(
         name="Enable Geospatial Mode",
         description="Automatically detect and use geographic coordinates",
@@ -215,7 +211,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=True,
     )
     
-    # Temporal data properties
     has_temporal_data: BoolProperty(
         name="Has Temporal Data",
         description="Enable temporal data filtering and aggregation",
@@ -252,14 +247,12 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default="",
     )
     
-    # Edge weight property
     weight_column: EnumProperty(
         name="Edge Weight Column",
         description="Column containing edge weights/values",
         items=get_column_items,
     )
     
-    # Globe visualization properties
     show_globe: BoolProperty(
         name="Show Earth Globe",
         description="Display Earth sphere for reference",
@@ -387,7 +380,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default='GREAT_CIRCLE',
     )
     
-    # CSV column selection
     available_csv_columns: CollectionProperty(type=CSVColumnItem)
 
     auto_layout_on_import: BoolProperty(
@@ -400,7 +392,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         name="Layout Algorithm",
         description="Algorithm to determine node positions",
         items=[
-            # === 2D LAYOUTS ===
             ('GRID', "Grid (2D)", "Arrange nodes in a 2D grid (instant)"),
             ('SPRING', "Spring (2D - NetworkX)", "Force-directed 2D layout via NetworkX (fast: 76 ms on 240 nodes)"),
             ('IGRAPH_DRL_2D', "DrL (2D - igraph)", "Distributed Recursive Layout 2D, very fast for huge graphs (very fast)"),
@@ -408,22 +399,18 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('IGRAPH_GRAPHOPT', "Graphopt (2D - igraph)", "Energy-based optimization (fast)"),
             ('CIRCLE_PACKING', "Circle Packing (2D - Koebe)", "Koebe theorem: tangent circles. Fast when planar; falls back to an iterative packing that took 97 s on 240 nodes when not"),
             
-            # === 3D GEOMETRIC LAYOUTS ===
             ('RANDOM', "Random (3D)", "Distribute nodes randomly in 3D space (instant)"),
             ('SPHERE', "Sphere (3D)", "Distribute nodes on sphere surface using Fibonacci algorithm (instant)"),
             ('SPIRAL_3D', "Spiral (3D)", "Arrange nodes in upward spiral pattern (instant)"),
             ('HELIX', "Helix (3D)", "Double helix pattern like DNA structure (instant)"),
             ('CUBE', "Cube (3D)", "Distribute nodes in and on a cube (instant)"),
             
-            # === 3D GRAPH-BASED LAYOUTS ===
             ('SPECTRAL_3D', "Spectral (3D)", "Use graph Laplacian eigenvectors for 3D positioning (fast)"),
             ('MDS_3D', "MDS (3D)", "Multidimensional scaling using shortest path distances (medium)"),
             ('HIERARCHICAL_3D', "Hierarchical (3D)", "Tree-like hierarchy in layers (fast)"),
             ('BIPARTITE_3D', "Bipartite (3D)", "Two parallel planes for bipartite graphs (fast)"),
             
-            # === 3D FORCE-DIRECTED LAYOUTS ===
-            # The 2D/3D in each label was measured against what the layout
-            # actually returns, not taken from its documentation.
+            # The 2D/3D in each label was measured, not read off the docs.
             ('FORCEATLAS2', "ForceAtlas2 (3D)", "Gephi's algorithm (Jacomy et al. 2014), via networkx (medium)"),
             ('YIFAN_HU', "Yifan Hu (2D + Z)", "Planar force-directed placement with a synthesized Z axis, via scigraphs-utils"),
             ('IGRAPH_DRL', "DrL (3D - igraph)", "Distributed Recursive Layout for huge graphs 100k+ (very fast)"),
@@ -432,7 +419,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('IGRAPH_LGL', "LGL (2D - igraph)", "Large Graph Layout, optimized for massive graphs (fast)"),
             ('SPRING_3D', "Spring (3D - NetworkX)", "Force-directed 3D layout via NetworkX (fast: 81 ms on 240 nodes)"),
 
-            # === GRAPHVIZ LAYOUTS (scigraphs-utils) ===
             ('GRAPHVIZ_DOT', "Graphviz Dot (2D)", "Hierarchical layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_NEATO', "Graphviz Neato (2D)", "Spring model layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_FDP', "Graphviz FDP (2D)", "Force-directed placement via bundled scigraphs-utils"),
@@ -442,13 +428,11 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('GRAPHVIZ_OSAGE', "Graphviz Osage (2D)", "Cluster layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_PATCHWORK', "Graphviz Patchwork (2D)", "Patchwork layout via bundled scigraphs-utils"),
             
-            # === DIRECTED GRAPH LAYOUTS ===
             ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Hierarchical DAG layout, minimizes crossings (fast)"),
             ('CIRCULAR_HIERARCHY', "Circular Hierarchy (2D - Directed)", "Concentric circles from roots (fast)"),
         ],
-        # Not Yifan Hu: it aborts Blender outright on a graph of a few hundred
-        # nodes. ForceAtlas2 is real 3D and took 111 ms on the same graph where
-        # Yifan Hu took 992.
+        # Not Yifan Hu: it aborts Blender outright on a few hundred nodes.
+        # ForceAtlas2 is real 3D and took 111 ms where Yifan Hu took 992.
         default='FORCEATLAS2',
     )
 
@@ -479,7 +463,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         options=set(),
     )
     
-    # Advanced Force-Directed Parameters
     repulsion_strength: FloatProperty(
         name="Repulsion Strength",
         description="Strength of repulsive forces between nodes",
@@ -520,7 +503,6 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         max=10.0,
     )
     
-    # Execution Control
     execution_speed: FloatProperty(
         name="Execution Speed",
         description="Time between iterations (seconds, lower = faster)",

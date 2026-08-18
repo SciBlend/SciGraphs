@@ -34,11 +34,7 @@ def get_cache_filepath(theme: str, resolution: str, provider: str = "default") -
 
 
 def is_texture_cached(theme: str, resolution: str, provider: str = "default") -> bool:
-    """Report whether a usable copy of the texture is already on disk.
-
-    Files under 1000 bytes count as absent: a failed download leaves an error
-    page behind, and it would otherwise be served as the texture forever.
-    """
+    """Report whether a usable copy of the texture is on disk. Files under 1000 bytes count as absent: a failed download leaves an error page that would be served as the texture forever."""
     filepath = get_cache_filepath(theme, resolution, provider)
     return os.path.exists(filepath) and os.path.getsize(filepath) > 1000
 
@@ -62,11 +58,7 @@ def download_nasa_texture(
     resolution: str,
     api_key: str = "DEMO_KEY"
 ) -> Optional[str]:
-    """Fetch NASA Earth imagery for a theme, returning the cached file path.
-
-    DEMO_KEY works but is rate limited. Themes other than NASA_BLUE_MARBLE and
-    NASA_VIIRS are generated procedurally instead.
-    """
+    """Fetch NASA Earth imagery for a theme, returning the cached file path. DEMO_KEY works but is rate limited, and themes other than NASA_BLUE_MARBLE and NASA_VIIRS are generated procedurally."""
     cache_path = get_cache_filepath(theme, resolution, "nasa")
     
     if is_texture_cached(theme, resolution, "nasa"):
@@ -86,13 +78,9 @@ def download_nasa_texture(
 
 
 def _download_nasa_blue_marble(cache_path: str, resolution: str, api_key: str) -> Optional[str]:
-    """Stitch Blue Marble from GIBS WMTS tiles in EPSG:4326.
-
-    The EPSG:4326 endpoint is what makes the result equirectangular; the Web
-    Mercator endpoint would need reprojecting before it could wrap a globe.
-    """
+    """Stitch Blue Marble from GIBS WMTS tiles in EPSG:4326, which is what makes the result equirectangular; the Web Mercator endpoint would need reprojecting first."""
     resolution_map = {
-        '2K': (8, 4),    # 32 tiles of 256 px = 2048x1024
+        '2K': (8, 4),
         '4K': (16, 8),
         '8K': (32, 16),
     }
@@ -184,11 +172,7 @@ def _stitch_wmts_tiles(
     tile_size: int,
     output_path: str
 ) -> bool:
-    """Download a WMTS tile grid in parallel and paste it into one image.
-
-    Missing tiles are left at the background fill rather than aborting, so a
-    partial download still produces a usable texture.
-    """
+    """Download a WMTS tile grid in parallel and paste it into one image. Missing tiles are left at the background fill rather than aborting, so a partial download is still usable."""
     try:
         from PIL import Image
         import numpy as np
@@ -252,12 +236,7 @@ def download_texture(
     resolution: str = '4K',
     force_download: bool = False
 ) -> Optional[str]:
-    """Get an equirectangular Earth texture from the configured provider.
-
-    Reads provider and API key from addon preferences, falling back to NASA.
-    A failed download always ends in a procedural texture, so this returns None
-    only if even that fails.
-    """
+    """Get an equirectangular Earth texture from the configured provider, read from addon preferences and defaulting to NASA. A failed download falls back to a procedural texture, so None means even that failed."""
     prefs = get_preferences()
     
     if prefs:
@@ -333,11 +312,7 @@ def _generate_procedural_texture(theme: str, resolution: str) -> Optional[str]:
 
 
 def _create_earth_texture(width: int, height: int):
-    """Fake continents: blobs of land over ocean, with ice past 63 degrees.
-
-    The seed is fixed so the same invented geography comes back every run.
-    These landmasses are decorative and do not correspond to real ones.
-    """
+    """Fake continents: blobs of land over ocean, ice past 63 degrees. The seed is fixed so the same invented geography comes back every run; these landmasses are decorative."""
     import numpy as np
     
     img = np.zeros((height, width, 3), dtype=np.float32)
@@ -389,9 +364,7 @@ def _create_earth_texture(width: int, height: int):
 
 
 def _create_night_lights_texture(width: int, height: int):
-    """Night lights: 15 real cities at their true coordinates, plus 200 random
-    glows scattered between 60 south and 70 north.
-    """
+    """Night lights: 15 real cities at their true coordinates, plus 200 random glows between 60 south and 70 north."""
     import numpy as np
     
     img = np.zeros((height, width, 3), dtype=np.float32)
@@ -445,7 +418,7 @@ def _create_night_lights_texture(width: int, height: int):
 
 
 def _create_urban_dark_texture(width: int, height: int):
-    """Dark blue-gray base texture with noise, for overlaying data on."""
+    """Dark blue-gray base texture with noise."""
     import numpy as np
     
     img = np.zeros((height, width, 3), dtype=np.float32)
@@ -481,7 +454,6 @@ def _create_topographic_texture(width: int, height: int):
 
 
 def _create_data_overlay_texture(width: int, height: int):
-    """Neutral dark gradient meant to sit under semitransparent data."""
     import numpy as np
     
     img = np.ones((height, width, 3), dtype=np.float32) * 40
@@ -501,12 +473,7 @@ def get_texture_for_globe(
     theme: str,
     resolution: str = '4K'
 ) -> Tuple[Optional[str], dict]:
-    """Return (texture_path, material_hints) for a globe theme.
-
-    The hints are the shading settings that go with each texture: roughness and
-    specular for land and water, bump and emission strength, and alpha for
-    DATA_OVERLAY. Theme 'NONE' returns no path, just default hints.
-    """
+    """Return (texture_path, material_hints) for a globe theme: roughness and specular for land and water, bump and emission strength, alpha for DATA_OVERLAY. Theme 'NONE' returns no path, just default hints."""
     material_hints = {
         'NASA_BLUE_MARBLE': {
             'water_specular': 0.8,

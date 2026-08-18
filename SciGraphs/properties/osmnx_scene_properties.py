@@ -538,7 +538,6 @@ OSMNX_SCENE_PROPERTIES = {
         max=130,
     ),
 
-    # Elevation properties
     'osmnx_elevation_scale': FloatProperty(
         name="Elevation Scale",
         description="Vertical exaggeration factor for 3D elevation display",
@@ -562,7 +561,6 @@ OSMNX_SCENE_PROPERTIES = {
         default="",
     ),
 
-    # Terrain plane import properties
     'terrain_offset_x': FloatProperty(
         name="Offset X",
         description="Horizontal offset of terrain in X direction",

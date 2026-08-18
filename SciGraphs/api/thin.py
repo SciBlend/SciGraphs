@@ -1,16 +1,9 @@
 """Materialize a top-k edge backbone as a second, thinner graph object.
 
 GPU preview sparsification does not update the mesh, so EEVEE still draws every
-edge. Thinning happens here on the GeoDataFrame instead.
-
-`topk_mask` reimplements the engine's `_topk_mask` (no import) so
-`verify_against_engine()` is a real comparison. Rank half-edges by weight at
-each endpoint; an edge survives if top-k at either end. `sense='high'` (default)
-keeps largest weights; negatives are clamped like `backbone_mask`.
-
-`mesh_edge_rows()` mirrors mesh construction (drops self-loops, duplicate pairs,
-missing endpoints). Unresolved weights become uniform — run `gpu_weights()`
-before trusting backbone figures.
+edge; thinning happens here on the GeoDataFrame instead. An unresolved weight
+name silently falls back to uniform, so run `gpu_weights()` before trusting any
+backbone figure.
 """
 
 import numpy as np
@@ -29,10 +22,11 @@ def _gpu_simplify():
 # --------------------------------------------------------------------------
 
 def topk_mask(edges, weights, k, sense='high'):
-    """Boolean mask: keep edges in the top-`k` at either endpoint.
+    """Boolean mask keeping edges in the top-`k` at either endpoint.
 
-    Independent reimplementation of the engine's `_topk_mask`. `edges` is (E, 2),
-    `weights` is (E,) or None (uniform). Ties break by position via `np.lexsort`.
+    Reimplemented rather than imported, so `verify_against_engine` is a real
+    comparison. `edges` is (E, 2), `weights` is (E,) or None for uniform, and
+    ties break by position through `np.lexsort`.
     """
     edges = np.asarray(edges, dtype=np.int64)
     e = edges.shape[0]
@@ -51,7 +45,6 @@ def topk_mask(edges, weights, k, sense='high'):
     eid = np.concatenate([np.arange(e), np.arange(e)])
     ww = np.concatenate([w, w])
 
-    # 'high': sort on -w so largest weight ranks 0.
     primary = -ww if str(sense).lower() == 'high' else ww
     order = np.lexsort((primary, node))
 
@@ -70,8 +63,8 @@ def topk_mask(edges, weights, k, sense='high'):
 def verify_against_engine(edges, weights, k):
     """Compare `topk_mask` to the engine's `backbone_mask` on the same input.
 
-    Returns agree/counts, or `available: False` if the engine cannot be imported.
-    Compares source in the working tree, not necessarily the installed extension.
+    Reads the working tree, not necessarily the installed extension, and returns
+    `available: False` when the engine cannot be imported.
     """
     try:
         from ..core.render.simplify import backbone_mask
@@ -98,10 +91,10 @@ def verify_against_engine(edges, weights, k):
 # --------------------------------------------------------------------------
 
 def mesh_edge_rows(nodes_gdf, edges_gdf):
-    """Rows of `edges_gdf` that become mesh edges, plus endpoint indices.
+    """Rows of `edges_gdf` that become mesh edges, as `(rows, pairs)`.
 
-    Mirrors `create_native_graph_from_gdfs`: skip missing endpoints, self-loops,
-    and duplicate undirected pairs. Returns `(rows, pairs)`.
+    Mirrors `create_native_graph_from_gdfs`, skipping missing endpoints,
+    self-loops, and duplicate undirected pairs.
     """
     import pandas as pd
 
@@ -112,7 +105,6 @@ def mesh_edge_rows(nodes_gdf, edges_gdf):
     seen = set()
     index = edges_gdf.index
     if not (isinstance(index, pd.MultiIndex) and index.nlevels >= 2):
-        # Flat index → mesh with vertices but no edges.
         raise ValueError(
             "the edges frame needs the (source, target) MultiIndex city2graph "
             f"produces; got a {type(index).__name__} of {index.nlevels} level(s)")
@@ -135,9 +127,8 @@ def mesh_edge_rows(nodes_gdf, edges_gdf):
 
 
 def gpu_weights(obj, attribute):
-    """What `simplify.edge_weights_raw` would hand the backbone for this mesh.
-
-    Returns `name`, `uniform`, `values`, and EDGE-domain scalar `candidates`.
+    """What `simplify.edge_weights_raw` would hand the backbone for this mesh,
+    as `name`, `uniform`, `values`, and the EDGE-domain scalar `candidates`.
     """
     if obj is None or obj.type != 'MESH':
         return {"name": None, "uniform": True, "values": None, "candidates": []}
@@ -147,7 +138,6 @@ def gpu_weights(obj, attribute):
     candidates = [a.name for a in mesh.attributes
                   if a.domain == 'EDGE' and a.data_type in ('FLOAT', 'INT')]
 
-    # Ask the same resolver the filter uses.
     gpu_simplify = _gpu_simplify()
     name = gpu_simplify.resolve_edge_weight_attr(mesh, attribute)
     if name is None:
@@ -187,10 +177,10 @@ def gpu_backbone(obj, attribute, k, sense='high'):
 # --------------------------------------------------------------------------
 
 def top_k(nodes_gdf, edges_gdf, weight, k=3, sense='high', verbose=True):
-    """Top-k-per-node subset of `edges_gdf`, plus a report.
+    """Top-k-per-node subset of `edges_gdf` as `(kept_edges_gdf, report)`.
 
-    `weight` is an edges column (not the mesh `edge_` prefix); None → uniform.
-    `sense='high'` keeps largest weights. Returns `(kept_edges_gdf, report)`.
+    `weight` names a column of the edges frame, without the mesh `edge_` prefix,
+    and None ranks uniformly. `sense='high'` keeps the largest weights.
     """
     rows, pairs = mesh_edge_rows(nodes_gdf, edges_gdf)
     if rows.size == 0:
@@ -240,10 +230,7 @@ def top_k(nodes_gdf, edges_gdf, weight, k=3, sense='high', verbose=True):
 
 def graph(nodes_gdf, edges_gdf, name, weight, k=3, sense='high',
           ref=None, coll=None, markers=None, verbose=True):
-    """Build a Blender graph object with only the top-k backbone edges.
-
-    Same node set (not pruned), subset of edges. Returns `(obj, report)`.
-    """
+    """Build a graph object with the unpruned node set and only the top-k edges."""
     kept, report = top_k(nodes_gdf, edges_gdf, weight, k=k, sense=sense,
                          verbose=verbose)
     marks = {
@@ -269,10 +256,10 @@ def graph(nodes_gdf, edges_gdf, name, weight, k=3, sense='high',
 
 def verify(thin_obj, full_obj, nodes_gdf, edges_gdf, weight, k=3, sense='high',
            verbose=True):
-    """Compare materialized backbone to the GPU filter, edge for edge.
+    """Compare the materialized backbone to the GPU filter, edge for edge.
 
-    Uses `edge_<weight>` on the GPU side; reports `unprefixed_name_resolves`.
-    Pairs compared unordered. Returns a report; `identical` is the headline.
+    Ranks on `edge_<weight>` on the GPU side and compares pairs unordered.
+    `identical` is the headline of the report it returns.
     """
     report = {"identical": False}
     if thin_obj is None or full_obj is None:
@@ -298,7 +285,6 @@ def verify(thin_obj, full_obj, nodes_gdf, edges_gdf, weight, k=3, sense='high',
     report["only_in_materialized"] = len(thin_pairs - kept_pairs)
     report["identical"] = (kept_pairs == thin_pairs)
 
-    # Spot-check ranking independently of set agreement.
     report["spot_check"] = _spot_check(nodes_gdf, edges_gdf, thin_pairs, weight,
                                        k, sense)
 
@@ -320,10 +306,10 @@ def verify(thin_obj, full_obj, nodes_gdf, edges_gdf, weight, k=3, sense='high',
 
 
 def _spot_check(nodes_gdf, edges_gdf, kept_pairs, weight, k, sense, limit=40):
-    """Naive per-node top-k check against `kept_pairs` (independent of `topk_mask`).
+    """Naive per-node top-k check against `kept_pairs`, independent of `topk_mask`.
 
-    Only strict-better-than-cut edges are required kept; ties at the cut are
-    counted separately. An edge may be kept via the other endpoint.
+    Only edges strictly better than the cut must be kept; ties there are counted
+    separately, and an edge may have been kept through its other endpoint.
     """
     if weight is None or weight not in edges_gdf.columns:
         return None
@@ -354,10 +340,9 @@ def _spot_check(nodes_gdf, edges_gdf, kept_pairs, weight, k, sense, limit=40):
         ids = incident[node]
         ordered = sorted(ids, key=lambda i: values[i], reverse=high)
         cut = values[ordered[min(kk, len(ordered)) - 1]]
-        # Strictly better than the k-th: ties cannot excuse dropping these.
         strict = [i for i in ordered[:kk]
                   if (values[i] > cut if high else values[i] < cut)]
-        # More edges at cut than slots → tie (k-th always equals cut).
+        # More edges at the cut than slots means a tie; the k-th always equals cut.
         at_cut = sum(1 for i in ids if values[i] == cut)
         if len(strict) + at_cut > min(kk, len(ordered)):
             tied += 1
@@ -372,7 +357,7 @@ __all__ = [
     "gpu_weights",
     "mesh_edge_rows",
     "mesh_edges",
-    "edges",
+    "top_k",
     "graph",
     "topk_mask",
     "verify",

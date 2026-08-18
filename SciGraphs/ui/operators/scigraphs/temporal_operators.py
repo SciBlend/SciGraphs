@@ -4,7 +4,6 @@ from bpy.props import IntProperty, BoolProperty
 
 
 class SCIGRAPHS_OT_AnalyzeTimeColumn(bpy.types.Operator):
-    """Analyze the selected time column to find available time periods."""
     bl_idname = "scigraphs.analyze_time_column"
     bl_label = "Analyze Time Column"
     bl_description = "Scan CSV to find unique time values in the selected column"
@@ -56,7 +55,6 @@ class SCIGRAPHS_OT_AnalyzeTimeColumn(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CreateTemporalGraphs(bpy.types.Operator):
-    """Create multiple graph objects, one for each selected time period."""
     bl_idname = "scigraphs.create_temporal_graphs"
     bl_label = "Create Temporal Graphs"
     bl_description = "Generate separate graph objects for each time period in the selected range"
@@ -209,7 +207,6 @@ class SCIGRAPHS_OT_CreateTemporalGraphs(bpy.types.Operator):
         return {'FINISHED'}
     
     def _add_geospatial_data(self, graph_data, props):
-        """Add geocoded coordinates to graph data."""
         from ....core import geospatial
         
         all_locations = list(set(graph_data.nodes))
@@ -223,7 +220,6 @@ class SCIGRAPHS_OT_CreateTemporalGraphs(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalNext(bpy.types.Operator):
-    """Move to the next time period."""
     bl_idname = "scigraphs.temporal_next"
     bl_label = "Next Time"
     bl_description = "Move to the next time period"
@@ -253,7 +249,6 @@ class SCIGRAPHS_OT_TemporalNext(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalPrevious(bpy.types.Operator):
-    """Move to the previous time period."""
     bl_idname = "scigraphs.temporal_previous"
     bl_label = "Previous Time"
     bl_description = "Move to the previous time period"
@@ -282,7 +277,6 @@ class SCIGRAPHS_OT_TemporalPrevious(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalFirst(bpy.types.Operator):
-    """Jump to the first time period."""
     bl_idname = "scigraphs.temporal_first"
     bl_label = "First Time"
     bl_description = "Jump to the first time period"
@@ -300,7 +294,6 @@ class SCIGRAPHS_OT_TemporalFirst(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalLast(bpy.types.Operator):
-    """Jump to the last time period."""
     bl_idname = "scigraphs.temporal_last"
     bl_label = "Last Time"
     bl_description = "Jump to the last time period"
@@ -323,7 +316,6 @@ class SCIGRAPHS_OT_TemporalLast(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalPlay(bpy.types.Operator):
-    """Play/pause temporal animation."""
     bl_idname = "scigraphs.temporal_play"
     bl_label = "Play/Pause"
     bl_description = "Start or stop temporal animation playback"
@@ -392,7 +384,6 @@ class SCIGRAPHS_OT_TemporalPlay(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalGoTo(bpy.types.Operator):
-    """Jump to a specific time index."""
     bl_idname = "scigraphs.temporal_goto"
     bl_label = "Go To Time"
     bl_description = "Jump to a specific time period"
@@ -421,7 +412,6 @@ class SCIGRAPHS_OT_TemporalGoTo(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalRefresh(bpy.types.Operator):
-    """Refresh the temporal visualization."""
     bl_idname = "scigraphs.temporal_refresh"
     bl_label = "Refresh Temporal View"
     bl_description = "Manually refresh the graph for the current time period"
@@ -463,7 +453,6 @@ class SCIGRAPHS_OT_TemporalRefresh(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TemporalClear(bpy.types.Operator):
-    """Clear temporal data and show all time periods."""
     bl_idname = "scigraphs.temporal_clear"
     bl_label = "Show All Time"
     bl_description = "Clear temporal filter and show all data"

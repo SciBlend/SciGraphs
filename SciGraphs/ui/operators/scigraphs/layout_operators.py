@@ -37,7 +37,6 @@ OPERATOR_LAYOUT_PROPERTIES = {
 
 
 class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
-    """Apply selected layout algorithm to graph."""
     bl_idname = "scigraphs.apply_layout"
     bl_label = "Apply Layout"
     bl_description = "Recalculate node positions using the selected layout algorithm"
@@ -308,11 +307,9 @@ class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
             iterations=self.iterations,
             scale=self.scale,
             props=self,
-            # The layout package may not read a mesh, so the operator reads the
-            # edges for it. Objects that keep their topology in mesh.edges
-            # rather than in the edges_data string (build_showcase.py output
-            # among them) otherwise arrive edgeless and come back as num_nodes
-            # isolated points.
+            # The layout package may not read a mesh, so pass the edges in.
+            # An object that keeps its topology in mesh.edges rather than in
+            # edges_data otherwise arrives edgeless and returns isolated points.
             edge_pairs=layout_edge_pairs(obj),
         )
         
@@ -331,7 +328,6 @@ SCIGRAPHS_OT_ApplyLayout.__annotations__.update(OPERATOR_LAYOUT_PROPERTIES)
 
 
 class SCIGRAPHS_OT_ExecuteLayoutStep(bpy.types.Operator):
-    """Execute layout iterations frame-by-frame in Gephi style."""
     bl_idname = "scigraphs.execute_layout_step"
     bl_label = "Execute"
     bl_description = "Execute layout iterations and cache them frame by frame in the timeline range (Gephi-style)"
@@ -369,14 +365,11 @@ class SCIGRAPHS_OT_ExecuteLayoutStep(bpy.types.Operator):
                 initial_temp=props.initial_temperature,
                 edge_dist=props.edge_distance,
                 auto_stop=props.auto_stop_threshold,
-                # The layout package is the Blender-free half of the tree, so
-                # the scene properties are passed in. Reaching for
-                # `bpy.context.scene.scigraphs` from there raises a NameError
-                # that a bare except swallows, and every algorithm below
-                # ForceAtlas2 quietly runs on hard-coded defaults.
+                # The layout package is Blender-free, so the scene properties are
+                # passed in. Reaching for `bpy.context` there raises a NameError a
+                # bare except swallows, and the algorithm runs on hard-coded defaults.
                 props=props,
-                # Edges likewise. Recomputed per iteration because
-                # `rebuild_edges` below replaces the mesh edges every frame.
+                # Recomputed per iteration: `rebuild_edges` replaces them each frame.
                 edge_pairs=layout_edge_pairs(obj),
             )
             
@@ -390,13 +383,12 @@ class SCIGRAPHS_OT_ExecuteLayoutStep(bpy.types.Operator):
             if props.update_viewport:
                 geometry.update_node_positions_from_property(obj)
 
-                # With the GPU preview up we push node positions and let it
-                # redraw. A layout never changes edge topology, so the per-frame
-                # edge rebuild (and any Geometry Nodes work) is wasted there.
+                # A layout never changes edge topology, so with the GPU preview up
+                # the per-frame edge rebuild is wasted work.
                 live_preview = gpu_preview is not None and gpu_preview.is_enabled()
                 if live_preview:
-                    # Moving nodes is the one change the batch and tree
-                    # signatures cannot see, so invalidate by hand.
+                    # Moving nodes is the one change the batch and tree signatures
+                    # cannot see, so invalidate by hand.
                     gpu_preview.invalidate_geometry(obj)
                 else:
                     geometry.rebuild_edges(obj)
@@ -453,7 +445,6 @@ class SCIGRAPHS_OT_ExecuteLayoutStep(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ResetLayout(bpy.types.Operator):
-    """Reset layout to initial random positions."""
     bl_idname = "scigraphs.reset_layout"
     bl_label = "Reset"
     bl_description = "Reset layout to initial random positions and clear timeline cache"
@@ -490,7 +481,6 @@ class SCIGRAPHS_OT_ResetLayout(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BakeAnimation(bpy.types.Operator):
-    """Create animation of layout simulation."""
     bl_idname = "scigraphs.bake_animation"
     bl_label = "Bake Animation"
     bl_description = "Create an animation of the layout simulation (automatic)"
@@ -547,7 +537,6 @@ class SCIGRAPHS_OT_BakeAnimation(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_NetworkSplitter3D(bpy.types.Operator):
-    """Split network layout into distinct Z-layers."""
     bl_idname = "scigraphs.network_splitter_3d"
     bl_label = "Network Splitter 3D"
     bl_description = "Split network layout into Z-layers by community, degree, attribute, etc."
@@ -576,9 +565,8 @@ class SCIGRAPHS_OT_NetworkSplitter3D(bpy.types.Operator):
             center_layers=props.splitter_center_layers,
             scale_by_size=props.splitter_scale_by_size,
             base_z=props.splitter_base_z,
-            # Every criterion but ATTRIBUTE is a function of the edges. Without
-            # them the splitter finds one component per node and reports a
-            # plausible layer count that means nothing.
+            # Every criterion but ATTRIBUTE is a function of the edges; without
+            # them the splitter reports one component per node.
             edge_pairs=layout_edge_pairs(obj),
         )
         
@@ -599,7 +587,6 @@ class SCIGRAPHS_OT_NetworkSplitter3D(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ResetSplitter(bpy.types.Operator):
-    """Reset Z positions to flat plane."""
     bl_idname = "scigraphs.reset_splitter"
     bl_label = "Flatten Z"
     bl_description = "Reset all Z positions to zero (flatten the layout)"

@@ -4,13 +4,11 @@ from . import utils
 
 
 def create_tessellation(buildings_obj, barriers_obj=None, shrink=0.4, segment_length=0.5):
-    """Create a Voronoi tessellation of building footprints as a Blender object.
+    """Voronoi tessellation of building footprints as a Blender object.
 
-    ``barriers_obj`` optionally supplies roads or other lines the cells must not
-    cross; ``shrink`` and ``segment_length`` reach city2graph as ``shrink`` and
-    ``segment``. Geographic input is projected to UTM first, since the
-    tessellation works in meters.
-    """
+    ``barriers_obj`` supplies lines the cells must not cross and ``segment_length``
+    reaches city2graph as ``segment``. Geographic input is projected to UTM first,
+    since the tessellation works in meters."""
     c2g = get_city2graph()
     if c2g is None:
         log("city2graph is not available")
@@ -90,9 +88,7 @@ def create_tessellation(buildings_obj, barriers_obj=None, shrink=0.4, segment_le
 
 
 def _reproject_graph_pos_to_wgs84(G, source_crs):
-    """Rewrite every node position of *G* from ``source_crs`` to (lon, lat), the
-    frame ``create_graph_from_networkx`` places nodes in.
-    """
+    """Rewrite every node position of *G* from ``source_crs`` to (lon, lat), the frame ``create_graph_from_networkx`` places nodes in."""
     try:
         from pyproj import Transformer
     except Exception as _e:  # noqa: BLE001
@@ -129,11 +125,7 @@ def _resolve_osmnx_parent(*candidates):
 
 
 def _prepare_morpho_inputs(buildings_obj, street_network_obj, center_lat, center_lon):
-    """Project buildings and streets onto one UTM CRS for the graph builders.
-
-    Returns ``(buildings_gdf, street_gdf, center_point, target_crs,
-    barrier_col)``. Raises ``ValueError`` when either object yields no geometry.
-    """
+    """Project buildings and streets onto one UTM CRS, returning ``(buildings_gdf, street_gdf, center_point, target_crs, barrier_col)``. Raises ``ValueError`` when either object yields no geometry."""
     import geopandas as gpd
     from shapely.geometry import Point
 
@@ -187,9 +179,7 @@ def _create_subset_morphological_graphs(
     clipping_buffer=300.0,
     contiguity="queen",
 ):
-    """Build the requested relations as one Blender object each, so a user who
-    turned off a relation type can style and export the rest on their own.
-    """
+    """Build the requested relations as one Blender object each, so the rest stay separately styleable when a relation is turned off."""
     if not (include_priv_priv or include_pub_pub or include_priv_pub):
         log("No relations selected; nothing to do.")
         return []
@@ -214,9 +204,8 @@ def _create_subset_morphological_graphs(
         log(str(e))
         return []
 
-    # One call to the high-level builder returns node and edge dicts already
-    # keyed by ('private'|'public', RELATION, 'private'|'public'), so all that
-    # is left is picking the relations the user asked for.
+    # The builder returns dicts already keyed by
+    # ('private'|'public', RELATION, 'private'|'public').
     try:
         nodes_dict, edges_dict = morphological_graph(
             buildings_gdf=buildings_gdf,
@@ -240,8 +229,7 @@ def _create_subset_morphological_graphs(
         log("morphological_graph did not return any node GeoDataFrames")
         return []
 
-    # Normalize the edge index names so the graph builders below read the
-    # right endpoints.
+    # Normalize the edge index names so the builders read the right endpoints.
     pp_key = ("private", "touched_to", "private")
     PP_key = ("public", "connected_to", "public")
     pf_key = ("private", "faced_to", "public")
@@ -266,11 +254,7 @@ def _create_subset_morphological_graphs(
     created = []
 
     def _build_homogeneous_graph(nodes_gdf, edges_gdf, id_col):
-        """Build an nx.Graph from a (nodes, edges) GeoDataFrame pair.
-
-        The ``as_nx=True`` paths in the c2g sub-functions drop edges when the id
-        columns are missing, so this reads the MultiIndex city2graph sets.
-        """
+        """Build an nx.Graph from a (nodes, edges) pair, reading the MultiIndex city2graph sets: the ``as_nx=True`` paths drop edges when the id columns are missing."""
         import networkx as nx
         G = nx.Graph()
         # Node centroids are kept as ``geometry`` for the reprojection step.
@@ -375,17 +359,9 @@ def create_morphological_graph(
 ):
     """Create the morphological graph(s) requested by the user.
 
-    With all three ``include_*`` flags True this makes one call to
-    ``city2graph.morphology.morphological_graph`` and returns a single
-    heterogeneous Blender object, which is the faster route; with any flag False
-    it builds each relation separately and returns a list.
-
-    ``buildings_obj`` carries the building polygons (private space) and
-    ``street_network_obj`` the street segments (public space). ``distance`` is
-    the analysis radius in meters about ``center_lat`` / ``center_lon``, or the
-    full extent of the input when None or 0. ``clipping_buffer`` is the
-    tessellation border buffer, also meters; ``contiguity`` is 'queen' or 'rook'.
-    """
+    All three ``include_*`` flags True takes one ``morphological_graph`` call and
+    returns one heterogeneous object; any flag False builds each relation into its
+    own. ``distance`` is the analysis radius in meters, the full extent if 0."""
     c2g = get_city2graph()
     if c2g is None:
         log("city2graph is not available")
@@ -474,13 +450,7 @@ def create_morphological_graph(
 
 
 def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osmnx_obj=None):
-    """Create a Blender graph object from a NetworkX graph.
-
-    With ``use_positions``, placement comes from each node's ``pos``: a 2-tuple
-    is read as (lon, lat) and projected against ``osmnx_obj``, a 3-tuple is
-    taken as local coordinates. Numeric edge attributes become ``edge_*`` mesh
-    attributes.
-    """
+    """Create a Blender graph object from a NetworkX graph. With ``use_positions``, placement comes from each node's ``pos``: a 2-tuple is read as (lon, lat) and projected against ``osmnx_obj``, a 3-tuple as local coordinates. Numeric edge attributes become ``edge_*``."""
     import bpy
     import bmesh
     

@@ -1,8 +1,7 @@
 """Operators to load OD matrices, turn them into graphs, and draw the flows.
 
-``core.city2graph.mobility`` computes and returns GeoDataFrames and NetworkX
-graphs; the two helpers here are the only step that touches bpy, which is what
-keeps that module importable without Blender.
+The two helpers here are the only step that touches bpy, which is what keeps
+``core.city2graph.mobility`` importable without Blender.
 """
 
 import bpy
@@ -106,7 +105,6 @@ def visualize_od_flows(od_data, zones_gdf, zone_id_col, feature_obj=None,
 
 
 class SCIGRAPHS_OT_C2G_LoadODMatrix(bpy.types.Operator):
-    """Load an OD matrix CSV file into the scene."""
     bl_idname = "scigraphs.c2g_load_od_matrix"
     bl_label = "Load OD Matrix"
     bl_description = "Load Origin-Destination matrix from CSV (edgelist or adjacency)"
@@ -144,7 +142,6 @@ class SCIGRAPHS_OT_C2G_LoadODMatrix(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_ODToGraph(bpy.types.Operator):
-    """Convert loaded OD matrix into a spatial graph."""
     bl_idname = "scigraphs.c2g_od_to_graph"
     bl_label = "OD Matrix → Graph"
     bl_description = "Convert the loaded OD data and zones into a Blender graph"

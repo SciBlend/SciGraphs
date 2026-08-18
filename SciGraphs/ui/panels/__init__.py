@@ -23,7 +23,6 @@ class SCIGRAPHS_PT_main(bpy.types.Panel):
 
 
 def register():
-    """Register main panel and all subpanel modules."""
     bpy.utils.register_class(SCIGRAPHS_PT_main)
     scigraphs.register()
     osmnx.register()
@@ -32,7 +31,6 @@ def register():
 
 
 def unregister():
-    """Unregister all panel modules in reverse order."""
     repro_panel.unregister()
     city2graph.unregister()
     osmnx.unregister()

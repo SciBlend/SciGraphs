@@ -1,8 +1,8 @@
 """Scripting API: drive SciGraphs from Python (`from SciGraphs import api as sg`).
 
-Submodules: `graphs`, `preview`, `render`, `context`, `thin`.
-Registered state goes through `bpy.ops` (direct PropertyGroup writes can miss the registered add-on).
-For Blender-free work use `scigraphs_engine`; for declarative YAML pipelines use `SciGraphs.core.repro`.
+Submodules are `graphs`, `preview`, `render`, `context`, and `thin`. Registered
+state goes through `bpy.ops`, since a direct PropertyGroup write can miss the
+registered add-on.
 """
 
 _MODULES = ("context", "graphs", "preview", "render", "thin")

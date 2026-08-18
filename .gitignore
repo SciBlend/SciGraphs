@@ -34,7 +34,7 @@ docs/.quarto/
 .geocode_cache.json
 .naturalearth_cache/
 
-# Downloaded research datasets (see scripts/visibility/fetch_darus_5108.sh)
+# Downloaded research datasets
 data/
 
 # IDE
@@ -75,3 +75,15 @@ web/*
 
 # Private engine history
 .git-private/
+
+# API keys and other secrets. The OpenTopography key lives in Blender's add-on
+# preferences (~/.config), or in OPENTOPOGRAPHY_API_KEY — never in the tree.
+*.key
+.env
+.secrets
+secrets.*
+**/api_keys.json
+
+# Quarto build artefacts inside the embedded-notebook folder, and the copies
+# themselves: both are derived from notebooks/*.ipynb by the docs build.
+docs/notebooks/_ipynb/

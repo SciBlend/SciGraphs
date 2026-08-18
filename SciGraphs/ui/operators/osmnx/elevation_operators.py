@@ -12,7 +12,6 @@ from .utils import (
 
 
 class SCIGRAPHS_OT_AddElevationsRaster(bpy.types.Operator):
-    """Add elevation to nodes from a local DEM raster file."""
     bl_idname = "scigraphs.osmnx_add_elevations_raster"
     bl_label = "Add Elevations from Raster"
     bl_description = "Sample node elevations from a local DEM file (GeoTIFF)"
@@ -67,7 +66,6 @@ class SCIGRAPHS_OT_AddElevationsRaster(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AddElevationsAPI(bpy.types.Operator):
-    """Add elevation to nodes from an online API (Open-Elevation)."""
     bl_idname = "scigraphs.osmnx_add_elevations_api"
     bl_label = "Add Elevations from API"
     bl_description = "Query node elevations from Open-Elevation API (free, no key required)"
@@ -134,7 +132,6 @@ class SCIGRAPHS_OT_AddElevationsAPI(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_AddEdgeGrades(bpy.types.Operator):
-    """Calculate edge grades (slopes) from node elevations."""
     bl_idname = "scigraphs.osmnx_add_edge_grades"
     bl_label = "Calculate Edge Grades"
     bl_description = "Calculate slope/grade for each edge based on node elevations"
@@ -180,7 +177,6 @@ class SCIGRAPHS_OT_AddEdgeGrades(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ApplyElevation3D(bpy.types.Operator):
-    """Apply elevation to transform the network into 3D."""
     bl_idname = "scigraphs.osmnx_apply_elevation_3d"
     bl_label = "Apply Elevation to 3D"
     bl_description = "Transform the flat network into 3D using node elevations"
@@ -196,17 +192,15 @@ class SCIGRAPHS_OT_ApplyElevation3D(bpy.types.Operator):
         obj = context.active_object
 
         mesh = obj.data
-        # Either property can hold the scale, depending on which import path
-        # built the object.
+        # Either key can hold the scale, depending on the import path used.
         scale = obj.get("osmnx_scale")
         if scale is None:
             scale = obj.get("scale", 0.001)
         elev_scale = props.osmnx_elevation_scale
         elev_offset = props.osmnx_elevation_offset
 
-        # ``apply_dem_elevations_to_graph`` writes the "elevation" attribute on
-        # every vertex, intersections and curve points alike, so the vertical
-        # scale and offset can be re-applied without the cached graph.
+        # "elevation" is written on every vertex, curve points included, so
+        # scale and offset re-apply without the cached graph.
         attr = mesh.attributes.get("elevation")
         if attr is None:
             self.report(
@@ -243,7 +237,6 @@ class SCIGRAPHS_OT_ApplyElevation3D(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_FlattenNetwork(bpy.types.Operator):
-    """Reset network to flat (Z=0)."""
     bl_idname = "scigraphs.osmnx_flatten_network"
     bl_label = "Flatten to 2D"
     bl_description = "Reset the network to flat 2D (Z=0 for all vertices)"
@@ -269,7 +262,6 @@ class SCIGRAPHS_OT_FlattenNetwork(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportTerrain(bpy.types.Operator):
-    """Import DEM from file and apply elevation to graph."""
     bl_idname = "scigraphs.osmnx_import_terrain"
     bl_label = "Import DEM from File"
     bl_description = "Load DEM file, apply elevation to network, and optionally show terrain"
@@ -340,7 +332,6 @@ class SCIGRAPHS_OT_ImportTerrain(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportTerrainAPI(bpy.types.Operator):
-    """Import DEM from API and apply elevation to graph."""
     bl_idname = "scigraphs.osmnx_import_terrain_api"
     bl_label = "Import DEM from API"
     bl_description = "Fetch elevation from API, apply to network, and optionally show terrain"
@@ -465,7 +456,6 @@ class SCIGRAPHS_OT_ImportTerrainAPI(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ToggleTerrain(bpy.types.Operator):
-    """Toggle terrain visibility."""
     bl_idname = "scigraphs.osmnx_toggle_terrain"
     bl_label = "Toggle Terrain"
     bl_description = "Show or hide the terrain mesh"
@@ -497,7 +487,6 @@ class SCIGRAPHS_OT_ToggleTerrain(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ExportAOI(bpy.types.Operator):
-    """Export Area of Interest for Copernicus DEM download."""
     bl_idname = "scigraphs.osmnx_export_aoi"
     bl_label = "Export AOI for Copernicus"
     bl_description = "Export the network area as GeoJSON/KML/WKT for downloading DEM from Copernicus"
@@ -611,7 +600,6 @@ class SCIGRAPHS_OT_ExportAOI(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportTerrainPlane(bpy.types.Operator):
-    """Import terrain plane from raster file."""
     bl_idname = "scigraphs.osmnx_import_terrain_plane"
     bl_label = "Import Terrain Plane"
     bl_description = "Import a georeferenced image as terrain plane (KMZ, GeoTIFF, PNG, JPG)"
@@ -685,7 +673,6 @@ class SCIGRAPHS_OT_ImportTerrainPlane(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_UpdateTerrainPlaneOffset(bpy.types.Operator):
-    """Update terrain plane position and scale."""
     bl_idname = "scigraphs.osmnx_update_terrain_plane"
     bl_label = "Update Terrain Plane"
     bl_description = "Update position and scale of terrain plane"
@@ -727,7 +714,6 @@ class SCIGRAPHS_OT_UpdateTerrainPlaneOffset(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveTerrainPlane(bpy.types.Operator):
-    """Remove terrain plane."""
     bl_idname = "scigraphs.osmnx_remove_terrain_plane"
     bl_label = "Remove Terrain Plane"
     bl_description = "Remove the terrain plane"
@@ -767,7 +753,6 @@ class SCIGRAPHS_OT_RemoveTerrainPlane(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportDEMDisplace(bpy.types.Operator):
-    """Import DEM using Displace modifier method (fast)."""
     bl_idname = "scigraphs.import_dem_displace"
     bl_label = "Import DEM (Displace)"
     bl_description = "Import GeoTIFF DEM using subdivision and displace modifier (fast method)"
@@ -884,7 +869,6 @@ class SCIGRAPHS_OT_ImportDEMDisplace(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportDEMRawMesh(bpy.types.Operator):
-    """Import DEM as raw mesh (accurate but slower)."""
     bl_idname = "scigraphs.import_dem_raw_mesh"
     bl_label = "Import DEM (Raw Mesh)"
     bl_description = "Import GeoTIFF DEM creating vertices from pixels (accurate method)"
@@ -992,7 +976,6 @@ class SCIGRAPHS_OT_ImportDEMRawMesh(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_DownloadDEM(bpy.types.Operator):
-    """Download DEM from OpenTopography."""
     bl_idname = "scigraphs.download_dem"
     bl_label = "Download DEM"
     bl_description = "Download elevation data from OpenTopography API"
@@ -1127,9 +1110,8 @@ class SCIGRAPHS_OT_DownloadDEM(bpy.types.Operator):
         
         self.report({'INFO'}, f"Downloading {self.dataset} from OpenTopography...")
 
-        # Reading the preference here keeps core.geo.dem_download a plain HTTP
-        # client with no bpy. A None key is fine: the downloader falls back to
-        # OPENTOPOGRAPHY_API_KEY and reports a missing key itself.
+        # Reading the preference here keeps core.geo.dem_download bpy-free. A
+        # None key is fine; the downloader falls back to OPENTOPOGRAPHY_API_KEY.
         from ....preferences import get_preferences
         prefs = get_preferences()
 
@@ -1202,7 +1184,6 @@ class SCIGRAPHS_OT_DownloadDEM(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_UpdateTerrainScale(bpy.types.Operator):
-    """Update terrain vertical scale."""
     bl_idname = "scigraphs.osmnx_update_terrain_scale"
     bl_label = "Update Terrain Scale"
     bl_description = "Update the vertical exaggeration of the terrain"
@@ -1226,7 +1207,6 @@ class SCIGRAPHS_OT_UpdateTerrainScale(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveTerrain(bpy.types.Operator):
-    """Remove terrain object."""
     bl_idname = "scigraphs.osmnx_remove_terrain"
     bl_label = "Remove Terrain"
     bl_description = "Remove the terrain mesh"
@@ -1248,7 +1228,6 @@ class SCIGRAPHS_OT_RemoveTerrain(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TerrainMaterial(bpy.types.Operator):
-    """Apply material to terrain."""
     bl_idname = "scigraphs.osmnx_terrain_material"
     bl_label = "Apply Terrain Material"
     bl_description = "Apply elevation-based material to terrain"
@@ -1284,10 +1263,6 @@ class SCIGRAPHS_OT_TerrainMaterial(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
-    """Pick a DEM source and apply it to the graph nodes, a terrain mesh, or both.
-
-    Delegates to the specialized operators, which stay callable on their own.
-    """
 
     bl_idname = "scigraphs.osmnx_get_elevation"
     bl_label = "Get Elevation Data"
@@ -1303,9 +1278,8 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
 
     def _safe_call(self, op_fn, **kwargs):
-        """Call a sub-operator, turning any failure into ``{'CANCELLED'}``.
-
-        Otherwise RuntimeError and KeyboardInterrupt reach Blender's red popup.
+        """Call a sub-operator, turning any failure into ``{'CANCELLED'}``, which
+        RuntimeError and KeyboardInterrupt would otherwise take to a red popup.
         """
         try:
             res = op_fn('EXEC_DEFAULT', **kwargs)
@@ -1313,7 +1287,6 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
             self.report({'WARNING'}, "Interrupted by user")
             return {'CANCELLED'}
         except RuntimeError as exc:
-            # The sub-operator already reported the cause; add context.
             self.report({'ERROR'}, f"Sub-operation failed: {exc}")
             return {'CANCELLED'}
         except Exception as exc:  # noqa: BLE001
@@ -1332,10 +1305,8 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
             )
             return {'CANCELLED'}
 
-        # Every elevation pipeline creates a *new* terrain object rather than
-        # editing the old one, so delete the previous terrain here or repeated
-        # runs stack duplicates. Its basemap material goes too, since it would
-        # point at a mesh that no longer exists.
+        # Every pipeline builds a new terrain object rather than editing the old
+        # one, so delete the previous one here or repeated runs stack duplicates.
         for slot in ("dem_terrain_child", "terrain_child"):
             old_name = obj.get(slot)
             if old_name and old_name in bpy.data.objects:
@@ -1386,8 +1357,7 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
             return {'FINISHED'}
 
         if source == 'OPEN_ELEVATION':
-            # Thousands of API calls block the main Blender thread for minutes,
-            # so warn before that happens.
+            # Thousands of API calls block the main thread for minutes.
             res_total = props.osmnx_dem_api_resolution ** 2
             if res_total > 10000:
                 self.report(
@@ -1461,10 +1431,8 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
 
     @staticmethod
     def _normalize_terrain_slots(osmnx_obj):
-        """Make ``terrain_child`` and ``dem_terrain_child`` agree.
-
-        Sub-operators set one slot or the other, so mirror them and let the
-        panel and the basemap operator query whichever key they like.
+        """Make ``terrain_child`` and ``dem_terrain_child`` agree, since
+        sub-operators set one slot or the other.
         """
         name = osmnx_obj.get("terrain_child") or osmnx_obj.get("dem_terrain_child")
         if name and name in bpy.data.objects:
@@ -1487,11 +1455,6 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveTerrainChild(bpy.types.Operator):
-    """Remove the terrain mesh attached to an OSMnx network.
-
-    ``osmnx_remove_terrain`` polls for ``is_terrain=True`` and so needs the
-    terrain itself selected; this works from the network side.
-    """
 
     bl_idname = "scigraphs.osmnx_remove_terrain_child"
     bl_label = "Remove Terrain"
@@ -1532,8 +1495,8 @@ def _resolve_terrain_object(osmnx_obj):
 def _terrain_bounds_wgs84(terrain_obj):
     """Return the WGS84 bbox stored on a SciGraphs terrain mesh, or None.
 
-    ``create_terrain_mesh`` records it, and the terrain XY extent matches that
-    rectangle exactly, so it also drives imagery fetching and UV projection.
+    The terrain XY extent matches that rectangle exactly, so it also drives
+    imagery fetching and UV projection.
     """
     keys = ('dem_bounds_north', 'dem_bounds_south', 'dem_bounds_east', 'dem_bounds_west')
     if not all(k in terrain_obj for k in keys):
@@ -1549,12 +1512,10 @@ def _terrain_bounds_wgs84(terrain_obj):
 def _terrain_xy_to_latlon_factory(terrain_obj):
     """Build a callable ``(world_x, world_y) -> (lat, lon)`` for a terrain.
 
-    Inverts the equirectangular-local projection that
-    :func:`SciGraphs.core.geo.terrain.create_terrain_mesh` used, from the
-    custom properties ``dem_center_lat`` and ``dem_center_lon`` (projection
-    origin) and ``dem_scale`` (meters to Blender units). Per-vertex inversion
-    is what makes a basemap drape follow the real geography instead of the
-    mesh bbox.
+    Inverts the equirectangular-local projection of ``create_terrain_mesh``
+    from ``dem_center_lat``/``dem_center_lon`` (projection origin) and
+    ``dem_scale`` (meters to Blender units). Inverting per vertex is what makes
+    a drape follow the real geography instead of the mesh bbox.
     """
     import math as _math
 
@@ -1567,9 +1528,8 @@ def _terrain_xy_to_latlon_factory(terrain_obj):
         f"dem_scale={scale}"
     )
 
-    # Terrains from older builds have no projection origin. Recover it from the
-    # parent OSMnx network, then from the DEM bbox, rather than making the user
-    # re-import a perfectly good terrain.
+    # Terrains from older builds have no projection origin; recover it rather
+    # than making the user re-import a perfectly good terrain.
     if center_lat is None or center_lon is None or not scale:
         import bpy as _bpy
         parent_name = (
@@ -1596,8 +1556,8 @@ def _terrain_xy_to_latlon_factory(terrain_obj):
             if not scale:
                 scale = parent.get("osmnx_scale") or parent.get("scale")
 
-        # Last resort: the bbox midpoint, which is the center of the plane
-        # ``create_dem_plane`` builds when there is no OSMnx parent.
+        # The bbox midpoint is the center of the plane ``create_dem_plane``
+        # builds when there is no OSMnx parent.
         if (center_lat is None or center_lon is None) and all(
             k in terrain_obj
             for k in ("dem_bounds_north", "dem_bounds_south",
@@ -1654,12 +1614,10 @@ def _terrain_xy_to_latlon_factory(terrain_obj):
 def _project_uv_geographic(terrain_obj, metadata):
     """Per-vertex UV unwrap that respects the basemap's own projection.
 
-    Each vertex goes from Blender world XY back to ``(lat, lon)``, then through
-    :func:`SciGraphs.core.geo.imagery.latlon_to_image_uv`, which knows whether
-    the basemap is Web Mercator (XYZ tiles) or WGS84-linear (WMS). Because the
-    UVs depend only on XY, a Displace modifier deforming Z cannot break the
-    alignment, and a Web Mercator image drapes correctly on an equirectangular
-    mesh.
+    Each vertex goes from world XY back to ``(lat, lon)``, then through
+    ``latlon_to_image_uv``, which knows whether the basemap is Web Mercator
+    (XYZ tiles) or WGS84-linear (WMS). The UVs depend only on XY, so a Displace
+    modifier deforming Z cannot break the alignment.
     """
     from scigraphs_core.geo import imagery
 
@@ -1750,7 +1708,6 @@ def _ensure_basemap_material(terrain_obj, image_path, attribution):
 
 
 class SCIGRAPHS_OT_FetchBasemap(bpy.types.Operator):
-    """Download a basemap for the graph bbox and drape it on the terrain."""
 
     bl_idname = "scigraphs.osmnx_fetch_basemap"
     bl_label = "Fetch & Apply Basemap"
@@ -1778,9 +1735,8 @@ class SCIGRAPHS_OT_FetchBasemap(bpy.types.Operator):
             self.report({'ERROR'}, "No terrain mesh attached to this network")
             return {'CANCELLED'}
 
-        # The terrain's own DEM bbox is the rectangle the mesh covers, so the
-        # imagery lines up with the streets even when graph and terrain were
-        # built with different padding. The graph bbox is the fallback.
+        # The terrain's own DEM bbox is the rectangle the mesh covers, so imagery
+        # lines up even when graph and terrain were built with different padding.
         bounds = _terrain_bounds_wgs84(terrain_obj)
         bounds_origin = "terrain"
         if bounds is None:
@@ -1876,7 +1832,6 @@ class SCIGRAPHS_OT_FetchBasemap(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ClearBasemap(bpy.types.Operator):
-    """Remove the basemap material from the terrain mesh."""
 
     bl_idname = "scigraphs.osmnx_clear_basemap"
     bl_label = "Clear Basemap"
@@ -1930,8 +1885,8 @@ classes = [
     SCIGRAPHS_OT_ImportTerrainAPI,
     SCIGRAPHS_OT_ToggleTerrain,
     SCIGRAPHS_OT_ExportAOI,
-    # Legacy "Georef Image Plane" operators kept registered for backwards
-    # compatibility with old .blend files but no longer surfaced in the UI.
+    # Legacy "Georef Image Plane" operators: still registered for old .blend
+    # files, no longer surfaced in the UI.
     SCIGRAPHS_OT_ImportTerrainPlane,
     SCIGRAPHS_OT_UpdateTerrainPlaneOffset,
     SCIGRAPHS_OT_RemoveTerrainPlane,

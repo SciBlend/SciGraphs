@@ -33,8 +33,7 @@ class SCIGRAPHS_AutoLayoutOnImport:
             scale=props.layout_scale,
             props=props,
             # The layout package does not read meshes, and the importers that
-            # store topology in the mesh rather than in the edges_data string
-            # are exactly the ones that land here, so hand the edges down.
+            # store topology there are exactly the ones that land here.
             edge_pairs=layout_edge_pairs(obj),
         )
 
@@ -54,7 +53,6 @@ class SCIGRAPHS_AutoLayoutOnImport:
 
 
 class SCIGRAPHS_OT_LoadColumns(bpy.types.Operator):
-    """Load column names from CSV file and auto-detect data types."""
     bl_idname = "scigraphs.load_columns"
     bl_label = "Load Columns"
     bl_description = "Load column names from the CSV file"
@@ -106,8 +104,8 @@ class SCIGRAPHS_OT_LoadColumns(bpy.types.Operator):
                     item.column_type = "datetime"
                     item.import_as_attribute = True
                 else:
-                    # Pandas calls a mixed column "object". Coerce it and count:
-                    # more than half convertible means numeric.
+                    # Pandas calls a mixed column "object"; more than half
+                    # convertible counts as numeric.
                     try:
                         converted = pd.to_numeric(df[col], errors='coerce')
                         non_null_count = converted.notna().sum()
@@ -132,7 +130,6 @@ class SCIGRAPHS_OT_LoadColumns(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_DetectGeospatial(bpy.types.Operator):
-    """Auto-detect geospatial and temporal columns in data."""
     bl_idname = "scigraphs.detect_geospatial"
     bl_label = "Auto-Detect Geospatial Data"
     bl_description = "Automatically detect geospatial and temporal columns"
@@ -184,7 +181,6 @@ class SCIGRAPHS_OT_DetectGeospatial(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CreateGraph(bpy.types.Operator):
-    """Create graph object from loaded data."""
     bl_idname = "scigraphs.create_graph"
     bl_label = "Create Graph"
     bl_description = "Generate the graph from the specified data"
@@ -336,7 +332,6 @@ class SCIGRAPHS_OT_CreateGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ToggleAllAttributes(bpy.types.Operator):
-    """Toggle all CSV column attribute checkboxes on or off."""
     bl_idname = "scigraphs.toggle_all_attributes"
     bl_label = "Toggle All Attributes"
     bl_description = "Select or deselect all columns for attribute import"
@@ -351,7 +346,6 @@ class SCIGRAPHS_OT_ToggleAllAttributes(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportNodeAttributes(bpy.types.Operator):
-    """Import vertex-only attributes from an external file onto the active graph."""
     bl_idname = "scigraphs.import_node_attributes"
     bl_label = "Import Node Attributes"
     bl_description = "Load a file with per-node values and store them as POINT attributes"
@@ -399,7 +393,6 @@ class SCIGRAPHS_OT_ImportNodeAttributes(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SetupVisualization(bpy.types.Operator):
-    """Setup Geometry Nodes for graph visualization."""
     bl_idname = "scigraphs.setup_visualization"
     bl_label = "Setup Visualization"
     bl_description = "Add Geometry Nodes modifier for visual representation"
@@ -494,7 +487,6 @@ class SCIGRAPHS_OT_SetupVisualization(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
-    """Import street network from OpenStreetMap using OSMnx."""
     bl_idname = "scigraphs.import_osm_graph"
     bl_label = "Import OSM Graph"
     bl_description = "Download and import street network from OpenStreetMap"
@@ -547,8 +539,7 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
             except ImportError:
                 self.report({'ERROR'}, "Shapely is required for POLYGON downloads")
                 return {'CANCELLED'}
-            # Vertex X and Y are taken as lon/lat and Z is dropped. Any mesh
-            # will do; the first face wins if there is one.
+            # Vertex X and Y are read as lon/lat, Z is dropped, first face wins.
             mesh = poly_obj.data
             if len(mesh.polygons) > 0:
                 face = mesh.polygons[0]
@@ -623,9 +614,8 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
 
             importer._osmnx_graph_cache[graph_id] = graph_data.osmnx_graph
 
-            # A freshly downloaded graph is always unprojected, so keep a copy
-            # under that key. Spatial queries still work if the user later
-            # projects the main one.
+            # A fresh download is always unprojected, so keep a copy under that
+            # key; spatial queries survive the user projecting the main one.
             importer._osmnx_graph_cache[graph_id + "_unprojected"] = graph_data.osmnx_graph.copy()
 
             obj["osmnx_scale"] = props.osmnx_scale
@@ -675,7 +665,6 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ClearTextureCache(bpy.types.Operator):
-    """Clear downloaded satellite textures from cache."""
     bl_idname = "scigraphs.clear_texture_cache"
     bl_label = "Clear Texture Cache"
     bl_description = "Remove all cached satellite/map textures to free disk space"
@@ -699,7 +688,6 @@ class SCIGRAPHS_OT_ClearTextureCache(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_DownloadGlobeTexture(bpy.types.Operator):
-    """Pre-download a globe texture without creating the globe."""
     bl_idname = "scigraphs.download_globe_texture"
     bl_label = "Download Globe Texture"
     bl_description = "Download and cache the selected globe texture"

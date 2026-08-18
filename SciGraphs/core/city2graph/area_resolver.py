@@ -1,8 +1,4 @@
-"""Resolve the download area for the city2graph Data Import panel.
-
-The panel mirrors the OSMnx download methods, so Overture and city2graph
-features can be fetched without importing a street graph first.
-"""
+"""Resolve the download area for the city2graph Data Import panel, which mirrors the OSMnx download methods so features can be fetched without a street graph."""
 from __future__ import annotations
 
 import math
@@ -15,11 +11,7 @@ _DEFAULT_SCALE = 0.001  # 1 unit = 1 km, consistent with the OSMnx importer.
 
 
 def _bbox_from_radius(lat: float, lon: float, radius_m: float) -> tuple:
-    """Return (N, S, E, W) for a geodesic disk of ``radius_m`` around (lat, lon).
-
-    Equirectangular approximation: exact enough at the radii Overture and
-    city2graph handle, up to 5 km, and it keeps pyproj out of the call site.
-    """
+    """Return (N, S, E, W) for a geodesic disk of ``radius_m`` around (lat, lon). Equirectangular, exact enough up to the 5 km these downloads handle, and it keeps pyproj out of the call site."""
     earth_radius_m = 6_371_000.0
     deg_per_meter_lat = (180.0 / math.pi) / earth_radius_m
     cos_lat = math.cos(math.radians(lat))
@@ -33,11 +25,7 @@ def _bbox_from_radius(lat: float, lon: float, radius_m: float) -> tuple:
 
 
 def _bbox_from_active_osmnx(osmnx_obj) -> Optional[tuple]:
-    """Return the bbox of an OSMnx object, or None if neither route works.
-
-    Prefers the cached ``osmnx_bbox_*`` properties, else the mesh extent plus
-    ``osmnx_center_*`` / ``osmnx_scale``.
-    """
+    """Return the bbox of an OSMnx object, from the cached ``osmnx_bbox_*`` properties or else the mesh extent plus ``osmnx_center_*`` / ``osmnx_scale``. None if neither works."""
     if osmnx_obj is None:
         return None
 
@@ -75,10 +63,7 @@ def _bbox_from_active_osmnx(osmnx_obj) -> Optional[tuple]:
 
 
 def _geocode_place_bbox(place_name: str, which_result: int = 0) -> tuple:
-    """Resolve a place name to a bbox with OSMnx's geocoder, which is already a
-    hard dependency and so needs no Nominatim setup here. Raises ValueError
-    when the name does not resolve.
-    """
+    """Resolve a place name to a bbox with OSMnx's geocoder, already a hard dependency. Raises ValueError when the name does not resolve."""
     place_name = (place_name or "").strip()
     if not place_name:
         raise ValueError("Empty place name")
@@ -91,7 +76,6 @@ def _geocode_place_bbox(place_name: str, which_result: int = 0) -> tuple:
         )
         if gdf is None or len(gdf) == 0:
             raise ValueError(f"No geocoding result for '{place_name}'")
-        # geocode_to_gdf returns columns bbox_north / bbox_south / bbox_east / bbox_west
         n = float(gdf.iloc[0]["bbox_north"])
         s = float(gdf.iloc[0]["bbox_south"])
         e = float(gdf.iloc[0]["bbox_east"])
@@ -102,9 +86,7 @@ def _geocode_place_bbox(place_name: str, which_result: int = 0) -> tuple:
 
 
 def _bbox_from_polygon_object(obj_name: str) -> tuple:
-    """Compute (N, S, E, W) from a mesh's vertex bounds, reading verts as
-    (lon, lat), the convention this add-on uses for boundary polygons.
-    """
+    """Compute (N, S, E, W) from a mesh's vertex bounds, reading verts as (lon, lat), the convention for boundary polygons here."""
     import bpy
     obj = bpy.data.objects.get(obj_name)
     if obj is None or obj.type != 'MESH':
@@ -131,12 +113,10 @@ def _osmnx_alignment(osmnx_obj):
 def resolve_area(context):
     """Resolve the download area from the Data Import panel.
 
-    Returns a dict holding the WGS84 ``bbox`` as (north, south, east, west),
-    the projection origin ``center_lat`` / ``center_lon``, the meters to
-    Blender units ``scale``, the active ``osmnx_obj`` if there is one, and a
-    short ``source`` label for operator reports. Raises ``ValueError`` with a
-    user-facing message when the panel inputs are unusable.
-    """
+    Returns the WGS84 ``bbox`` as (north, south, east, west), the projection
+    origin ``center_lat`` / ``center_lon``, the meters-to-Blender ``scale``, any
+    active ``osmnx_obj``, and a ``source`` label. Raises ``ValueError`` with a
+    user-facing message when the panel inputs are unusable."""
     props = context.scene.city2graph
     scene_props = context.scene.scigraphs
 
@@ -215,8 +195,7 @@ def resolve_area(context):
         n, s, e, w = bbox
         center_lat = (n + s) / 2.0
         center_lon = (e + w) / 2.0
-        # Tighten to the requested radius: the geocoder bbox can cover a whole
-        # city when several places share the address name.
+        # The geocoder bbox can cover a whole city when names collide.
         bbox = _bbox_from_radius(center_lat, center_lon, radius)
         return {
             'bbox': bbox,

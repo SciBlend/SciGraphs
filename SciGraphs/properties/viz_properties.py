@@ -44,9 +44,8 @@ _ATTRIBUTE_ITEMS_CACHE = []
 def _attribute_items(self, context):
     """Attribute enum with an explicit 'NONE' first entry.
 
-    Without a leading sentinel the enum default is whatever attribute sorts
-    first (Blender's own ``.select_vert``), binding sizing or filtering to a
-    bogus attribute.
+    Without the sentinel the default is whatever sorts first, which is
+    Blender's own ``.select_vert``.
     """
     global _ATTRIBUTE_ITEMS_CACHE
     items = [('NONE', "(None)", "No attribute - uniform value")]
@@ -60,8 +59,8 @@ def _attribute_items(self, context):
 def _viz_update(self, context):
     """Push the changed value onto the active object's modifier, live.
 
-    Best-effort: a property edit must never raise out of the UI, and the simple
-    tree has no interface sockets, so the push is then a silent no-op.
+    A property edit must never raise out of the UI, and the simple tree has no
+    interface sockets, so the push is a silent no-op there.
     """
     obj = getattr(context, "active_object", None) if context else None
     if obj is None or obj.type != 'MESH':

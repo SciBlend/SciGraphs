@@ -7,11 +7,7 @@ from scigraphs_core.logger import log
 
 
 def fill_nodata(data, nodata_value=None, method='nearest'):
-    """Fill NoData holes in an elevation array by interpolation.
-
-    nodata_value=None auto-detects NaN and inf. Without scipy, both methods
-    degrade to filling with the mean.
-    """
+    """Fill NoData holes in an elevation array by interpolation; nodata_value=None auto-detects NaN and inf, and without scipy both methods degrade to the mean."""
     result = data.copy().astype(np.float32)
     
     if nodata_value is not None:
@@ -83,11 +79,7 @@ def fill_nodata(data, nodata_value=None, method='nearest'):
 
 
 def normalize_elevation(data, dtype, target_range=(0, 1)):
-    """Rescale an elevation array to target_range, returned as float32.
-
-    uint8 is assumed to span the full 0-255 range; every other dtype uses the
-    array's own min and max.
-    """
+    """Rescale an elevation array to target_range as float32; uint8 is assumed to span the full 0-255 range, every other dtype uses its own min and max."""
     data_f = data.astype(np.float32)
 
     if 'uint8' in dtype:
@@ -116,11 +108,7 @@ def normalize_elevation(data, dtype, target_range=(0, 1)):
 
 
 def calculate_displace_strength(georaster, scale=1.0):
-    """Return (strength, midlevel) for a Displace modifier over this raster.
-
-    One unit of displacement should equal one meter of elevation, so strength
-    is the elevation range times scale (0.001 for meters to Blender km units).
-    """
+    """Return (strength, midlevel) for a Displace modifier: one unit of displacement is one meter of elevation, so strength is the elevation range times scale (0.001 for meters to Blender km units)."""
     stats = georaster.get_statistics()
     if stats is None:
         return 1.0, 0.5
@@ -145,8 +133,7 @@ def calculate_displace_strength(georaster, scale=1.0):
         midlevel = 0
 
     elif 'uint8' in dtype:
-        # A range under 10 means the file is normalized rather than in meters,
-        # so treat the full 0-255 span as the elevation range.
+        # A range under 10 means normalized, not meters, so use the 0-255 span.
         if elev_range > 10:
             strength = elev_range * scale
         else:
@@ -165,11 +152,7 @@ def calculate_displace_strength(georaster, scale=1.0):
 
 
 def create_raster_extent_mesh(georaster, scale=0.001, name="DEM_Plane", osmnx_obj=None):
-    """Create a flat quad covering the raster extent, ready for displacement.
-
-    Pass osmnx_obj to reuse that network's projection origin, otherwise the
-    plane and the network land in different places.
-    """
+    """Create a flat quad covering the raster extent, ready for displacement. Pass osmnx_obj to reuse that network's projection origin, or plane and network land in different places."""
     bounds = georaster.bounds
     if bounds is None:
         log("GeoRaster has no bounds")
@@ -238,8 +221,7 @@ def create_raster_extent_mesh(georaster, scale=0.001, name="DEM_Plane", osmnx_ob
     obj["dem_width_m"] = width_m
     obj["dem_height_m"] = height_m
     obj["dem_scale"] = scale
-    # Origin of the local equirectangular frame the vertices sit in. The
-    # basemap UV unwrapper needs it to invert mesh XY back to (lat, lon).
+    # Origin of the local frame; the basemap UV unwrapper inverts XY through it.
     obj["dem_center_lat"] = float(graph_center_lat)
     obj["dem_center_lon"] = float(graph_center_lon)
     obj["dem_bounds_north"] = bounds['north']
@@ -251,11 +233,7 @@ def create_raster_extent_mesh(georaster, scale=0.001, name="DEM_Plane", osmnx_ob
 
 
 def apply_displace_modifier(obj, georaster, subdivision_levels=6, scale=0.001):
-    """Turn a flat plane into terrain with Subdivision plus Displace modifiers.
-
-    The fast path. The DEM image is loaded as Non-Color: sRGB would gamma
-    correct the elevations and flatten the relief.
-    """
+    """Turn a flat plane into terrain with Subdivision plus Displace modifiers, the fast path. The DEM image is loaded as Non-Color: sRGB would gamma correct the elevations and flatten the relief."""
     if obj is None or georaster is None:
         return False
     
@@ -295,11 +273,7 @@ def apply_displace_modifier(obj, georaster, subdivision_levels=6, scale=0.001):
 
 def raster_to_mesh(georaster, scale=0.001, subsample=1, name="DEM_RawMesh",
                    osmnx_obj=None, vertical_scale=1.0, vertical_offset=0.0):
-    """Build a mesh with one vertex per raster pixel, Z from elevation.
-
-    Slower than the Displace path but exact. subsample=2 halves the resolution
-    on each axis; vertical_offset is in meters, applied before scaling.
-    """
+    """Build a mesh with one vertex per raster pixel, Z from elevation: slower than the Displace path but exact. subsample=2 halves each axis; vertical_offset is meters, applied before scaling."""
     if georaster is None or georaster.data is None:
         return None
     
@@ -322,8 +296,7 @@ def raster_to_mesh(georaster, scale=0.001, subsample=1, name="DEM_RawMesh",
         ox, oy = 0, 0
         sx, sy = 1, -1
 
-    # Reuse the network's projection origin when there is one, so terrain and
-    # network share a frame.
+    # Reuse the network's projection origin so terrain and network share a frame.
     if osmnx_obj is not None and osmnx_obj.get("is_osmnx", False):
         center_y = osmnx_obj.get("osmnx_center_lat")
         center_x = osmnx_obj.get("osmnx_center_lon")
@@ -362,8 +335,7 @@ def raster_to_mesh(georaster, scale=0.001, subsample=1, name="DEM_RawMesh",
             
             z_m = float(data[row, col])
 
-            # Must match apply_georaster_elevations_to_graph exactly, or the
-            # network floats above or sinks into the terrain.
+            # Must match apply_georaster_elevations_to_graph, or the network floats.
             x = x_m * scale
             y = y_m * scale
             z = ((z_m - elev_min) + vertical_offset) * scale * vertical_scale
@@ -401,8 +373,8 @@ def raster_to_mesh(georaster, scale=0.001, subsample=1, name="DEM_RawMesh",
     obj["dem_elev_min"] = float(elev_min)
     obj["dem_elev_max"] = float(elev_max)
     obj["dem_scale"] = scale
-    # Projection origin these vertices were placed against. The basemap UV
-    # unwrapper reads it back in _terrain_xy_to_latlon_factory.
+    # Projection origin these vertices were placed against, read back by the
+    # basemap UV unwrapper.
     obj["dem_center_lat"] = float(center_y)
     obj["dem_center_lon"] = float(center_x)
     
@@ -419,11 +391,7 @@ def raster_to_mesh(georaster, scale=0.001, subsample=1, name="DEM_RawMesh",
 
 
 def apply_elevation_material(obj, style='ELEVATION'):
-    """Give terrain a material driven by the "elevation" vertex attribute.
-
-    style 'ELEVATION' ramps green to brown to white across the object's stored
-    elevation range; anything else gets flat gray.
-    """
+    """Give terrain a material driven by the "elevation" vertex attribute: style 'ELEVATION' ramps green to brown to white across the stored elevation range, anything else gets flat gray."""
     if obj is None:
         return None
     
@@ -488,13 +456,10 @@ def apply_elevation_material(obj, style='ELEVATION'):
 def apply_georaster_elevations_to_graph(osmnx_obj, georaster, vertical_scale=1.0, vertical_offset=0.0):
     """Lift every mesh vertex of an OSMnx network onto the DEM surface.
 
-    Elevations are sampled per mesh vertex, at the (lat, lon) recovered by
-    inverting the equirectangular-local projection that built the mesh. Going
-    through the cached graph instead is what produces vertical spikes in
-    high-relief terrain: node coordinates may be simplified, projected to UTM
-    or ordered differently from the curve points, and orphan vertices end up
-    interpolated to the midpoint elevation.
-    """
+    Sampled per mesh vertex, at the (lat, lon) recovered by inverting the
+    projection that built the mesh. Going through the cached graph instead gives
+    vertical spikes in high relief: its node coordinates may be simplified,
+    projected to UTM or reordered, and orphans land at the midpoint elevation."""
     import math
     import numpy as np
 
@@ -522,8 +487,7 @@ def apply_georaster_elevations_to_graph(osmnx_obj, georaster, vertical_scale=1.0
         f"(with {graph_offset}m offset)"
     )
 
-    # The projection origin lives on the object, written when the mesh was
-    # built. Recomputing it here would drift from the vertex positions.
+    # The origin lives on the object; recomputing it here would drift.
     center_lat = osmnx_obj.get("osmnx_center_lat")
     center_lon = osmnx_obj.get("osmnx_center_lon")
     if center_lat is None or center_lon is None:
@@ -576,8 +540,7 @@ def apply_georaster_elevations_to_graph(osmnx_obj, georaster, vertical_scale=1.0
     elev_attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
     elev_attr.data.foreach_set("value", vertex_elevations)
 
-    # Mirror the elevations back into the cached graph so grade calculations
-    # and GraphML export see them.
+    # Mirror back into the cached graph for grade calculations and GraphML export.
     nodes_str = osmnx_obj.get("nodes_data", "")
     node_ids = nodes_str.split(",") if nodes_str else []
     from ..data_io.importer import _osmnx_graph_cache

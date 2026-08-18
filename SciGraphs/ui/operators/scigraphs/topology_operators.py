@@ -13,7 +13,6 @@ from scigraphs_core.mesh.mesh_utils import (
 
 
 class SCIGRAPHS_OT_CheckPlanarity(bpy.types.Operator):
-    """Check if the graph can be embedded in a plane without edge crossings."""
     bl_idname = "scigraphs.check_planarity"
     bl_label = "Check Planarity"
     bl_description = "Test if graph is planar (can be drawn without edge crossings)"
@@ -53,7 +52,6 @@ class SCIGRAPHS_OT_CheckPlanarity(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateGenus(bpy.types.Operator):
-    """Calculate the genus (number of handles) of the minimal embedding surface."""
     bl_idname = "scigraphs.calculate_genus"
     bl_label = "Calculate Genus"
     bl_description = "Compute the genus of the minimal surface for graph embedding"
@@ -94,7 +92,6 @@ class SCIGRAPHS_OT_CalculateGenus(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeFaces(bpy.types.Operator):
-    """Compute and visualize faces of a planar graph embedding."""
     bl_idname = "scigraphs.compute_faces"
     bl_label = "Compute Faces"
     bl_description = "Find all faces in the planar embedding and create face_id attribute"
@@ -148,7 +145,6 @@ class SCIGRAPHS_OT_ComputeFaces(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ValidateCrossings(bpy.types.Operator):
-    """Validate if the current embedding has edge crossings."""
     bl_idname = "scigraphs.validate_crossings"
     bl_label = "Validate Crossings"
     bl_description = "Check if any edges cross in the current 3D embedding"
@@ -187,7 +183,6 @@ class SCIGRAPHS_OT_ValidateCrossings(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
-    """Compute a crossing-free planar embedding."""
     bl_idname = "scigraphs.visualize_surface"
     bl_label = "Compute Embedding"
     bl_description = "Compute planar embedding with surface mesh"
@@ -213,7 +208,6 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
             return {'CANCELLED'}
     
     def _create_planar_embedding(self, context, obj, graph_data, num_nodes):
-        """Create planar embedding with plane surface."""
         is_planar = obj.get("topo_is_planar", None)
         if is_planar is None:
             return {'success': False, 'message': "Run planarity check first"}
@@ -300,7 +294,6 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         
         mesh.update()
     def _create_plane_surface(self, context, obj, node_positions):
-        """Create a plane mesh as child of the graph object."""
         old_surface_name = obj.get("topo_surface_child", "")
         if old_surface_name and old_surface_name in bpy.data.objects:
             old_obj = bpy.data.objects[old_surface_name]
@@ -367,7 +360,6 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
-    """Create the geometric dual graph G* of a planar graph."""
     bl_idname = "scigraphs.create_dual_graph"
     bl_label = "Create Dual Graph"
     bl_description = "Generate the geometric dual graph (vertices at face centroids, edges between adjacent faces)"
@@ -498,7 +490,6 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ToggleDualGraph(bpy.types.Operator):
-    """Toggle visibility of the dual graph."""
     bl_idname = "scigraphs.toggle_dual_graph"
     bl_label = "Toggle Dual"
     bl_description = "Toggle visibility of the dual graph"
@@ -527,7 +518,6 @@ class SCIGRAPHS_OT_ToggleDualGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveDualGraph(bpy.types.Operator):
-    """Remove the dual graph object."""
     bl_idname = "scigraphs.remove_dual_graph"
     bl_label = "Remove Dual"
     bl_description = "Remove the dual graph object"
@@ -553,7 +543,6 @@ class SCIGRAPHS_OT_RemoveDualGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ToggleTopoSurface(bpy.types.Operator):
-    """Toggle visibility of the topology surface mesh."""
     bl_idname = "scigraphs.toggle_topo_surface"
     bl_label = "Toggle Surface"
     bl_description = "Toggle visibility of the embedding surface mesh"
@@ -582,7 +571,6 @@ class SCIGRAPHS_OT_ToggleTopoSurface(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveTopoSurface(bpy.types.Operator):
-    """Remove the topology surface mesh."""
     bl_idname = "scigraphs.remove_topo_surface"
     bl_label = "Remove Surface"
     bl_description = "Remove the embedding surface mesh"

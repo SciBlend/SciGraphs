@@ -23,22 +23,28 @@ def _gpu_style_refresh(self, context):
 EDGE_STYLE_PROPERTIES = {
     # --- EDGE STYLE PROPERTIES ----------------------------------------------
 
+    # A .blend stores an enum item's number, not its identifier, and an item
+    # written as a 3-tuple gets its position. Inserting the five bundling styles
+    # ahead of TAPERED moved it from 6 to 10, so every scene saved as TAPERED
+    # reopened as FDEB and every ORTHOGONAL one as SBEB, silently and with no
+    # error anywhere. The numbers below are explicit for that reason: append new
+    # styles with the next free number and never renumber an existing one.
     'edge_style_type': EnumProperty(
         name="Edge Style",
         description="Visual style for graph edges",
         items=[
-            ('STRAIGHT', "Straight", "Direct straight lines between nodes"),
-            ('CURVED', "Curved (Bezier)", "Smooth cubic Bezier curves"),
-            ('QUADRATIC', "Quadratic", "Quadratic Bezier curves (simpler, faster)"),
-            ('ARC', "Arc", "Circular arc segments"),
-            ('BUNDLED', "Bundled (FDEB)", "Force-directed edge bundling: edges attract each other pairwise (Holten & van Wijk 2009)"),
-            ('HIERARCHICAL', "Bundled (Hierarchical)", "Route edges along the cluster tree, from each endpoint up to the least common ancestor and back down (Holten 2006). Needs a clustering attribute; scales to any edge count"),
-            ('FDEB', "Bundled (Force-Directed, GPU)", "The same forces as FDEB, relaxed in compute shaders against a spatial neighborhood instead of an all-pairs matrix. No clustering attribute needed, and no 4096-edge ceiling"),
-            ('SBEB', "Bundled (Skeleton, image-based)", "Attract edges toward the skeleton of their own drawn density, computed in image space (Ersoy et al. 2011). Its cost follows the raster resolution rather than the edge count"),
-            ('ROUTED', "Bundled (Routed roads)", "Route edges along a grid and make shared stretches cheaper each round, so they converge onto exactly coincident roads (Lambert et al. 2010). Can be told to steer clear of crowded regions"),
-            ('MINGLE', "Bundled (Agglomerative, ink)", "Merge edges into a tree of shared trunks, choosing at each step the merge that saves the most drawn ink (Gansner et al. 2011). Meeting points are explicit and exactly shared, which reads differently from the soft merging of the force-directed families"),
-            ('TAPERED', "Tapered", "Variable thickness along edge (for directed graphs)"),
-            ('ORTHOGONAL', "Orthogonal", "Right-angle (90°) connections"),
+            ('STRAIGHT', "Straight", "Direct straight lines between nodes", 0, 0),
+            ('CURVED', "Curved (Bezier)", "Smooth cubic Bezier curves", 0, 1),
+            ('QUADRATIC', "Quadratic", "Quadratic Bezier curves (simpler, faster)", 0, 2),
+            ('ARC', "Arc", "Circular arc segments", 0, 3),
+            ('BUNDLED', "Bundled (FDEB)", "Force-directed edge bundling: edges attract each other pairwise (Holten & van Wijk 2009)", 0, 4),
+            ('HIERARCHICAL', "Bundled (Hierarchical)", "Route edges along the cluster tree, from each endpoint up to the least common ancestor and back down (Holten 2006). Needs a clustering attribute; scales to any edge count", 0, 5),
+            ('FDEB', "Bundled (Force-Directed, GPU)", "The same forces as FDEB, relaxed in compute shaders against a spatial neighborhood instead of an all-pairs matrix. No clustering attribute needed, and no 4096-edge ceiling", 0, 6),
+            ('SBEB', "Bundled (Skeleton, image-based)", "Attract edges toward the skeleton of their own drawn density, computed in image space (Ersoy et al. 2011). Its cost follows the raster resolution rather than the edge count", 0, 7),
+            ('ROUTED', "Bundled (Routed roads)", "Route edges along a grid and make shared stretches cheaper each round, so they converge onto exactly coincident roads (Lambert et al. 2010). Can be told to steer clear of crowded regions", 0, 8),
+            ('MINGLE', "Bundled (Agglomerative, ink)", "Merge edges into a tree of shared trunks, choosing at each step the merge that saves the most drawn ink (Gansner et al. 2011). Meeting points are explicit and exactly shared, which reads differently from the soft merging of the force-directed families", 0, 9),
+            ('TAPERED', "Tapered", "Variable thickness along edge (for directed graphs)", 0, 10),
+            ('ORTHOGONAL', "Orthogonal", "Right-angle (90°) connections", 0, 11),
         ],
         default='STRAIGHT',
         update=_gpu_style_refresh,
@@ -48,13 +54,13 @@ EDGE_STYLE_PROPERTIES = {
         name="Preset",
         description="Pre-configured edge style settings",
         items=[
-            ('CUSTOM', "Custom", "Use manual settings"),
-            ('GEPHI_DEFAULT', "Gephi Default", "Gephi-style curved edges"),
-            ('CYTOSCAPE_BEZIER', "Cytoscape Bezier", "Cytoscape-style Bezier curves"),
-            ('SCHEMATIC', "Schematic", "Technical diagram style with orthogonal edges"),
-            ('BUNDLED_DENSE', "Bundled (Dense)", "Strong bundling for very dense graphs"),
-            ('FLOW_DIAGRAM', "Flow Diagram", "Tapered edges showing direction"),
-            ('MINIMAL', "Minimal", "Clean straight lines"),
+            ('CUSTOM', "Custom", "Use manual settings", 0, 0),
+            ('GEPHI_DEFAULT', "Gephi Default", "Gephi-style curved edges", 0, 1),
+            ('CYTOSCAPE_BEZIER', "Cytoscape Bezier", "Cytoscape-style Bezier curves", 0, 2),
+            ('SCHEMATIC', "Schematic", "Technical diagram style with orthogonal edges", 0, 3),
+            ('BUNDLED_DENSE', "Bundled (Dense)", "Strong bundling for very dense graphs", 0, 4),
+            ('FLOW_DIAGRAM', "Flow Diagram", "Tapered edges showing direction", 0, 5),
+            ('MINIMAL', "Minimal", "Clean straight lines", 0, 6),
         ],
         default='CUSTOM',
     ),
@@ -199,7 +205,7 @@ EDGE_STYLE_PROPERTIES = {
 
     # --- Shared by every bundling mode -------------------------------------
     # These act on the control polygon whatever produced it, hence no mode
-    # prefix on the names.
+    # prefix in the registered names.
 
     'edge_bundle_turn_limit': FloatProperty(
         name="Turning Limit",
@@ -314,9 +320,8 @@ EDGE_STYLE_PROPERTIES = {
             "a threshold chosen against three terms is strictly stricter once "
             "there are four, and the CPU default leaves almost nothing above it"
         ),
-        # Holten's own is 0.05. This sits above it because the neighborhood
-        # radius already excludes the distant pairs a low threshold would
-        # otherwise admit, and below the CPU default for the reason above.
+        # Holten's own is 0.05; this sits above it because the neighborhood
+        # radius already excludes the distant pairs, and below the CPU default.
         default=0.25,
         min=0.0,
         max=1.0,
@@ -492,8 +497,7 @@ EDGE_STYLE_PROPERTIES = {
             "0 leaves every round independent and nothing converges"
         ),
         # Stops below 1: full reinforcement makes a used cell free, and every
-        # route after the first then collapses onto the first one's road
-        # whatever it costs to reach it.
+        # later route then collapses onto the first one's road.
         default=0.5,
         min=0.0,
         max=0.99,

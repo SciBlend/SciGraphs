@@ -1,6 +1,5 @@
 # Viewport drawing helpers for the OSMnx spatial operators, plus aliases that
-# re-export core.osmnx.graph_cache and mesh_bridge under the private names the
-# operators import.
+# re-export core.osmnx.graph_cache and mesh_bridge under their private names.
 
 import math
 import gpu
@@ -10,7 +9,6 @@ _draw_handlers = {}
 
 
 def _draw_highlight_circle(position_3d, radius, color, segments=32):
-    """Draw a circle at a 3D position for highlighting nodes."""
     vertices = []
     for i in range(segments + 1):
         angle = 2 * math.pi * i / segments
@@ -33,7 +31,6 @@ def _draw_highlight_circle(position_3d, radius, color, segments=32):
 
 
 def _draw_highlight_line(start_3d, end_3d, color, width=4.0):
-    """Draw a line between two 3D positions for highlighting edges."""
     vertices = [start_3d, end_3d]
     
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
@@ -50,7 +47,6 @@ def _draw_highlight_line(start_3d, end_3d, color, width=4.0):
 
 
 def _draw_highlight_point(position_3d, color, size=10.0):
-    """Draw a point at a 3D position."""
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     batch = batch_for_shader(shader, 'POINTS', {"pos": [position_3d]})
     

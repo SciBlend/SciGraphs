@@ -1,9 +1,4 @@
-"""Reference generator for reproducible SciGraphs pipelines.
-
-Introspects the live Blender property groups, the pipeline ``SCHEMA`` and the
-operator registry to write out every option a pipeline JSON/YAML can set, so
-the authoring docs cannot drift from the code.
-"""
+"""Writes the pipeline options reference by introspecting the live property groups, the pipeline ``SCHEMA`` and the operator registry, so the docs cannot drift from the code."""
 
 from __future__ import annotations
 
@@ -70,7 +65,6 @@ def _iter_group_properties(group) -> List[Tuple[str, Any]]:
 
 
 def _group_table(group) -> List[str]:
-    """Build a Markdown table for one scene property group."""
     lines = ["| Property | Type | Default | Enum values |", "| --- | --- | --- | --- |"]
     for name, prop in _iter_group_properties(group):
         ptype = getattr(prop, "type", "")
@@ -99,7 +93,6 @@ def _schema_section_table(section: Dict[str, Any]) -> List[str]:
 
 
 def generate_reference_markdown() -> str:
-    """Generate the complete pipeline-options reference as a Markdown string."""
     lines: List[str] = []
     lines.append("# SciGraphs pipeline options reference")
     lines.append("")
@@ -118,8 +111,7 @@ def generate_reference_markdown() -> str:
         "applied by the executor."
     )
     lines.append("")
-    # Order mirrors the executor's stage sequence. A section missing from this
-    # tuple is absent from the reference even though it validates and runs.
+    # Executor stage order. A section missing here is absent from the reference.
     for section_name in (
         "meta", "dataset", "analysis", "layout", "visual", "labels",
         "world", "lighting", "render", "exports",

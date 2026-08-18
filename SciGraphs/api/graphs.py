@@ -92,7 +92,7 @@ def from_hetero(nodes_dict, edges_dict, name, ref=None, coll=None, markers=None)
 
 
 def from_features(gdf, name, ref=None, coll=None):
-    """Raw geometry mesh (polygons/lines/points). Uses gdf_to_blender_mesh so `_c2g_gdf_pickle` is cached."""
+    """Raw geometry mesh of polygons, lines, or points, with `_c2g_gdf_pickle` cached."""
     from ..core.city2graph import utils as c2g_utils
 
     ref = ref if ref is not None else anchor_from(gdf)

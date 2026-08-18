@@ -62,7 +62,6 @@ def _resolve_iso_center(props, obj, G):
 
 
 class SCIGRAPHS_OT_OSMnxIsochrones(bpy.types.Operator):
-    """Generate concentric isochrone polygons from a center node."""
     bl_idname = "scigraphs.osmnx_isochrones"
     bl_label = "Generate Isochrones"
     bl_description = "Create Blender meshes for isochrone polygons around the selected node"
@@ -170,7 +169,6 @@ class SCIGRAPHS_OT_OSMnxIsochrones(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxEgoSubgraph(bpy.types.Operator):
-    """Keep only nodes reachable within a network distance from a center node."""
     bl_idname = "scigraphs.osmnx_ego_subgraph"
     bl_label = "Extract Ego Subgraph"
     bl_description = "Truncate the graph to nodes reachable within a distance from a center"
@@ -222,7 +220,6 @@ class SCIGRAPHS_OT_OSMnxEgoSubgraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxNetworkDBSCAN(bpy.types.Operator):
-    """Cluster graph nodes by network distance using DBSCAN."""
     bl_idname = "scigraphs.osmnx_network_dbscan"
     bl_label = "Network-Constrained DBSCAN"
     bl_description = "Cluster nodes by shortest-path distance (not Euclidean)"

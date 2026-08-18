@@ -18,9 +18,8 @@ from ....core.mesh.geo_mesh import (
 def _effective_feature_count(obj):
     """Count a feature object's real features from its mesh geometry.
 
-    Counts the way downstream code reads the geometry: one feature per face,
-    per connected edge chain, or per isolated vertex. Used when the
-    ``feature_count`` custom property is missing or zero.
+    Counts as downstream code reads it: one feature per face, per connected
+    edge chain, or per isolated vertex. Used when ``feature_count`` is unset.
     """
     if obj is None or obj.type != 'MESH' or not obj.data:
         return 0
@@ -57,7 +56,6 @@ def _effective_feature_count(obj):
 
 
 class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
-    """Generate single-layer proximity graph from OSM features."""
     bl_idname = "scigraphs.generate_proximity_graph"
     bl_label = "Generate Proximity Graph"
     bl_description = "Generate proximity graph from selected feature object"
@@ -213,7 +211,6 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GenerateMultilayerGraph(bpy.types.Operator):
-    """Generate multi-layer proximity graph connecting different feature types."""
     bl_idname = "scigraphs.generate_multilayer_graph"
     bl_label = "Generate Multi-Layer Graph"
     bl_description = "Connect multiple feature layers with proximity edges"
@@ -306,7 +303,6 @@ class SCIGRAPHS_OT_GenerateMultilayerGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_GenerateGroupNodesGraph(bpy.types.Operator):
-    """Generate graph connecting polygon zones to contained points."""
     bl_idname = "scigraphs.generate_group_nodes_graph"
     bl_label = "Generate Group Nodes Graph"
     bl_description = "Connect polygons to points they contain"

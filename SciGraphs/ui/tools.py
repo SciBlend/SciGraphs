@@ -15,7 +15,6 @@ _PATH_MARKER_HANDLE = None
 
 
 def _get_nearest_node_index(context, event, obj):
-    """Find the nearest node to mouse position."""
     if not obj or "node_positions" not in obj:
         return None, None
     
@@ -146,7 +145,6 @@ def disable_path_selection_markers():
 
 
 class SCIGRAPHS_OT_select_node_tool(bpy.types.Operator):
-    """Click to select the nearest graph node."""
     bl_idname = "scigraphs.select_node_tool"
     bl_label = "Select Node"
     bl_description = "Click on a node to select it"
@@ -222,7 +220,6 @@ class SCIGRAPHS_OT_select_node_tool(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_pick_path_node(bpy.types.Operator):
-    """Pick a graph node in the viewport and assign it to shortest-path inputs."""
     bl_idname = "scigraphs.pick_path_node"
     bl_label = "Pick Path Node"
     bl_description = "Click a graph node in the viewport to use it for shortest path"
@@ -327,7 +324,6 @@ class SCIGRAPHS_OT_pick_path_node(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
-    """Select source and target for shortest path visualization."""
     bl_idname = "scigraphs.path_tool"
     bl_label = "Shortest Path Tool"
     bl_description = "Click two nodes to visualize shortest path"
@@ -361,12 +357,10 @@ class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
             idx, pos = _get_nearest_node_index(context, event, obj)
             if idx is not None:
                 if self._source_idx is None:
-                    # First click: set source
                     self._source_idx = idx
                     self._source_pos = pos
                     self.report({'INFO'}, f"Source: node {idx}. Click target node.")
                 else:
-                    # Second click: set target and compute path
                     props = context.scene.scigraphs
                     props.pathfinding_source = str(self._source_idx)
                     props.pathfinding_target = str(idx)
@@ -441,7 +435,6 @@ class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_move_node_tool(bpy.types.Operator):
-    """Click and drag to move a graph node."""
     bl_idname = "scigraphs.move_node_tool"
     bl_label = "Move Node"
     bl_description = "Click and drag a node to move it"
@@ -473,19 +466,16 @@ class SCIGRAPHS_OT_move_node_tool(bpy.types.Operator):
             if self._dragging and self._drag_idx is not None:
                 coord = (event.mouse_region_x, event.mouse_region_y)
                 
-                # Get depth from current node position
                 pos_flat = obj.get("node_positions", [])
                 positions = np.array(pos_flat).reshape(-1, 3)
                 old_pos = positions[self._drag_idx]
                 world_old = obj.matrix_world @ Vector(old_pos)
                 
-                # Project new 2D position to 3D at same depth
                 depth_vec = rv3d.view_matrix @ world_old.to_4d()
                 new_world = view3d_utils.region_2d_to_location_3d(
                     region, rv3d, coord, Vector((0, 0, -depth_vec.z))
                 )
                 
-                # Transform back to local space
                 new_local = obj.matrix_world.inverted() @ new_world
                 
                 positions[self._drag_idx] = [new_local.x, new_local.y, new_local.z]
@@ -562,7 +552,6 @@ class SCIGRAPHS_OT_move_node_tool(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_lasso_select_tool(bpy.types.Operator):
-    """Draw a lasso to select multiple nodes."""
     bl_idname = "scigraphs.lasso_select_tool"
     bl_label = "Lasso Select"
     bl_description = "Draw a lasso to select multiple nodes"
@@ -606,7 +595,6 @@ class SCIGRAPHS_OT_lasso_select_tool(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _select_nodes_in_lasso(self, context, obj):
-        """Select nodes inside the lasso polygon."""
         from mathutils.geometry import intersect_point_tri_2d
         
         region = context.region

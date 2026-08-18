@@ -39,8 +39,7 @@ class SCIGRAPHS_OT_RunPipeline(Operator, ImportHelper):
         return ImportHelper.invoke(self, context, event)
 
     def execute(self, context):
-        # Two packages on purpose: the parser is Blender-free and ships in the
-        # wheel, the executor drives a scene and stays in the add-on.
+        # Parser from the wheel (Blender-free), executor from the add-on.
         from scigraphs_core.repro import parse_pipeline
         from ....core.repro.executor import PipelineExecutor
 
@@ -64,8 +63,7 @@ class SCIGRAPHS_OT_RunPipeline(Operator, ImportHelper):
                 errors = "; ".join(result.errors[:3])
                 self.report({'WARNING'}, f"Pipeline completed with errors: {errors}")
 
-            # CANCELLED on failure, so a script driving this can tell a broken
-            # specification from a good one.
+            # CANCELLED on failure so a driving script can tell the two apart.
             return {'FINISHED'} if result.success else {'CANCELLED'}
 
         except Exception as e:
@@ -497,13 +495,9 @@ class SCIGRAPHS_OT_DropPipeline(Operator):
     # second drop would silently re-run the first file.
     filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
 
-    # Deliberately not SCIGRAPHS_OT_RunPipeline, whose invoke() prefers the path
-    # stored in the panel over its own filepath: right for a button, wrong for
-    # a drop.
-
-    # No poll() either. A failing poll makes Blender reject the drop silently,
-    # which looks exactly like the drop never arriving. The area check belongs
-    # to the file handler's poll_drop.
+    # Not SCIGRAPHS_OT_RunPipeline: its invoke() prefers the panel's path over
+    # its own filepath. No poll() either, since a failing poll makes Blender
+    # reject the drop silently; the area check lives in poll_drop.
 
     def execute(self, context):
         # Parser from the wheel, executor from the add-on; see RunPipeline.

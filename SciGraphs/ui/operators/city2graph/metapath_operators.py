@@ -55,7 +55,6 @@ def _resolve_geo_center(center_lat, center_lon, gdf):
 
 
 class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
-    """Create dual graph where street segments become nodes (City2Graph method)"""
     bl_idname = "scigraphs.create_street_dual_graph"
     bl_label = "Create Street Dual Graph"
     bl_description = "Create dual graph using City2Graph (street segments become nodes)"
@@ -238,7 +237,6 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
-    """Bridge amenity features to nearest street segments"""
     bl_idname = "scigraphs.bridge_amenities"
     bl_label = "Bridge Amenities to Streets"
     bl_description = "Connect amenities to their nearest street segments using KNN"
@@ -310,7 +308,6 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
             return {'CANCELLED'}
     
     def _visualize_bridges(self, context, dual_obj, edges_dict, amenities_gdf):
-        """Create curve visualization of bridge connections."""
         bridge_key = ('amenity', 'is_nearby', 'segment')
         if bridge_key not in edges_dict:
             return
@@ -360,7 +357,6 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
-    """Compute metapaths between amenities via street segments"""
     bl_idname = "scigraphs.compute_metapaths"
     bl_label = "Compute Metapaths"
     bl_description = "Compute N-hop metapaths between amenities through the street network"
@@ -552,7 +548,6 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
-    """Complete metapath analysis: dual graph + bridges + metapaths"""
     bl_idname = "scigraphs.compute_metapaths_wizard"
     bl_label = "Compute Metapaths (Complete)"
     bl_description = "Run complete metapath analysis pipeline from OSMnx graph to metapaths"
@@ -592,7 +587,6 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to create dual graph")
             return {'CANCELLED'}
         
-        # The next two operators act on the active object.
         bpy.ops.object.select_all(action='DESELECT')
         dual_obj.select_set(True)
         context.view_layer.objects.active = dual_obj
@@ -622,7 +616,6 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
-    """Convert metapath curves to mesh with multiplicity attribute"""
     bl_idname = "scigraphs.convert_metapaths_to_mesh"
     bl_label = "Convert to Mesh (with Attributes)"
     bl_description = "Convert metapath curves to mesh to view multiplicity in Spreadsheet Editor"
@@ -675,7 +668,6 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
                 if mult < self.min_multiplicity:
                     splines_to_remove.append(spline_idx)
             
-            # Remove splines in reverse order
             for spline_idx in sorted(splines_to_remove, reverse=True):
                 if spline_idx < len(curve_data.splines):
                     curve_data.splines.remove(curve_data.splines[spline_idx])
@@ -813,7 +805,6 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ComputeMetapathsByWeight(bpy.types.Operator):
-    """Compute weighted metapaths using Dijkstra cost threshold."""
     bl_idname = "scigraphs.compute_metapaths_by_weight"
     bl_label = "Weighted Metapaths"
     bl_description = "Connect nodes reachable within a travel cost threshold (Dijkstra)"

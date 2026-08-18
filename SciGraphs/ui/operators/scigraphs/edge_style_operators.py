@@ -21,7 +21,6 @@ _PRESET_IDS = {item[0] for item in _PRESET_ITEMS}
 
 
 class SCIGRAPHS_OT_ApplyEdgeStyle(bpy.types.Operator):
-    """Apply the selected edge style to the graph."""
     bl_idname = "scigraphs.apply_edge_style"
     bl_label = "Apply Edge Style"
     bl_description = "Apply the selected edge style to graph edges"
@@ -56,7 +55,6 @@ class SCIGRAPHS_OT_ApplyEdgeStyle(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ResetEdgeStyle(bpy.types.Operator):
-    """Reset edges to straight lines."""
     bl_idname = "scigraphs.reset_edge_style"
     bl_label = "Reset to Straight"
     bl_description = "Reset all edges to straight lines"
@@ -91,7 +89,6 @@ class SCIGRAPHS_OT_ResetEdgeStyle(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ApplyEdgeStylePreset(bpy.types.Operator):
-    """Apply a predefined edge style preset."""
     bl_idname = "scigraphs.apply_edge_style_preset"
     bl_label = "Apply Edge Preset"
     bl_description = "Apply a predefined edge style configuration"
@@ -137,7 +134,6 @@ class SCIGRAPHS_OT_ApplyEdgeStylePreset(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_PreviewEdgeStyle(bpy.types.Operator):
-    """Preview edge style without fully applying (shows on selected edges only)."""
     bl_idname = "scigraphs.preview_edge_style"
     bl_label = "Preview Style"
     bl_description = "Preview the edge style on the graph"
@@ -154,7 +150,6 @@ class SCIGRAPHS_OT_PreviewEdgeStyle(bpy.types.Operator):
 
 
 def update_preset_callback(self, context):
-    """Callback when preset selection changes."""
     if self.edge_style_preset != 'CUSTOM':
         edge_styles.apply_preset(self, self.edge_style_preset)
 

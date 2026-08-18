@@ -12,10 +12,8 @@ from .utils import (
 
 
 def _graph_has_edge_attribute(G, attr):
-    """Return True if ``attr`` is present and non-empty on every edge of G.
-
-    Handles both the MultiDiGraph that OSMnx builds and the plain DiGraph or
-    Graph you get back from ``to_digraph`` / ``to_undirected``.
+    """Return True if ``attr`` is present and non-empty on every edge of G,
+    whether it is an OSMnx MultiDiGraph or a plain DiGraph or Graph.
     """
     if G is None or G.number_of_edges() == 0:
         return False
@@ -32,7 +30,6 @@ def _graph_has_edge_attribute(G, attr):
 
 
 class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
-    """Interactive modal operator to select nearest node by clicking in viewport."""
     bl_idname = "scigraphs.osmnx_select_nearest_node"
     bl_label = "Select Nearest Node"
     bl_description = "Click in the viewport to find the nearest graph node (with highlight)"
@@ -109,7 +106,6 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _build_vertex_lookup(self):
-        """Build a lookup of vertex positions for fast nearest-vertex finding."""
         import numpy as np
         
         mesh = self.obj.data
@@ -133,8 +129,8 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
     def _update_highlight(self, context, event):
         """Highlight the mesh vertex nearest the cursor.
 
-        Works in screen space rather than 3D, so Geometry Nodes and elevated
-        (non-flat) graphs do not throw the pick off.
+        Picks in screen space rather than 3D, so Geometry Nodes and elevated
+        graphs do not throw it off.
         """
         from bpy_extras import view3d_utils
         import numpy as np
@@ -177,7 +173,6 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
             self.highlight_node_id = None
     
     def _draw_callback(self, context):
-        """Draw the highlight circle."""
         if self.highlight_pos is None:
             return
         
@@ -256,7 +251,6 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
-    """Interactive modal operator to select nearest edge by clicking in viewport."""
     bl_idname = "scigraphs.osmnx_select_nearest_edge"
     bl_label = "Select Nearest Edge"
     bl_description = "Click in the viewport to find the nearest graph edge (with highlight)"
@@ -327,7 +321,6 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _build_edge_lookup(self):
-        """Build lookup structures for edge highlighting."""
         import numpy as np
         from collections import defaultdict
         
@@ -373,10 +366,7 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
         self.num_intersections = num_intersections
     
     def _update_highlight(self, context, event):
-        """Highlight the edge whose midpoint is nearest the cursor.
-
-        Screen-space, so Geometry Nodes do not throw the pick off.
-        """
+        """Highlight the edge whose midpoint is nearest the cursor, in screen space."""
         from bpy_extras import view3d_utils
         import numpy as np
         
@@ -423,7 +413,6 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
             self.highlight_edge_ids = None
     
     def _draw_callback(self, context):
-        """Draw highlighted edges."""
         if not self.highlight_edges:
             return
         
@@ -490,7 +479,6 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_CalculateShortestPath(bpy.types.Operator):
-    """Calculate shortest path between two nodes."""
     bl_idname = "scigraphs.osmnx_shortest_path"
     bl_label = "Calculate Shortest Path"
     bl_description = "Find the shortest path between source and target nodes"
@@ -593,7 +581,6 @@ class SCIGRAPHS_OT_CalculateShortestPath(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SelectPathSource(bpy.types.Operator):
-    """Interactive selection of path source node with visual highlight."""
     bl_idname = "scigraphs.osmnx_select_path_source"
     bl_label = "Select Source Node"
     bl_description = "Click on a node to set it as path source (with highlight)"
@@ -707,7 +694,6 @@ class SCIGRAPHS_OT_SelectPathSource(bpy.types.Operator):
             self.highlight_node_id = None
     
     def _draw_callback(self, context):
-        """Draw highlight - green for source."""
         if self.highlight_pos is None:
             return
         
@@ -725,7 +711,6 @@ class SCIGRAPHS_OT_SelectPathSource(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SelectPathTarget(bpy.types.Operator):
-    """Interactive selection of path target node with visual highlight."""
     bl_idname = "scigraphs.osmnx_select_path_target"
     bl_label = "Select Target Node"
     bl_description = "Click on a node to set it as path target (with highlight)"
@@ -839,7 +824,6 @@ class SCIGRAPHS_OT_SelectPathTarget(bpy.types.Operator):
             self.highlight_node_id = None
     
     def _draw_callback(self, context):
-        """Draw highlight - red for target."""
         if self.highlight_pos is None:
             return
         
@@ -857,7 +841,6 @@ class SCIGRAPHS_OT_SelectPathTarget(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_UseSelectedAsSource(bpy.types.Operator):
-    """Use the currently selected node as path source."""
     bl_idname = "scigraphs.osmnx_use_selected_source"
     bl_label = "Use as Source"
     bl_description = "Set the selected node as the path source"
@@ -875,7 +858,6 @@ class SCIGRAPHS_OT_UseSelectedAsSource(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_UseSelectedAsTarget(bpy.types.Operator):
-    """Use the currently selected node as path target."""
     bl_idname = "scigraphs.osmnx_use_selected_target"
     bl_label = "Use as Target"
     bl_description = "Set the selected node as the path target"
@@ -893,7 +875,6 @@ class SCIGRAPHS_OT_UseSelectedAsTarget(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TruncatePolygon(bpy.types.Operator):
-    """Truncate graph to polygon."""
     bl_idname = "scigraphs.osmnx_truncate_polygon"
     bl_label = "Truncate to Polygon"
     bl_description = "Remove nodes outside a polygon (from selected Blender object)"
@@ -951,7 +932,6 @@ class SCIGRAPHS_OT_TruncatePolygon(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TruncateDistance(bpy.types.Operator):
-    """Truncate graph by distance from point."""
     bl_idname = "scigraphs.osmnx_truncate_distance"
     bl_label = "Truncate by Distance"
     bl_description = "Keep only nodes within distance from a center point"
@@ -1034,10 +1014,8 @@ class SCIGRAPHS_OT_TruncateDistance(bpy.types.Operator):
 
 
 class _SelectDistanceNodeBase(bpy.types.Operator):
-    """Base modal eyedropper for the node-pair distance calculator.
-
-    Subclasses set ``_target_prop`` to ``"osmnx_dist_node_a"`` or
-    ``"osmnx_dist_node_b"``.
+    """Base modal eyedropper for the node-pair distance calculator; subclasses
+    set ``_target_prop`` to ``"osmnx_dist_node_a"`` or ``"osmnx_dist_node_b"``.
     """
 
     bl_options = {'REGISTER', 'UNDO'}
@@ -1145,7 +1123,6 @@ class _SelectDistanceNodeBase(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SelectDistanceNodeA(_SelectDistanceNodeBase):
-    """Pick the first node for the node-pair distance calculator."""
     bl_idname = "scigraphs.osmnx_select_distance_node_a"
     bl_label = "Pick Node A (Distance)"
     bl_description = "Click a node to set it as the first endpoint of the distance calculator"
@@ -1157,7 +1134,6 @@ class SCIGRAPHS_OT_SelectDistanceNodeA(_SelectDistanceNodeBase):
 
 
 class SCIGRAPHS_OT_SelectDistanceNodeB(_SelectDistanceNodeBase):
-    """Pick the second node for the node-pair distance calculator."""
     bl_idname = "scigraphs.osmnx_select_distance_node_b"
     bl_label = "Pick Node B (Distance)"
     bl_description = "Click a node to set it as the second endpoint of the distance calculator"
@@ -1169,12 +1145,6 @@ class SCIGRAPHS_OT_SelectDistanceNodeB(_SelectDistanceNodeBase):
 
 
 class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
-    """Compare distance metrics between two graph nodes.
-
-    Straight-line distance (great-circle when unprojected, Euclidean when
-    projected), shortest network distance, their ratio as circuity, and travel
-    time where ``travel_time`` exists on the edges.
-    """
 
     bl_idname = "scigraphs.osmnx_calc_node_pair_distance"
     bl_label = "Compute Node-Pair Distances"

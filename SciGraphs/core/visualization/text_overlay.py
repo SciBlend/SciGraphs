@@ -47,21 +47,16 @@ class TextOverlaySettings:
 class ProjectedNode:
     """A node projected to screen coordinates."""
     name: str
-    x: float  # Pixel X coordinate
-    y: float  # Pixel Y coordinate
-    distance: float  # Distance from camera
+    x: float
+    y: float
+    distance: float
     visible: bool
     occluded: bool
     attribute_value: Optional[float]
 
 
 def resolve_node_names(obj) -> Optional[List[str]]:
-    """Resolve the node names of a graph object from its stored metadata.
-
-    ``obj["node_names"]`` (a JSON list) first, then ``obj["nodes_data"]`` (the
-    comma-separated form geospatial graphs use), then names built from vertex
-    indices. Aligned with mesh vertex order; None if the object is not a mesh.
-    """
+    """Resolve a graph object's node names: ``obj["node_names"]`` (JSON list) first, then ``obj["nodes_data"]`` (the comma-separated form geospatial graphs use), then vertex indices. Aligned with mesh vertex order; None if the object is not a mesh."""
     if obj is None or obj.type != 'MESH':
         return None
 
@@ -147,12 +142,7 @@ def project_nodes_to_screen(
     scene: bpy.types.Scene,
     render_resolution: Tuple[int, int]
 ) -> List[ProjectedNode]:
-    """Project 3D node positions onto 2D screen pixels.
-
-    Reproduces Blender's own camera projection: focal length, sensor size and
-    fit, lens shift, and the camera transform. ``render_resolution`` is
-    (width, height) in pixels.
-    """
+    """Project 3D node positions onto 2D screen pixels, reproducing Blender's own camera projection: focal length, sensor size and fit, lens shift, camera transform. ``render_resolution`` is (width, height) in pixels."""
     import mathutils
     
     if camera is None or camera.type != 'CAMERA':
@@ -167,9 +157,9 @@ def project_nodes_to_screen(
     camera_pos = camera.matrix_world.translation
     
     cam_data = camera.data
-    focal_length = cam_data.lens  # in mm
-    sensor_width = cam_data.sensor_width  # in mm
-    sensor_height = cam_data.sensor_height  # in mm
+    focal_length = cam_data.lens  # mm, as are the sensor sizes below
+    sensor_width = cam_data.sensor_width
+    sensor_height = cam_data.sensor_height
     shift_x = cam_data.shift_x
     shift_y = cam_data.shift_y
     
@@ -215,17 +205,14 @@ def project_nodes_to_screen(
             ))
             continue
         
-        depth = -cam_co.z  # Make positive (distance along view axis)
+        depth = -cam_co.z
         
-        # Sensor-plane projection: (cam_coord * focal_length) / depth, then
-        # normalized to sensor size.
+        # Sensor-plane projection: cam_coord * focal_length / depth, normalized.
         
         if sensor_fit == 'HORIZONTAL':
-            # Horizontal fit: sensor_width matches image width
             proj_x = (cam_co.x * focal_length) / (depth * sensor_width / 2.0)
             proj_y = (cam_co.y * focal_length) / (depth * sensor_width / 2.0) * aspect_ratio
         else:
-            # Vertical fit: sensor_height matches image height
             proj_x = (cam_co.x * focal_length) / (depth * sensor_height / 2.0) / aspect_ratio
             proj_y = (cam_co.y * focal_length) / (depth * sensor_height / 2.0)
         
@@ -233,7 +220,6 @@ def project_nodes_to_screen(
         proj_x += shift_x * 2.0
         proj_y += shift_y * 2.0
         
-        # Convert from projection space [-1, 1] to normalized [0, 1]
         norm_x = (proj_x + 1.0) / 2.0
         norm_y = (proj_y + 1.0) / 2.0
         
@@ -242,7 +228,7 @@ def project_nodes_to_screen(
             0.0 <= norm_y <= 1.0
         )
         
-        # Convert to pixel coordinates (flip Y for image coordinates)
+        # Flip Y for image coordinates.
         x_px = norm_x * width
         y_px = (1.0 - norm_y) * height
         
@@ -254,7 +240,7 @@ def project_nodes_to_screen(
             y=y_px,
             distance=distance,
             visible=visible,
-            occluded=False,  # Will be set by occlusion test
+            occluded=False,
             attribute_value=None
         ))
     
@@ -267,10 +253,7 @@ def test_depth_occlusion(
     projected_nodes: List[ProjectedNode],
     camera: bpy.types.Object
 ) -> List[ProjectedNode]:
-    """Flag the nodes hidden by geometry, raycasting from the camera to each one.
-
-    Returns the same list with ``occluded`` set.
-    """
+    """Flag the nodes hidden by geometry, raycasting from the camera to each one; returns the same list with ``occluded`` set."""
     if camera is None:
         return projected_nodes
     
@@ -301,7 +284,6 @@ def test_depth_occlusion(
         direction = (node_pos - camera_pos).normalized()
         node_distance = (node_pos - camera_pos).length
         
-        # Small offset to avoid self-intersection
         ray_origin = camera_pos + direction * 0.01
         
         hit, location, normal, index, hit_obj, matrix = context.scene.ray_cast(
@@ -310,7 +292,6 @@ def test_depth_occlusion(
         
         if hit:
             hit_distance = (location - camera_pos).length
-            # Node is occluded if the hit occurs before reaching the node
             node.occluded = hit_distance < (node_distance - tolerance)
         else:
             node.occluded = False
@@ -324,14 +305,10 @@ def declutter_labels(
 ) -> List[ProjectedNode]:
     """Drop labels whose box would overlap one already accepted.
 
-    The renderer has no collision pass and simply overdraws, so a clustered
-    layout turns into stacked, unreadable text. Greedy in the order it is given,
-    so sort by importance first: the first label to claim a region keeps it.
-
-    The box is estimated, not measured. Asking Pillow for metrics would mean
-    loading the font a second time and duplicating `calculate_text_size`; the
-    estimate only has to keep neighbors apart, and it errs wide.
-    """
+    The renderer has no collision pass and simply overdraws, so a clustered layout
+    stacks into unreadable text. Greedy in the order given, so sort by importance
+    first. The box is estimated rather than measured, and errs wide: asking Pillow
+    for metrics would load the font twice and duplicate `calculate_text_size`."""
     accepted: List[ProjectedNode] = []
     boxes: List[Tuple[float, float, float, float]] = []
     half_h = max(font_size, 1) * 0.62
@@ -423,10 +400,9 @@ def calculate_text_size(
             size = int(base_size * 10.0 / node.distance)
         else:
             size = int(base_size)
-        return max(4, min(size, 200))  # Clamp to reasonable range
+        return max(4, min(size, 200))
     
     elif settings.size_mode == 'ADAPTIVE':
-        # Minimum size guaranteed, plus scaling
         if node.distance > 0:
             scaled_size = int(base_size * 5.0 / node.distance)
         else:
@@ -437,11 +413,7 @@ def calculate_text_size(
 
 
 def format_value(value: Any, settings: TextOverlaySettings) -> str:
-    """Format a value for display, following the overlay's format settings.
-
-    Covers integer/float detection, decimal places, scientific notation,
-    percentages, thousands separators and prefix/suffix.
-    """
+    """Format a value for display: integer/float detection, decimal places, scientific notation, percentages, thousands separators, prefix and suffix."""
     # A string that will not parse as a number passes through untouched.
     if isinstance(value, str):
         try:
@@ -455,7 +427,6 @@ def format_value(value: Any, settings: TextOverlaySettings) -> str:
     result = ""
     
     if settings.format_type == 'AUTO':
-        # Detect if value is effectively an integer
         if isinstance(value, float) and value.is_integer():
             result = str(int(value))
         elif isinstance(value, int):
@@ -510,13 +481,13 @@ def load_font(font_path: str, size: int):
             log(f"Could not load custom font {font_path}: {e}")
     
     fallback_fonts = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Linux
-        "/usr/share/fonts/TTF/DejaVuSans.ttf",  # Arch Linux
-        "C:\\Windows\\Fonts\\arial.ttf",  # Windows
-        "C:\\Windows\\Fonts\\segoeui.ttf",  # Windows
-        "/Library/Fonts/Arial.ttf",  # macOS
-        "/System/Library/Fonts/Helvetica.ttc",  # macOS
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "/Library/Fonts/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
     ]
     
     for fallback in fallback_fonts:
@@ -555,7 +526,6 @@ def generate_text_image(
     # Sort by distance (furthest first, so closer nodes draw on top)
     visible_nodes.sort(key=lambda n: -n.distance)
     
-    # Cache fonts by size to avoid reloading
     font_cache = {}
     
     for node in visible_nodes:
@@ -570,7 +540,6 @@ def generate_text_image(
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
         
-        # Center text on node position
         x = node.x - text_width / 2
         y = node.y - text_height / 2
         
@@ -594,19 +563,13 @@ def generate_text_image(
 
 
 def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
-    """Wire the compositor to lay the text image over the render.
-
-    Render Layers -> Alpha Over <- Image, scaled to render size. Works on
-    Blender 5.0+, which uses ``compositing_node_group``, and on 4.x, which uses
-    ``scene.node_tree``.
-    """
+    """Wire the compositor to lay the text image over the render: Render Layers -> Alpha Over <- Image, scaled to render size. Blender 5.0+ uses ``compositing_node_group``, 4.x uses ``scene.node_tree``."""
     log(f"Setting up compositor overlay with image: {image_path}")
     
     tree = None
     is_blender_5 = hasattr(scene, 'compositing_node_group')
     
     if is_blender_5:
-        # Blender 5.0+ API: use compositing_node_group
         log("Using Blender 5.0+ compositor API")
         
         if scene.compositing_node_group is not None:
@@ -617,7 +580,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
             scene.compositing_node_group = tree
             log("Created new compositor node group")
     else:
-        # Blender 4.x API: use scene.node_tree
         log("Using Blender 4.x compositor API")
         scene.use_nodes = True
         tree = getattr(scene, 'node_tree', None)
@@ -681,7 +643,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
     
     image_node.image = img
     
-    # Create or find Scale node to ensure text image matches render size
     scale_node = None
     for node in tree.nodes:
         if node.type == 'SCALE' and node.name == 'SciGraphs_TextScale':
@@ -694,8 +655,7 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         scale_node.label = 'Match Render Size'
         scale_node.location = (250, 100)
     
-    # Always ensure Scale node is set to Render Size mode
-    # Blender 4.x uses 'space' property, Blender 5.0+ uses inputs[1]
+    # Scale node in Render Size mode: 4.x has a 'space' property, 5.0+ inputs[1].
     scale_set = False
     
     if hasattr(scale_node, 'space'):
@@ -707,8 +667,7 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         except (AttributeError, TypeError):
             pass  # Property exists but is read-only or deprecated in this version
     
-    # Blender 5.0+ uses inputs[1] for the scale mode (enum socket)
-    # Valid values: 'Relative', 'Absolute', 'Scene Size', 'Render Size'
+    # inputs[1] is an enum socket: 'Relative', 'Absolute', 'Scene Size', 'Render Size'.
     if not scale_set and len(scale_node.inputs) > 1:
         mode_input = scale_node.inputs[1]
         if hasattr(mode_input, 'default_value'):
@@ -729,9 +688,8 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         elif link.from_node == scale_node:
             tree.links.remove(link)
     
-    # Blender 5.0 names the Alpha Over inputs "Background" (the rendered scene),
-    # "Foreground" (the labels) and "Factor". Connect by name where the name
-    # exists, by index otherwise.
+    # Blender 5.0 names the Alpha Over inputs "Background" (the render),
+    # "Foreground" (the labels) and "Factor"; connect by name, else by index.
     if 'Background' in alpha_over.inputs:
         tree.links.new(render_layers.outputs['Image'], alpha_over.inputs['Background'])
     else:
@@ -773,10 +731,8 @@ def remove_compositor_overlay(scene: bpy.types.Scene) -> bool:
     is_blender_5 = hasattr(scene, 'compositing_node_group')
     
     if is_blender_5:
-        # Blender 5.0+ API
         tree = scene.compositing_node_group
     else:
-        # Blender 4.x API
         if not getattr(scene, 'use_nodes', False):
             return True
         tree = getattr(scene, 'node_tree', None)
@@ -792,7 +748,6 @@ def remove_compositor_overlay(scene: bpy.types.Scene) -> bool:
     for node in nodes_to_remove:
         tree.nodes.remove(node)
     
-    # Reconnect render layers to output directly
     render_layers = None
     output_node = None
     
@@ -827,13 +782,12 @@ def get_available_attributes(obj) -> List[str]:
     
     for key in obj.keys():
         if key.startswith("attr_") and key not in attributes:
-            attr_name = key[5:]  # Remove "attr_" prefix
+            attr_name = key[5:]
             attributes.append(attr_name)
     
     return sorted(set(attributes))
 
 
-# ---- Settings snapshot helpers ----
 
 def get_font_path(props) -> str:
     """Resolve the font path from the addon property group."""
@@ -846,10 +800,7 @@ def get_font_path(props) -> str:
 
 
 def get_settings_snapshot(context):
-    """Create a hashable snapshot of all overlay-relevant settings.
-
-    A change in the returned tuple signals that the overlay needs regeneration.
-    """
+    """Hashable snapshot of every overlay-relevant setting; a change in the tuple means the overlay needs regenerating."""
     return get_settings_snapshot_with_object(context, context.active_object)
 
 

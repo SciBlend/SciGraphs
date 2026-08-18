@@ -1,5 +1,4 @@
-# Terrain meshes from DEM rasters and elevation APIs, aligned to OSMnx
-# street networks.
+# Terrain meshes from DEM rasters and elevation APIs, aligned to OSMnx networks.
 
 import bpy
 import bmesh
@@ -9,12 +8,7 @@ from scigraphs_core.logger import log
 
 
 def load_dem_data(filepath, bounds=None):
-    """Read a DEM raster into an elevation dict, cropped to bounds if given.
-
-    Requires rasterio. The returned bounds are the ones actually read, which
-    for a cropped window are snapped to pixel edges and so differ slightly
-    from the bounds requested. Nodata pixels come back as NaN.
-    """
+    """Read a DEM raster (rasterio) into an elevation dict, cropped to bounds if given. The returned bounds are the ones actually read, snapped to pixel edges. Nodata pixels come back as NaN."""
     try:
         import rasterio
         from rasterio.windows import from_bounds
@@ -80,12 +74,7 @@ def load_dem_data(filepath, bounds=None):
 
 
 def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=5):
-    """Sample elevations over a bounding box from an online API.
-
-    Returns the same dict shape as load_dem_data(). resolution is points per
-    side, so the request costs resolution squared points; api is
-    'open-elevation' or 'opentopodata'.
-    """
+    """Sample elevations over a bounding box from an online API, in the dict shape load_dem_data() returns. `resolution` is points per side, so a request costs resolution squared points; `api` is 'open-elevation' or 'opentopodata'."""
     import requests
     
     north = bounds['north']
@@ -138,12 +127,7 @@ def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=
 
 
 def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max_workers=5):
-    """Fetch elevations from Open-Elevation in parallel batches. No key needed.
-
-    Batches that fail every retry come back as NaN for the caller to
-    interpolate. Raising max_workers speeds things up until the API starts
-    rate limiting.
-    """
+    """Fetch elevations from Open-Elevation in parallel batches; no key needed. Batches that fail every retry come back as NaN for the caller to interpolate, and raising max_workers helps until the API rate limits."""
     import requests
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
@@ -238,11 +222,7 @@ def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max
 
 
 def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_workers=2):
-    """Fetch elevations from OpenTopoData in parallel batches.
-
-    Rate limits here are stricter than Open-Elevation, so max_workers is capped
-    at 3 below and 2 is the sane default. Failed batches come back as NaN.
-    """
+    """Fetch elevations from OpenTopoData in parallel batches. Rate limits are stricter than Open-Elevation, so max_workers is capped at 3 and 2 is the default. Failed batches come back as NaN."""
     import requests
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -337,11 +317,9 @@ def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_wo
 def _interpolate_nan_values(grid):
     """Fill NaN gaps left by failed API batches, by nearest neighbor.
 
-    scipy is an optional extra, and the import is guarded because it sits
-    downstream of the network fetch: an unguarded ImportError here would throw
-    away an elevation download that already succeeded. Without scipy the gaps
-    get the mean of the valid samples instead, which patches visibly flatter.
-    """
+    The scipy import is guarded because it sits downstream of the network fetch:
+    an unguarded ImportError would throw away a download that already succeeded.
+    Without scipy the gaps get the mean of the valid samples, patching flatter."""
     try:
         from scipy import ndimage
     except ImportError:
@@ -401,11 +379,7 @@ def create_terrain_from_api(bounds, resolution=50, scale=0.001, vertical_scale=1
 
 def create_terrain_from_osmnx_api(osmnx_obj, resolution=50, vertical_scale=1.0,
                                    vertical_offset=0.0, api='open-elevation', padding=0.1):
-    """Build API terrain under an OSMnx network, sharing its scale and extent.
-
-    padding is a fraction of the network extent added on each side, so 0.1
-    widens the DEM request by 10 percent.
-    """
+    """Build API terrain under an OSMnx network, sharing its scale and extent. `padding` is a fraction of the network extent added on each side, so 0.1 widens the DEM request by 10 percent."""
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         log("Invalid OSMnx object")
         return None
@@ -471,11 +445,10 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
                         center_lat=None, center_lon=None):
     """Build a Blender mesh from a DEM dict.
 
-    Pass the network's center_lat and center_lon to share its projection
-    origin; left None they default to the DEM bbox center, which puts the
-    terrain somewhere else entirely if the network was fetched with padding.
-    scale converts meters to Blender units and must match the network's.
-    """
+    Pass the network's center_lat and center_lon to share its projection origin;
+    left None they default to the DEM bbox center, which lands the terrain
+    elsewhere entirely when the network was fetched with padding. `scale` is
+    meters to Blender units and must match the network's."""
     if dem_data is None:
         return None
     
@@ -587,11 +560,7 @@ def _add_elevation_attribute(obj, elevation, subsample):
 
 
 def apply_terrain_material(obj, style='ELEVATION'):
-    """Assign the terrain material for a style, reusing it across objects.
-
-    The material is shared by name, so its elevation range comes from whichever
-    object created it first.
-    """
+    """Assign the terrain material for a style. It is shared by name, so its elevation range comes from whichever object created it first."""
     if obj is None or not obj.get("is_terrain", False):
         return None
     
@@ -679,10 +648,7 @@ def _create_simple_material(nodes, links):
 
 def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0, 
                                vertical_offset=0.0, subsample=1, padding=0.1):
-    """Build terrain from a DEM file, cropped and aligned to an OSMnx network.
-
-    Falls back to loading the whole DEM if the network extent cannot be found.
-    """
+    """Build terrain from a DEM file, cropped and aligned to an OSMnx network; falls back to the whole DEM when the network extent cannot be found."""
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         log("Invalid OSMnx object")
         return None
@@ -768,11 +734,7 @@ def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0,
 
 
 def update_terrain_vertical_scale(terrain_obj, vertical_scale):
-    """Re-exaggerate an existing terrain by rescaling Z in place.
-
-    Works from the ratio against the stored scale, so repeated calls do not
-    compound.
-    """
+    """Re-exaggerate an existing terrain by rescaling Z in place, from the ratio against the stored scale, so repeated calls do not compound."""
     if terrain_obj is None or not terrain_obj.get("is_terrain", False):
         return
     
@@ -816,11 +778,7 @@ def remove_terrain(terrain_obj):
 
 
 def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, vertical_offset=0.0):
-    """Lift an OSMnx network's vertices onto a DEM grid.
-
-    Terrain built from the same dem_data then shares the elevation source, so
-    the network sits on the surface rather than through it.
-    """
+    """Lift an OSMnx network's vertices onto a DEM grid. Terrain built from the same dem_data shares the elevation source, so the network sits on the surface rather than through it."""
     if osmnx_obj is None or dem_data is None:
         return False
 
@@ -841,16 +799,15 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
     if np.isnan(max_elev):
         max_elev = min_elev
 
-    # Sample through the mesh coordinates, not the cached MultiDiGraph node
-    # coordinates. The two diverge for simplified or converted graphs, whose
-    # node IDs no longer match nodes_data one for one, and for projected
-    # graphs, where G.nodes[n]['x','y'] hold UTM meters rather than degrees.
+    # Sample through the mesh coordinates, not the cached MultiDiGraph nodes:
+    # they diverge for simplified or converted graphs (node IDs no longer match
+    # nodes_data) and for projected graphs (x, y hold UTM meters, not degrees).
     EARTH_RADIUS = 6_371_000.0
     center_lat = osmnx_obj.get("osmnx_center_lat")
     center_lon = osmnx_obj.get("osmnx_center_lon")
     if center_lat is None or center_lon is None:
-        # The DEM bbox center is off when the graph was fetched with different
-        # padding, but that beats refusing to apply elevations at all.
+        # Off when the graph was fetched with different padding, but that beats
+        # refusing to apply elevations at all.
         center_lat = (bounds['north'] + bounds['south']) / 2
         center_lon = (bounds['east'] + bounds['west']) / 2
         log("Network has no osmnx_center_lat/lon; using DEM bbox center as fallback")
@@ -862,8 +819,7 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
         cos_lat = 1.0  # At the poles the longitude scale would divide by zero.
     inv_scale = 1.0 / float(scale) if scale else 1.0
 
-    # Recover each vertex's (lat, lon) by inverting the equirectangular
-    # projection that placed it.
+    # Invert the equirectangular projection that placed each vertex.
     vertex_elevations = [0.0] * len(mesh.vertices)
     out_of_bounds = 0
     for vert_idx, vert in enumerate(mesh.vertices):
@@ -872,8 +828,8 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
         lat = center_lat + (y_m / (np.pi / 180.0 * EARTH_RADIUS))
         lon = center_lon + (x_m / (np.pi / 180.0 * EARTH_RADIUS * cos_lat))
 
-        # _sample_elevation_from_grid clamps these to the border, so the value
-        # stays sane. A large count means the DEM tile was fetched too small.
+        # Clamped to the border downstream; a large count means the DEM tile
+        # was fetched too small.
         if not (bounds['south'] <= lat <= bounds['north']
                 and bounds['west'] <= lon <= bounds['east']):
             out_of_bounds += 1
@@ -894,8 +850,7 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
             "Increase 'Padding' before fetching the DEM if this is large."
         )
 
-    # Mirror the elevations back into the cached graph, where grade
-    # calculations and GraphML export read G.nodes[n]['elevation'].
+    # Grade calculations and GraphML export read G.nodes[n]['elevation'].
     nodes_str = osmnx_obj.get("nodes_data", "")
     node_ids = nodes_str.split(",") if nodes_str else []
     from ..data_io.importer import _osmnx_graph_cache
@@ -934,11 +889,7 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
 
 
 def _sample_elevation_from_grid(lat, lon, elevation_grid, bounds):
-    """Bilinearly sample the elevation grid at one (lat, lon).
-
-    Coordinates outside the grid are clamped to the edge. NaN corners are
-    replaced with the mean of the valid corners, and an all-NaN cell reads 0.
-    """
+    """Bilinearly sample the elevation grid at one (lat, lon). Coordinates outside the grid clamp to the edge, NaN corners take the mean of the valid corners, and an all-NaN cell reads 0."""
     height, width = elevation_grid.shape
     
     x_frac = (lon - bounds['west']) / (bounds['east'] - bounds['west'])
@@ -988,10 +939,9 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
                        api='open-elevation', subsample=1, padding=0.1, max_workers=5):
     """Import a DEM, lift the network onto it, and optionally build terrain.
 
-    One DEM fetch feeds both steps, which is what keeps network and terrain on
-    the same surface. dem_source is a file path when source_type is 'file' and
-    ignored when it is 'api'. Returns (terrain_obj or None, success).
-    """
+    One fetch feeds both steps, which is what keeps network and terrain on the
+    same surface. `dem_source` is a file path when source_type is 'file' and is
+    ignored when it is 'api'. Returns (terrain_obj or None, success)."""
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         log("Invalid OSMnx object")
         return None, False
@@ -1083,11 +1033,7 @@ def toggle_terrain_visibility(osmnx_obj, visible):
 
 
 def get_osmnx_bounds(osmnx_obj, padding=0.1):
-    """Return a network's bounds in WGS84 degrees, padded by a fraction.
-
-    Always WGS84 even when the cached graph is projected, since the DEM
-    services and the export formats below all expect EPSG:4326.
-    """
+    """Return a network's bounds in WGS84 degrees, padded by a fraction. Always WGS84 even for a projected cached graph, since the DEM services and export formats expect EPSG:4326."""
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         return None
     
@@ -1118,12 +1064,7 @@ def get_osmnx_bounds(osmnx_obj, padding=0.1):
 
 
 def _get_wgs84_extent(G):
-    """Graph extent in WGS84 degrees, reprojecting a projected graph first.
-
-    Nodes outside the valid lat/lon ranges are dropped: on a projected graph
-    that was missed, UTM meters would otherwise pass as degrees and blow the
-    extent up to the whole planet.
-    """
+    """Graph extent in WGS84 degrees, reprojecting a projected graph first. Nodes outside the valid lat/lon ranges are dropped: on a projected graph that was missed, UTM meters would pass as degrees and blow the extent up to the planet."""
     if G is None:
         return None
     
@@ -1173,11 +1114,7 @@ def _get_wgs84_extent(G):
 
 
 def export_bounds_geojson(bounds, filepath):
-    """Write bounds as a GeoJSON polygon for Copernicus Data Space.
-
-    Copernicus requires EPSG:4326, so out-of-range degrees are rejected here
-    rather than uploaded and silently misinterpreted.
-    """
+    """Write bounds as a GeoJSON polygon for Copernicus Data Space, which requires EPSG:4326, so out-of-range degrees are rejected here rather than silently misinterpreted after upload."""
     import json
     
     if bounds is None:
@@ -1308,12 +1245,7 @@ def export_bounds_wkt(bounds, filepath):
 
 
 def export_aoi_for_copernicus(osmnx_obj, filepath, format='geojson', padding=0.1):
-    """Export a network's area of interest for Copernicus Data Space.
-
-    format is 'geojson', 'kml' or 'wkt'. Returns (success, bounds_info); the
-    second element carries the bounds plus the extent in km and its area, and
-    is filled in even when the write fails.
-    """
+    """Export a network's area of interest; `format` is 'geojson', 'kml' or 'wkt'. Returns (success, bounds_info), the second carrying bounds plus extent in km and area, filled in even when the write fails."""
     bounds = get_osmnx_bounds(osmnx_obj, padding=padding)
     
     if bounds is None:
@@ -1350,10 +1282,6 @@ def export_aoi_for_copernicus(osmnx_obj, filepath, format='geojson', padding=0.1
     return success, bounds_info
 
 
-# =============================================================================
-# TERRAIN PLANE IMPORT (Textured plane from raster/KMZ)
-# =============================================================================
-
 SUPPORTED_CRS = {
     'EPSG:4326': {
         'name': 'WGS 84',
@@ -1375,12 +1303,7 @@ SUPPORTED_CRS = {
 
 def import_terrain_plane(filepath, source_crs='EPSG:4326', target_crs='EPSG:4326',
                          osmnx_obj=None, name="Terrain_Plane"):
-    """Import a raster as a flat textured plane, picked by file extension.
-
-    Handles GeoTIFF at 8, 16 or 32 bit, KMZ with an embedded ground overlay,
-    and plain PNG or JPG, which has no georeferencing of its own and so needs
-    osmnx_obj. Returns (object, metadata) or (None, None).
-    """
+    """Import a raster as a flat textured plane, picked by file extension: GeoTIFF at 8, 16 or 32 bit, KMZ with an embedded ground overlay, or PNG/JPG, which carries no georeferencing and so needs osmnx_obj. Returns (object, metadata) or (None, None)."""
     import os
     
     ext = os.path.splitext(filepath)[1].lower()
@@ -1442,11 +1365,7 @@ def _import_kmz_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
 
 
 def _parse_kml_ground_overlay(kml_path, base_dir):
-    """Pull the GroundOverlay bounds and image path out of a KML.
-
-    Every lookup is tried with the KML namespace and then without it, since
-    exporters disagree about declaring it.
-    """
+    """Pull the GroundOverlay bounds and image path out of a KML. Every lookup is tried with the KML namespace and then without, since exporters disagree about declaring it."""
     import xml.etree.ElementTree as ET
     import os
 
@@ -1605,12 +1524,7 @@ def _import_image_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
 
 
 def _normalize_raster_data(data, dtype):
-    """Rescale raster bands to 0-255 for use as a texture.
-
-    uint16 is shifted down by 256, which assumes the data really uses the full
-    16-bit range. Signed and float data are stretched between their own min and
-    max, so the result shows relative values, not absolute ones.
-    """
+    """Rescale raster bands to 0-255 for use as a texture. uint16 is shifted down by 256, assuming the data uses the full 16-bit range; signed and float data are stretched between their own min and max, so the result is relative, not absolute."""
 
     if 'uint8' in dtype:
         return data.astype(np.float32)
@@ -1635,12 +1549,7 @@ def _normalize_raster_data(data, dtype):
 
 
 def _reproject_bounds(bounds, from_crs, to_crs):
-    """Reproject a bounds dict between CRS with pyproj. None if pyproj is absent.
-
-    Only the two opposite corners are transformed, so for a rotated or strongly
-    curved projection the result is the corners' new positions, not the true
-    bounding box of the reprojected area.
-    """
+    """Reproject a bounds dict between CRS with pyproj, None if pyproj is absent. Only the two opposite corners are transformed, so under a rotated or strongly curved projection the result is those corners' new positions, not the true bounding box."""
     if from_crs == to_crs:
         return bounds
     
@@ -1668,10 +1577,7 @@ def _reproject_bounds(bounds, from_crs, to_crs):
 
 def _create_textured_terrain_plane(image_path, bounds, source_crs, target_crs, 
                                    osmnx_obj, name):
-    """Build the quad, size it to the bounds, and texture it.
-
-    Unknown CRS are assumed geographic, so their bounds are read as degrees.
-    """
+    """Build the quad, size it to the bounds, and texture it. Unknown CRS are assumed geographic, so their bounds are read as degrees."""
     lat_mid = (bounds['north'] + bounds['south']) / 2
 
     if SUPPORTED_CRS.get(source_crs, {}).get('is_geographic', True):
@@ -1800,11 +1706,7 @@ def _create_terrain_texture_material(image_path, name):
 
 
 def update_terrain_plane_offset(terrain_obj, offset_x=0, offset_y=0, offset_z=0, scale_xy=1.0):
-    """Nudge a terrain plane relative to its parent network.
-
-    Offsets are in Blender units and measured from the parent's location, so
-    they are absolute, not cumulative between calls.
-    """
+    """Nudge a terrain plane relative to its parent network. Offsets are Blender units measured from the parent's location, so they are absolute, not cumulative between calls."""
     if terrain_obj is None or not terrain_obj.get("is_terrain_plane", False):
         return
     

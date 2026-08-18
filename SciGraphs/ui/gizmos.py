@@ -144,8 +144,8 @@ _TOOLBAR_LABELS = {
 def set_active_toolbar(context, toolbar):
     """Select the toolbar profile to show when the quick toolbar is visible.
 
-    While the navbar arrows have set a manual override, contextual switching
-    from the side panels is ignored so the chosen profile stays put.
+    A manual override from the navbar arrows suppresses contextual switching,
+    so the chosen profile stays put.
     """
     wm = context.window_manager
     if toolbar not in _TOOLBAR_PROFILES:
@@ -400,7 +400,6 @@ def disable_gizmos():
 
 
 class SCIGRAPHS_OT_enable_node_gizmos(bpy.types.Operator):
-    """Show/hide viewport node handles."""
     bl_idname = "scigraphs.toggle_node_gizmos"
     bl_label = "Toggle Node Handles"
     bl_description = "Show/hide visual handles for graph nodes"
@@ -422,7 +421,6 @@ class SCIGRAPHS_OT_enable_node_gizmos(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_toggle_quick_toolbar(bpy.types.Operator):
-    """Show/hide the floating SciGraphs toolbar."""
     bl_idname = "scigraphs.toggle_quick_toolbar"
     bl_label = "Toggle SciGraphs Quick Toolbar"
     bl_description = "Show or hide the floating SciGraphs quick toolbar"
@@ -437,7 +435,6 @@ class SCIGRAPHS_OT_toggle_quick_toolbar(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_set_quick_toolbar(bpy.types.Operator):
-    """Show and switch the SciGraphs floating toolbar profile."""
     bl_idname = "scigraphs.set_quick_toolbar"
     bl_label = "Set SciGraphs Quick Toolbar"
     bl_description = "Show the floating toolbar and switch to a specific profile"
@@ -461,7 +458,6 @@ class SCIGRAPHS_OT_set_quick_toolbar(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_cycle_quick_toolbar(bpy.types.Operator):
-    """Switch the floating toolbar to the previous or next profile."""
     bl_idname = "scigraphs.cycle_quick_toolbar"
     bl_label = "Cycle SciGraphs Quick Toolbar"
     bl_description = "Switch the floating toolbar between SciGraphs, OSMnx, and City2Graph"
@@ -486,7 +482,6 @@ class SCIGRAPHS_OT_cycle_quick_toolbar(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_quick_import_dialog(bpy.types.Operator):
-    """Floating import dialog for SciGraphs graph data."""
     bl_idname = "scigraphs.quick_import_dialog"
     bl_label = "SciGraphs Quick Import"
     bl_description = "Configure and start a SciGraphs data import"
@@ -579,7 +574,6 @@ class SCIGRAPHS_OT_quick_import_dialog(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_osmnx_quick_import_dialog(bpy.types.Operator):
-    """Floating import dialog for OSMnx street networks."""
     bl_idname = "scigraphs.osmnx_quick_import_dialog"
     bl_label = "OSMnx Quick Import"
     bl_description = "Configure and import an OSMnx network"
@@ -641,7 +635,6 @@ class SCIGRAPHS_OT_osmnx_quick_import_dialog(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_osmnx_quick_action_dialog(bpy.types.Operator):
-    """Quick parameter dialog for OSMnx toolbar actions."""
     bl_idname = "scigraphs.osmnx_quick_action_dialog"
     bl_label = "OSMnx Quick Action"
     bl_description = "Configure and run an OSMnx toolbar action"
@@ -886,7 +879,6 @@ class SCIGRAPHS_OT_osmnx_quick_action_dialog(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_city2graph_quick_action_dialog(bpy.types.Operator):
-    """Quick parameter dialog for City2Graph toolbar actions."""
     bl_idname = "scigraphs.city2graph_quick_action_dialog"
     bl_label = "City2Graph Quick Action"
     bl_description = "Configure and run a City2Graph toolbar action"
@@ -1078,9 +1070,8 @@ class SCIGRAPHS_OT_city2graph_quick_action_dialog(bpy.types.Operator):
 class _PanelDrawProxy:
     """Stand-in for a Panel instance during popup drawing.
 
-    Holds a fixed ``layout`` and forwards every other lookup to the originating
-    Panel class, binding instance methods to the proxy so the panel's own
-    ``self._draw_*`` calls still work from inside a popup.
+    Holds a fixed ``layout`` and forwards everything else to the originating
+    Panel class, binding methods to the proxy so ``self._draw_*`` still works.
     """
 
     def __init__(self, layout, panel_cls=None):
@@ -1155,7 +1146,6 @@ _SUBPANEL_BY_KEY = {
 
 
 class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
-    """Open a SciGraphs side-panel subpanel as a popup, mirroring its full contents."""
     bl_idname = "scigraphs.open_subpanel"
     bl_label = "Open Subpanel"
     bl_description = "Open a side-panel subpanel as a popup dialog"
@@ -1239,7 +1229,6 @@ class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_panel_quick_dialog(bpy.types.Operator):
-    """Panel-oriented quick controls for the SciGraphs toolbar."""
     bl_idname = "scigraphs.panel_quick_dialog"
     bl_label = "SciGraphs Panel Tools"
     bl_description = "Open quick actions for a SciGraphs subpanel"
@@ -1551,7 +1540,6 @@ class SCIGRAPHS_OT_panel_quick_dialog(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_drag_quick_toolbar(bpy.types.Operator):
-    """Drag the floating SciGraphs toolbar."""
     bl_idname = "scigraphs.drag_quick_toolbar"
     bl_label = "Move SciGraphs Toolbar"
     bl_description = "Drag to reposition the floating SciGraphs toolbar"
@@ -1601,7 +1589,6 @@ class SCIGRAPHS_OT_drag_quick_toolbar(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_quick_toolbar_action(bpy.types.Operator):
-    """Run an action from the floating SciGraphs toolbar."""
     bl_idname = "scigraphs.quick_toolbar_action"
     bl_label = "SciGraphs Quick Action"
     bl_description = "Run a SciGraphs quick toolbar action"

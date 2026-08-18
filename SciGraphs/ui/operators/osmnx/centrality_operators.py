@@ -18,7 +18,6 @@ def _pick_graph(obj):
 
 
 class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
-    """Compute node or edge centrality and store it as mesh attribute."""
     bl_idname = "scigraphs.osmnx_centrality"
     bl_label = "Compute Centrality"
     bl_description = "Compute betweenness or closeness centrality (optionally with rustworkx)"
@@ -99,7 +98,6 @@ class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
                     for data in G.get_edge_data(u, v).values():
                         data[attr] = float(val)
 
-        # Write to mesh attribute for easy preview in Blender.
         mesh = obj.data
         try:
             if target == 'NODES':
@@ -136,7 +134,6 @@ class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxAttrToColors(bpy.types.Operator):
-    """Map a float mesh attribute (nodes or edges) to vertex colors."""
     bl_idname = "scigraphs.osmnx_attr_to_colors"
     bl_label = "Apply Attribute to Vertex Colors"
     bl_description = "Convert a float attribute into a Blender color attribute using a colormap"
@@ -201,7 +198,6 @@ class SCIGRAPHS_OT_OSMnxAttrToColors(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxOrientationRose(bpy.types.Operator):
-    """Generate a 2D polar rose plot from edge bearings as a Blender image."""
     bl_idname = "scigraphs.osmnx_orientation_rose"
     bl_label = "Generate Orientation Rose"
     bl_description = (
@@ -347,7 +343,6 @@ class SCIGRAPHS_OT_OSMnxOrientationRose(bpy.types.Operator):
         image.name = image_name
         image.pack()
 
-        # Try to display it in any open Image Editor.
         for window in context.window_manager.windows:
             for area in window.screen.areas:
                 if area.type == 'IMAGE_EDITOR':

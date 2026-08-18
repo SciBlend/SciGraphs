@@ -12,7 +12,6 @@ from scigraphs_core.logger import log
 
 
 class SCIGRAPHS_OT_GenerateTextOverlay(bpy.types.Operator):
-    """Generate text overlay image for graph node labels"""
     bl_idname = "scigraphs.generate_text_overlay"
     bl_label = "Generate Text Overlay"
     bl_description = "Generate PNG with node labels and add to compositor"
@@ -147,7 +146,6 @@ class SCIGRAPHS_OT_GenerateTextOverlay(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveTextOverlay(bpy.types.Operator):
-    """Remove text overlay from compositor"""
     bl_idname = "scigraphs.remove_text_overlay"
     bl_label = "Remove Text Overlay"
     bl_description = "Remove text overlay nodes from compositor"
@@ -169,7 +167,6 @@ class SCIGRAPHS_OT_RemoveTextOverlay(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_StartAutoUpdate(bpy.types.Operator):
-    """Start automatic text overlay update when view or settings change"""
     bl_idname = "scigraphs.start_auto_update"
     bl_label = "Start Auto Update"
     bl_description = "Continuously update text overlay as view or settings change"
@@ -249,7 +246,6 @@ class SCIGRAPHS_OT_StartAutoUpdate(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_StopAutoUpdate(bpy.types.Operator):
-    """Stop automatic text overlay update"""
     bl_idname = "scigraphs.stop_auto_update"
     bl_label = "Stop Auto Update"
     bl_description = "Stop continuous overlay updates"

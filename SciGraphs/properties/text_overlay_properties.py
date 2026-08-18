@@ -149,7 +149,6 @@ TEXT_OVERLAY_PROPERTIES = {
         default=True,
     ),
 
-    # --- Attribute Format Properties ---
 
     'text_format_type': EnumProperty(
         name="Format Type",
@@ -190,7 +189,6 @@ TEXT_OVERLAY_PROPERTIES = {
         default=False,
     ),
 
-    # --- Font Properties ---
 
     'text_font_source': EnumProperty(
         name="Font Source",
@@ -215,7 +213,6 @@ TEXT_OVERLAY_PROPERTIES = {
         default="",
     ),
 
-    # --- Auto-Update Properties ---
 
     'text_auto_update': BoolProperty(
         name="Auto Update",

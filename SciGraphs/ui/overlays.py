@@ -10,7 +10,6 @@ _ENABLED = False
 
 
 def _get_graph_stats(obj):
-    """Extract stats from a graph object."""
     if not obj or obj.type != 'MESH' or "num_nodes" not in obj:
         return None
 
@@ -77,7 +76,6 @@ def _text_width(text, size=13):
 
 
 def _draw_text(x, y, text, size=14, color=(1.0, 1.0, 1.0, 0.9)):
-    """Draw text at screen position."""
     font_id = 0
     blf.size(font_id, size)
     blf.color(font_id, *color)
@@ -86,7 +84,6 @@ def _draw_text(x, y, text, size=14, color=(1.0, 1.0, 1.0, 0.9)):
 
 
 def _draw_background(x, y, width, height, color=(0.1, 0.1, 0.1, 0.7)):
-    """Draw a semi-transparent background rectangle."""
     vertices = [
         (x, y),
         (x + width, y),
@@ -106,7 +103,6 @@ def _draw_background(x, y, width, height, color=(0.1, 0.1, 0.1, 0.7)):
 
 
 def _draw_hud_callback():
-    """Main draw callback for the HUD overlay."""
     context = bpy.context
     
     if context.area is None or context.area.type != 'VIEW_3D':
@@ -201,7 +197,6 @@ def _draw_hud_callback():
         if stats['genus'] is not None:
             lines.append(f"Genus: {stats['genus']}")
     
-    # Calculate background size and anchor to bottom-right.
     region = context.region
     padding = 18
     line_height = 18
@@ -213,7 +208,6 @@ def _draw_hud_callback():
     
     _draw_background(x - 8, y - 8, max_width, bg_height, (0.05, 0.05, 0.08, 0.8))
     
-    # Draw lines (from bottom up)
     for i, line in enumerate(lines):
         text_y = y + (len(lines) - 1 - i) * line_height
         
@@ -224,7 +218,6 @@ def _draw_hud_callback():
 
 
 def enable_hud():
-    """Enable the HUD overlay."""
     global _HANDLE, _ENABLED
     if not _ENABLED:
         _HANDLE = bpy.types.SpaceView3D.draw_handler_add(
@@ -234,7 +227,6 @@ def enable_hud():
 
 
 def disable_hud():
-    """Disable the HUD overlay."""
     global _HANDLE, _ENABLED
     if _ENABLED and _HANDLE:
         bpy.types.SpaceView3D.draw_handler_remove(_HANDLE, 'WINDOW')
@@ -243,7 +235,6 @@ def disable_hud():
 
 
 class SCIGRAPHS_OT_toggle_hud(bpy.types.Operator):
-    """Toggle the HUD overlay on/off."""
     bl_idname = "scigraphs.toggle_hud"
     bl_label = "Toggle Graph HUD"
     bl_description = "Show/hide graph statistics overlay in viewport"

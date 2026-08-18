@@ -33,7 +33,6 @@ def _parse_int(value, default=None):
 
 
 class SCIGRAPHS_OT_OSMnxKShortest(bpy.types.Operator):
-    """Compute K alternative shortest paths between source and target."""
     bl_idname = "scigraphs.osmnx_k_shortest"
     bl_label = "K Shortest Paths"
     bl_description = "Find K alternative shortest paths between source and target"
@@ -88,7 +87,6 @@ class SCIGRAPHS_OT_OSMnxKShortest(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxBatchRoutes(bpy.types.Operator):
-    """Compute many-to-many routes between random origin-destination pairs."""
     bl_idname = "scigraphs.osmnx_batch_routes"
     bl_label = "Batch Routes (N random OD pairs)"
     bl_description = "Compute shortest paths for N random (origin, destination) pairs"
@@ -147,7 +145,6 @@ class SCIGRAPHS_OT_OSMnxBatchRoutes(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxRouteSummary(bpy.types.Operator):
-    """Summarize the last computed shortest path (length, time, grade, rise)."""
     bl_idname = "scigraphs.osmnx_route_summary"
     bl_label = "Summarize Last Route"
     bl_description = "Compute aggregate metrics for the last shortest path"
@@ -198,7 +195,6 @@ class SCIGRAPHS_OT_OSMnxRouteSummary(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_OSMnxRouteElevationProfile(bpy.types.Operator):
-    """Generate a 2D curve showing elevation along the last route."""
     bl_idname = "scigraphs.osmnx_route_elev_profile"
     bl_label = "Generate Elevation Profile"
     bl_description = "Create a Blender curve with cumulative distance (X) vs. elevation (Y)"

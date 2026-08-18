@@ -3,7 +3,6 @@ from bpy.props import StringProperty, FloatProperty, IntProperty
 
 
 class SCIGRAPHS_OT_GeocodeToGDF(bpy.types.Operator):
-    """Geocode to GeoDataFrame."""
     bl_idname = "scigraphs.osmnx_geocode_to_gdf"
     bl_label = "Geocode to GeoDataFrame"
     bl_description = "Geocode a query and get geometry as GeoDataFrame"
@@ -37,7 +36,6 @@ class SCIGRAPHS_OT_GeocodeToGDF(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BBoxFromPoint(bpy.types.Operator):
-    """Create bounding box from point."""
     bl_idname = "scigraphs.osmnx_bbox_from_point"
     bl_label = "BBox from Point"
     bl_description = "Create a bounding box around a point"
@@ -95,7 +93,6 @@ class SCIGRAPHS_OT_BBoxFromPoint(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BBoxToPoly(bpy.types.Operator):
-    """Convert bounding box to polygon."""
     bl_idname = "scigraphs.osmnx_bbox_to_poly"
     bl_label = "BBox to Polygon"
     bl_description = "Convert current bounding box to a Shapely polygon"
@@ -120,7 +117,6 @@ class SCIGRAPHS_OT_BBoxToPoly(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BufferGeometry(bpy.types.Operator):
-    """Buffer selected geometry."""
     bl_idname = "scigraphs.osmnx_buffer_geometry"
     bl_label = "Buffer Geometry"
     bl_description = "Create buffer around selected mesh geometry"
@@ -165,7 +161,6 @@ class SCIGRAPHS_OT_BufferGeometry(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_InterpolatePoints(bpy.types.Operator):
-    """Generate evenly spaced interpolated points along each edge of the active mesh."""
     bl_idname = "scigraphs.osmnx_interpolate_points"
     bl_label = "Interpolate Points"
     bl_description = "Generate evenly spaced points along edges of the active mesh (creates a new point-mesh)"
@@ -229,7 +224,6 @@ class SCIGRAPHS_OT_InterpolatePoints(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SamplePoints(bpy.types.Operator):
-    """Sample N points uniformly along the edges of the active OSMnx network."""
     bl_idname = "scigraphs.osmnx_sample_points"
     bl_label = "Sample Points"
     bl_description = "Generate N random points along the graph edges and snap each to the nearest node"

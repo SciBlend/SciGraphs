@@ -1,15 +1,8 @@
-# Core module for SciGraphs: the half that needs Blender. These modules build
-# meshes, project rasters onto them, read a live scene, draw into the viewport,
-# or replay a pipeline against one. `render` is a shim over the
-# `scigraphs_engine` wheel, and is not lazy because it is not a re-export.
+# The half of SciGraphs that needs Blender. `_LAZY` names resolve to modules
+# here; `_MOVED` names are back-compat aliases into the `scigraphs_core`
+# distribution, and new code should import from there directly.
 #
-# `_LAZY` names resolve to modules in this package. `_MOVED` names resolve into
-# the `scigraphs_core` distribution and exist only so that older callers keep
-# working; new code should import from `scigraphs_core` directly.
-#
-# Keep `_LAZY` values as plain relative strings. tests/purity/test_core_purity.py
-# reads this table with `literal_eval` and follows string values to build its
-# import graph; anything else parses fine and silently deletes those edges.
+# Keep `_LAZY` values as plain relative strings: tests/purity/test_core_purity.py reads this table with `literal_eval` and follows string values, so anything else parses fine and silently drops those import edges.
 
 import importlib
 

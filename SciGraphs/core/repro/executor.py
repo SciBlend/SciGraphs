@@ -1,5 +1,4 @@
-# Executes declarative SciGraphs pipelines, with timing, logging, error
-# handling and provenance artifacts.
+# Executes declarative SciGraphs pipelines: timing, logging, errors, provenance.
 
 import datetime
 import json
@@ -37,11 +36,7 @@ class ExecutionResult:
 
 
 class PipelineExecutor:
-    """Executes reproducible pipelines from declarative specifications.
-
-    Seeds deterministically, runs each stage with timing and error recovery,
-    then writes the provenance artifacts.
-    """
+    """Runs a declarative pipeline: deterministic seeding, per-stage timing and error recovery, then the provenance artifacts."""
 
     def __init__(self, stop_on_error: bool = True, verbose: bool = True):
         self.stop_on_error = stop_on_error
@@ -50,12 +45,10 @@ class PipelineExecutor:
         self._bpy = None
         # Friendly metric name -> actual mesh attribute produced by analysis.
         self._metric_attributes: Dict[str, str] = {}
-        # Configured as its own section, executed inside the render stage,
-        # where the camera is final.
+        # Its own spec section, but run inside the render stage, where the camera is final.
         self._pending_labels: Optional[LabelsSpec] = None
 
     def _get_bpy(self):
-        """Lazy import of bpy."""
         if self._bpy is None:
             try:
                 import bpy
@@ -65,7 +58,6 @@ class PipelineExecutor:
         return self._bpy
 
     def _log(self, message: str, level: str = "info") -> None:
-        """Log a message if verbose."""
         if self.verbose:
             getattr(self.logger, level)(message)
             print(f"[SciGraphs Repro] {message}")
@@ -76,17 +68,15 @@ class PipelineExecutor:
             result.warnings.append(warning)
 
     def _prepare_output_dir(self, output_dir: str) -> str:
-        """Prepare output directory, resolving // paths."""
+        """Create the output directory, resolving Blender's ``//`` blend-relative prefix; with no blend file saved it falls back under the temp directory."""
         bpy = self._get_bpy()
 
         if output_dir.startswith("//"):
-            # Blender-style relative path
             blend_path = bpy.data.filepath
             if blend_path:
                 base_dir = os.path.dirname(blend_path)
                 output_dir = os.path.join(base_dir, output_dir[2:])
             else:
-                # No blend file - use temp directory
                 import tempfile
                 output_dir = os.path.join(tempfile.gettempdir(), "scigraphs_repro", output_dir[2:])
 
@@ -124,10 +114,9 @@ class PipelineExecutor:
         set_pipeline_seed(seed)
         self._log(f"Set global seed: {seed}")
 
-        # The Blender version is passed in rather than looked up inside
-        # provenance.py, which otherwise never touches Blender. It also records
-        # the Blender actually running the pipeline, which a lookup there could
-        # not promise once a `bpy` wheel exists on PyPI.
+        # Pass the Blender version in rather than look it up in provenance.py: it
+        # otherwise never touches Blender, and with a `bpy` wheel on PyPI a lookup
+        # there would not name the Blender actually running the pipeline.
         manifest = create_manifest(
             pipeline_hash, schema.meta.title, seed,
             blender_version=".".join(str(v) for v in bpy.app.version),
@@ -139,8 +128,7 @@ class PipelineExecutor:
         result.artifacts.append(canonical_path)
 
         try:
-            # Start from an empty scene: leftovers from the startup file get
-            # rendered, or picked up as the active object.
+            # Leftovers from the startup file get rendered, or become the active object.
             if getattr(schema.meta, "clear_scene", True):
                 self._clear_scene(result)
 
@@ -224,13 +212,8 @@ class PipelineExecutor:
             result.warnings.append(f"Scene clear failed: {e}")
 
     def _apply_color_mapping(self, spec: VisualSpec, coloring, result: ExecutionResult) -> None:
-        """Normalization, explicit domain and ramp options.
-
-        `auto_range` must be off for `vmin`/`vmax` to reach the shader.
-        """
-        # Coloring a heavy-tailed measure through the linear default puts almost
-        # every node in one bin. Cheap to detect, invisible otherwise, and the
-        # most common mistake in a hand-written or generated specification.
+        """Normalization, explicit domain and ramp options; `auto_range` must be off for `vmin`/`vmax` to reach the shader."""
+        # A heavy-tailed measure through the linear default puts almost every node in one bin.
         heavy_tailed = ("betweenness", "degree", "closeness",
                         "eigenvector", "pagerank", "katz")
         clip = list(spec.color_clip_percentile or [0.0, 100.0])
@@ -280,12 +263,7 @@ class PipelineExecutor:
                 result.warnings.append(f"coloring.{name}={value!r} rejected: {e}")
 
     def _apply_glyph_settings(self, spec: VisualSpec, result: ExecutionResult) -> None:
-        """Stage glyph shape, resolution and radii on the graph object.
-
-        The node tree reads these as object custom properties at build time, so
-        they must be written before `setup_visualization` runs. The `_rel` radii
-        are fractions of the graph extent, resolved here against the bounds.
-        """
+        """Stage glyph shape, resolution and radii as object custom properties, which the node tree reads at build time, so this must precede `setup_visualization`. The `_rel` radii are fractions of the graph extent, resolved here."""
         bpy = self._get_bpy()
         obj = bpy.context.active_object
         if obj is None or obj.type != 'MESH':
@@ -352,18 +330,12 @@ class PipelineExecutor:
                 bsdf.inputs["Metallic"].default_value = float(spec.material_metallic)
 
     def _apply_render_quality(self, spec: RenderSpec, result: ExecutionResult) -> None:
-        """Color management, image format and engine-specific quality.
-
-        Every setting is hasattr-guarded: the EEVEE Next rewrite dropped many
-        property names, and an unsupported one warns rather than aborts.
-        """
+        """Color management, image format and engine-specific quality. Every setting is hasattr-guarded: the EEVEE Next rewrite dropped many property names, and an unsupported one warns rather than aborts."""
         bpy = self._get_bpy()
         scene = bpy.context.scene
 
         def _set(owner, name, value, label):
-            # An empty string is not a value: it is a field the caller left
-            # blank, and every enum in Blender rejects "" with a confusing
-            # message about the identifier not being found.
+            # Blender enums reject "" with a confusing identifier-not-found error.
             if value is None or value == "":
                 return
             if not hasattr(owner, name):
@@ -374,8 +346,8 @@ class PipelineExecutor:
             except Exception as e:
                 result.warnings.append(f"{label} rejected: {e}")
 
-        # Color management. view_transform first: valid `look` values are
-        # scoped to it, so the reverse order rejects every look.
+        # view_transform first: valid `look` values are scoped to it, so the
+        # reverse order rejects every look.
         _set(scene.view_settings, "view_transform", spec.view_transform, "view_transform")
         _set(scene.view_settings, "look", spec.look, "look")
         _set(scene.view_settings, "exposure", spec.exposure, "exposure")
@@ -387,8 +359,8 @@ class PipelineExecutor:
         if spec.dpi is not None:
             _set(scene.render, "ppm_factor", float(spec.dpi), "dpi")
 
-        # Reconstruction filter. The two properties are not aliased: Cycles
-        # ignores render.filter_size and reads cycles.filter_width (on 5.2).
+        # Not aliased: Cycles ignores render.filter_size and reads
+        # cycles.filter_width (5.2).
         if spec.filter_width is not None:
             if spec.engine == "CYCLES":
                 _set(scene.cycles, "filter_width", float(spec.filter_width), "filter_width")
@@ -401,8 +373,7 @@ class PipelineExecutor:
             if spec.denoiser and spec.denoiser != "AUTO":
                 _set(scene.cycles, "denoiser", spec.denoiser, "denoiser")
         elif spec.engine == "BLENDER_EEVEE":
-            # use_fast_gi does nothing with use_raytracing off, so enable the
-            # parent rather than silently no-op.
+            # use_fast_gi does nothing with use_raytracing off.
             wants_gi = bool(spec.ambient_occlusion) or bool(spec.raytracing)
             if wants_gi:
                 _set(scene.eevee, "use_raytracing", True, "raytracing")
@@ -415,12 +386,7 @@ class PipelineExecutor:
             _set(scene.eevee, "clamp_surface_indirect", spec.clamp_indirect, "clamp_indirect")
 
     def _execute_labels(self, spec, output_dir, manifest, result) -> None:
-        """Composite node labels over the render.
-
-        Calls `text_overlay` directly: `scigraphs.generate_text_overlay` polls
-        for an active object that background mode does not provide. Must run
-        after camera framing and before the render.
-        """
+        """Composite node labels over the render, after camera framing and before the render. Calls `text_overlay` directly because `scigraphs.generate_text_overlay` polls for an active object that background mode does not provide."""
         bpy = self._get_bpy()
         self._log("Generating labels")
         start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -453,8 +419,7 @@ class PipelineExecutor:
                 background_color=tuple(spec.halo_color)[:3],
                 background_alpha=float(spec.halo_alpha),
                 depth_occlusion=bool(spec.occlusion),
-                # Ranked in _rank_labels instead: the built-in filter is a
-                # single threshold, which does not carry across graphs.
+                # Ranked in _rank_labels: the built-in filter is one threshold.
                 filter_enabled=False,
                 filter_attribute="",
                 filter_operator="GREATER",
@@ -468,8 +433,7 @@ class PipelineExecutor:
             n_visible = len(projected)
 
             if spec.occlusion:
-                # Takes a context, but only for evaluated_depsgraph_get(),
-                # which works in background mode.
+                # Takes a context only for evaluated_depsgraph_get(), fine headless.
                 projected = overlay.test_depth_occlusion(
                     bpy.context, obj, projected, camera
                 ) or projected
@@ -602,11 +566,7 @@ class PipelineExecutor:
         add_step(manifest, "world", "apply_world", start_time, end_time, status, error)
 
     def _execute_lighting(self, spec, manifest, result) -> None:
-        """A single sun.
-
-        One light, not a rig: the add-on's three-point rigs put their fills at
-        fixed coordinates near the origin, which does nothing at graph scale.
-        """
+        """A single sun, not a rig: the add-on's three-point rigs put their fills at fixed coordinates near the origin, which does nothing at graph scale."""
         bpy = self._get_bpy()
         self._log("Applying lighting")
         start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -628,8 +588,7 @@ class PipelineExecutor:
                 bpy.context.scene.collection.objects.link(sun)
 
             sun.data.energy = float(spec.sun_energy)
-            # `angle` is the angular diameter in radians, capped at pi (5.2);
-            # anything larger is silently reduced.
+            # `angle` is angular diameter in radians, silently capped at pi (5.2).
             sun.data.angle = min(math.radians(float(spec.sun_angle)), math.pi)
             sun.rotation_euler = tuple(spec.sun_rotation)[:3]
             self._log(
@@ -645,11 +604,7 @@ class PipelineExecutor:
         add_step(manifest, "lighting", "apply_lighting", start_time, end_time, status, error)
 
     def _graph_bounds(self):
-        """World-space (center, radius) over every mesh object, or None.
-
-        Evaluated geometry, so the glyphs and edges instanced by the Geometry
-        Nodes modifier count; the bare point cloud under-reports the extent.
-        """
+        """World-space (center, radius) over every mesh object, or None. Uses evaluated geometry so the modifier-instanced glyphs and edges count; the bare point cloud under-reports the extent."""
         import math
 
         from mathutils import Vector
@@ -676,9 +631,7 @@ class PipelineExecutor:
         center = [(lo[a] + hi[a]) * 0.5 for a in range(3)]
         radius = 0.5 * math.sqrt(sum((hi[a] - lo[a]) ** 2 for a in range(3)))
 
-        # The corners of an axis-aligned box around a diagonal graph are empty
-        # space, so framing on them still leaves the drawing small. Use the real
-        # vertices instead, subsampled: framing only needs the silhouette.
+        # A box around a diagonal graph is mostly empty, so use the real vertices.
         points = []
         budget = 20000
         for obj in bpy.data.objects:
@@ -726,10 +679,8 @@ class PipelineExecutor:
             direction = Vector((0.48, -0.72, 0.50))
         direction.normalize()
 
-        # Fit the projected bounding box, not a bounding sphere. The sphere's
-        # radius is half the box diagonal, which for an elongated graph is far
-        # larger than anything visible, so the drawing ended up small in a wide
-        # empty frame. Projecting the eight corners is cheap and exact.
+        # Fit the projected bounding box, not a bounding sphere: the sphere radius
+        # is half the box diagonal, so elongated graphs came out small in the frame.
         sensor = cam.sensor_width or 36.0
         half_h = math.atan((sensor * 0.5) / max(cam.lens, 1e-6))
         res_x = max(bpy.context.scene.render.resolution_x, 1)
@@ -761,8 +712,7 @@ class PipelineExecutor:
             (cam_obj.location - center_vec).to_track_quat('Z', 'Y').to_euler()
         )
 
-        # Orthographic drops the near/far size falloff, so a node radius that
-        # encodes a value stays comparable across the frame.
+        # Orthographic drops the near/far falloff, so node radius stays comparable.
         if spec.camera_ortho:
             cam.type = 'ORTHO'
             half_w = max(abs((p - center_vec).dot(right)) for p in points)
@@ -809,7 +759,6 @@ class PipelineExecutor:
 
         try:
             if spec.source == "osmnx":
-                # The operator reads the osmnx_* properties from scene.scigraphs.
                 scene_props = {
                     "osmnx_download_method": spec.method or "PLACE",
                     "osmnx_place_name": spec.query or "",
@@ -826,7 +775,6 @@ class PipelineExecutor:
                 add_input(manifest, f"osmnx://{spec.query}", source="network", pinned=spec.cache)
 
             elif spec.source in ("gexf", "graphml", "csv"):
-                # create_graph reads the path and column mapping from scene.scigraphs.
                 if not spec.filepath:
                     raise ValueError(f"filepath required for {spec.source} source")
 
@@ -849,8 +797,7 @@ class PipelineExecutor:
                     "use_geospatial": False,
                     "auto_layout_on_import": bool(spec.auto_layout),
                 }
-                # CSV needs an explicit source/target column mapping; default to
-                # the first two columns when the spec does not override them.
+                # CSV needs a source/target column mapping; default to columns 0 and 1.
                 if spec.source == "csv":
                     scene_props.setdefault("source_column", "0")
                     scene_props.setdefault("target_column", "1")
@@ -863,11 +810,8 @@ class PipelineExecutor:
             elif spec.source == "suitesparse":
                 if not spec.matrix_name:
                     raise ValueError("matrix_name required for suitesparse source")
-                # auto_layout_on_import matters for the same reason as on the
-                # flat-file path: the importer otherwise runs a layout of its own
-                # the moment the mesh exists, overwriting the auxiliary
-                # coordinates a matrix may ship with. A spec that omits the
-                # layout section to keep them must also say auto_layout: false.
+                # Without auto_layout_on_import the importer lays out the mesh at once,
+                # overwriting any auxiliary coordinates the matrix shipped with.
                 scene_props = {
                     "suitesparse_id": spec.matrix_name,
                     "suitesparse_mode": spec.matrix_mode,
@@ -952,10 +896,8 @@ class PipelineExecutor:
         error = None
 
         try:
-            # calculate_centrality takes a `method` enum and stores its result
-            # on a mesh attribute named centrality_<method>. That mapping is
-            # remembered so the visual stage can resolve a friendly name like
-            # "betweenness" to the attribute actually produced.
+            # calculate_centrality stores its result on centrality_<method>;
+            # remember the mapping so the visual stage can resolve "betweenness".
             if spec.metrics:
                 method_map = {
                     "degree": "degree",
@@ -1000,7 +942,6 @@ class PipelineExecutor:
                         self._metric_attributes[metric_lower] = attr_name
                         self._metric_attributes[method] = attr_name
 
-            # apply_clustering reads algorithm, resolution and seed from scene.scigraphs.
             if spec.clustering:
                 algo_aliases = {"louvain": "rb", "leiden": "rb", "label_prop": "rb"}
                 algo = spec.clustering.algorithm.lower()
@@ -1050,8 +991,7 @@ class PipelineExecutor:
             layout_seed = spec.seed if spec.seed is not None else global_seed
             set_pipeline_seed(layout_seed)
 
-            # apply_layout reads everything from scene.scigraphs, so map the
-            # friendly typed fields onto the real scene property names.
+            # apply_layout reads scene.scigraphs, so map the typed fields onto it.
             scene_props: Dict[str, Any] = {
                 "layout_algorithm": spec.algorithm,
                 "layout_scale": spec.scale,
@@ -1096,12 +1036,7 @@ class PipelineExecutor:
         add_step(manifest, "layout", f"apply_{spec.algorithm}", start_time, end_time, status, error)
 
     def _resolve_visual_attribute(self, name: str) -> Optional[str]:
-        """Resolve a friendly attribute name to a real mesh attribute.
-
-        Handles the centrality naming convention (``betweenness`` ->
-        ``centrality_betweenness``) and verifies the attribute exists on the
-        active graph object.
-        """
+        """Resolve a friendly attribute name against the active graph object, handling the centrality convention (``betweenness`` -> ``centrality_betweenness``)."""
         bpy = self._get_bpy()
         obj = bpy.context.active_object
         if obj is None or obj.type != 'MESH':
@@ -1172,8 +1107,7 @@ class PipelineExecutor:
         error = None
 
         try:
-            # Glyph geometry and sizes are baked into the node tree when it is
-            # built, so they have to be staged on the object first.
+            # Glyph geometry is baked into the node tree at build time.
             self._apply_glyph_settings(spec, result)
 
             if spec.setup_geometry_nodes:
@@ -1182,8 +1116,7 @@ class PipelineExecutor:
                 if res.get("status") == "error":
                     result.warnings.append(f"Geometry nodes setup failed: {res.get('error')}")
 
-            # node_scale and edge_thickness are the upper bounds the viz tree
-            # uses for attribute-driven sizing.
+            # node_scale and edge_thickness bound attribute-driven sizing.
             viz = getattr(bpy.context.scene, "scigraphs_viz", None)
             if viz is not None:
                 size_map = {
@@ -1234,8 +1167,7 @@ class PipelineExecutor:
                     if res.get("status") == "error":
                         result.warnings.append(f"Node coloring failed: {res.get('error')}")
 
-            # After coloring: the material these override does not exist until
-            # color_apply has run.
+            # The material these override does not exist until color_apply runs.
             if spec.material_roughness is not None or spec.material_metallic is not None:
                 obj = bpy.context.active_object
                 if obj is not None and obj.type == 'MESH':
@@ -1357,8 +1289,7 @@ class PipelineExecutor:
             if getattr(spec, "frame_camera", True) and not spec.camera:
                 self._frame_camera(spec, result)
 
-            # Between framing and rendering: the projection needs the final
-            # camera matrix, and the composite must be wired before the render.
+            # The projection needs the final camera matrix, wired before the render.
             if self._pending_labels is not None:
                 self._execute_labels(
                     self._pending_labels, output_dir, manifest, result

@@ -2,7 +2,6 @@ import bpy
 
 
 class SCIGRAPHS_OT_C2G_TravelSummaryGraph(bpy.types.Operator):
-    """Create travel summary graph."""
     bl_idname = "scigraphs.c2g_travel_summary_graph"
     bl_label = "Travel Summary Graph"
     bl_description = "Create travel summary graph from GTFS data"
@@ -51,7 +50,6 @@ class SCIGRAPHS_OT_C2G_TravelSummaryGraph(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_GetODPairs(bpy.types.Operator):
-    """Extract Origin-Destination pairs from GTFS data."""
     bl_idname = "scigraphs.c2g_get_od_pairs"
     bl_label = "Extract OD Pairs"
     bl_description = "Extract origin-destination pairs from loaded GTFS data"

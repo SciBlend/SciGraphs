@@ -1,12 +1,11 @@
 """GPU preview render: graphs only, via the SciGraphs engine.
 
-    from SciGraphs.api import preview
+Take every scale from `extent()` rather than a constant, since a geospatial
+graph runs about 1 Blender unit per km.
 
     preview.autoscale(obj)
     preview.frame_camera(obj)
     preview.render(obj, "/tmp/streets.png")
-
-Scale from `extent()`, not constants — geospatial graphs are ~1 unit/km.
 """
 
 import pathlib
@@ -35,7 +34,7 @@ def extent(obj):
     size = hi - lo
     diagonal = float(np.linalg.norm(size))
 
-    # Cap NN sample at 2000 — full pairwise is O(n^2).
+    # Cap the NN sample at 2000; full pairwise is O(n^2).
     sample = coords
     if len(coords) > 2000:
         step = len(coords) // 2000
@@ -158,7 +157,7 @@ def render(obj, filename, resolution=(1280, 960), node_style='AUTO',
            edge_style='AUTO', background=(0.05, 0.05, 0.08, 1.0),
            aa=2, direction=(0.0, -0.35, 1.0), autosize=True,
            isolate=True, verbose=True):
-    """Render with the SciGraphs engine. Prefer SPHERE nodes on Vulkan."""
+    """Render with the SciGraphs engine, preferring SPHERE nodes on Vulkan."""
     scene = bpy.context.scene
     path = pathlib.Path(filename)
     if path.suffix.lower() != ".png":
@@ -186,7 +185,6 @@ def render(obj, filename, resolution=(1280, 960), node_style='AUTO',
     scene.scigraphs_preview_render_bg = background
     scene.scigraphs_preview_render_aa = int(aa)
 
-    # AUTO: LINE if tubes would be <1.5 px on screen, else RIBBON.
     if edge_style == 'AUTO':
         measurements = extent(obj)
         edge_radius = (scene.scigraphs_preview_impostor_radius
@@ -247,7 +245,6 @@ def shrink_png(path, colors=256):
             image.convert("RGB").convert(
                 "P", palette=Image.ADAPTIVE, colors=int(colors)
             ).save(buffer, "PNG", optimize=True)
-        # Only overwrite if palette version is smaller.
         if buffer.tell() < before:
             path.write_bytes(buffer.getvalue())
     except Exception:  # noqa: BLE001 - never fail a notebook over file size

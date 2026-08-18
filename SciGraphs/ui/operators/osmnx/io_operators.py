@@ -6,7 +6,6 @@ from .utils import _get_osmnx_graph, _store_osmnx_graph
 
 
 class SCIGRAPHS_OT_SaveGraphML(bpy.types.Operator):
-    """Save the OSMnx graph to GraphML format."""
     bl_idname = "scigraphs.osmnx_save_graphml"
     bl_label = "Save GraphML"
     bl_description = "Export the graph to GraphML format for use in other tools"
@@ -59,7 +58,6 @@ class SCIGRAPHS_OT_SaveGraphML(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_LoadGraphML(bpy.types.Operator):
-    """Load an OSMnx graph from GraphML format."""
     bl_idname = "scigraphs.osmnx_load_graphml"
     bl_label = "Load GraphML"
     bl_description = "Import a graph from GraphML format"
@@ -121,7 +119,6 @@ class SCIGRAPHS_OT_LoadGraphML(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_SaveToCache(bpy.types.Operator):
-    """Save the OSMnx graph to cache directory for automatic reloading."""
     bl_idname = "scigraphs.osmnx_save_to_cache"
     bl_label = "Save to Cache"
     bl_description = "Save graph to cache directory for automatic reloading when Blender restarts"

@@ -10,7 +10,6 @@ from mathutils import Vector
 
 
 class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
-    """Interactively highlight communities on mouse hover."""
     bl_idname = "scigraphs.highlight_communities"
     bl_label = "Highlight Communities"
     bl_description = "Hover over nodes to highlight their community"
@@ -44,7 +43,6 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _update_hover(self, context, event, obj):
-        """Find which cluster the mouse is hovering over."""
         region = context.region
         rv3d = context.region_data
         coord = (event.mouse_region_x, event.mouse_region_y)
@@ -140,7 +138,6 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
         self._draw_cluster_info(context, self._current_cluster, len(nodes))
     
     def _draw_cluster_info(self, context, cluster_id, node_count):
-        """Draw cluster info text."""
         font_id = 0
         blf.size(font_id, 16)
         blf.color(font_id, 1.0, 1.0, 1.0, 1.0)
@@ -158,7 +155,6 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
-    """Interactive centrality visualization with threshold slider."""
     bl_idname = "scigraphs.visualize_centrality_interactive"
     bl_label = "Interactive Centrality View"
     bl_description = "Adjust centrality threshold interactively"
@@ -244,7 +240,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
         gpu.state.blend_set('ALPHA')
         gpu.state.depth_test_set('ALWAYS')
         
-        # Draw nodes above threshold in hot color, below in cool color
         hot_positions = []
         cold_positions = []
         
@@ -295,7 +290,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
-    """Preview layout algorithm in real-time before applying."""
     bl_idname = "scigraphs.preview_layout"
     bl_label = "Preview Layout"
     bl_description = "Preview layout changes in real-time"
@@ -339,7 +333,6 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _iterate_layout(self, context):
-        """Perform one layout iteration."""
         from scigraphs_core import layout
         from scigraphs_core.mesh.mesh_utils import layout_edge_pairs
 
@@ -359,9 +352,8 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
                 scale=props.layout_scale,
                 props=props,
                 # A mesh-native object keeps its edges in mesh.edges, which the
-                # layout package may not read, so read them here. Otherwise the
-                # preview animates isolated points and the applied layout then
-                # looks like a completely different algorithm.
+                # layout package may not read; without them the preview animates
+                # isolated points and the applied layout looks like another algorithm.
                 edge_pairs=layout_edge_pairs(obj),
             )
             
@@ -394,7 +386,6 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _draw_callback(self, context):
-        """Draw iteration count."""
         font_id = 0
         blf.size(font_id, 16)
         blf.color(font_id, 1.0, 1.0, 0.5, 1.0)

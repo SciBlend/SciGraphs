@@ -81,7 +81,6 @@ def _graph_with_2d_positions(graph):
 
 
 class SCIGRAPHS_OT_C2G_GraphToolApply(bpy.types.Operator):
-    """Apply a graph utility tool to the selected graph object."""
     bl_idname = "scigraphs.c2g_graph_tool_apply"
     bl_label = "Apply Graph Tool"
     bl_description = "Apply the selected graph utility (clip, filter, isochrone, remove isolated)"

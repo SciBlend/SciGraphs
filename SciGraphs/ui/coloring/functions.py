@@ -73,7 +73,6 @@ def resolve_attribute_name(props, obj) -> str:
     if not available:
         return ""
 
-    # Priority order: explicit string -> enum value -> first available.
     candidate = (props.attribute_name or "").strip()
     if candidate and candidate in available:
         return candidate
@@ -199,10 +198,8 @@ def write_normalized_attribute(
     domain: str,
     norm: np.ndarray,
 ) -> Tuple[bool, str]:
-    """Bake already-normalized ``[0, 1]`` values into a FLOAT mesh attribute.
-
-    RANK and QUANTILE depend on the whole distribution, so the shader cannot
-    recompute them from a single sample. Non-finite entries become ``0.0``.
+    """Bake already-normalized ``[0, 1]`` values into a FLOAT mesh attribute,
+    turning non-finite entries into ``0.0``.
     """
     mesh = obj.data
     values = np.asarray(norm, dtype=float)
@@ -282,9 +279,8 @@ def _mesh_has_attribute(obj, name: str) -> bool:
 def _gate_attribute_available(obj, name: str) -> bool:
     """True when ``name`` will be readable by the shader on this object.
 
-    ``scigraphs_is_node`` exists only on geometry produced by the
-    SciGraphs_Viz tree, never on the source mesh, so that one is tested by
-    looking for the modifier.
+    ``scigraphs_is_node`` lives only on geometry the SciGraphs_Viz tree produces,
+    never on the source mesh, so it is tested by looking for the modifier.
     """
     if name == "scigraphs_is_node":
         return obj is not None and hasattr(obj, "modifiers") and (
@@ -307,22 +303,16 @@ def build_color_material(
     plan: Optional[NormalizationPlan] = None,
     value_attribute_name: Optional[str] = None,
 ) -> Optional[bpy.types.Material]:
-    """Build (or refresh) a shader graph that maps a float attribute to color.
+    """Build or refresh a shader graph that maps a float attribute to color.
 
-    The node chain has to reproduce ``normalize_values`` exactly or the render
-    disagrees with the data: ``Map Range`` for LINEAR, ``log10(max(x, eps))``
-    in front of it for LOG, ``Math(POWER, 1 / gamma)`` after it for gamma.
-    RANK and QUANTILE depend on the whole distribution and cannot be done in
-    shader math, so the caller bakes them into ``value_attribute_name`` and the
-    graph reads that through an identity ``Map Range``. ``plan=None`` means a
-    plain linear ``vmin``/``vmax`` mapping.
-
-    ``fallback_color_layer`` is a FLOAT_COLOR attribute mixed in only where the
-    source attribute is missing from the rendered geometry, which happens on
-    realized tubes whose custom data was stripped. ``nodes_only`` restricts the
-    colormap to geometry where ``intersection_attribute`` equals 1 and paints
-    everything else with ``edge_color``, so curve points and tube vertices do
-    not dilute the map.
+    The node chain must reproduce ``normalize_values`` exactly or the render
+    disagrees with the data. RANK and QUANTILE need the whole distribution, so
+    the caller bakes them into ``value_attribute_name``; ``plan=None`` maps
+    ``vmin``/``vmax`` linearly. ``fallback_color_layer`` is mixed in only where
+    the source attribute is missing from the rendered geometry, as on realized
+    tubes whose custom data was stripped. ``nodes_only`` limits the colormap to
+    geometry where ``intersection_attribute`` is 1 and paints the rest
+    ``edge_color``, so tube vertices do not dilute the map.
     """
     if obj is None:
         return None
@@ -455,7 +445,6 @@ def build_color_material(
 
         color_socket = fallback_mix.outputs['Color']
 
-    # Optional gating: only color real intersection nodes when requested.
     if nodes_only and _gate_attribute_available(obj, intersection_attribute):
         ec = tuple(edge_color) if edge_color is not None else (0.18, 0.18, 0.20, 1.0)
         if len(ec) == 3:
@@ -498,10 +487,10 @@ SCIGRAPHS_NODE_MARKER_ATTR = "scigraphs_is_node"
 def _stamp_node_marker_after_realize(node_group, marker_name: str = SCIGRAPHS_NODE_MARKER_ATTR) -> bool:
     """Insert ``Store Named Attribute`` after every ``Realize Instances``.
 
-    Realized sphere geometry gets ``marker_name = 1`` on POINT so the shader
-    can tell node vertices from edge-tube vertices. Tube vertices inherit
-    ``is_intersection`` from the source curve points and would otherwise be
-    colored as nodes.
+    Realized sphere geometry gets ``marker_name = 1`` on POINT so the shader can
+    tell node vertices from edge-tube vertices. Tube vertices inherit
+    ``is_intersection`` from the source curve points, so gating on that instead
+    paints an edge segment in the node color.
     """
     if node_group is None:
         return False
@@ -546,7 +535,6 @@ def _stamp_node_marker_after_realize(node_group, marker_name: str = SCIGRAPHS_NO
             nodes.remove(store)
             continue
 
-        # Find the value input across Blender versions.
         value_input = store.inputs.get('Value')
         if value_input is None:
             for candidate in store.inputs:
@@ -575,12 +563,9 @@ def _stamp_node_marker_after_realize(node_group, marker_name: str = SCIGRAPHS_NO
 def wire_color_into_visual_setup(obj, source_attribute_name: str, material: bpy.types.Material) -> bool:
     """Hook the coloring material into the SciGraphs_Viz Geometry Nodes tree.
 
-    Sets the Material input on every ``Set Material`` node, records the
-    protected attribute on the object, and bypasses any ``Remove Attribute``
-    node that would strip it. Also stamps ``scigraphs_is_node = 1`` on realized
-    sphere geometry, because ``is_intersection`` leaks into the first tube
-    vertex of every street and is not a safe gate. True when the modifier was
-    found and patched.
+    Sets the Material input on every ``Set Material`` node, records the protected
+    attribute on the object, bypasses any ``Remove Attribute`` node that would
+    strip it, and stamps the node marker. True when the modifier was patched.
     """
     if obj is None or material is None:
         return False
@@ -614,8 +599,8 @@ def wire_color_into_visual_setup(obj, source_attribute_name: str, material: bpy.
             protected = {
                 source_attribute_name,
                 f"{source_attribute_name}_color",
-                # The baked helper must survive too, or the shader reads
-                # nothing on realized geometry.
+                # The baked helper must survive, or the shader reads nothing
+                # on realized geometry.
                 normalized_attribute_name(source_attribute_name),
             }
             if current_name in protected:
@@ -654,11 +639,9 @@ def has_visual_setup(obj) -> bool:
 def reapply_coloring_after_viz_rebuild(obj) -> bool:
     """Restore the coloring wiring after a ``SciGraphs_Viz`` rebuild.
 
-    Rebuilds (centrality, edge style, and so on) recreate the tree from
-    scratch, wiping both the material on ``Set Material`` and the
-    ``scigraphs_is_node`` marker. The attribute name survives on
-    ``obj["scigraphs_color_attr"]`` and the material in ``bpy.data``, so when
-    both are still there the wiring is simply reapplied.
+    A rebuild recreates the tree from scratch and wipes both the material on
+    ``Set Material`` and the ``scigraphs_is_node`` marker, but the attribute name
+    survives on ``obj["scigraphs_color_attr"]`` and the material in ``bpy.data``.
     """
     if obj is None or obj.type != 'MESH':
         return False
@@ -703,15 +686,13 @@ def apply_coloring(context) -> Tuple[bool, str]:
         return False, f"Attribute '{attribute_name}' has no data"
 
     if not colormap_exists(props.colormap):
-        # Catalog should always include the value, but be defensive.
         return False, f"Unknown colormap '{props.colormap}'"
 
     vmin = None if props.auto_range else float(props.vmin)
     vmax = None if props.auto_range else float(props.vmax)
 
-    # Normalize first, then gather onto the color domain. The shader only ever
-    # sees the source attribute, so both paths have to be the same function of
-    # a source sample.
+    # Normalize first, then gather onto the color domain: the shader only sees
+    # the source attribute, so both paths must be the same function of a sample.
     norm_source, _finite_source, plan = normalize_values(
         source_values,
         mode=getattr(props, "color_norm", "LINEAR"),
@@ -744,8 +725,8 @@ def apply_coloring(context) -> Tuple[bool, str]:
     if not ok:
         return False, message
 
-    # RANK/QUANTILE are not shader math -> bake the transformed value for the
-    # material. Other modes drop the helper so no stale value is picked up.
+    # RANK/QUANTILE are not shader math, so bake them; other modes drop the
+    # helper so no stale value is picked up.
     helper_name = normalized_attribute_name(attribute_name)
     baked_attribute: Optional[str] = None
     bake_warning = ""
@@ -766,9 +747,7 @@ def apply_coloring(context) -> Tuple[bool, str]:
     props.last_vmax = eff_vmax
 
     if props.auto_setup_material:
-        # `is_intersection` is also 1 on the tube vertex that closes against an
-        # intersection, which shows up as an edge segment wearing the node
-        # color. With the modifier installed, gate on the stamped marker.
+        # With the modifier installed, gate on the stamped marker instead.
         gate_attr = (
             SCIGRAPHS_NODE_MARKER_ATTR if has_visual_setup(obj) else "is_intersection"
         )

@@ -1,7 +1,4 @@
-# SciGraphs Addon Preferences
-#
-# User preferences stored in Blender's addon preferences system.
-# Access via Edit > Preferences > Add-ons > SciGraphs
+# Add-on preferences, at Edit > Preferences > Add-ons > SciGraphs.
 
 import bpy
 from bpy.props import (
@@ -13,12 +10,10 @@ from bpy.props import (
     PointerProperty,
 )
 
-# Get the addon package name dynamically
-# This ensures bl_idname matches regardless of how the addon is installed
+# Resolved dynamically so bl_idname matches however the add-on was installed.
 ADDON_PACKAGE = __package__
 
 
-# Database connection profile property group
 class DatabaseConnectionProfile(bpy.types.PropertyGroup):
     """A single database connection profile."""
     
@@ -73,7 +68,6 @@ class DatabaseConnectionProfile(bpy.types.PropertyGroup):
         default="",
     )
     
-    # SQLite specific
     sqlite_path: StringProperty(
         name="SQLite File",
         description="Path to SQLite database file",
@@ -81,7 +75,6 @@ class DatabaseConnectionProfile(bpy.types.PropertyGroup):
         default="",
     )
     
-    # SSL/Security options
     use_ssl: BoolProperty(
         name="Use SSL",
         description="Use SSL/TLS for connection",
@@ -102,7 +95,6 @@ class DatabaseConnectionProfile(bpy.types.PropertyGroup):
         default='prefer',
     )
     
-    # Connection timeout
     timeout: IntProperty(
         name="Timeout",
         description="Connection timeout in seconds",
@@ -111,7 +103,6 @@ class DatabaseConnectionProfile(bpy.types.PropertyGroup):
         max=300,
     )
     
-    # Use environment variables for credentials
     use_env_password: BoolProperty(
         name="Password from Environment",
         description="Read password from environment variable instead of storing here",
@@ -126,12 +117,7 @@ class DatabaseConnectionProfile(bpy.types.PropertyGroup):
 
 
 def get_preferences():
-    """
-    Get SciGraphs addon preferences.
-    
-    Returns:
-        AddonPreferences instance or None if not found
-    """
+    """The SciGraphs AddonPreferences instance, or None when not registered."""
     addon = bpy.context.preferences.addons.get(ADDON_PACKAGE)
     if addon:
         return addon.preferences
@@ -143,7 +129,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
     
     bl_idname = ADDON_PACKAGE
     
-    # OpenTopography API settings
     opentopography_api_key: StringProperty(
         name="OpenTopography API Key",
         description="API key for downloading DEM data from OpenTopography. "
@@ -166,7 +151,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         default='SRTMGL1',
     )
     
-    # Overture Maps API settings
     overture_api_key: StringProperty(
         name="Overture Maps API Key",
         description="API key for downloading Overture Maps data (buildings, POIs, etc.). "
@@ -175,7 +159,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         default="DEMO-API-KEY",
     )
     
-    # General settings
     auto_apply_material: BoolProperty(
         name="Auto-Apply Terrain Material",
         description="Automatically apply elevation-based material to imported DEMs",
@@ -200,7 +183,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         max=10,
     )
     
-    # OSMnx cache settings
     osmnx_cache_directory: StringProperty(
         name="Cache Directory",
         description="Directory to store cached OSMnx graphs for automatic reloading",
@@ -240,7 +222,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         default="bridge,tunnel,oneway,lanes,ref,name,highway,maxspeed,service,access,area,landuse,width,est_width,junction",
     )
     
-    # Globe Texture API settings
     globe_texture_provider: EnumProperty(
         name="Texture Provider",
         description="Service to use for downloading globe textures",
@@ -258,7 +239,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         default="DEMO_KEY",
     )
     
-    # Database connection profiles
     db_profiles: CollectionProperty(
         type=DatabaseConnectionProfile,
         name="Database Connections",
@@ -275,21 +255,18 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
     def draw(self, context):
         layout = self.layout
         
-        # OpenTopography section
         box = layout.box()
         box.label(text="OpenTopography API", icon='URL')
         
         row = box.row()
         row.prop(self, "opentopography_api_key")
         
-        # Validation button and status
         row = box.row(align=True)
         row.operator("scigraphs.validate_api_key", text="Validate Key", icon='CHECKMARK')
         row.operator("wm.url_open", text="Get API Key", icon='WORLD').url = "https://opentopography.org/myopentopo"
         
         box.prop(self, "opentopography_default_dataset")
         
-        # Help text
         help_box = box.box()
         help_box.scale_y = 0.8
         col = help_box.column(align=True)
@@ -300,7 +277,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         
         layout.separator()
         
-        # Overture Maps section
         box = layout.box()
         box.label(text="Overture Maps API", icon='WORLD')
         
@@ -321,7 +297,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         
         layout.separator()
         
-        # Import defaults
         box = layout.box()
         box.label(text="DEM Import Defaults", icon='IMPORT')
         
@@ -331,7 +306,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         
         layout.separator()
         
-        # OSMnx cache settings
         box = layout.box()
         box.label(text="OSMnx Graph Cache", icon='FILE_CACHE')
         
@@ -346,7 +320,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
 
         layout.separator()
 
-        # OSMnx advanced settings
         box = layout.box()
         box.label(text="OSMnx Advanced Settings", icon='PREFERENCES')
         col = box.column(align=True)
@@ -360,7 +333,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         
         layout.separator()
         
-        # Globe Texture API settings
         box = layout.box()
         box.label(text="Globe Texture APIs", icon='WORLD')
         
@@ -388,7 +360,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         
         layout.separator()
         
-        # Database Connections section
         box = layout.box()
         box.label(text="Database Connections", icon='ASSET_MANAGER')
         
@@ -404,7 +375,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
         col.operator("scigraphs.add_db_profile", icon='ADD', text="")
         col.operator("scigraphs.remove_db_profile", icon='REMOVE', text="")
         
-        # Show active profile settings
         if self.db_profiles and len(self.db_profiles) > self.active_db_profile_index:
             profile = self.db_profiles[self.active_db_profile_index]
             
@@ -443,7 +413,6 @@ class SciGraphsPreferences(bpy.types.AddonPreferences):
             row = settings_box.row()
             row.operator("scigraphs.test_db_connection", text="Test Connection", icon='PLUGIN')
         
-        # Help text for database connections
         help_box = box.box()
         help_box.scale_y = 0.7
         help_col = help_box.column(align=True)
@@ -457,7 +426,6 @@ class SCIGRAPHS_UL_db_profiles(bpy.types.UIList):
     
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            # Icon based on database type
             db_icons = {
                 'POSTGRESQL': 'SYSTEM',
                 'MYSQL': 'LINKED',
@@ -472,7 +440,6 @@ class SCIGRAPHS_UL_db_profiles(bpy.types.UIList):
 
 
 class SCIGRAPHS_OT_AddDBProfile(bpy.types.Operator):
-    """Add a new database connection profile."""
     bl_idname = "scigraphs.add_db_profile"
     bl_label = "Add Database Profile"
     bl_description = "Add a new database connection profile"
@@ -488,7 +455,6 @@ class SCIGRAPHS_OT_AddDBProfile(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_RemoveDBProfile(bpy.types.Operator):
-    """Remove the selected database connection profile."""
     bl_idname = "scigraphs.remove_db_profile"
     bl_label = "Remove Database Profile"
     bl_description = "Remove the selected database connection profile"
@@ -506,7 +472,6 @@ class SCIGRAPHS_OT_RemoveDBProfile(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ValidateAPIKey(bpy.types.Operator):
-    """Validate OpenTopography API key."""
     bl_idname = "scigraphs.validate_api_key"
     bl_label = "Validate API Key"
     bl_description = "Test if the API key is valid"
@@ -540,7 +505,6 @@ class SCIGRAPHS_OT_ValidateAPIKey(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_ApplyOSMnxSettings(bpy.types.Operator):
-    """Apply the OSMnx advanced settings declared in preferences to ox.settings.*."""
     bl_idname = "scigraphs.apply_osmnx_settings"
     bl_label = "Apply OSMnx Settings"
     bl_description = "Apply log_console / use_cache / all_oneway / useful_tags_way / elevation_url_template to osmnx.settings"
@@ -581,7 +545,6 @@ class SCIGRAPHS_OT_ApplyOSMnxSettings(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_TestDBConnection(bpy.types.Operator):
-    """Test the selected database connection."""
     bl_idname = "scigraphs.test_db_connection"
     bl_label = "Test Database Connection"
     bl_description = "Test if the database connection works"
@@ -599,7 +562,6 @@ class SCIGRAPHS_OT_TestDBConnection(bpy.types.Operator):
         
         profile = prefs.db_profiles[idx]
         
-        # Import the db_connector module to test connection
         try:
             from scigraphs_core import db_connector
             success, message = db_connector.test_connection(profile)

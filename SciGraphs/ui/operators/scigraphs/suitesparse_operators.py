@@ -5,7 +5,6 @@ from ...view_utils import focus_graph_in_top_view
 
 
 class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
-    """Download a matrix from SuiteSparse and create a graph."""
     bl_idname = "scigraphs.download_suitesparse"
     bl_label = "Download & Import"
     bl_description = "Download matrix from SuiteSparse Matrix Collection and create graph"
@@ -56,7 +55,6 @@ class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_BrowseSuiteSparse(bpy.types.Operator):
-    """Open SuiteSparse website in browser."""
     bl_idname = "scigraphs.browse_suitesparse"
     bl_label = "Browse Collection"
     bl_description = "Open SuiteSparse Matrix Collection website in your browser"
