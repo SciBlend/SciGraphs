@@ -1,0 +1,29 @@
+---
+title: "11 · Terrain"
+execute:
+  enabled: false
+---
+
+Where a digital elevation model comes from, what it costs to fetch, what happens
+when you put a graph *on* a surface rather than *above* it, and what a slope is
+worth once it is an edge attribute. The eight notebooks before this one draw on
+a plane, which claims every edge costs the same to walk in either direction.
+
+The site is the Albaicín in Granada rather than the Ciutat Vella of the rest of
+the suite, for a measured reason: central València has 21 m of relief across the
+1.2 km frame, under 2 % of its width. Two of the figures are of failures, kept
+because neither raises: a network that sinks into the hillside after being
+sampled at one resolution while the surface was built at another, and a finer
+mesh that buys a smoother surface and not one meter of extra relief, because the
+source is 30 m data either way.
+
+Nothing here needs an API key. The keyed route (OpenTopography) and the file
+route (a GeoTIFF you already have) are switched off at the top, since both need
+`rasterio`, which Blender's Python does not ship.
+
+For the same operations from the sidebar, see the
+[Elevation panel](../panels/osmnx/elevation.qmd) and its
+[tutorial](../tutorials/panels/osmnx/elevation.qmd), and
+[Tutorial 3](../examples/03-urban-terrain.qmd).
+
+{{< embed _ipynb/11_terrain.ipynb echo=true >}}

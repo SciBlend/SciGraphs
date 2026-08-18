@@ -2,19 +2,13 @@
 title: "Visualization"
 ---
 
-::: {.lead}
-The Visualization panel controls how the graph looks: node and edge geometry,
-material and lighting presets, edge styling, and on-render text labels. It is
-where attribute-driven encodings become visible.
-:::
+The Visualization panel controls node and edge geometry, material and lighting
+presets, edge styling, and on-render text labels. It requires a graph to be
+loaded. The rendering geometry itself is created by **Setup Visual** (in the
+[Data panel](data.qmd), Step 4), which instances node spheres and edge cylinders
+through Geometry Nodes.
 
-The parent panel requires a graph to be loaded. The rendering geometry itself is
-created by **Setup Visual** (available in the [Data panel](data.qmd) Step 4),
-which instances node spheres and edge cylinders through Geometry Nodes.
-
-## Subpanel — Appearance {#appearance}
-
-Base geometry of nodes and edges.
+## Subpanel: Appearance {#appearance}
 
 | Control | Description |
 | --- | --- |
@@ -28,16 +22,14 @@ Base geometry of nodes and edges.
 | **Show Arrows** | Adds direction arrows; exposes arrow **Size** and **Position** along the edge. |
 | **Update Appearance** | Applies the appearance settings to the geometry. |
 
-## Subpanel — Scene Setup {#scene}
-
-Materials and lighting for renders.
+## Subpanel: Scene Setup {#scene}
 
 | Control | Description |
 | --- | --- |
 | **Material Preset** | A predefined material style; **Apply Preset** assigns it. |
 | **Lighting** | A lighting rig preset; **Setup Lighting** builds the lights in the scene. |
 
-## Subpanel — Edge Style {#edge-style}
+## Subpanel: Edge Style {#edge-style}
 
 Controls the geometric routing of edges, from straight tubes to bundled,
 curved, orthogonal, and tapered styles.
@@ -64,7 +56,7 @@ One-click presets emulate familiar tools and use cases: **Gephi**,
 | **Preview** (eye icon) | Previews the style without committing. |
 | **Reset** (loop icon) | Restores straight edges. |
 
-## Subpanel — Text Labels {#text}
+## Subpanel: Text Labels {#text}
 
 ::: {.callout-note}
 Enable the overlay with the checkbox in the subpanel header. Labels are
@@ -80,17 +72,6 @@ composited over the final render using the scene camera and render resolution.
 | **Visibility** | **Max Distance** beyond which labels hide, and **Depth Occlusion** so labels behind geometry are hidden. |
 | **Attribute Filter** | Optionally show labels only for nodes matching an attribute/operator/value condition (e.g. degree above a threshold). |
 | **Font** | System font or a custom font file. |
-| **Appearance** | Text colour and an optional background with colour and opacity. |
+| **Appearance** | Text color and an optional background with color and opacity. |
 | **Auto Update** | Periodically regenerates the overlay (with an interval); start/stop the modal updater. |
 | **Generate / Update / Remove** | Build, refresh, or remove the overlay image. |
-
-## Typical workflow
-
-1. Run **Setup Visual** so the graph has renderable geometry.
-2. In **Appearance**, set base node/edge sizes; enable direction arrows for
-   directed graphs.
-3. Apply a **Material Preset** and **Lighting** in **Scene Setup**.
-4. Choose an **Edge Style** (or a quick preset) appropriate to the density.
-5. Drive node/edge **colour and size from attributes** (centrality, community,
-   etc.) and add **Text Labels** for key nodes.
-6. Render with Cycles or EEVEE and continue to [Export](export.qmd).

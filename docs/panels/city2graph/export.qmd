@@ -2,12 +2,10 @@
 title: "GeoAI Export"
 ---
 
-::: {.lead}
 The GeoAI Export panel exports a graph for graph-neural-network training and
 provides a ready-to-use PyTorch Geometric loader script.
-:::
 
-## Graph Export for GNN
+## Graph export for GNN
 
 | Control | Description |
 | --- | --- |

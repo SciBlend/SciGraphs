@@ -40,6 +40,8 @@ These typed sections cover the common workflow. Every field below is applied by 
 | `nodes_query` | string |  |  |  |
 | `edges_query` | string |  |  |  |
 | `matrix_name` | string |  |  |  |
+| `matrix_mode` | string | BIPARTITE | BIPARTITE, SYMMETRIC | BIPARTITE duplicates every index as a row node and a column node; the auxiliary coordinate file indexes rows only, so a matrix carrying coordinates must be read as SYMMETRIC or both copies land on the same point |
+| `giant_only` | boolean | True |  | Keep only the largest connected component |
 | `bbox` | array |  |  |  |
 | `layers` | array |  |  |  |
 

@@ -2,30 +2,25 @@
 title: "System architecture"
 ---
 
-SciGraphs follows a modular architecture running on top of Blender's Python
-interpreter. The core is written in Python and designed to be extensible and
-maintainable across different graph types and use cases. The overall design
-decouples data acquisition, analysis, and visualization into separate modules
-that communicate through a common graph abstraction.
+SciGraphs runs on Blender's Python interpreter. Data acquisition, analysis and
+visualization live in separate modules that meet at a common graph abstraction.
 
 ![The SciGraphs pipeline: data ingestion modules normalize diverse inputs into a unified representation; the processing core bifurcates into combinatorial and spatial/geometric domains; Blender's Geometry Nodes and Cycles engine convert these analytical structures into procedural geometry and photorealistic renders.](../assets/graphical_abstract3.png)
 
 ## The unifying data structure
 
-A unifying data structure stores the network as an adjacency list with
-node/edge attributes and bridges external libraries with Blender's internal
-data. This abstraction lets SciGraphs treat diverse sources uniformly in the
-visualization pipeline. Graph metrics computed during analysis are injected
-into the Blender mesh as **named attributes** before visualization, so the same
-graph can be re-styled or animated on different attributes without repeating
-layout computations.
+The network is stored as an adjacency list with node and edge attributes, which
+is what bridges the external libraries to Blender's own data. Metrics computed
+during analysis are written into the Blender mesh as named attributes, so a
+graph can be re-styled or animated on a different attribute without recomputing
+the layout.
 
 ## Bundled scientific stack
 
 | Library | Role |
 | --- | --- |
 | **NetworkX** | Graph data structures and algorithms (traversal, centrality, clustering, community detection). |
-| **igraph** | High-performance C++ layout algorithms (Fruchterman–Reingold, Kamada–Kawai, DrL, LGL, Davidson–Harel, Graphopt). |
+| **igraph** | High-performance C++ layout algorithms (Fruchterman-Reingold, Kamada-Kawai, DrL, LGL, Davidson-Harel, Graphopt). |
 | **rustworkx** | Fast graph operations used by the City2Graph module. |
 | **NumPy / SciPy** | Array operations and linear algebra. |
 | **pandas** | Tabular data handling. |
@@ -40,47 +35,53 @@ layout computations.
 | **`scigraphs-utils`** | Native Graphviz layout bindings (project-maintained). |
 | **`pysurprise`** | SurpriseMe community detection and the Surprise metric (project-maintained). |
 
-By embedding these analysis capabilities, SciGraphs avoids round-trip data
-exports and maintains an interactive environment where changes in the data or
-parameters are immediately reflected in the visualization.
+Analysis runs in the same process as the render, so nothing has to be exported
+to another tool and reimported.
 
 ## Geometry Nodes and instancing
 
-Naive approaches in Blender — creating an individual mesh object for every node
-— incur significant overhead due to dependency-graph evaluation. SciGraphs
-circumvents this by consolidating the entire graph into a single container
-object with internal point-cloud data, then using **Geometry Nodes** for
-procedural instancing of node spheres and edge cylinders.
+Giving every node its own mesh object costs more dependency-graph evaluation
+than it is worth. SciGraphs instead consolidates the whole graph into a single
+container object holding point-cloud data, then instances the node spheres and
+edge cylinders with Geometry Nodes.
 
-This architecture sustains interactive viewport frame rates for networks well
-beyond $10^5$ elements. In *raw* mode (graph stored as mesh topology) the
-viewport sustains over 60 FPS up to ~200,000 nodes and remains above 20 FPS at
-$10^6$ nodes; in *visual* mode (after the **Setup Visual** operator) interactive
-rates are maintained up to ~500,000 nodes on consumer hardware.
+In *raw* mode (graph stored as mesh topology) the viewport holds over 60 FPS up
+to roughly 200,000 nodes and stays above 20 FPS at $10^6$. In *visual* mode,
+after the **Setup Visual** operator, interactive rates hold to about 500,000
+nodes on consumer hardware.
 
 ## Source layout
 
-The codebase is organized into clearly separated concerns:
+Three distributions live in this repository. Two of them install without
+Blender.
 
 ```
-SciGraphs/
-├── core/            # Analysis, layout, geometry, IO — no Blender UI
-│   ├── algorithms/  # traversal, pathfinding, spanning, flow, topology, stats
-│   ├── city2graph/  # urban morphology, proximity, transport, metapaths
-│   ├── coloring/    # colormaps and attribute-driven coloring
-│   ├── data_io/     # file/SQL/SuiteSparse importers and exporters
-│   ├── geo/         # DEM, terrain, imagery, geospatial projection
-│   ├── mesh/        # layouts, edge styles, geometry generation
-│   ├── osmnx/       # download, routing, centrality, bearing, elevation
-│   ├── repro/       # reproducible-pipeline executor, schema, provenance
-│   └── visualization/ # animation, text overlay
-├── properties/      # Blender PropertyGroups (scene settings)
+SciGraphs/          # the Blender add-on
+├── core/           # the Blender-side half: mesh builders, terrain and raster
+│                   #   projection, caches keyed on live scene objects, the
+│                   #   viewport text overlay, the pipeline executor
+├── properties/     # Blender PropertyGroups (scene settings)
+├── api/            # the scripting API
 ├── ui/
-│   ├── operators/   # Blender operators (the buttons that do the work)
-│   └── panels/      # Blender panels (the sidebar UI documented here)
-└── utils/           # dependency loading, logging, helpers
+│   ├── operators/  # the buttons that do the work
+│   └── panels/     # the sidebar UI documented here
+└── utils/          # dependency loading, logging, helpers
+
+core/               # distribution scigraphs-core, import scigraphs_core:
+                    #   graph algorithms, every layout, colormaps, tabular and
+                    #   geospatial IO, the OSMnx and city2graph wrappers, the
+                    #   pipeline schema and parser
+
+engine/             # distribution scigraphs-engine, import scigraphs_engine:
+                    #   structural filter channels, backbone extraction, edge
+                    #   bundling, PNG rendering through wgpu
 ```
 
-The **Panel Reference** in this documentation mirrors the `ui/panels/`
-structure: each tab in the Blender sidebar corresponds to a panel group, and
-each subpanel corresponds to a collapsible section within it.
+Neither `core/` nor `engine/` imports `bpy`. `blender_manifest.toml` lists both
+as wheels, so Blender installs them the way it installs `networkx` or `osmnx`,
+and nothing is vendored into the extension zip. Away from Blender they are
+ordinary pip installs.
+
+The **Panel Reference** mirrors `ui/panels/`: each sidebar tab is a panel group,
+each subpanel a collapsible section within it. To drive the same operations from
+Python, see the [Python API](../reference/python-api.qmd).

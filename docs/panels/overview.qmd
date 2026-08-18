@@ -2,16 +2,11 @@
 title: "Panel Reference"
 ---
 
-This reference documents **every panel and subpanel** in the SciGraphs sidebar,
-organized by tab. Each page describes what a panel does, when it is visible, the
-meaning of every control, and the recommended workflow.
-
-For a high-level map of the whole interface, see
-**[The sidebar interface](../guide/interface.qmd)**.
+Every panel and subpanel in the sidebar, by tab: what it does, when it is
+visible, and what each control means. For a map of the whole interface, see
+[The sidebar interface](../guide/interface.qmd).
 
 ## SciGraphs tab
-
-The core combinatorial workflow.
 
 | Panel | What it covers |
 | --- | --- |
@@ -48,7 +43,7 @@ The core combinatorial workflow.
 | [Data Import](city2graph/data.qmd) | Overture/OSMnx features, local files, segment processing, and GTFS feeds. |
 | [Urban Morphology](city2graph/morphology.qmd) | Segment graphs, tessellations, and morphological building/street graphs. |
 | [Transportation](city2graph/transportation.qmd) | Travel-summary and OD graphs from a loaded GTFS feed. |
-| [Mobility (OD Matrix)](city2graph/mobility.qmd) | Graphs from an external origin–destination matrix. |
+| [Mobility (OD Matrix)](city2graph/mobility.qmd) | Graphs from an external origin-destination matrix. |
 | [Graph Tools](city2graph/graph-tools.qmd) | Largest-component, distance filter, clip, and isochrone utilities. |
 | [Proximity Graphs](city2graph/proximity.qmd) | Single-layer, multi-layer, and group-node spatial networks. |
 | [Metapath Analysis](city2graph/metapaths.qmd) | Connect amenities through the street network. |

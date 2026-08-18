@@ -1,0 +1,193 @@
+---
+title: "SciGraphs · Freeze and replay a pipeline"
+---
+
+::: {.lead}
+Turn a figure you built by hand into a short JSON or YAML file that rebuilds it
+(dataset, analysis, layout, style, render and exports) and read the provenance
+manifest each run leaves behind.
+:::
+
+Mirrors the [Reproducibility panel](../../../panels/scigraphs/reproducibility.qmd).
+
+A specification is a few kilobytes of text that regenerates an image, instead of
+a screenshot and a paragraph describing which buttons were pressed. You build
+the result once interactively, freeze it, and from then on the file is the
+result.
+
+## 1. Freeze what you already built
+
+**Reproducibility** sits at the bottom of the **SciGraphs** tab, closed by
+default. With a graph object selected, press **Export Current Scene** in the
+**Templates** box and pick a name such as `burjassot_walk.yaml`. The add-on
+serializes the active graph and the current SciGraphs settings into a
+specification. With nothing selected it reports *No graph object selected* and
+does nothing.
+
+::: {.callout-note}
+The export is a good first draft, not a transcript. It detects the source type
+and captures the settings it knows how to read; anything it could not detect
+falls back to a default. Read the file before you trust it, which is step 2.
+:::
+
+To start from a blank instead, **Export Template** offers **Minimal**, **OSMnx
+Network**, **GEXF/GraphML** and **Full Example**. Both buttons default to
+`.yaml`; type a `.json` extension if you prefer JSON.
+
+## 2. Read the specification
+
+The file has one block per stage, and only `meta` is required:
+
+```json
+{
+  "meta": {
+    "title": "burjassot_walk",
+    "seed": 42,
+    "output_dir": "//repro/burjassot_walk"
+  },
+  "dataset": {
+    "source": "osmnx",
+    "method": "PLACE",
+    "query": "Burjassot, Valencia, Spain",
+    "network_type": "walk",
+    "cache": true
+  },
+  "analysis": {
+    "metrics": ["degree", "betweenness"]
+  },
+  "visual": {
+    "node_color": "betweenness",
+    "colormap": "plasma",
+    "color_norm": "RANK",
+    "node_radius_rel": 0.004,
+    "edge_radius_rel": 0.0014
+  },
+  "render": {
+    "engine": "CYCLES",
+    "samples": 64,
+    "output": "figure.png",
+    "view_transform": "Standard"
+  }
+}
+```
+
+Two things about it are deliberate. There is no `layout` block, because a street
+network arrives with real coordinates and a force-directed layout would throw
+the geography away. And `color_norm` is `RANK`, because betweenness on a road
+network concentrates on the few streets carrying through traffic, so a linear
+ramp would leave almost every node in the darkest color.
+
+Paths beginning `//` resolve against the folder holding the specification, so a
+downloaded spec keeps its outputs beside itself.
+
+::: {.callout-warning}
+## Fields that are not in the schema are dropped in silence
+
+The validator checks types and values, but it does not reject keys it does not
+know: unrecognized fields are filtered out and the run continues with whatever
+the defaults were.
+
+This is not hypothetical. A `dataset` block written as `"method": "POINT",
+"latitude": …, "longitude": …, "distance": …`, which looks like the natural way
+to ask for a point and a radius, validated without complaint and downloaded an
+entirely different city, because those three fields do not exist in the schema
+and the executor fell back to the scene defaults. To locate an area the schema
+offers `query` (with `"method": "PLACE"`) or `bbox`; there is no
+point-plus-radius form.
+
+A run that finishes is not evidence that it ran what you meant. Step 4 is how
+you check.
+:::
+
+## 3. Validate, then run
+
+In the **Pipeline** box, set **Pipeline file**, and in **Artifacts** set the
+**Artifacts Folder** where the run's outputs land when `meta.output_dir` does
+not override it. The default is `//repro/`, beside the current `.blend`.
+
+Press **Validate**. It parses the file and checks it against the schema without
+executing anything, and reports the first problem it finds. Fix and re-validate
+until it is clean, then press **Run**. Stages execute in order with
+deterministic seeding from `meta.seed`, and progress goes to the system console
+prefixed `[SciGraphs Repro]`. An OSMnx dataset needs internet access, and the
+download is usually the slow part.
+
+::: {.callout-tip}
+You do not have to open the panel at all: drag the `.json` or `.yaml` file from
+your file manager onto the 3D Viewport and it runs immediately, writing its
+outputs beside the file. Note that `meta.clear_scene` defaults to `true`, so a
+dropped specification will wipe the current scene. Save your work first, and
+read a file you did not write before you drop it.
+:::
+
+## 4. Check the manifest against what you meant
+
+Every run leaves four kinds of thing in the artifacts folder:
+
+| File | What it holds |
+| --- | --- |
+| `pipeline.normalized.json` | The canonical specification, sorted and pretty-printed. What the hash was taken over. |
+| `run_manifest.json` | The provenance record: dependency versions, the effective seed, a hash of the specification, per-stage timings and status, and a SHA-256 for the files it read and wrote. |
+| `run.log` | The execution log. |
+| the outputs | The render, plus whatever `exports` asked for. |
+
+Open `run_manifest.json` and read three things before anything else:
+
+- **`success`**, and below it each entry in `steps`. A stage can fail while the
+  run as a whole carries on, so a file appearing in the folder is not proof that
+  every stage worked. Each step carries its own `status` and `error`.
+- **`inputs`**, which is the check for the trap in step 2. For an OSMnx dataset
+  the entry reads `"path": "osmnx://Burjassot, Valencia, Spain"`: the query that
+  actually went over the wire. If it names somewhere else, or is empty, your
+  `dataset` block did not say what you thought it said.
+- **`warnings`**, where settings the executor could not apply are recorded
+  rather than raised.
+
+That comparison, not the fact that a run finished, is what tells you the file
+describes your figure.
+
+::: {.callout-note}
+## The OSMnx cache is relative to wherever Blender was launched
+
+`dataset.cache` sets OSMnx's cache flag, but nothing in the pipeline sets its
+cache directory. OSMnx then falls back to a relative path resolved against
+Blender's working directory, which is whatever folder Blender was started from,
+not the folder holding your specification.
+
+Caching therefore appears to be on and is, in practice, per-launch-directory.
+Replay the same specification from somewhere else and it downloads everything
+again; do that often enough and Overpass rate-limits you and the run fails
+outright. Fix it once: in **Edit ▸ Preferences ▸ Add-ons ▸ SciGraphs**, set
+**Cache Directory** to an absolute path, then press **Apply Now** under **OSMnx
+Advanced Settings**.
+:::
+
+## 5. Hand it to someone else
+
+The specification, plus any local data files it references, is the whole
+deliverable. On another machine with the add-on installed, the recipient sets
+**Pipeline file**, presses **Run**, and compares their `run_manifest.json`
+against yours: same specification hash, same seed, same digests means they got
+what you got. A digest that differs names exactly which file to look at.
+
+::: {.callout-tip}
+Not sure a field exists? **Export Options Reference** in the **Templates** box
+writes a Markdown file listing every option a pipeline can set, introspected
+from the live add-on, so it cannot drift from the build you are running. The
+same list is published as the
+[pipeline options reference](../../../reference/pipeline-options.qmd).
+:::
+
+## Next steps
+
+- [Writing pipeline files](../../../guide/pipeline-schema.qmd) has the full
+  schema, the `ops` escape hatch and the nested `scene_props` form that reaches
+  settings with no dedicated field.
+- [Tutorial 5, a reproducible pipeline](../../../examples/05-reproducible-pipeline.qmd)
+  has complete specifications with the figure each one produces, and how to run
+  one headlessly.
+- [Notebook 19](../../../notebooks/19-repro-pipelines.qmd) drives the same system
+  from Python inside Blender, with the checks above run as code.
+
+This is the last panel of the SciGraphs tab; the set starts back at
+[the index](index.qmd).

@@ -2,17 +2,15 @@
 title: "Routing & Paths"
 ---
 
-::: {.lead}
 The Routing & Paths panel computes shortest paths, K alternative routes, and
 many-to-many batch routing across the network.
-:::
 
 ::: {.callout-note}
 Requires an active OSMnx graph. Travel-time weighting requires travel times from
 [Network Attributes](attributes.qmd).
 :::
 
-## Source & Target Nodes
+## Source & target nodes
 
 | Control | Description |
 | --- | --- |
@@ -20,7 +18,7 @@ Requires an active OSMnx graph. Travel-time weighting requires travel times from
 | **Minimize** | Weight to optimize: length, travel time, or **elevation impedance**. |
 | **Alpha** | Elevation-impedance strength (only shown for that weight). |
 
-## Shortest Path
+## Shortest path
 
 | Control | Description |
 | --- | --- |
@@ -28,18 +26,18 @@ Requires an active OSMnx graph. Travel-time weighting requires travel times from
 | **Summarize** | Adds route rise and mean absolute grade. |
 | **Elevation Profile** | Builds a profile curve of the route. |
 
-## K Alternative Routes
+## K alternative routes
 
 | Control | Description |
 | --- | --- |
 | **K** | Number of alternative routes to compute. |
 | **Compute K Alternatives** | Computes the K shortest distinct routes. |
 
-## Batch (Many-to-Many)
+## Batch (many-to-many)
 
 | Control | Description |
 | --- | --- |
-| **Random OD Pairs** | Number of random origin–destination pairs to route. |
+| **Random OD Pairs** | Number of random origin-destination pairs to route. |
 | **CPU Cores (0=auto)** | Parallel workers for the batch. |
 | **Run Batch Routing** | Routes all pairs; reports the reached fraction and mean distance. |
 

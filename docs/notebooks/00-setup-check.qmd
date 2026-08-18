@@ -1,0 +1,17 @@
+---
+title: "00 · Environment check"
+execute:
+  enabled: false
+---
+
+Nothing is analyzed here. The notebook checks that the kernel really is Blender,
+that `city2graph` is installed inside it, and that the SciGraphs operators are
+registered; a last cell puts a cube in the 3D viewport, which proves the kernel
+and Blender are one process. It also shows the quirk the rest of the sequence
+depends on: the working directory is Blender's, not the notebook's, so the
+helpers in `notebooks/tools/` are found through the extension's `notebook_dir`
+preference.
+
+No network access needed. Run it first.
+
+{{< embed _ipynb/00_setup_check.ipynb echo=true >}}

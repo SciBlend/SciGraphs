@@ -2,10 +2,8 @@
 title: "Accessibility"
 ---
 
-::: {.lead}
 The Accessibility panel measures reachability across the network: isochrones from
 a center, ego subgraphs around a node, and network-constrained clustering.
-:::
 
 ::: {.callout-note}
 Requires an active OSMnx graph.
@@ -22,13 +20,13 @@ Requires an active OSMnx graph.
 | **Buffer (m)** | Buffer distance (shown only for the buffer-union mode). |
 | **Generate Isochrones** | Builds the reachable-area polygons. |
 
-## Ego Subgraph
+## Ego subgraph
 
 | Control | Description |
 | --- | --- |
-| **Extract Ego Subgraph** | Extract the neighbourhood subgraph around a node. |
+| **Extract Ego Subgraph** | Extract the neighborhood subgraph around a node. |
 
-## Network-Constrained DBSCAN
+## Network-constrained DBSCAN
 
 | Control | Description |
 | --- | --- |

@@ -1,0 +1,27 @@
+---
+title: "12 · Imagery"
+execute:
+  enabled: false
+---
+
+A photograph on the surface notebook 11 built. A graph on an empty field is a
+drawing of a topology; the same graph over the aerial photograph of the place is
+a claim you can check by looking, because every edge either lies on a street or
+does not. Half the notebook is the sources, what each one is for, what it costs
+in tiles and seconds and what you owe its publisher; half is the alignment that
+makes the claim checkable.
+
+Including what a wrong one looks like. The georeference is deliberately shifted
+250 m and the surface redraped, and the numeric alignment check still passes,
+because it measures the mesh and the mesh has not moved. Only the photograph
+gives it away, which is worth knowing before you trust a check that returns
+`True`.
+
+Nothing here needs an API key: thirteen tile sources and any WMS endpoint you
+name are open.
+
+For the same basemaps from the sidebar, see the
+[basemap tutorial](../tutorials/panels/osmnx/basemaps.qmd) and the
+[Features panel](../panels/osmnx/features.qmd).
+
+{{< embed _ipynb/12_imagery.ipynb echo=true >}}

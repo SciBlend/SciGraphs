@@ -2,18 +2,17 @@
 title: "Elevation & Terrain"
 ---
 
-::: {.lead}
 The Elevation & Terrain panel is a staged pipeline for 3D terrain integration: it
 sources a DEM, applies elevation to the network, computes grades, builds a
-terrain mesh, and drapes a basemap onto it.
-:::
+terrain mesh, and drapes a basemap onto it. It powers the
+[urban-terrain example](../../examples/03-urban-terrain.qmd).
 
 ::: {.callout-note}
 Requires an active OSMnx graph. Later stages appear only once the relevant data
 exists (elevation applied, terrain created, etc.).
 :::
 
-## Step 1 — Get Elevation Data
+## Step 1. Get elevation data
 
 | Control | Description |
 | --- | --- |
@@ -30,27 +29,27 @@ OpenTopography requires an API key set in add-on preferences; the key-bound
 basemap providers below (Mapbox, MapTiler, Stadia/Stamen) require their own keys.
 :::
 
-## Step 2 — 3D Positions
+## Step 2. 3D positions
 
 | Control | Description |
 | --- | --- |
 | **Apply 3D Positions** | Move node positions to their elevations. |
 | **Flatten to 2D** | Return the network to a flat layout. |
 
-## Step 3 — Slope / Grade
+## Step 3. Slope / grade
 
 | Control | Description |
 | --- | --- |
 | **Calculate Grades** | Compute edge grades; reports mean/max grade and the percentage of steep edges (>5%). |
 
-## Step 4 — Terrain Object
+## Step 4. Terrain object
 
 | Control | Description |
 | --- | --- |
 | **Show / Hide** | Toggle the terrain mesh visibility. |
 | **Remove** | Delete the generated terrain mesh. |
 
-## Step 5 — Basemap Texture
+## Step 5. Basemap texture
 
 | Control | Description |
 | --- | --- |
@@ -61,14 +60,10 @@ basemap providers below (Mapbox, MapTiler, Stadia/Stamen) require their own keys
 | **Fetch & Apply** | Download and drape the basemap onto the terrain. |
 | **Clear** | Remove the applied basemap. |
 
-This panel powers the
-[urban-terrain example](../../examples/03-urban-terrain.qmd).
-
 ## Step-by-step tutorial
 
-For a worked example using **Avenida Naciones Unidas, La Paz** (2 km
-radius), follow
-[Elevation, DEM & 3D terrain](../../tutorials/panels/osmnx/elevation.qmd). To
-drape satellite, street or WMS imagery from the mapping APIs onto that terrain,
-continue with
+For a worked example using **Avenida Naciones Unidas, La Paz** (2 km radius),
+follow [Elevation, DEM & 3D terrain](../../tutorials/panels/osmnx/elevation.qmd).
+To drape satellite, street or WMS imagery from the mapping APIs onto that
+terrain, continue with
 [Basemaps & API textures](../../tutorials/panels/osmnx/basemaps.qmd).

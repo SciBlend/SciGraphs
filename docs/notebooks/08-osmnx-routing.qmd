@@ -1,0 +1,23 @@
+---
+title: "08 · Routing"
+execute:
+  enabled: false
+---
+
+A route starts from a coordinate, not from a node, so the first thing that
+happens is a snap and the first thing that can be wrong is that snap. Over 500
+points the median lands 49.7 m from its nearest intersection, and applied at
+both ends that is a median 9.7 % of the trip, 39 % in the worst case measured:
+a 582 m route carrying 228 m of pure snapping.
+
+Weighting by travel time instead of distance changes 35 of 200
+origin-destination pairs, and where it changes the two routes share only a third
+of their edges. The alternatives `k_shortest` returns are a weaker notion than
+they sound: the travel-time route appears among them as alternative three of
+eight.
+
+The OSMnx router **does** honor the edge weight, unlike the add-on's generic
+shortest-path operator, which cannot read one at all and reports a hop count
+where you expect meters. The rest of the suite depends on that.
+
+{{< embed _ipynb/08_osmnx_routing.ipynb echo=true >}}

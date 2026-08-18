@@ -1,0 +1,23 @@
+---
+title: "05 · Topology"
+execute:
+  enabled: false
+---
+
+Planarity, faces, genus, duals and crossings, tested against graphs whose
+answers have been known for a century, because this is the notebook where a
+wrong result is hardest to notice.
+
+Planarity is right 13 times out of 13, including on two different drawings of
+the same graph, so the operator reads the graph and not the picture. Euler's
+identity holds on every connected planar case, with the outer face counted, and
+the crossing counts match an independent combinatorial oracle.
+
+What sits on top of that does not hold. The genus routine returns 0 for K₃,₃ and
+for the Petersen graph, both established as non-planar by the same function
+moments earlier, because its bound ignores the planarity result it has just
+computed. Every non-planar graph is reported as containing an "unknown
+subdivision", since the call that would identify it goes to a NetworkX function
+that does not exist.
+
+{{< embed _ipynb/05_topology.ipynb echo=true >}}

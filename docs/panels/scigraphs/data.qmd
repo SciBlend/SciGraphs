@@ -2,22 +2,14 @@
 title: "Data"
 ---
 
-::: {.lead}
-The Data panel is the entry point of the pipeline: it imports heterogeneous
-network data and builds the Blender graph object that every other panel
-operates on.
-:::
+The Data panel imports network data and builds the Blender graph object every
+other panel operates on. Which steps appear depends on the selected data source.
 
-The panel is organized as a numbered, step-by-step flow. The exact steps shown
-depend on the selected **data source**.
-
-## Step 1 — Select data source
-
-A row of toggles selects one of four ingestion pathways:
+## Step 1. Select data source
 
 | Source | Use it for |
 | --- | --- |
-| **File** | Flat files — GEXF (native graph), CSV/JSON edge lists and node tables, GraphML. The importer auto-detects native graph files. |
+| **File** | Flat files: GEXF (native graph), CSV/JSON edge lists and node tables, GraphML. The importer auto-detects native graph files. |
 | **Database** | Live SQL connections (PostgreSQL, MySQL/MariaDB, SQLite; SQL Server optional) executing a `SELECT` query. |
 | **SuiteSparse** | Matrices downloaded by identifier from the SuiteSparse Matrix Collection. |
 | **Repro** | Replaying a declarative reproducible pipeline (see [Reproducibility](reproducibility.qmd)). |
@@ -56,7 +48,7 @@ Only `SELECT` queries are allowed. SciGraphs never modifies your database.
 | **Download & Create Graph** | Fetches the matrix and builds the graph in one step. |
 | **Browse Collection** | Opens the online collection to find matrix identifiers. |
 
-## Step 2 — Define graph structure
+## Step 2. Define graph structure
 
 Shown for File and Database sources once data is loaded.
 
@@ -69,7 +61,7 @@ Shown for File and Database sources once data is loaded.
 | **Weight Column** | Optional numeric column used as edge weight. |
 | **Import as Attributes** | A checklist of the remaining columns. Tick the ones to import as node/edge attributes; icons mark numeric, datetime, and text types. Use **All** / **None** to toggle the whole list. |
 
-## Step 3 — Create graph object
+## Step 3. Create graph object
 
 | Control | Description |
 | --- | --- |
@@ -78,8 +70,8 @@ Shown for File and Database sources once data is loaded.
 
 ## Importing node attributes
 
-When a graph object already exists, an **Import Node Attributes** section lets
-you attach a vertex-only attribute table from a separate file.
+When a graph object already exists, an **Import Node Attributes** section
+attaches a vertex-only attribute table from a separate file.
 
 | Control | Description |
 | --- | --- |
@@ -87,16 +79,15 @@ you attach a vertex-only attribute table from a separate file.
 | **Delimiter / Header** | Parsing options for the file. |
 | **Import Node Attributes** | Matches rows to nodes by name. Format: `node_name <sep> value(s)`; nodes missing from the file receive `NaN`. |
 
-## Step 4 — Apply visualization
+## Step 4. Apply visualization
 
-A shortcut to **Setup Visual**, which adds the Geometry Nodes rendering setup
-(instanced node spheres and edge cylinders). This is the same operation
-documented in the [Visualization panel](visualization.qmd) and is the bridge
-from raw topology to renderable geometry.
+**Setup Visual** adds the Geometry Nodes rendering setup (instanced node spheres
+and edge cylinders). It is the same operation documented in the
+[Visualization panel](visualization.qmd).
 
 ---
 
-## Subpanel — Geospatial Options {#geospatial}
+## Subpanel: Geospatial Options {#geospatial}
 
 ::: {.callout-note}
 **When it appears:** after a file is loaded or SQL columns are available. Enable
@@ -104,7 +95,8 @@ it with the checkbox in the subpanel header.
 :::
 
 Embeds the graph into real-world coordinates instead of using a force-directed
-layout.
+layout. This is the global-scale embedding used in the
+[geospatial globe example](../../examples/02-geospatial-globe.qmd).
 
 | Control | Description |
 | --- | --- |
@@ -118,10 +110,7 @@ layout.
 | **Material Style** (theme = none) | Simple globe material, including a `World Map` mode with map detail and feature type. |
 | **Edge Style** | Edge representation for geodesic arcs on the globe. |
 
-This subpanel drives the **global-scale** geospatial embedding used in the
-[geospatial globe example](../../examples/02-geospatial-globe.qmd).
-
-## Subpanel — Temporal Data {#temporal}
+## Subpanel: Temporal Data {#temporal}
 
 ::: {.callout-note}
 **When it appears:** after a file is loaded or SQL columns are available. Enable
@@ -136,15 +125,4 @@ Builds a sequence of graph snapshots from a time column and plays them back.
 | **Aggregation** | How rows are grouped into snapshots; `Range` exposes **From** / **To** bounds. |
 | **Analyze Time Column** | Inspects the time column and prepares snapshot creation. |
 | **Create Temporal Graphs** | Builds the snapshot sequence (enabled after analysis). |
-| **Playback** | Transport controls — first, previous, play, next, last — plus **Refresh** and **Clear**. |
-
-## Typical workflow
-
-1. Pick a **data source** in Step 1 and load it.
-2. Map **Source/Target** columns and choose directedness in Step 2; tick any
-   attribute columns to import.
-3. Optionally enable **Geospatial** or **Temporal** options.
-4. **Create Graph** in Step 3.
-5. **Setup Visual** in Step 4 to make the graph renderable, then continue to
-   [Layout](layout.qmd), [Analysis](analysis.qmd), and
-   [Visualization](visualization.qmd).
+| **Playback** | Transport controls (first, previous, play, next, last) plus **Refresh** and **Clear**. |

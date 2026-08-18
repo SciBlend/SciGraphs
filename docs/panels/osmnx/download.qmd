@@ -2,15 +2,12 @@
 title: "Download"
 ---
 
-::: {.lead}
-The Download panel imports a street network from OpenStreetMap into Blender. It
-is the entry point of the OSMnx tab — every other panel operates on the graph it
-creates.
-:::
+The Download panel imports a street network from OpenStreetMap into Blender.
+Every other panel in the OSMnx tab operates on the graph it creates.
 
-## Step 1 — Download method
+## Step 1. Download method
 
-Pick how the area is defined; the inputs change with the method.
+The inputs change with the method.
 
 | Method | Inputs |
 | --- | --- |
@@ -22,7 +19,7 @@ Pick how the area is defined; the inputs change with the method.
 | **Polygon** | A mesh object whose vertices are treated as `(lon, lat)`. |
 | **XML** | A local `.osm` XML file. |
 
-## Step 2 — Network Type & Filter
+## Step 2. Network type & filter
 
 | Control | Description |
 | --- | --- |
@@ -30,7 +27,7 @@ Pick how the area is defined; the inputs change with the method.
 | **Network Type** | `drive`, `walk`, `bike`, etc. (only used when no preset is active). |
 | **Advanced Filter** | A raw Overpass filter string for full control. |
 
-## Step 3 — Options
+## Step 3. Options
 
 | Control | Description |
 | --- | --- |

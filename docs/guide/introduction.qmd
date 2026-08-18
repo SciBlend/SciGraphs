@@ -4,30 +4,25 @@ title: "Introduction"
 
 ## What is SciGraphs?
 
-Graphs are one of the most versatile abstractions in science: a set of nodes
-and edges encodes pairwise relationships, enabling analyses of spatial
-proximity, information flow, temporal evolution, or hierarchical containment.
-In practice, the usefulness of a graph model often depends on whether humans can
-perceive structure — communities, bottlenecks, symmetries, hierarchies, and
-anomalies that guide hypothesis formation.
+A set of nodes and edges encodes pairwise relationships, which makes graphs
+useful for spatial proximity, information flow, temporal evolution or
+hierarchical containment. Whether the model earns its keep usually comes down to
+whether a human can see structure in it: communities, bottlenecks, symmetries,
+anomalies.
 
-Most network visualization still defaults to 2D node–link diagrams, which
-exhibit well-known failure modes at scale: edge crossings, overplotting, and
-visual "hairballs" that obscure topology when graphs become large or dense.
-At the same time, a persistent gap exists between analytical network
-exploration and high-fidelity 3D scientific communication. Many scientific
-problems — spatial networks (transport, migration, infrastructure), multi-layer
-urban contexts, or geometric/topological constraints — benefit from depth cues,
-lighting, and a physically meaningful environment.
+Most network visualization still defaults to 2D node-link diagrams, with the
+failure modes those have at scale: edge crossings, overplotting, and hairballs
+that hide the topology of anything large or dense. Spatial networks, multi-layer
+urban contexts and geometrically constrained graphs also benefit from depth
+cues, lighting and a physically meaningful environment, which leaves a gap
+between analytical exploration and 3D scientific communication.
 
-**SciGraphs** addresses this gap. It is an open-source Blender extension that
-unifies graph ingestion, analysis, and rendering into a single pipeline,
-preserving analytical metadata throughout while providing cinematographic
-composition, physically based lighting, and realistic camera effects.
+**SciGraphs** is an open-source Blender extension that closes that gap by
+putting graph ingestion, analysis and rendering in one pipeline. Analytical
+metadata survives the whole way through, alongside cinematographic composition,
+physically based lighting and realistic camera effects.
 
 ## The two domains
-
-SciGraphs is designed around two complementary domains.
 
 | Domain | Description | Typical inputs |
 | --- | --- | --- |
@@ -36,24 +31,22 @@ SciGraphs is designed around two complementary domains.
 
 ## Why Blender?
 
-Blender is a free, open-source 3D creation suite that has gained traction in
-scientific visualization owing to three key features:
+Blender is a free, open-source 3D creation suite with three properties that
+matter here:
 
-1. **A fully scriptable Python API** that exposes every aspect of the
+1. **A fully scriptable Python API** that exposes every part of the
    application, from scene construction to render dispatch.
-2. **Two production-grade render engines** — Cycles (unbiased path-tracer) and
-   EEVEE Next (real-time rasterizer) — producing photorealistic or
-   interactive-quality imagery.
-3. **Geometry Nodes**, a node-based visual programming environment for
-   procedural geometry generation that operates on *named attributes*.
+2. **Two production-grade render engines**, Cycles (unbiased path tracer) and
+   EEVEE Next (real-time rasterizer).
+3. **Geometry Nodes**, a node-based environment for procedural geometry that
+   operates on *named attributes*.
 
-The Geometry Nodes attribute model maps naturally to graph analytics: metrics
-computed by SciGraphs are stored as per-node or per-edge named attributes, and
-Geometry Nodes read those attributes to drive instance scale, colour-ramp
-lookups, node size, or any other visual parameter — without ever modifying the
-source data (a non-destructive workflow). Because Geometry Nodes evaluate
-lazily on the GPU and use hardware instancing, a single modifier can place
-millions of node glyphs and edge primitives with minimal memory overhead.
+That attribute model maps directly onto graph analytics. Metrics computed by
+SciGraphs are stored as per-node or per-edge named attributes, and Geometry
+Nodes read them to drive instance scale, color-ramp lookups, node size or any
+other visual parameter, leaving the source data untouched. Because Geometry
+Nodes evaluate lazily on the GPU and use hardware instancing, one modifier can
+place millions of glyphs and edge primitives with little memory overhead.
 
 ::: {.callout-note}
 ## How this documentation is organized

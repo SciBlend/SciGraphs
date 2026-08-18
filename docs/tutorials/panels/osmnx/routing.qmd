@@ -3,31 +3,26 @@ title: "OSMnx · Find routes"
 ---
 
 ::: {.lead}
-Compute shortest paths across the Burjassot network, generate alternative
-routes, summarize a route's metrics, and run many origin-destination pairs at
-once.
+Shortest paths across the Burjassot network, alternatives, route metrics, and
+bulk origin-destination pairs. Mirrors the
+[Routing panel](../../../panels/osmnx/routing.qmd).
 :::
 
-This walkthrough mirrors the [Routing panel](../../panels/osmnx/routing.qmd).
-
-## Before you begin
-
-Download a `drive` network and add **Edge Speeds** and **Travel Times** (see
-[Add edge attributes](attributes.qmd)) so time-based routing works.
+Needs a `drive` network with **Edge Speeds** and **Travel Times** already
+computed ([Add edge attributes](attributes.qmd)), or time-based routing has
+nothing to work with.
 
 ## 1. Pick origin and destination
 
-In **Routing**, press the **Select Source** eyedropper and click a node in the
-viewport, then **Select Target** and click another. The node IDs appear in the
-panel.
+**Select Source** and **Select Target** are eyedroppers: press one, click a node
+in the viewport. The node IDs appear in the panel.
 
 ![Selecting source and target nodes with the eyedroppers.](../../../assets/guides/osmnx/04-select-od.png)
 
 ## 2. Shortest path
 
-Set **Path Weight** to **length** and press **Shortest Path**. The route is
-highlighted and its distance is reported. Switch the weight to **travel_time**
-to optimize for time instead.
+**Path Weight** decides what "shortest" means: **length** for distance,
+**travel_time** for time.
 
 ![A shortest path highlighted across the network.](../../../assets/guides/osmnx/04-shortest-path.png)
 
@@ -38,26 +33,24 @@ The **elevation_impedance** weight needs edge grades; see the
 
 ## 3. Alternative routes
 
-Set **K** (default `3`) and press **K Shortest Paths** to draw several distinct
-alternatives between the same endpoints.
+**K Shortest Paths** draws **K** distinct alternatives (default `3`) between the
+same endpoints.
 
 ![Three alternative routes between the same endpoints.](../../../assets/guides/osmnx/04-k-shortest.png)
 
 ## 4. Route summary
 
-Press **Route Summary** to report the active route's length, travel time, mean
-absolute grade and rise.
+Reports the active route's length, travel time, mean absolute grade and rise.
 
 ![Route Summary reports length, time and grade.](../../../assets/guides/osmnx/04-route-summary.png)
 
 ## 5. Batch routing
 
-Set **Random N** (number of OD pairs) and **Batch CPUs**, then press **Batch
-Routes** to sample and route many pairs at once, reporting aggregate statistics.
+**Random N** is how many OD pairs to sample and **Batch CPUs** how many to route
+in parallel. The result is aggregate statistics rather than drawn routes.
 
 ![Batch routing many random OD pairs.](../../../assets/guides/osmnx/04-batch.png)
 
 ## Next steps
 
-Continue with [Measure accessibility](accessibility.qmd) for isochrones and
-reachable-area analysis.
+[Measure accessibility](accessibility.qmd): isochrones and reachable areas.

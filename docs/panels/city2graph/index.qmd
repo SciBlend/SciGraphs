@@ -2,29 +2,24 @@
 title: "City2Graph"
 ---
 
-::: {.lead}
-The City2Graph tab builds *heterogeneous urban graphs* from real-world data:
+The City2Graph tab builds heterogeneous urban graphs from real-world data:
 buildings, streets, amenities, and transit, connected by morphological,
-proximity, and metapath relationships. It targets urban analytics and GeoAI
-workflows.
-:::
+proximity, and metapath relationships.
 
 The root **City2Graph** panel is a status header. It reports the active object's
 type (OSMnx network, City2Graph features, tessellation, morphological graph, or
-travel graph) and its feature/node/edge counts. OSMnx street networks can be
-used directly by every City2Graph operation, so the two tabs are designed to be
-used together.
+travel graph) and its feature/node/edge counts. OSMnx street networks can be used
+directly by every City2Graph operation, so the two tabs are designed to be used
+together.
 
 ## Panels in this tab
-
-Each panel of the addon has its own reference page:
 
 | Panel | What it does |
 | --- | --- |
 | [Data Import](data.qmd) | Acquire the raw layers: Overture/OSMnx features, local files, GTFS transit. |
 | [Urban Morphology](morphology.qmd) | Build tessellations and morphological building/street graphs. |
 | [Transportation](transportation.qmd) | Turn a loaded GTFS feed into travel-summary and OD graphs. |
-| [Mobility (OD Matrix)](mobility.qmd) | Build graphs from an external origin–destination matrix. |
+| [Mobility (OD Matrix)](mobility.qmd) | Build graphs from an external origin-destination matrix. |
 | [Graph Tools](graph-tools.qmd) | Clip, filter, isochrone, and largest-component utilities. |
 | [Proximity Graphs](proximity.qmd) | Spatial networks (KNN, radius, Delaunay…) over feature objects. |
 | [Metapath Analysis](metapaths.qmd) | Connect amenities through the street network. |
@@ -43,20 +38,6 @@ When a compatible object is active, the header reports:
 
 If nothing compatible is selected, the header invites you to import data with the
 panels below.
-
-## Typical workflow
-
-1. In **[Data Import](data.qmd)**, define an area and download buildings,
-   segments, and places; load a GTFS feed if you need transit.
-2. Build a **[Morphological Graph](morphology.qmd)**, generate
-   **[Proximity Graphs](proximity.qmd)** over amenities, or run
-   **[Metapath Analysis](metapaths.qmd)** to connect amenities along the street
-   network. For transit, use **[Transportation](transportation.qmd)** or
-   **[Mobility](mobility.qmd)**.
-3. Refine the result with **[Graph Tools](graph-tools.qmd)** (keep the largest
-   component, clip, isochrone).
-4. Visualize in Blender (city2graph layers carry per-type attributes) and/or
-   **[export](export.qmd)** for GNN training.
 
 ::: {.callout-tip}
 Most operations align their output with the **active OSMnx graph** when one is

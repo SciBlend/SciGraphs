@@ -1,0 +1,23 @@
+---
+title: "19 · Reproducible pipelines"
+execute:
+  enabled: false
+---
+
+The preceding notebooks are exploratory: you run them top to bottom and the
+result stays in the scene. For a figure you intend to publish you also need to
+say exactly what ran, with which parameters and which seed, and to have someone
+else repeat it.
+
+SciGraphs has a declarative system for that. A JSON or YAML specification
+describes the whole pipeline (data, analysis, layout, styling, render, exports)
+and the executor replays it step by step, writing a provenance manifest with
+hashes. This notebook drives that system from Python: explore in a notebook,
+then freeze the result as a specification.
+
+For the same thing from the sidebar or from a terminal, see the
+[Reproducibility panel](../panels/scigraphs/reproducibility.qmd), the
+[pipeline schema](../guide/pipeline-schema.qmd) and
+[Tutorial 5](../examples/05-reproducible-pipeline.qmd).
+
+{{< embed _ipynb/19_repro_pipelines.ipynb echo=true >}}

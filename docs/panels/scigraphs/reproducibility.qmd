@@ -2,12 +2,9 @@
 title: "Reproducibility"
 ---
 
-::: {.lead}
-The Reproducibility panel replays an entire pipeline — dataset, analysis,
-layout, visualization, render, and export — from a short declarative JSON or
-YAML file, and records a provenance manifest so results are bit-for-bit
-reproducible.
-:::
+The Reproducibility panel replays a whole pipeline (dataset, analysis, layout,
+visualization, render, export) from a declarative JSON or YAML file, and records
+a provenance manifest.
 
 This panel sits at the top level of the **SciGraphs** sidebar tab. The same
 controls are also surfaced inside the [Data panel](data.qmd) when the data
@@ -91,32 +88,21 @@ Only `meta` is required; the rest are optional and run in the order below.
 Two things in that example are deliberate and worth copying.
 
 There is **no `layout` block**. A street network arrives with real coordinates,
-and those coordinates are the data — running a force-directed layout over them
+and those coordinates are the data; running a force-directed layout over them
 would throw the geography away. Layouts are for graphs that have no positions of
 their own.
 
 `color_norm` is set to `RANK`. Betweenness on a road network concentrates on the
 few streets carrying through-traffic, so the default linear ramp would leave
-almost every node in the darkest colour of the map. Ranking spreads the ramp
+almost every node in the darkest color of the map. Ranking spreads the ramp
 evenly whatever the distribution.
 
 ## Run artifacts
 
-Each run emits:
-
-- a **canonical (normalized) specification** — the fully resolved pipeline;
-- a **provenance manifest** with input/output hashes and timing;
-- an **execution log**.
-
-Together with the `meta.seed`, these guarantee that the same inputs reproduce
-the same result.
-
-## Typical workflow
-
-1. Build a scene interactively, then **Export Current Scene** to capture it as a
-   specification — or **Export Template** and edit it by hand.
-2. **Validate** the specification.
-3. **Run** the pipeline and inspect the artifacts in the **Artifacts** folder.
+Each run emits a canonical (normalized) specification with the fully resolved
+pipeline, a provenance manifest with input/output hashes and timing, and an
+execution log. Together with the `meta.seed`, these guarantee that the same
+inputs reproduce the same result.
 
 See the [reproducible-pipeline example](../../examples/05-reproducible-pipeline.qmd)
 for a complete walkthrough.

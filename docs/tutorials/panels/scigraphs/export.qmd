@@ -1,0 +1,109 @@
+---
+title: "SciGraphs · Export a graph"
+---
+
+::: {.lead}
+Write the graph out as GraphML, GEXF, Pajek or JSON, export node positions, and
+generate a statistics report. And know, before you open the file elsewhere, what
+each route keeps and what it quietly drops.
+:::
+
+Mirrors the [Export & Tools panel](../../../panels/scigraphs/export.qmd).
+
+## Before you begin
+
+Have a graph object active, with whatever attributes you want to carry out
+already computed in [Analysis](analysis.qmd). Then decide what the file is for.
+Topology alone, typed numbers for pandas or QGIS, and direction are three
+different requirements, and no single route in the add-on satisfies all three.
+[Notebook 10](../../../notebooks/10-osmnx-centrality-export.qmd) tries eight
+routes and tabulates what survives each.
+
+## 1. Set the path and format
+
+In **Export Options**, set the **Path**, choose a **Format** (**GraphML**,
+**GEXF**, **JSON** or **CSV**), decide whether to tick **Attributes**, and press
+**Export Graph**. The matching extension is appended if the path lacks it, and
+an empty path is refused with an error, so the button either writes the file it
+names or writes nothing.
+
+**GEXF**, **GraphML**, **Pajek** and **JSON** are also available as quick-format
+buttons that write straight to that format using the current **Path**.
+
+::: {.callout-warning}
+**CSV ignores the Attributes checkbox.** The CSV writer emits an edge list and
+nothing else, whether the box is ticked or not.
+:::
+
+::: {.callout-warning}
+**Every GraphML, GEXF and JSON export comes out undirected**, whatever the graph
+was. The writers ask the graph structure whether it is directed, and that
+structure never carries the flag for anything the add-on builds, while the
+answer sits on the object itself as `is_directed`, written and never read. A
+one-way street network leaves as a two-way one, with no warning and no clue in
+the file. If direction is the point of the analysis, export through the OSMnx
+panel instead (step 3).
+:::
+
+## 2. Know what "Attributes" actually carries
+
+Ticking **Attributes** collects the mesh's attribute layers and writes them as
+**node** attributes. Two consequences are worth checking before the file is
+analyzed.
+
+**No edge attribute leaves through this panel.** Edge betweenness, flows and
+per-edge weights computed onto the mesh simply do not appear in the file. Of the
+eight routes measured in notebook 10, only the two that read the graph rather
+than the mesh, GeoPackage and Gephi GraphML, carry an edge attribute at all.
+
+**The renderer's color layers are exported as data.** Every color layer the
+drawing left on the mesh is averaged to a single scalar and written out
+alongside the real attributes, so a file can arrive with four extra "attributes"
+that are just the last four figures you rendered. Read the column list before
+trusting it.
+
+**Positions** writes the node coordinates to CSV and nothing else. Pair it with
+a topology export from step 1.
+
+## 3. When the numbers matter, leave through the OSMnx panel
+
+For an OSMnx-derived network the [Import/Export panel](../osmnx/io.qmd) has
+routes this one does not, with their own trade-offs:
+
+- **Export → GeoPackage** is the only route that returns node and edge
+  attributes as exact float64 values in a file QGIS opens with no repair. Its
+  cost is rows: it is written undirected under OSMnx's default, which the
+  wrapper does not expose, so a two-way street collapses to a single row (363 of
+  375 segments in the measured case) and any per-direction quantity loses a
+  value.
+- **Export → GraphML (Gephi)** keeps every node and edge attribute and types
+  none of them: every attribute becomes a string. Right for Gephi, wrong for
+  pandas, where `"0.257"` sorts and compares as text.
+- **Save GraphML** is the only route that keeps all 375 directed segments, the
+  graph metadata and the values. Reading one back through **Load GraphML**
+  returns the numbers as strings, because no dtypes are declared on the way in;
+  the values were never lost, only their types.
+
+Notebook 10's table sets all eight routes side by side and is the fastest way to
+pick one.
+
+::: {.callout-warning}
+**Save GraphML does not refuse an empty path.** Unlike **Export Graph**, it
+appends the extension to nothing and writes a file literally named `.graphml`
+into whatever directory Blender was launched from, then reports success and
+names it. No glob matches that name and no `.gitignore` anticipates it. Set the
+path before pressing the button.
+:::
+
+## 4. Generate a statistics report
+
+In **Utilities**, tick **Power Law Fit** to have the degree distribution fitted,
+and press **Generate Report** for a text summary of the graph's metrics. It
+records what the graph was at export time, which is what makes a mismatch
+downstream diagnosable.
+
+## Next steps
+
+Record the steps that produced the file with
+[Reproducibility](reproducibility.qmd), so the graph and the figure can be
+rebuilt from the pipeline rather than from memory.

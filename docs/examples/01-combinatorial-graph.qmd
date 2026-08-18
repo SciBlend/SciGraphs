@@ -1,12 +1,6 @@
 ---
-title: "Tutorial 1 — A combinatorial graph from a file"
+title: "Tutorial 1: A combinatorial graph from a file"
 ---
-
-::: {.lead}
-Import a network from an edge-list file, lay it out in 3D, compute node
-importance and community structure, encode those metrics visually, and render a
-publication-quality image.
-:::
 
 **What you need:** a CSV edge list (two columns of node identifiers, optionally a
 weight and extra attribute columns) or a GEXF/GraphML file. Any small-to-medium
@@ -32,7 +26,7 @@ graph works.
    (sfdp)** gives high-quality 3D results; for very large graphs prefer
    **igraph DrL**.
 3. Optionally tune values in **Algorithm Parameters**.
-4. Press **Apply Layout Now** in **Quick Settings** for a one-shot layout — or
+4. Press **Apply Layout Now** in **Quick Settings** for a one-shot layout, or
    open **Interactive Mode**, press **Start Execution**, watch convergence, and
    **Bake to Animation**.
 
@@ -51,7 +45,7 @@ graph works.
 
 1. Expand **[Visualization](../panels/scigraphs/visualization.qmd)**.
 2. In **Appearance**, set base node and edge sizes.
-3. Drive **node colour** from the community id or centrality, and **node size**
+3. Drive **node color** from the community id or centrality, and **node size**
    from degree or centrality, using a scientific colormap.
 4. In **Scene Setup**, apply a **Material Preset** and **Setup Lighting**.
 5. In **Edge Style**, pick a preset such as **Gephi** or **Bundled** depending on
@@ -68,6 +62,6 @@ graph works.
    report.
 
 ::: {.callout-tip}
-Because metrics are stored as named attributes, you can re-colour or re-size the
-same layout on a different metric instantly — no need to recompute the layout.
+Metrics are stored as named attributes, so recoloring or resizing the same
+layout on a different metric does not require recomputing the layout.
 :::

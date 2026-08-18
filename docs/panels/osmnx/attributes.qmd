@@ -2,25 +2,23 @@
 title: "Network Attributes"
 ---
 
-::: {.lead}
 The Network Attributes panel computes per-edge metrics used by routing,
 statistics, and visualization. Checkmarks indicate metrics already present on the
 active graph.
-:::
 
 ::: {.callout-note}
 Requires an active OSMnx graph. Project the graph first
 ([Graph Operations](graph-operations.qmd)) so metric values are accurate.
 :::
 
-## Edge Metrics
+## Edge metrics
 
 | Control | Description |
 | --- | --- |
 | **Add Lengths** | Add edge lengths (in CRS units). |
 | **Add Bearings** | Add edge compass bearings; reports the **bearing entropy** once computed. |
 
-## Speed & Travel Time
+## Speed & travel time
 
 | Control | Description |
 | --- | --- |

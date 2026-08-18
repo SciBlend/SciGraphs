@@ -4,121 +4,90 @@ title: "OSMnx · Basemaps & API textures (La Paz)"
 
 ::: {.lead}
 Drape satellite, street and WMS imagery over the **Avenida Naciones Unidas, La
-Paz** terrain. La Paz's dramatic relief makes each basemap texture
-fetched through the imagery APIs (Esri, OpenStreetMap, CARTO, Mapbox, MapTiler,
-Stadia/Stamen, WMS) read clearly across the slopes, so it is the reference case
-for this workflow.
+Paz** terrain. Covers **5 · Basemap Texture** of the
+[Elevation panel](../../../panels/osmnx/elevation.qmd) and continues from
+[Elevation, DEM & 3D terrain](elevation.qmd).
 :::
 
-This walkthrough focuses on **Step 5 — Basemap Texture** of the
-[Elevation panel](../../panels/osmnx/elevation.qmd) and continues from
-[Elevation, DEM & 3D terrain](elevation.qmd).
+The basemap controls stay hidden until a terrain object exists, so finish
+[Elevation, DEM & 3D terrain](elevation.qmd) first. Blender needs internet access
+either way, since the imagery APIs stream tiles or a WMS image.
 
-## Before you begin
+## 1. Why La Paz
 
-- Complete [Elevation, DEM & 3D terrain](elevation.qmd) so an OSMnx terrain mesh
-  exists for the 2 km radius around Avenida Naciones Unidas, La Paz. The basemap
-  controls only appear once a terrain object is present.
-- Ensure Blender has internet access. The imagery APIs stream map tiles or a WMS
-  image over the network.
-- Mapbox, MapTiler and Stadia/Stamen require their own API keys, set in add-on
-  preferences. Esri, OpenStreetMap, CARTO and most public WMS endpoints work
-  without a key.
-
-## 1. Why La Paz for basemaps
-
-A basemap is fetched for the terrain's geographic bounding box and UV-mapped onto
-the mesh, so it follows the elevation surface instead of lying flat. On gentle
-terrain the difference is subtle; on La Paz's steep relief the imagery wraps over
-ridges and valleys, which makes it the clearest case to verify that the texture is
-georeferenced and aligned with the streets.
+The basemap is fetched for the terrain's geographic bounding box and UV-mapped
+onto the mesh, so it follows the elevation surface instead of lying flat. On
+gentle terrain that is hard to see. On La Paz's relief the imagery wraps over
+ridges and valleys, which makes it easy to confirm the texture is georeferenced
+and aligned with the streets.
 
 ![The La Paz terrain ready to receive a basemap.](../../../assets/guides/osmnx/10-basemap-terrain.png)
 
 ## 2. Choose an imagery source
 
-Expand **Step 5 — Basemap Texture** and set **Source**. The dropdown is grouped
-by provider; each API exposes several styles, so you can pick the exact look that
-suits the scene (satellite, streets, dark, light, topographic, ...).
+**Source** is grouped by provider, and each provider exposes several styles.
 
-### No API key required
-
-| Provider | Styles | API key |
+| Provider | Styles | Key |
 | --- | --- | --- |
-| **Esri** | Satellite (Imagery), Streets, Topographic, Dark Gray Canvas, Light Gray Canvas, Ocean Base, Hillshade, Terrain Base | No |
-| **OpenStreetMap** | OSM Standard, OpenTopoMap | No |
-| **CARTO** | Voyager, Positron (Light), Dark Matter | No (fair-use) |
-
-### API key required (set in add-on preferences)
-
-| Provider | Styles | API key |
-| --- | --- | --- |
+| **Esri** | Satellite (Imagery), Streets, Topographic, Dark Gray Canvas, Light Gray Canvas, Ocean Base, Hillshade, Terrain Base | None |
+| **OpenStreetMap** | OSM Standard, OpenTopoMap | None |
+| **CARTO** | Voyager, Positron (Light), Dark Matter | None (fair-use) |
 | **Mapbox** | Satellite, Satellite Streets, Streets, Outdoors, Light, Dark | Mapbox token |
 | **MapTiler** | Satellite, Satellite Hybrid, Streets, Topographic, Outdoor, Basic, Winter, Ocean | MapTiler key |
 | **Stadia / Stamen** | Alidade Smooth (Light), Alidade Smooth Dark, Outdoors, Stamen Toner (B/W), Stamen Terrain, Stamen Watercolor | Stadia key |
-
-### Custom
-
-| Source | Imagery | API key |
-| --- | --- | --- |
 | **Custom WMS** | Any OGC WMS `GetMap` layer | Depends on server |
 
-For a first pass, **Esri · Satellite (Imagery)** gives high-resolution satellite
-imagery with no key. The minimal **CARTO** and **Esri** canvas styles (Positron,
-Dark Matter, Light/Dark Gray) work well as neutral backdrops for data overlays.
+**Esri · Satellite (Imagery)** is the best first pass: high resolution, no key.
+The minimal canvas styles (Positron, Dark Matter, Light/Dark Gray) work better as
+neutral backdrops for data overlays.
 
 ![Selecting an imagery source in the Basemap Texture step.](../../../assets/guides/osmnx/10-basemap-source.png)
 
 ::: {.callout-note}
-For key-bound providers (**Mapbox**, **MapTiler**, **Stadia/Stamen**), set the
-matching key in add-on preferences. When a key-bound source is selected without a
-key, the panel names the provider in a hint and the fetch is blocked until the key
-is provided.
+Keys go in add-on preferences. Select a key-bound source without its key and the
+panel names the provider in a hint and blocks the fetch.
 :::
 
 ## 3. Set zoom (tile sources)
 
-For all tile sources (every provider except WMS), set **Zoom**. Higher zoom means
-more detail and more tiles to download. A live tile-count estimate is shown so you
-can balance detail against download size before fetching; very high zoom over the
-2 km radius is capped to protect against accidental large requests. Some styles
-have a lower native maximum zoom and are clamped automatically.
+Every provider except WMS needs a **Zoom**. Higher zoom means more detail and
+more tiles, so use the live tile-count estimate to balance the two before
+fetching. Very high zoom over the 2 km radius is capped to stop accidental large
+requests, and styles with a lower native maximum are clamped automatically.
 
 ![The zoom control with the live tile-count estimate.](../../../assets/guides/osmnx/10-basemap-zoom.png)
 
 ## 4. Fetch and apply
 
-Press **Fetch & Apply**. The add-on downloads the tiles (or the single WMS image),
-stitches them into one georeferenced image, and drapes it over the La Paz terrain
-using per-vertex UV mapping. The active source and its attribution are shown once
-the basemap is applied.
+**Fetch & Apply** downloads the tiles (or the single WMS image), stitches them
+into one georeferenced image, and drapes it over the terrain with per-vertex UV
+mapping. The active source and its attribution appear once it is applied.
 
 ![Esri satellite imagery draped over the La Paz terrain.](../../../assets/guides/osmnx/10-basemap-esri.png)
 
 ::: {.callout-tip}
-Fetching is cancellable. If you interrupt a long download, in-flight tile requests
-are dropped so Blender's UI does not freeze.
+Fetching is cancellable. Interrupt a long download and in-flight tile requests
+are dropped, so Blender's UI does not freeze.
 :::
 
 ## 5. Use a WMS layer
 
-To use an institutional or national orthophoto service, set **Source** to **WMS**
-and fill in **WMS URL** and **Layer**. The add-on issues a single `GetMap` request
-in `EPSG:4326` for the terrain's bounding box, so the returned image maps linearly
+For an institutional or national orthophoto service, set **Source** to **WMS**
+and fill in **WMS URL** and **Layer**. The add-on issues one `GetMap` request in
+`EPSG:4326` for the terrain's bounding box, so the returned image maps linearly
 onto the mesh.
 
 ![A WMS orthophoto layer applied to the terrain.](../../../assets/guides/osmnx/10-basemap-wms.png)
 
 ## 6. Compare and swap textures
 
-Press **Clear** to remove the current basemap, then fetch a different source to
-compare them on the same relief — for example Esri satellite versus a CARTO Dark
-Matter backdrop versus a Stamen Watercolor style versus a WMS orthophoto.
-Downloaded tiles are cached, so re-fetching the same source and zoom is fast.
+**Clear** removes the current basemap, then fetch a different source to compare
+them on the same relief. Downloaded tiles are cached, so re-fetching a source and
+zoom you have already used is fast.
 
 ![Comparing satellite and street basemaps on the same La Paz terrain.](../../../assets/guides/osmnx/10-basemap-compare.png)
 
 ## Next steps
 
-This completes the OSMnx tutorials. Move on to the City2Graph tab with
+That completes the OSMnx tutorials. Move on to the City2Graph tab with
 [Import urban data](../city2graph/data.qmd).

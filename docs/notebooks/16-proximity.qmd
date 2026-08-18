@@ -1,0 +1,28 @@
+---
+title: "16 · Proximity graphs"
+execute:
+  enabled: false
+---
+
+When no flow is observed and no street joins two entities, the relation between
+them can be posited from geometric closeness. City2Graph offers seven
+constructions for points and one for polygons, and which you pick is a
+hypothesis about which spatial relation matters, not a neutral preprocessing
+step, so the notebook builds all of them over the same points, restaurants and
+cafés in one neighborhood: `knn_graph` and
+`fixed_radius_graph` for relative and absolute proximity, the four
+non-parametric constructions (`delaunay_graph`, `gabriel_graph`,
+`relative_neighborhood_graph`, `euclidean_minimum_spanning_tree`), the
+probabilistic `waxman_graph`, and `contiguity_graph` for polygons. It closes
+with the two layer-coupling tools, `bridge_nodes` and `group_nodes`.
+
+Two divergences are documented where they appear: `generate_proximity_graph`
+reduces polygons to points before calling `contiguity_graph()`, so `CONTIGUITY`
+always yields zero edges, and `prox_deduplicate`, on by default, rebuilds the
+GeoDataFrame and loses columns and the original index. The notebook also detects
+a bug in **city2graph 0.3.1** itself: `gabriel_graph()` compares squared
+distances against an absolute `1e-12` tolerance, so with UTM coordinates it
+returns an incorrect graph (248 edges where there should be 453). The check is
+`RNG ⊆ Gabriel`, and a workaround is included.
+
+{{< embed _ipynb/16_proximity.ipynb echo=true >}}

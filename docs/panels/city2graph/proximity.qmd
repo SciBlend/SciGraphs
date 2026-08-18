@@ -2,16 +2,12 @@
 title: "Proximity Graphs"
 ---
 
-::: {.lead}
 The Proximity Graphs panel builds spatial networks from feature objects:
 single-layer graphs (KNN, radius, Delaunay…), multi-layer graphs that connect
 different feature types, and group-node graphs that link polygons to the points
-they contain. It is split into five subpanels.
-:::
-
-The header subpanel only describes the capability. Generation parameters live in
-the **Single-Layer**, **Multi-Layer**, and **Group Nodes** subpanels, while
-**Advanced Settings** and **Visualization** apply across them.
+they contain. Generation parameters live in the **Single-Layer**,
+**Multi-Layer**, and **Group Nodes** subpanels, while **Advanced Settings** and
+**Visualization** apply across them.
 
 ::: {.callout-note}
 Feature inputs must be City2Graph/OSM feature objects (a green checkmark with the
@@ -24,9 +20,7 @@ OSMnx Features can create these objects from Overture layers, OSMnx presets, or
 custom OSM tags such as `amenity=restaurant`.
 :::
 
-## Subpanel — Single-Layer Graphs {#single}
-
-Builds one graph over a single set of features.
+## Subpanel: Single-Layer Graphs {#single}
 
 | Control | Description |
 | --- | --- |
@@ -39,18 +33,18 @@ Builds one graph over a single set of features.
 
 | Type | Meaning | Extra parameter |
 | --- | --- | --- |
-| **K-Nearest Neighbors** | Connect each node to its K closest nodes. | **K (Neighbors)** — must be `< feature count`. |
-| **Delaunay** | Delaunay triangulation. | — |
+| **K-Nearest Neighbors** | Connect each node to its K closest nodes. | **K (Neighbors)**, must be `< feature count`. |
+| **Delaunay** | Delaunay triangulation. | (none) |
 | **Fixed Radius** | Connect all nodes within a distance (Gilbert graph). | **Radius (meters)**. |
 | **Waxman** | Probabilistic graph; edge likelihood decays with distance. | **Beta**, **R0**, **Seed**. |
-| **Gabriel** | Gabriel graph (a subset of Delaunay). | — |
-| **Relative Neighborhood** | Relative Neighborhood Graph (RNG). | — |
-| **EMST** | Euclidean Minimum Spanning Tree. | — |
+| **Gabriel** | Gabriel graph (a subset of Delaunay). | (none) |
+| **Relative Neighborhood** | Relative Neighborhood Graph (RNG). | (none) |
+| **EMST** | Euclidean Minimum Spanning Tree. | (none) |
 | **Contiguity** | Polygon adjacency graph. | **Contiguity Type**: **Queen** (share edges or vertices) / **Rook** (share only edges). |
 
 **Generate Graph** builds the network.
 
-## Subpanel — Multi-Layer Graphs {#multi}
+## Subpanel: Multi-Layer Graphs {#multi}
 
 Connects features *across* layers (e.g. restaurants → hospitals → schools).
 
@@ -62,9 +56,9 @@ Connects features *across* layers (e.g. restaurants → hospitals → schools).
 | **Metric** | Euclidean / Manhattan / Network (with a **Network** object). |
 | **Generate Multi-Layer Graph** | Builds the cross-layer bridge graph; per-edge-type attributes are created for coloring. |
 
-## Subpanel — Group Nodes (Polygon → Point) {#group}
+## Subpanel: Group Nodes (Polygon to Point) {#group}
 
-Connects polygon zones to the points they contain (e.g. districts → buildings).
+Connects polygon zones to the points they contain (e.g. districts to buildings).
 
 | Control | Description |
 | --- | --- |
@@ -74,19 +68,17 @@ Connects polygon zones to the points they contain (e.g. districts → buildings)
 | **Metric** | Euclidean / Manhattan / Network (with a **Network** object). |
 | **Generate Group Nodes** | Connects each point to its containing polygon(s). |
 
-## Subpanel — Advanced Settings {#advanced}
+## Subpanel: Advanced Settings {#advanced}
 
-Controls duplicate handling, useful when OSM ways/relations were imported as
-many vertices.
+Duplicate handling, useful when OSM ways/relations were imported as many
+vertices.
 
 | Control | Description |
 | --- | --- |
 | **Deduplicate Points** | Merge coincident points before building the graph. |
 | **Dedup Tolerance** | Points within this distance (meters) are merged. |
 
-## Subpanel — Visualization {#viz}
-
-Controls how generated edges and nodes are displayed.
+## Subpanel: Visualization {#viz}
 
 | Control | Description |
 | --- | --- |

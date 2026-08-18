@@ -1,0 +1,100 @@
+---
+title: "Python API"
+---
+
+Everything the panels do is reachable from Python.
+
+```python
+from SciGraphs import api as sg
+
+ref = sg.graphs.anchor(39.4699, -0.3763)
+obj = sg.graphs.from_gdf(nodes_gdf, edges_gdf, "Streets", ref=ref)
+sg.render.eevee(obj, "/tmp/streets.png", look="ink")
+```
+
+The declarative counterpart is [reproducible pipelines](pipeline-options.qmd),
+which run the same steps from a YAML spec that can be hashed and re-executed.
+Use a spec when the pipeline is the artifact; use this when you are writing one.
+
+## The five modules
+
+| module | what it does |
+|---|---|
+| `sg.graphs` | GeoDataFrames in, native mesh graph objects out; inspection, coloring, saving |
+| `sg.preview` | the add-on's own GPU engine: sizing, camera, edge backbone, render |
+| `sg.render` | EEVEE: geometry nodes, materials, a light rig, six looks, legibility measurements |
+| `sg.context` | terrain, buildings, basemap imagery, and the alignment checks |
+| `sg.thin` | the edge backbone materialized in the data |
+
+Submodules import on first use, so `sg.graphs` does not drag in the EEVEE camera
+solver or the imagery tile fetcher.
+
+## Where it runs
+
+Inside Blender. Every module imports `bpy`, so this covers an embedded Jupyter
+kernel (see the [notebooks](../notebooks/index.qmd)), a
+`blender --background --python script.py` run, and the scripting workspace.
+
+Two halves of the project do install without Blender, as ordinary wheels that
+Blender ships and installs like any other dependency:
+
+| distribution | import | what is in it |
+|---|---|---|
+| `scigraphs-core` | `scigraphs_core` | graph algorithms, layouts, colormaps, tabular and geospatial IO, the OSMnx and city2graph wrappers, the pipeline schema |
+| `scigraphs-engine` | `scigraphs_engine` | graph filtering on structural channels, backbone extraction, edge bundling, PNG rendering through wgpu |
+
+Neither imports `bpy`. What stays in the add-on is what needs a scene: the mesh
+builders, terrain and raster projection, the caches keyed on live objects, the
+viewport overlay and the pipeline executor.
+
+## Two rules the API keeps
+
+Paths belong to the caller. Nothing decides where a file goes or invents an
+output directory. `sg.render.eevee(obj, path)` writes to `path`.
+
+Registered state goes through `bpy.ops`. Blender registers operators, panels and
+scene properties at start-up, and registration does not follow `sys.path`, so a
+`PropertyGroup` written by direct import can belong to a different copy of the
+add-on than the operator that reads it. Anything driving the coloring or
+visualization pipeline is called as an operator for that reason.
+
+## Sizing, which is where geospatial figures go wrong
+
+A geospatial graph arrives in Blender units where 1 km is one unit. The node
+radius that suits an abstract graph of forty nodes covers a whole district here,
+and the figure comes back as a pile of overlapping spheres. Push it the other
+way and you get an empty frame. Every function that draws takes its scale from
+the graph's measured extent rather than from a constant:
+
+```python
+sg.preview.extent(obj)              # center, size, diagonal, nearest neighbor
+sg.render.autoscale_geometry(obj)   # node radius and tube width from that
+sg.render.measure(obj)              # what it settled on, to print or assert
+```
+
+## Sparsification every renderer can see
+
+`sg.preview.backbone()` thins the picture by setting scene properties read in
+one place: while the add-on's GPU engine fills its buffers. The mesh is
+unchanged, so the Geometry Nodes path, and therefore EEVEE, still instances a
+tube on every edge. A near-complete graph rendered that way comes back a solid
+mat with nothing in the log to say why.
+
+`sg.thin` does the same ranking in Python, on the GeoDataFrame, and builds a
+second object from the result. That object is an ordinary graph, so the thinning
+survives into the mesh, into a saved GeoPackage, and into any renderer.
+
+```python
+sg.thin.gpu_weights(obj, "travel_time")   # what the filter will actually rank
+
+thin_obj, report = sg.thin.graph(nodes_gdf, edges_gdf, "Top3",
+                                 weight="travel_time", k=3, sense="low", ref=ref)
+sg.thin.verify(thin_obj, obj, nodes_gdf, edges_gdf,
+               weight="travel_time", k=3, sense="low")
+```
+
+`sense` is worth reading twice. `TOPK` keeps the edges of largest weight, so on
+a travel time it keeps each node's slowest connections: the k least accessible
+destinations, not the most. `sense="low"` inverts it. `sense="high"` is the GPU
+engine's own rule and the default, so parity can be demonstrated before it is
+departed from.

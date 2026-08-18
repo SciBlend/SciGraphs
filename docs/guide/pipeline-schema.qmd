@@ -3,18 +3,18 @@ title: "Writing pipeline files"
 ---
 
 ::: {.lead}
-A SciGraphs pipeline is a declarative JSON or YAML file that replays an entire
-workflow - dataset, analysis, layout, visualization, render and export - with a
-fixed seed so results are reproducible. This page is the reference for authoring
-your own pipelines.
+A SciGraphs pipeline is a declarative JSON or YAML file that replays a whole
+workflow, dataset through export, with a fixed seed so results are reproducible.
+This page is the authoring reference.
 :::
 
 {{< include ../reference/_skill-download.qmd >}}
 
-Run a pipeline from the **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)**
-(Validate, then Run) or with the `scigraphs.run_pipeline` operator. An
-auto-generated, exhaustive option list is at
-[pipeline options reference](../reference/pipeline-options.qmd).
+Run one from the **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)**
+(Validate, then Run) or with the `scigraphs.run_pipeline` operator. Every field
+of every section, with its type, default and enum values, is listed in the
+auto-generated [pipeline options reference](../reference/pipeline-options.qmd);
+this page is about how to write a specification, that one is the exhaustive list.
 
 ## Top-level structure
 
@@ -34,14 +34,14 @@ auto-generated, exhaustive option list is at
 }
 ```
 
-Only `meta` is required. Every other stage is optional and runs in the order
-above. The `ops` stage runs after `lighting` and before `render`; `labels` runs
-inside the render stage, after the camera is framed and before the image is
-produced, because it needs the final camera matrix.
+Only `meta` is required; the rest are optional and run in the order above.
+`ops` runs after `lighting` and before `render`. `labels` runs inside the render
+stage, after the camera is framed and before the image is produced, because it
+needs the final camera matrix.
 
 Paths beginning with `//` resolve against the folder holding the specification,
-so a specification and the data it references travel together and the whole
-folder can be moved without editing anything.
+so a specification and its data travel together and the folder can be moved
+without editing anything.
 
 ## `meta`
 
@@ -79,8 +79,8 @@ Choose one `source`. Each source uses a subset of the fields.
 | `normalize` | boolean | `true` | Normalize centrality values |
 
 Each metric is stored as a mesh attribute named `centrality_<metric>` (and
-`clustering` for the clustering coefficient). Community labels are stored on
-`cluster_id`. These attribute names are what you reference from `visual`.
+`clustering` for the clustering coefficient); community labels go on
+`cluster_id`. Those names are what you reference from `visual`.
 
 ## `layout`
 
@@ -95,16 +95,15 @@ Each metric is stored as a mesh attribute named `centrality_<metric>` (and
 | `gravity` | number | `1.0` | Maps to `fa2_gravity` (ForceAtlas2) or `gravity_strength` |
 | `scaling_ratio` | number | `2.0` | ForceAtlas2 scaling ratio |
 
-Algorithm-specific parameters beyond these (the dozens of `fa2_*`, `sfdp_*`,
-`igraph_*`, `graphviz_*` properties) are set through `ops` with nested
-`scene_props` (see below).
+The dozens of algorithm-specific `fa2_*`, `sfdp_*`, `igraph_*` and `graphviz_*`
+properties are set through `ops` with nested `scene_props`, below.
 
 ## `visual`
 
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `setup_geometry_nodes` | boolean | `true` | Build the Geometry Nodes visualization |
-| `node_color` | string | - | Attribute name to colour nodes by |
+| `node_color` | string | - | Attribute name to color nodes by |
 | `node_size` | string | - | Attribute name to size nodes by |
 | `edge_width` | string | - | Attribute name to drive edge width |
 | `edge_color` | string | - | Attribute name for edge coloring |
@@ -117,21 +116,21 @@ Algorithm-specific parameters beyond these (the dozens of `fa2_*`, `sfdp_*`,
 ### Color mapping
 
 `color_norm` is the field most worth knowing. A linear ramp over a heavy-tailed
-measure — betweenness, or degree on a scale-free graph — puts almost every node
-in the darkest bin, so the color channel carries little information. `RANK`
+measure, betweenness or degree on a scale-free graph, drops almost every node
+into the darkest bin and the color channel stops carrying information. `RANK`
 equalizes the histogram and is the robust default for centrality; `LOG` keeps
 the shape of a smoothly varying quantity; `QUANTILE` ranks unique values rather
 than samples, which helps when many nodes tie. `color_vmin`/`color_vmax` pin an
-explicit domain so two figures share a scale, and contradict `RANK`, which
+explicit domain so two figures share a scale, and they contradict `RANK`, which
 derives its own.
 
 ### Glyph geometry and size
 
 `node_radius_rel` and `edge_radius_rel` express radius as a fraction of the
-graph's own measured extent. Prefer them to the absolute forms, which are wrong
-at every scale but the one they were chosen for — a layout scaled to 50 units
-drawn with a 0.02 radius is subpixel at any framing. When both are given, the
-relative form wins.
+graph's measured extent. Prefer them to the absolute forms, which are wrong at
+every scale but the one they were chosen for: a layout scaled to 50 units drawn
+with a 0.02 radius is subpixel at any framing. When both are given, the relative
+form wins.
 
 `node_glyph`, `node_resolution` and `edge_profile` choose the primitive. Below
 about twelve segments the silhouette is visibly faceted in print.
@@ -161,7 +160,7 @@ colormap entry for its value. Set `Standard` for anything color-quantitative.
 Engine-specific fields are ignored by the other engine. Two are easy to get
 wrong: `filter_width` defaults to 1.5 px and visibly softens thin edges, and
 EEVEE's `ambient_occlusion` does nothing without `raytracing`, since fast GI is
-a mode of the ray tracing pipeline — the executor enables the parent for you.
+a mode of the ray tracing pipeline. The executor enables the parent for you.
 
 ## `labels`
 
@@ -172,30 +171,23 @@ matrix.
 Prefer `max_count` to `min_value`: the centrality attributes are normalized to
 [0,1], so a threshold that works on one graph is meaningless on the next, while
 a count is bounded whatever the size or distribution. `occlusion` hides labels
-whose node is behind geometry; `declutter` drops labels that would overlap a
-higher-ranked one, without which the renderer simply overdraws and dense regions
-become unreadable.
+whose node is behind geometry, and `declutter` drops labels that would overlap a
+higher-ranked one. Without it the renderer overdraws and dense regions become
+unreadable.
 
 ## `world`
 
 Background `color`, ambient `strength`, and an optional `hdri`. Untouched by
 default, in which case the render inherits whatever world the startup file
-carried — exactly the kind of undeclared dependency a specification exists to
-remove.
+carried, which is exactly the kind of undeclared dependency a specification
+exists to remove.
 
 ## `lighting`
 
 A single sun: `sun_energy`, `sun_angle`, `sun_rotation` and `replace`. One wide,
-soft key rather than a rig — the graph is convex-ish and self-shadowing costs
-more legibility than the modelling it buys. A large `sun_angle` gives
+soft key rather than a rig, because the graph is convex-ish and self-shadowing
+costs more legibility than the modeling it buys. A large `sun_angle` gives
 near-shadowless light that still separates glyphs by their own shading gradient.
-
-::: {.callout-note}
-Every field of every section, with its type, default and enum values, is in the
-[pipeline options reference](../reference/pipeline-options.qmd), generated from
-the add-on itself. This page is about how to write a specification; that one is
-the exhaustive list.
-:::
 
 ## `exports`
 
@@ -218,10 +210,9 @@ list of operator calls. Each entry has:
 
 ### Nested `scene_props` by property group
 
-`scene_props` may be **flat** (applied to `scene.scigraphs`) or **nested** by
-property group. This is what makes every parameter in SciGraphs reachable,
-including City2Graph, the coloring toolbar and the interactive visualization
-settings.
+`scene_props` may be flat (applied to `scene.scigraphs`) or nested by property
+group. Nesting is what makes every parameter reachable, including City2Graph,
+the coloring toolbar and the interactive visualization settings.
 
 ```json
 {
@@ -242,13 +233,10 @@ settings.
 | `repro` | `scene.scigraphs_repro` |
 | `splitter` | `scene.scigraphs_splitter` |
 
-A flat `scene_props` (no group keys) is still applied to `scene.scigraphs` for
-backward compatibility.
-
-For the complete, always-current list of every property in every group, use the
-auto-generated reference: open the Reproducibility panel and click **Export
-Options Reference**, or read
-[pipeline options reference](../reference/pipeline-options.qmd).
+A flat `scene_props` with no group keys is still applied to `scene.scigraphs`
+for backward compatibility. For the always-current list of every property in
+every group, open the Reproducibility panel and click **Export Options
+Reference**.
 
 ## Run artifacts
 
@@ -262,7 +250,7 @@ Together with `meta.seed`, these make a run reproducible.
 
 ## Examples
 
-Six complete, ready-to-run specifications — with their renders, and a note on
-the field each one exists to demonstrate — are in the
+Six complete, ready-to-run specifications, with their renders and a note on the
+field each one exists to demonstrate, are in the
 [reproducible-pipeline example](../examples/05-reproducible-pipeline.qmd). You
 can drag any of them straight onto the Blender viewport from that page.

@@ -1,33 +1,22 @@
 ---
-title: "Tutorial 5 — A reproducible pipeline"
+title: "Tutorial 5: A reproducible pipeline"
 ---
 
-::: {.lead}
-Capture an entire workflow — dataset, analysis, layout, styling, lighting,
-labels, render and export — in a short declarative file, then replay it
-deterministically with a provenance manifest.
-:::
-
 A pipeline specification is a JSON or YAML file with one block per stage of the
-workflow. Running it reproduces the whole figure: the same `seed` and the same
-inputs give the same result, on any machine with the add-on installed. Each run
-also writes a manifest recording the versions it used and a SHA-256 for every
-file it produced, so a third party can check that they got what you got.
-
-That turns a figure into something you can put in a repository — a few kilobytes
-of text that regenerates the image, instead of a screenshot and a paragraph
-describing which buttons were pressed.
+workflow: dataset, analysis, layout, styling, lighting, labels, render and
+export. Running it reproduces the whole figure, since the same `seed` and the
+same inputs give the same result on any machine with the add-on installed. Each
+run also writes a manifest recording the versions it used and a SHA-256 for
+every file it produced, so a third party can check that they got what you got.
 
 ## Ready-to-run specifications
 
-The specifications below are complete and self-contained: each produces the
-figure shown beside it, with no editing. They are not fragments to adapt — they
-run as they are. Each card explains what it demonstrates and why its fields are
-set the way they are, so the collection doubles as a tour of the schema.
+Each specification below is complete and produces the figure shown beside it
+with no editing.
 
 **Download one, then drag it from your file manager onto the 3D Viewport.** With
 SciGraphs enabled it runs immediately, writing its outputs and a provenance
-manifest beside the file. Nothing else needs to be open.
+manifest beside the file.
 
 You can also set the **Pipeline file** in
 **SciGraphs ▸ [Reproducibility](../panels/scigraphs/reproducibility.qmd)** and
@@ -35,15 +24,15 @@ press **Validate**, then **Run**.
 
 ## From a terminal, without opening Blender
 
-A specification is a batch job, so it does not need a window. This runs one
-headlessly and needs nothing but Blender with SciGraphs installed:
+This runs a specification headlessly and needs nothing but Blender with
+SciGraphs installed:
 
 ```bash
 blender -b --python-expr "import bpy; bpy.ops.scigraphs.run_pipeline(filepath='/path/to/spec.json')"
 ```
 
-Outputs and the manifest land beside the specification exactly as they would
-from the interface. Progress goes to stdout, prefixed `[SciGraphs Repro]`.
+Outputs and the manifest land beside the specification as they would from the
+interface. Progress goes to stdout, prefixed `[SciGraphs Repro]`.
 
 For scripting or continuous integration, exit on the operator's result so a
 failure stops the build instead of passing silently:
@@ -54,18 +43,15 @@ blender -b --python-expr "import bpy, sys; sys.exit(0 if 'FINISHED' in bpy.ops.s
 
 Blender itself exits 0 whatever happens inside the script, so the `sys.exit` is
 what makes a broken specification visible. Everything after `--` is passed to
-the script rather than interpreted by Blender.
-
-This is also the way to regenerate a set of figures: loop over the
-specifications and let each one write its own manifest, then compare the digests
-against the ones recorded previously.
+the script rather than interpreted by Blender. To regenerate a set of figures,
+loop over the specifications and compare each manifest's digests against the
+ones recorded previously.
 
 ::: {.callout-note}
 Paths beginning `//` resolve against the folder holding the specification, so
 keep a downloaded file next to any data it references. Two of these download a
 street network live from OpenStreetMap; the rest need no network.
 :::
-
 
 ## Les Misérables from a GEXF file
 
@@ -78,22 +64,20 @@ Rank normalization on a betweenness distribution that is half zeros
 The co-appearance network of *Les Misérables*: 77 characters, 254 edges,
 distributed with the specification so the example runs with no network access.
 
-Betweenness here is extreme even by the standards of social networks. **43 of the
-77 characters have betweenness exactly zero** — they appear only alongside
-someone more central — and the maximum, Valjean, reaches 0.57. Normalized
-linearly onto a colormap, 71 of 77 nodes fall in the lowest tenth and only 5 of
-10 color bins are used at all.
+Betweenness here is extreme even by the standards of social networks. 43 of the
+77 characters have betweenness exactly zero, appearing only alongside someone
+more central, and the maximum, Valjean, reaches 0.57. Normalized linearly onto a
+colormap, 71 of 77 nodes fall in the lowest tenth and only 5 of 10 color bins
+are used at all.
 
 `color_norm: RANK` replaces each value by its position in the sorted order. The
-bins become 8, 8, 7, 8, 7, 8, 8, 7, 8, 8 — uniform by construction. That is what
-the figure shows.
-
-The limit is visible too: the 43 tied zeros share one rank, so they share one
-color. Ranking fixes the distribution, not the ties.
+bins become 8, 8, 7, 8, 7, 8, 8, 7, 8, 8, uniform by construction. The limit is
+visible too: the 43 tied zeros share one rank, so they share one color. Ranking
+fixes the distribution, not the ties.
 
 | | |
 | --- | --- |
-| **Source** | `gexf` — lesmiserables.gexf |
+| **Source** | `gexf`: lesmiserables.gexf |
 | **Engine** | Cycles |
 | **Color transform** | `RANK` |
 | **Metrics** | `degree`, `betweenness` |
@@ -197,7 +181,7 @@ Choosing a color transform by measuring what it does to the histogram
 
 The walkable street network of Llíria (Valencia, about 23,000 inhabitants):
 6037 nodes, 8067 edges, downloaded live from OpenStreetMap. There is no `layout`
-block on purpose — the coordinates arrive with the data, and a force-directed
+block on purpose. The coordinates arrive with the data, and a force-directed
 layout would discard the geography.
 
 `camera_ortho` removes the near/far size falloff, so a node radius that encodes a
@@ -205,10 +189,9 @@ value stays comparable anywhere in the frame. The cost is the loss of depth cues
 a fair trade for a network that is essentially flat.
 
 Betweenness here is extremely concentrated: median 0.001 against a maximum of
-0.26, with 1112 nodes at exactly zero. Choosing how to map that onto a colormap
-is the interesting decision, and it is one you can measure rather than guess.
-Counting how many nodes each transform sends into the brightest three tenths of
-the ramp:
+0.26, with 1112 nodes at exactly zero. How to map that onto a colormap can be
+measured rather than guessed. Counting how many nodes each transform sends into
+the brightest three tenths of the ramp:
 
 | `color_norm` | Ramp bins used | Nodes in the brightest 30 % |
 | --- | --- | --- |
@@ -217,24 +200,24 @@ the ramp:
 | `RANK` | 10 of 10 | 1811 (30.0 %) |
 | `LOG` | 10 of 10 | 2419 (40.1 %) |
 
-`RANK` and `LOG` both flood the image: they equalize the histogram, which is
-exactly right for a graph whose ordering you want to read, and exactly wrong for
-one where the interesting fact is that a small minority of streets carry the
-through traffic. Plain `LINEAR` goes too far the other way — a single extreme
-node compresses everything else into one bin.
+`RANK` and `LOG` both flood the image. They equalize the histogram, which is
+right for a graph whose ordering you want to read and wrong for one where the
+interesting fact is that a small minority of streets carry the through traffic.
+Plain `LINEAR` goes too far the other way: a single extreme node compresses
+everything else into one bin.
 
 Clipping the top percentile and then mapping linearly keeps the concentration
-while spending the whole ramp: the arterial routes come out as continuous bright
+while spending the whole ramp. The arterial routes come out as continuous bright
 chains against a violet field, and their brightness still means magnitude rather
 than rank.
 
-**This example needs the Overpass API.** When it is down — which happens — the
+**This example needs the Overpass API.** When it is down, which happens, the
 dataset stage retries and appears to hang. Nominatim answering does not mean
 Overpass will.
 
 | | |
 | --- | --- |
-| **Source** | `osmnx` — Llíria, Valencia, Spain |
+| **Source** | `osmnx`: Llíria, Valencia, Spain |
 | **Engine** | Cycles |
 | **Color transform** | `LINEAR` |
 | **Metrics** | `degree`, `betweenness` |
@@ -341,28 +324,28 @@ A rectangular constraint matrix as a bipartite graph, laid out the way the colle
 ![](../assets/gallery/fig3_suitesparse_nemsafm.png){.gallery-figure}
 
 `Meszaros/nemsafm` is a linear program in standard form: 334 constraints by 2348
-variables, 2826 nonzeros, 0.36 % dense. Read as a bipartite graph — one node per
-row, one per column, an edge per nonzero — that is 2682 nodes and 2826 edges.
+variables, 2826 nonzeros, 0.36 % dense. Read as a bipartite graph, one node per
+row, one per column, an edge per nonzero, that is 2682 nodes and 2826 edges.
 
 The structure the drawing shows is in the statistics the run exports. Clustering
 coefficient is exactly 0, as it must be for a bipartite graph: no triangles.
-Median degree is 1 against a mean of 2.11, so most nodes are leaves; assortativity
-is −0.79, so those leaves hang off hubs. Together they produce the radial tufts.
-Diameter 22 over 2682 nodes gives the elongated shape, and the mean column degree
-of 1.20 says most variables appear in a single constraint.
+Median degree is 1 against a mean of 2.11, so most nodes are leaves;
+assortativity is -0.79, so those leaves hang off hubs. Together they produce the
+radial tufts. Diameter 22 over 2682 nodes gives the elongated shape, and the mean
+column degree of 1.20 says most variables appear in a single constraint.
 
 The layout is `YIFAN_HU`, the multilevel force-directed method SuiteSparse itself
 uses for its gallery, so the drawing is comparable with the collection's own. It
 places the graph in a plane with only slight relief, so `camera_direction` looks
 straight down that plane's normal; the default oblique view would foreshorten it.
 
-The matrix ships no coordinates, so a layout is required — unlike a structural
-mesh, where the auxiliary coordinate file *is* the embedding and a layout would
-overwrite it.
+The matrix ships no coordinates, so a layout is required. In a structural mesh
+the auxiliary coordinate file *is* the embedding, and a layout would overwrite
+it.
 
 | | |
 | --- | --- |
-| **Source** | `suitesparse` — Meszaros/nemsafm |
+| **Source** | `suitesparse`: Meszaros/nemsafm |
 | **Engine** | Cycles |
 | **Color transform** | `RANK` |
 | **Metrics** | `degree`, `betweenness` |
@@ -470,15 +453,15 @@ analysis, color and glyph fields produce the same geometry, and only the last
 section differs from a Cycles specification.
 
 Nodes are colored by closeness centrality under `QUANTILE` normalization, which
-ranks unique values rather than samples — appropriate here because a grid-like
-street plan produces large groups of nodes with identical closeness.
+ranks unique values rather than samples. That suits a grid-like street plan,
+which produces large groups of nodes with identical closeness.
 
-`ambient_occlusion` darkens the crevices between clustered nodes, which is what
-lets a dense scatter read as depth rather than as a flat field.
+`ambient_occlusion` darkens the crevices between clustered nodes, which lets a
+dense scatter read as depth rather than as a flat field.
 
 | | |
 | --- | --- |
-| **Source** | `osmnx` — Xàtiva, Valencia, Spain |
+| **Source** | `osmnx`: Xàtiva, Valencia, Spain |
 | **Engine** | EEVEE Next |
 | **Color transform** | `QUANTILE` |
 | **Metrics** | `degree`, `closeness` |
@@ -572,7 +555,7 @@ lets a dense scatter read as depth rather than as a flat field.
 ```
 :::
 
-## Labelled characters
+## Labeled characters
 
 ::: {.gallery-tagline}
 Ranking, occlusion and collision, in that order
@@ -581,7 +564,7 @@ Ranking, occlusion and collision, in that order
 ![](../assets/gallery/fig6_labels_lesmiserables.png){.gallery-figure}
 
 The same 77-node network with the eighteen highest-betweenness characters
-labelled.
+labeled.
 
 Three filters run in sequence, and the run reports each: 77 nodes projected, 77
 inside the frame, 59 not hidden behind geometry, 18 kept. `rank_by` decides the
@@ -594,7 +577,7 @@ next, whereas a count is bounded whatever the size or distribution.
 
 | | |
 | --- | --- |
-| **Source** | `gexf` — lesmiserables.gexf |
+| **Source** | `gexf`: lesmiserables.gexf |
 | **Engine** | Cycles |
 | **Color transform** | `RANK` |
 | **Metrics** | `degree`, `betweenness` |
@@ -613,7 +596,7 @@ next, whereas a count is bounded whatever the size or distribution.
     "title": "fig6_labels_lesmiserables",
     "seed": 42,
     "output_dir": "//repro/fig6_labels",
-    "description": "Node labels generated from a headless pipeline. The add-on's only entry point for this is an operator whose poll() rejects a background context, so labelled figures were unreachable from a specification; the underlying code never needed a GUI. Labels are ranked by betweenness, occlusion-tested against the real glyph geometry, and decluttered.",
+    "description": "Node labels generated from a headless pipeline. The add-on's only entry point for this is an operator whose poll() rejects a background context, so labeled figures were unreachable from a specification; the underlying code never needed a GUI. Labels are ranked by betweenness, occlusion-tested against the real glyph geometry, and decluttered.",
     "clear_scene": true
   },
   "dataset": {
@@ -710,15 +693,18 @@ Beside every specification you run, in the folder its `meta.output_dir` names:
   dependency versions, the seed, a hash of the specification, and a SHA-256 for
   every input and output;
 - an **execution log** (`run.log`);
-- the outputs themselves — the render, plus whatever `exports` asked for.
+- the outputs themselves: the render, plus whatever `exports` asked for.
 
-Two manifests can be compared directly, which reports whether the specification,
-the seed and the environment agreed, and names any file whose digest differs.
+Two manifests can be compared directly. The comparison reports whether the
+specification, the seed and the environment agreed, and names any file whose
+digest differs.
 
 ## Writing your own
 
-Every field these examples use — and the ones they do not — is listed in the
+Every field, including the ones these examples do not use, is listed in the
 [pipeline options reference](../reference/pipeline-options.qmd), generated from
 the add-on itself so it cannot go stale. For the shape of a specification and
 what each stage does, read [Writing pipeline files](../guide/pipeline-schema.qmd).
+To drive the same steps imperatively instead, see the
+[Python API](../reference/python-api.qmd).
 

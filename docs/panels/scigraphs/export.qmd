@@ -2,14 +2,10 @@
 title: "Export & Tools"
 ---
 
-::: {.lead}
 The Export & Tools panel writes the graph back out to standard formats and
-generates analytical reports.
-:::
+generates analytical reports. It requires a graph to be loaded.
 
-The parent panel requires a graph to be loaded.
-
-## Subpanel — Export Options {#export-options}
+## Subpanel: Export Options {#export-options}
 
 | Control | Description |
 | --- | --- |
@@ -35,17 +31,9 @@ A conversion script for **PyTorch Geometric** structures is included in the
 repository to bridge visualization and machine-learning workflows.
 :::
 
-## Subpanel — Utilities {#utilities}
+## Subpanel: Utilities {#utilities}
 
 | Control | Description |
 | --- | --- |
 | **Power Law Fit** | Include a power-law fit of the degree distribution in the report. |
 | **Generate Report** | Produces a statistics report (text) summarizing the graph's metrics. |
-
-## Typical workflow
-
-1. Choose a **Format** and **Path**, decide whether to include **Attributes**,
-   and press **Export Graph** — or use a quick-format button.
-2. Use **Positions** to export coordinates for reuse elsewhere.
-3. Generate a **Statistics Report** for a textual summary, optionally with a
-   power-law fit.

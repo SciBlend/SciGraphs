@@ -1,0 +1,11 @@
+# These notebooks need a live Blender kernel, so Quarto must never try to run
+# them. The pages show the outputs stored in the .ipynb files as they were
+# executed inside Blender.
+#
+# The embedded copies live in _ipynb/ because the embed shortcode cannot reach
+# outside the project directory. They are refreshed automatically by the
+# `_sync_notebooks.py` pre-render hook declared in ../_quarto.yml — there is no
+# manual copy step any more. To refresh them without a render:
+#   python3 docs/_sync_notebooks.py
+execute:
+  enabled: false

@@ -1,0 +1,21 @@
+---
+title: "07 · Street geometry and orientation"
+execute:
+  enabled: false
+---
+
+What the shape of a street network says about the place, measured three ways
+over three neighborhoods. Orientation entropy separates them cleanly:
+L'Eixample in València, a nineteenth-century grid, scores 2.76 nats with 16 % of
+its streets in a single sector, while the Albaicín in Granada scores 3.50,
+within 2 % of the theoretical maximum, which is another way of saying it has no
+dominant direction at all. Circuity agrees, 1.015 against 1.094.
+
+One figure is deliberately not drawn. Coloring streets by bearing is impossible
+here: an edge attribute is averaged onto the vertices, bearing is circular, and
+at 95 % of the intersections where two orientations meet the average is more
+than 5° from every street that touches it. The map would show a direction that
+does not exist in the data, so the distribution and the rose carry that material
+instead.
+
+{{< embed _ipynb/07_osmnx_geometry.ipynb echo=true >}}

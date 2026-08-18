@@ -2,16 +2,10 @@
 title: "Analysis"
 ---
 
-::: {.lead}
-The Analysis panel computes the network measures that drive the visual
-encoding: centralities, communities, directed-structure metrics, global
-statistics, and topological invariants. Every result is stored as a named mesh
-attribute.
-:::
+The Analysis panel computes network measures and stores every result as a named
+mesh attribute. It requires a graph to be loaded.
 
-The parent panel requires a graph to be loaded.
-
-## Subpanel — Centrality Metrics {#centrality}
+## Subpanel: Centrality Metrics {#centrality}
 
 Node-importance measures for undirected graphs.
 
@@ -21,27 +15,26 @@ Node-importance measures for undirected graphs.
 | **Calculate** (Node Importance) | Computes the chosen centrality and stores it as an attribute. |
 | **Calculate** (Local Clustering) | Computes the local clustering coefficient per node. |
 
-## Subpanel — Community Detection {#community}
+## Subpanel: Community Detection {#community}
 
-Partitions the graph into communities using the SurpriseMe algorithms
-(`pysurprise`).
+Partitions the graph using the SurpriseMe algorithms (`pysurprise`).
 
 | Algorithm | Reference |
 | --- | --- |
-| **CPM** — Clique Percolation Method | Traag et al., Phys. Rev. E 84 (2011) |
-| **Infomap** — map-equation framework | Rosvall & Bergstrom, PNAS 105 (2008) |
-| **RB** — Reichardt–Bornholdt Potts model | Phys. Rev. E 74 (2006) |
-| **RN** — resolution-free Potts model | Ronhovde & Nussinov, Phys. Rev. E 81 (2010) |
-| **RNSC** — Restricted Neighbourhood Search | King et al., Bioinformatics 20 (2004) |
-| **SCluster** — hierarchical clustering (Jerarca) | Aldecoa & Marín, PLoS ONE 5 (2010) |
-| **UVCluster** — iterative cluster analysis (Jerarca) | Arnau et al., Bioinformatics 21 (2005) |
+| **CPM** (Clique Percolation Method) | Traag et al., Phys. Rev. E 84 (2011) |
+| **Infomap** (map-equation framework) | Rosvall & Bergstrom, PNAS 105 (2008) |
+| **RB** (Reichardt–Bornholdt Potts model) | Phys. Rev. E 74 (2006) |
+| **RN** (resolution-free Potts model) | Ronhovde & Nussinov, Phys. Rev. E 81 (2010) |
+| **RNSC** (Restricted Neighborhood Search) | King et al., Bioinformatics 20 (2004) |
+| **SCluster** (hierarchical clustering, Jerarca) | Aldecoa & Marín, PLoS ONE 5 (2010) |
+| **UVCluster** (iterative cluster analysis, Jerarca) | Arnau et al., Bioinformatics 21 (2005) |
 
 | Control | Description |
 | --- | --- |
 | **Clustering Algorithm** | One of the seven algorithms above. |
 | **Detect Communities** | Runs detection and assigns a community id per node. The **Surprise** quality metric is computed automatically. |
 
-## Subpanel — Directed Analysis {#directed}
+## Subpanel: Directed Analysis {#directed}
 
 ::: {.callout-note}
 **When it appears:** only for **directed** graphs. It groups three child
@@ -71,18 +64,16 @@ subpanels.
 | **Speed / Smoothness / Loop** | Animation pacing, gradient smoothness (continuous), and looping. When looping, the panel reports how many cycles fit in the timeline. |
 | **Create Flow Animation** | Propagates activation from source nodes through the directed topology, writing `flow_activation` and `flow_distance` attributes. |
 
-## Subpanel — Statistical Analysis {#statistical}
-
-Global graph metrics.
+## Subpanel: Statistical Analysis {#statistical}
 
 | Control | Description |
 | --- | --- |
 | **Calculate Statistics** | Computes density, global clustering, diameter, average path length, assortativity, and the degree distribution (mean, median, std, range). Results are displayed inline. |
 
-## Subpanel — Topological Analysis {#topology}
+## Subpanel: Topological Analysis {#topology}
 
-Switches between analysis modes with a mode selector at the top. The
-**Surface Embedding** child subpanel is shown in `Surface` mode.
+A mode selector at the top switches between analysis modes. The **Surface
+Embedding** child subpanel is shown in `Surface` mode.
 
 ### Surface Embedding {#surface}
 
@@ -109,13 +100,6 @@ Switches between analysis modes with a mode selector at the top. The
 A read-only summary of all topology properties: planarity, genus bound, face
 count, cycles, linked pairs, intrinsic linking, and the Euler characteristic.
 
-## Typical workflow
-
-1. For an undirected graph, compute a **centrality** and detect **communities**;
-   for a directed graph, use **Directed Analysis**.
-2. Run **Statistical Analysis** for global descriptors.
-3. Use **Topological Analysis** for planarity, genus, and crossing-free
-   embeddings.
-4. Map the resulting attributes to colour/size in the
-   [Visualization panel](visualization.qmd) or stratify them with the
-   [Network Splitter 3D](layout.qmd#splitter).
+The attributes produced here can drive color and size in the
+[Visualization panel](visualization.qmd) or stratify a layout with the
+[Network Splitter 3D](layout.qmd#splitter).

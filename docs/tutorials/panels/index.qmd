@@ -3,21 +3,35 @@ title: "Panel tutorials"
 ---
 
 ::: {.lead}
-Step-by-step walkthroughs of every OSMnx and City2Graph panel, each following a
-concrete case so you can reproduce the result button by button. These are the
-worked "typical workflows" referenced from the
+Step-by-step walkthroughs of every SciGraphs, OSMnx and City2Graph panel, each
+following a concrete case so you can reproduce the result button by button. Each
+one mirrors a single panel and ends where the next begins, so they chain into a
+full pipeline. These are the worked "typical workflows" referenced from the
 [Panel Reference](../../panels/overview.qmd).
 :::
 
-Every tutorial mirrors one panel and ends where the next one begins, so you can
-chain them into a full pipeline.
-
 ## Example areas
 
-| Area | Used for | Why |
+Most tutorials use **Burjassot, Valencia (Spain)**: compact, well connected, rich
+in amenities. The elevation and basemap tutorials use a 2 km radius around
+**Avenida Naciones Unidas, La Paz (Bolivia)** instead, where the relief makes
+DEMs, node elevations, street grades and draped imagery clearly visible.
+
+## SciGraphs panels
+
+The core of the add-on: it works on any graph, geographic or not. See
+[the set's own index](scigraphs/index.qmd) for how these relate to the Jupyter
+notebooks, which cover the same ground from Python and in more depth.
+
+| # | Tutorial | Panel |
 | --- | --- | --- |
-| **Burjassot, Valencia (Spain)** | Every panel except elevation | Compact, well-connected urban area with rich amenities. |
-| **Avenida Naciones Unidas, La Paz (Bolivia)** — 2 km radius | [Elevation, DEM & 3D terrain](osmnx/elevation.qmd) and [Basemaps & API textures](osmnx/basemaps.qmd) | Strong relief makes DEMs, node elevations and street grades clearly visible, and shows basemap textures fetched through the imagery APIs draped over the 3D terrain. |
+| 1 | [Load a graph](scigraphs/data.qmd) | [Data](../../panels/scigraphs/data.qmd) |
+| 2 | [Lay it out](scigraphs/layout.qmd) | [Layout & Positioning](../../panels/scigraphs/layout.qmd) |
+| 3 | [Run algorithms](scigraphs/algorithms.qmd) | [Graph Algorithms](../../panels/scigraphs/algorithms.qmd) |
+| 4 | [Measure the network](scigraphs/analysis.qmd) | [Analysis](../../panels/scigraphs/analysis.qmd) |
+| 5 | [Make a figure](scigraphs/visualization.qmd) | [Visualization](../../panels/scigraphs/visualization.qmd) |
+| 6 | [Export a graph](scigraphs/export.qmd) | [Export & Tools](../../panels/scigraphs/export.qmd) |
+| 7 | [Freeze and replay a pipeline](scigraphs/reproducibility.qmd) | [Reproducibility](../../panels/scigraphs/reproducibility.qmd) |
 
 ## OSMnx panels
 
@@ -48,7 +62,9 @@ chain them into a full pipeline.
 | 8 | [Export for GeoAI](city2graph/export.qmd) | [Export](../../panels/city2graph/export.qmd) |
 
 ::: {.callout-tip}
-New to the add-on? Enable SciGraphs (see [Installation](../../guide/installation.qmd)),
-open the 3D Viewport sidebar with `N`, and start with
-[Download a street network](osmnx/download.qmd).
+New to the add-on? Enable SciGraphs (see
+[Installation](../../guide/installation.qmd)), open the 3D Viewport sidebar with
+`N`, and start with [Download a street network](osmnx/download.qmd). To script
+the same operations instead, see the
+[Python API reference](../../reference/python-api.qmd).
 :::

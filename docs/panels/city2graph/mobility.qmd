@@ -2,21 +2,17 @@
 title: "Mobility (OD Matrix)"
 ---
 
-::: {.lead}
-The Mobility panel builds a graph from an external origin–destination (OD)
+The Mobility panel builds a graph from an external origin-destination (OD)
 matrix, mapping flows between zones onto zone geometries.
-:::
 
-## Load OD Matrix
+## Load OD matrix
 
 | Control | Description |
 | --- | --- |
 | **OD Matrix File** | Path to the OD matrix file (CSV). |
 | **Load OD Matrix** | Loads the file; a badge confirms the loaded file name. |
 
-## OD to Graph
-
-Maps the loaded matrix onto zones and builds the flow graph.
+## OD to graph
 
 | Control | Description |
 | --- | --- |

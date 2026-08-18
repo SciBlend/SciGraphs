@@ -1,0 +1,23 @@
+---
+title: "20 · A local model writes the specification"
+execute:
+  enabled: false
+---
+
+Notebook 19 writes a pipeline specification by hand. This one asks a model
+running on your own machine to write it, checks what comes back, and runs it
+through the same operator. The request goes to `localhost` and the endpoint
+refuses any other host unless you say so, so nothing leaves the computer.
+
+What earns the notebook its place is not that a model can produce JSON. It is
+the three passes between the answer and the render: one strips what should
+never come from a model, one applies rules a schema cannot express, and one
+reports what validates but will still fail. The last example is a request the
+notebook deliberately refuses to run, because the specification it produced is
+valid and wrong.
+
+The model is given the [pipeline skill](../guide/pipeline-schema.qmd), generated
+from the same schema the executor reads, and a JSON schema passed as the
+response format so it cannot invent field names.
+
+{{< embed _ipynb/20_pipeline_assistant.ipynb echo=true >}}

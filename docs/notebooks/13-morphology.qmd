@@ -1,0 +1,22 @@
+---
+title: "13 · Urban morphology"
+execute:
+  enabled: false
+---
+
+Both of City2Graph's morphological constructions, each brought into Blender as a
+native SciGraphs object colored by layer. `segments_to_graph()` gives the
+homogeneous **primal** graph, intersections as nodes and street segments as
+edges. `morphological_graph()` gives the **heterogeneous** graph, where street
+segments are the channels movement organizes along (*public*) and plots with
+their buildings are the units where activity happens (*private*), stitched
+together by three relations: `(private, touched_to, private)`,
+`(public, connected_to, public)` and `(private, faced_to, public)`.
+
+Input comes from OpenStreetMap via OSMnx rather than from Overture Maps, because
+Overture reads remote parquet and takes minutes even for one neighborhood; the
+Overture path is an optional cell at the end. The `c2g_generate_tessellation`
+operator passes `buildings=`/`barriers=` arguments the API does not have, so
+they are silently discarded and the tessellation is never enclosed.
+
+{{< embed _ipynb/13_morphology.ipynb echo=true >}}

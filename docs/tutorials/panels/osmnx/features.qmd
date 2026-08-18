@@ -3,54 +3,42 @@ title: "OSMnx · Download features (POIs)"
 ---
 
 ::: {.lead}
-Download buildings and amenities for Burjassot, snap points of interest to the
-street network, and use the geocoding and geometry helpers.
+Buildings and amenities for Burjassot, snapped to the street network, plus the
+geocoding and geometry helpers. Mirrors the
+[Features panel](../../../panels/osmnx/features.qmd).
 :::
 
-This walkthrough mirrors the [Features panel](../../panels/osmnx/features.qmd).
+Features download independently of any network, but snapping needs one present.
 
-## Before you begin
+## 1. Download the features
 
-Open the **OSMnx** tab. A downloaded street network is useful for snapping POIs,
-but features can be downloaded independently.
-
-## 1. Features from a place
-
-In **Features**, choose **From Place** and enter `Burjassot, Valencia, Spain`.
-Set the tag to fetch (the default is buildings). Press the operator to download
-the footprints as a mesh.
+**From Place** with `Burjassot, Valencia, Spain` and the tag to fetch (buildings
+by default) brings the footprints in as a mesh. **From Point**, **From
+Address**, **From BBox**, **From Polygon** and **From XML** cover the other
+cases; **From Point** with a center and **Distance** gives a fixed radius.
 
 ![Downloading building footprints from a place.](../../../assets/guides/osmnx/07-features-place.png)
 
-## 2. Other sources
-
-The same panel offers **From Point**, **From Address**, **From BBox**, **From
-Polygon** and **From XML**. Use **From Point** with a center and **Distance** for
-a fixed radius around a location.
-
 ![The feature source buttons.](../../../assets/guides/osmnx/07-features-sources.png)
 
-## 3. Snap POIs to the network
+## 2. Snap POIs to the network
 
-With both a feature object and a street network present, press **Snap POIs** and
-pick a mode:
-
-- **Attribute Only** — record the nearest node without moving anything.
-- **Move to Node** — relocate each POI to its nearest street node.
-- **Add Connector** — draw a short connector edge to the network.
+**Snap POIs** has three modes. **Attribute Only** records the nearest node
+without moving anything. **Move to Node** relocates each POI onto its nearest
+street node. **Add Connector** leaves the POI in place and draws a short edge to
+the network.
 
 ![Snapping POIs to the nearest street nodes.](../../../assets/guides/osmnx/07-snap.png)
 
-## 4. Geocoding and geometry helpers
+## 3. Geocoding and geometry helpers
 
-The panel also exposes utilities: **Geocode**, **Geocode to GDF**, **BBox from
-Point**, **BBox to Polygon**, **Buffer**, **Interpolate** and **Sample Points**.
-Use **Geocode** to resolve a place name to coordinates without downloading a
-network.
+**Geocode**, **Geocode to GDF**, **BBox from Point**, **BBox to Polygon**,
+**Buffer**, **Interpolate** and **Sample Points**. **Geocode** resolves a place
+name to coordinates without downloading anything.
 
 ![The geocoding and geometry helper buttons.](../../../assets/guides/osmnx/07-helpers.png)
 
 ## Next steps
 
-Continue with [Save, export and cache](io.qmd), or build proximity graphs from
-these features in the [City2Graph proximity tutorial](../city2graph/proximity.qmd).
+[Save, export and cache](io.qmd), or feed these features into the
+[City2Graph proximity tutorial](../city2graph/proximity.qmd).

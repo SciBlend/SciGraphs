@@ -2,21 +2,19 @@
 title: "Data Import"
 ---
 
-::: {.lead}
-The Data Import panel is the entry point of the City2Graph pipeline. It acquires
-urban feature layers from the shared feature selector, plus GTFS transit feeds,
-and materializes them as Blender objects every other panel can consume.
-:::
+The Data Import panel acquires urban feature layers from the shared feature
+selector, plus GTFS transit feeds, and materializes them as Blender objects every
+other panel can consume.
 
 At the very top, an **Overture API Key** badge shows whether a production key is
 configured (`Set`) or the bundled `DEMO` key is in use. With the demo key the
 Overture endpoints are rate-limited and may cap results; the gear icon opens the
 add-on preferences to paste your own key.
 
-## Step 1 — Define Area
+## Step 1. Define area
 
-Choose how to bound the data download. The methods mirror the OSMnx tab so the
-same workflow works with or without an imported graph.
+The methods mirror the OSMnx tab so the same workflow works with or without an
+imported graph.
 
 | Method | Description |
 | --- | --- |
@@ -32,10 +30,7 @@ If you pick a non-OSMnx method while an OSMnx graph is active, a hint confirms
 that the **outputs will still be aligned** with that graph's coordinate space.
 :::
 
-## Step 2 — Feature Source & Tags
-
-Choose one feature source, one feature preset or a custom OSM tag expression, and
-the maximum number of features to request.
+## Step 2. Feature source & tags
 
 | Control | Description |
 | --- | --- |
@@ -69,7 +64,7 @@ match an OSMnx `{"amenity": ...}` query. For OSM-tag-exact results, switch the
 **Source** to **OSMnx / Overpass**.
 :::
 
-## Step 3 — Download
+## Step 3. Download
 
 | Control | Description |
 | --- | --- |
@@ -82,18 +77,20 @@ For point-based analyses (proximity graphs, metapaths) either use **Get as
 Points** or convert an existing polygon object to centroids.
 :::
 
-## Local File (GeoJSON / Shapefile)
+## Local file (GeoJSON / Shapefile)
 
 **Load from File** imports a GeoJSON or Shapefile directly, aligning it with the
-active OSMnx graph when present. Use this when you already have local data.
+active OSMnx graph when present.
 
-## Process Segments
+## Process segments
 
 Prepares a raw segment object for graph construction (splitting by connectors and
-extracting barriers). Select the segment object — and optionally also a
-connectors object — then run **Process Segments**.
+extracting barriers). Select the segment object, and optionally also a connectors
+object, then run **Process Segments**.
 
-## GTFS Transit Data
+## GTFS transit data
+
+A loaded feed unlocks the [Transportation](transportation.qmd) panel.
 
 | Control | Description |
 | --- | --- |
@@ -102,8 +99,6 @@ connectors object — then run **Process Segments**.
 | **Create Stops / Create Routes** | Once loaded, choose what to visualize. |
 | **Stop Size** | Size of the stop sphere visualizations. |
 | **Visualize GTFS** | Builds the stop/route objects in the viewport. |
-
-A loaded feed unlocks the [Transportation](transportation.qmd) panel.
 
 ## Step-by-step tutorial
 

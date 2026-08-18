@@ -1,0 +1,13 @@
+---
+title: "02 · Layouts"
+execute:
+  enabled: false
+---
+
+An abstract graph arrives with no positions, so the layout is an assertion about
+the data rather than a display setting. The notebook covers the families and
+what each is for, what they cost as the graph grows, and whether running one
+twice gives the same answer. That last question is measured, and the answer is
+uncomfortable.
+
+{{< embed _ipynb/02_layouts.ipynb echo=true >}}

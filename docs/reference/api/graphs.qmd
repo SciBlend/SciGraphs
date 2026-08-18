@@ -1,0 +1,145 @@
+---
+title: "sg.graphs"
+---
+
+::: {.lead}
+GeoDataFrames, > SciGraphs mesh objects for coloring, layout, and render.
+:::
+
+Auto-generated from `SciGraphs/api/graphs.py`. Regenerate it with
+`python3 scripts/docs/write_api_reference.py`, which also runs on every
+`quarto render docs`. Edits made here are overwritten.
+
+## Blender scene plumbing
+
+### `collection`
+
+```python
+def collection(name, parent=None)
+```
+
+Get or create a Blender collection under `parent` (or the scene).
+
+### `anchor`
+
+```python
+def anchor(lat, lon, scale=0.001, name="C2G_Anchor")
+```
+
+Create georeference Empty (`c2g_center_*` / `c2g_scale`). scale: meters→Blender units (0.001 → 1 km = 1 unit).
+
+### `anchor_from`
+
+```python
+def anchor_from(gdf, scale=0.001, name="C2G_Anchor")
+```
+
+Anchor centered on a GeoDataFrame's bounds (reprojected to WGS84).
+
+### `activate`
+
+```python
+def activate(obj)
+```
+
+Make `obj` active and sole selection (needed before most `bpy.ops.scigraphs.*`).
+
+## GeoDataFrames, > Blender
+
+### `from_gdf`
+
+```python
+def from_gdf(nodes_gdf, edges_gdf, name, ref=None, coll=None, markers=None)
+```
+
+Homogeneous (nodes, edges) graph from city2graph GDFs. edges need (source, target) MultiIndex.
+
+### `from_hetero`
+
+```python
+def from_hetero(nodes_dict, edges_dict, name, ref=None, coll=None, markers=None)
+```
+
+Heterogeneous city2graph result: layers → one mesh with layer_id / edge_type_id attrs.
+
+### `from_features`
+
+```python
+def from_features(gdf, name, ref=None, coll=None)
+```
+
+Raw geometry mesh of polygons, lines, or points, with `_c2g_gdf_pickle` cached.
+
+### `from_networkx`
+
+```python
+def from_networkx(graph, name, ref=None, coll=None, markers=None)
+```
+
+Materialize a NetworkX graph produced by city2graph (`as_nx=True`).
+
+## Looking at the result
+
+### `summary`
+
+```python
+def summary(obj)
+```
+
+Graph markers on an object as a plain dict.
+
+### `attributes`
+
+```python
+def attributes(obj)
+```
+
+Scalar mesh attributes available for coloring, with their domains.
+
+### `visualize`
+
+```python
+def visualize(obj, node_size=None, edge_thickness=None)
+```
+
+Build Geometry Nodes viz (nodes on verts, tubes on edges).
+
+### `color_by`
+
+```python
+def color_by(obj, attribute, colormap="viridis", reverse=False)
+```
+
+Color by mesh attribute (GDF columns arrive as `node_*` / `edge_*`).
+
+### `frame`
+
+```python
+def frame(obj=None)
+```
+
+Point the viewport at an object (or at everything).
+
+### `clear_scene`
+
+```python
+def clear_scene(keep_anchor=True)
+```
+
+Empty the scene so a notebook can be re, run from the top.
+
+### `save_gdf`
+
+```python
+def save_gdf(gdf, path, driver="GPKG")
+```
+
+Write GDF to disk; extra geometry cols → WKT, MultiIndex → columns.
+
+### `save_blend`
+
+```python
+def save_blend(path)
+```
+
+Save a copy of the current scene (`copy=True` keeps the session file).

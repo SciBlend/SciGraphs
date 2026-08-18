@@ -5,7 +5,7 @@ tagline: "Choosing a color transform by measuring what it does to the histogram"
 
 The walkable street network of Llíria (Valencia, about 23,000 inhabitants):
 6037 nodes, 8067 edges, downloaded live from OpenStreetMap. There is no `layout`
-block on purpose — the coordinates arrive with the data, and a force-directed
+block on purpose, the coordinates arrive with the data, and a force-directed
 layout would discard the geography.
 
 `camera_ortho` removes the near/far size falloff, so a node radius that encodes a
@@ -28,7 +28,7 @@ the ramp:
 `RANK` and `LOG` both flood the image: they equalize the histogram, which is
 exactly right for a graph whose ordering you want to read, and exactly wrong for
 one where the interesting fact is that a small minority of streets carry the
-through traffic. Plain `LINEAR` goes too far the other way — a single extreme
+through traffic. Plain `LINEAR` goes too far the other way, a single extreme
 node compresses everything else into one bin.
 
 Clipping the top percentile and then mapping linearly keeps the concentration
@@ -36,6 +36,6 @@ while spending the whole ramp: the arterial routes come out as continuous bright
 chains against a violet field, and their brightness still means magnitude rather
 than rank.
 
-**This example needs the Overpass API.** When it is down — which happens — the
+**This example needs the Overpass API.** When it is down, which happens, the
 dataset stage retries and appears to hang. Nominatim answering does not mean
 Overpass will.

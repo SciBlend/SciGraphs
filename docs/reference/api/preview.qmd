@@ -1,0 +1,70 @@
+---
+title: "sg.preview"
+---
+
+::: {.lead}
+GPU preview render: graphs only, via the SciGraphs engine.
+:::
+
+Auto-generated from `SciGraphs/api/preview.py`. Regenerate it with
+`python3 scripts/docs/write_api_reference.py`, which also runs on every
+`quarto render docs`. Edits made here are overwritten.
+
+### `extent`
+
+```python
+def extent(obj)
+```
+
+Graph bounding box: (center, size, diagonal, median_nn).
+
+### `autoscale`
+
+```python
+def autoscale(obj, node_fraction=_NODE_FRACTION, verbose=True)
+```
+
+Set preview node radius from median nearest, neighbor distance.
+
+### `frame_camera`
+
+```python
+def frame_camera(obj, direction=(0.0, -0.35, 1.0), margin=1.06, lens=50.0)
+```
+
+Frame scene camera on the graph via camera_fit_coords.
+
+### `backbone`
+
+```python
+def backbone(mode='TOPK', k=3, alpha=0.05, attribute="")
+```
+
+Sparsify edges on GPU: TOPK, DISPARITY, MST, SAMPLE, or ALL.
+
+### `render`
+
+```python
+def render(obj, filename, resolution=(1280, 960), node_style='AUTO',
+           edge_style='AUTO', background=(0.05, 0.05, 0.08, 1.0),
+           aa=2, direction=(0.0, -0.35, 1.0), autosize=True,
+           isolate=True, verbose=True)
+```
+
+Render with the SciGraphs engine, preferring SPHERE nodes on Vulkan.
+
+### `shrink_png`
+
+```python
+def shrink_png(path, colors=256)
+```
+
+Palette, quantize PNG in place when smaller; no, op if Pillow missing.
+
+### `snapshot`
+
+```python
+def snapshot(filename, samples=32, resolution=(1280, 720))
+```
+
+Quick scene render with the current engine; returns output path.

@@ -1,0 +1,149 @@
+---
+title: "SciGraphs · Run graph algorithms"
+---
+
+::: {.lead}
+Animate a breadth-first traversal, highlight a shortest path, extract a spanning
+tree, and on a directed graph compute a maximum flow and its minimum cut,
+entirely from the sidebar.
+:::
+
+Mirrors the [Graph Algorithms panel](../../../panels/scigraphs/algorithms.qmd).
+
+::: {.callout-important}
+**Every algorithm on this panel is unweighted.** The graph object handed to the
+algorithms carries a node list and an edge list and nothing else, so each
+operator gives every edge the literal weight `1.0`, whatever the mesh, the panel
+or your source file says. **Find Path** returns the fewest-hops route, **Compute
+MST** returns a spanning tree of the unweighted graph, and **Max Flow** and
+**Min Cut** answer the unit-capacity version of your network. The numbers are
+correct answers to a question you did not ask, and nothing warns you.
+:::
+
+## Before you begin
+
+Create a graph first (see [Import an abstract graph](data.qmd)); the quickest
+start is the SuiteSparse source with **Matrix Identifier** `Newman/karate`,
+**Graph Representation** set to **Symmetric (A+A^T)**, and **Download & Create
+Graph**. Lay it out with [Lay out a graph](layout.qmd) so the results are
+legible.
+
+Two things to settle first:
+
+- **Directed Graph** must have been enabled in the Data panel at import time for
+  the **Network Flow** subpanel to appear at all. It is a property of the object,
+  not a switch you can flip afterwards.
+- **Weight Column** is read at import and stored on the mesh, but no operator on
+  this panel ever looks at it. Setting it changes what you see in the
+  Spreadsheet, not what any algorithm computes.
+
+## 1. Animate a traversal
+
+In **Traversal**, choose `BFS` (layer by layer) or `DFS` (one branch to the end
+first). **Start mode** can be left automatic or set to `Manual` with
+comma-separated node indices. **Mode** is either `Discrete`, stepping node by
+node, or `Continuous`, sweeping a smooth wave and enabling **Smoothness**.
+
+Press **Animate Traversal**, then Play. The operator writes two POINT
+attributes: `traversal_order`, the fixed visit index of each node, and
+`traversal_activation`, the 0 to 1 value the animation drives.
+
+::: {.callout-note}
+BFS computes two more arrays that never reach the mesh: the BFS layer (hop
+distance from the root) and the BFS tree (each node's parent). If you need
+either, [notebook 04](../../../notebooks/04-paths-trees-flows.qmd) shows how to
+get them.
+:::
+
+## 2. Find a shortest path
+
+In **Pathfinding**, press the eyedropper beside **Source Node** and click a node
+in the viewport, then do the same for **Target Node**, and press **Find Path**.
+
+A POINT attribute `shortest_path` is written, `1.0` on the nodes of the path and
+`0.0` elsewhere, along with the object properties `shortest_path_source`,
+`shortest_path_target`, `shortest_path_nodes` and `shortest_path_length`.
+
+::: {.callout-important}
+**The reported "distance" is a hop count.** Because every edge weighs 1.0, the
+route returned is the one with the fewest edges, and the figure beside it counts
+those edges. On a weighted lattice this was measured at `10.00` where the true
+weighted optimum was `31.26` along a different route; deleting the edge weights
+from the mesh entirely changed neither the path nor the number.
+
+**Bellman-Ford is not implemented.** The menu offers it, the operator never
+dispatches it, and choosing it silently runs Dijkstra, so it cannot handle
+negative weights. **A\*** also falls back to Dijkstra unless the object carries
+node positions; on a laid-out graph it does run, and returns the same
+fewest-hops answer faster.
+
+For a genuinely weighted shortest path, compute it outside the panel.
+[Notebook 04](../../../notebooks/04-paths-trees-flows.qmd) checks each operator
+against the same computation done properly and shows the route both ways.
+:::
+
+`shortest_path` is on the POINT domain, so you can drive node color or size from
+it (see [Make a figure](visualization.qmd)). There is no per-edge result.
+
+## 3. Extract a spanning tree
+
+In **Spanning Trees**, choose `Kruskal`, `Prim` or `Maximum` and press **Compute
+MST**.
+
+::: {.callout-important}
+**This is not a minimum spanning tree.** With every edge at 1.0 the operator
+returns *a* spanning tree of the unweighted graph, which is valid and is not the
+minimum one; `Maximum` returns the same kind of object. The reported total
+weight is the edge count in disguise: on a connected graph of *n* nodes it is
+always *n* - 1.
+
+**Nothing is written to the mesh.** The implementation builds a per-edge
+in-the-tree flag and the operator discards it, keeping only the object
+properties `mst_edges` and `mst_weight`. There is no attribute to color by, so
+the tree cannot be drawn from this panel.
+:::
+
+## 4. Maximum flow and minimum cut
+
+**Network Flow** appears only when the active object is directed. Type node
+indices into **Source Node** and **Sink Node**, then press **Max Flow** for the
+value or **Min Cut** for the bottleneck.
+
+**Min Cut** writes a POINT attribute `min_cut_partition`, `1.0` on the nodes
+still reachable from the source once the cut is removed and `0.0` on the rest,
+so the two sides of the cut can be drawn. **Max Flow** stores only
+`max_flow_value`.
+
+::: {.callout-important}
+**Both answer the unit-capacity network.** Capacities are not read, so what you
+get is the number of edge-disjoint source-to-sink routes. On an eight-node,
+twelve-arc test network the pair returned 3 = 3 where the true weighted answer
+is 19 = 19.
+
+The equality is the trap. Max-flow min-cut duality holds perfectly on the
+unweighted problem, so the two operators agree with each other and confirm
+nothing about your data. The per-arc flow assignment and the list of cut edges,
+the drawable half of a flow solution, are computed by both operators and thrown
+away.
+:::
+
+## What each operator leaves behind
+
+| Operator | Mesh attributes (POINT) | Object properties |
+| --- | --- | --- |
+| **Animate Traversal** | `traversal_order`, `traversal_activation` | `traversal_algorithm`, `traversal_visited_count`, `traversal_max_order` |
+| **Find Path** | `shortest_path` | `shortest_path_source/target/nodes/length` |
+| **Compute MST** | *none* | `mst_edges`, `mst_weight` |
+| **Max Flow** | *none* | `max_flow_value` |
+| **Min Cut** | `min_cut_partition` | `min_cut_value` |
+
+Nothing here writes an EDGE-domain attribute, which is why a path, a tree, a
+flow and a cut can only ever be shown through their nodes.
+[Notebook 04](../../../notebooks/04-paths-trees-flows.qmd) shows the way round
+it: draw the subset as a second object with thicker tubes on the same anchor
+rather than asking color to carry membership.
+
+## Next steps
+
+[Analyze a graph](analysis.qmd) covers centrality, communities and global
+statistics.

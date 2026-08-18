@@ -1,0 +1,221 @@
+---
+title: "Jupyter notebooks"
+---
+
+::: {.lead}
+Twenty-one notebooks that work through SciGraphs running **inside** Blender, so
+every graph appears in the viewport as it is built and every step ends with its
+own render. One group per tab of the add-on: **SciGraphs** for graphs with no
+coordinates, **OSMnx** for street networks and the ground they sit on, and
+**City2Graph** for urban morphology, transport and mobility.
+:::
+
+The notebooks live in [`notebooks/`](https://github.com/SciBlend/SciGraphs/tree/main/notebooks)
+in the repository. The pages here embed them exactly as they were executed,
+outputs and renders included, so you can read the whole sequence without
+installing anything. To run them yourself, see [Setting up](#setting-up).
+
+## Why they run inside Blender
+
+The kernel is not a separate Python process talking to Blender over a socket.
+The [`jupyter_blender`](https://github.com/kolibril13/jupyter-blender) extension
+starts the kernel **in the Blender process itself**, on the main thread, so
+`import bpy` in a cell edits the scene you are looking at. A cell that builds a
+graph puts the object in the viewport; the next cell can select it, run a
+SciGraphs operator on it, and render it.
+
+Two consequences follow:
+
+- A heavy cell freezes the Blender interface until it finishes. There is one
+  thread, and the cell is on it.
+- The working directory is Blender's, not the notebook's. The kernel existed
+  before you opened anything, so it inherited whatever `cwd` Blender was
+  launched from. The first cell of every notebook locates `notebooks/tools/`
+  through the extension's `notebook_dir` preference rather than assuming the
+  `cwd`.
+
+Figures are rendered with **EEVEE**, from a top-down orthographic camera, and
+colored by an attribute the notebook computed: flow, travel time, layer,
+cluster, centrality. Overhead and orthographic is deliberate, because a map read
+at an angle cannot be measured off the page, and under a perspective camera two
+edges of equal length come out different lengths. Where the graph sits on real
+ground, EEVEE is also the only option: terrain, buildings and a basemap are
+ordinary Blender geometry, and SciGraphs' own engine draws graph buffers and
+nothing else.
+
+That engine (`scene.render.engine = 'SCIGRAPHS'`) still appears where the
+interactive preview is itself the subject: it draws from the GPU buffers of the
+viewport, so what you get in the notebook is what you see on screen. Put the
+Blender window and the browser side by side.
+
+## Setting up
+
+Once:
+
+```bash
+./notebooks/tools/setup.sh
+```
+
+It installs the `jupyter_blender` extension, then pulls JupyterLab and
+ipykernel (about 100 MB) into Blender's Python. The extension carries no wheels
+of its own, so that second half is not optional.
+
+By hand instead: add
+`https://jan-hendrik-mueller.de/blender-extensions/index.json` under
+**Preferences ▸ Get Extensions ▸ Repositories**, install Jupyter from the list,
+then click **Install Python Modules** once in **N ▸ Jupyter**.
+
+Order matters, and only in one direction. Those modules land in the site-packages
+directory Blender manages for extension wheels, and Blender prunes anything there
+that no installed extension's manifest claims. Reinstalling SciGraphs triggers that
+sweep, which takes JupyterLab and ipykernel with it. The kernel then refuses to
+start with `No module named 'ipykernel'`, and the Jupyter panel shows all five
+dependencies missing again. So install or upgrade SciGraphs first, and click
+**Install Python Modules** after. If you have already lost them, one more click
+brings them back.
+
+The `jupyter_blender` extension is Jan-Hendrik Müller's work, and it is what makes
+these notebooks possible: without a kernel inside the Blender process there is no
+way to write a cell that edits the scene you are looking at.
+
+Then, to open Blender and serve JupyterLab:
+
+```bash
+./notebooks/tools/launch.sh --opengl
+```
+
+JupyterLab comes up at <http://127.0.0.1:10462/lab>. If the browser does not
+open by itself, copy the tokenized URL from Blender's sidebar under
+**N ▸ Jupyter ▸ Copy URL**. `launch.sh` also takes a port number, `--no-browser`
+and `--keep`.
+
+`--opengl` is recommended: on the Vulkan backend, point size is ignored for
+custom shaders, so graphs drawn as points come out one pixel wide.
+
+Relaunching closes the previous run. The extension supports one kernel at a
+time and its connection file lives at a fixed path shared by every Blender of
+the installation, so a second Blender overwrites it and the first server ends up
+pointing at a kernel that is no longer its own. The notebooks then stop
+responding without saying why, and a different port does not avoid it. So
+`launch.sh` shuts down the Blender and the server it started last time and
+removes the orphaned connection file. A Blender you opened by hand is left
+alone; `--keep` skips the cleanup.
+
+The server listens on `127.0.0.1` only. To reach it from another machine, tunnel
+over SSH (`ssh -N -L 10462:127.0.0.1:10462 user@host`); binding it to `0.0.0.0`
+would hand arbitrary Python execution to the whole network.
+
+Start with [notebook 00](00-setup-check.qmd), which checks the environment and
+touches nothing else.
+
+## The notebooks
+
+Three groups, in the same order as the [Panel Reference](../panels/overview.qmd):
+the SciGraphs tab, the OSMnx tab, the City2Graph tab.
+[Notebook 00](00-setup-check.qmd) sits outside them because it belongs to all
+three: it checks the kernel, the install and the registered operators.
+
+### SciGraphs
+
+Graphs that are not maps: no coordinates, so the layout is a choice rather than
+a measurement. Data, layout, analysis, algorithms and topology.
+
+| # | Notebook | Network | What it builds |
+| --- | --- | --- | --- |
+| 01 | [Abstract graphs](01-abstract-graphs.qmd) | **no** | Edge lists, adjacency matrices, generators, and keeping attributes intact. |
+| 02 | [Layouts](02-layouts.qmd) | **no** | The families, what they cost, and whether they are reproducible. |
+| 03 | [Centrality and communities](03-centrality-communities.qmd) | **no** | Four centralities, where they disagree, and judging a partition. |
+| 04 | [Paths, trees and flows](04-paths-trees-flows.qmd) | **no** | Shortest paths, spanning trees, max-flow and min-cut, each checked. |
+| 05 | [Topology](05-topology.qmd) | **no** | Planarity, Euler's formula, genus, duals and crossings, against known answers. |
+
+### OSMnx
+
+Street networks, and the ground they sit on.
+
+| # | Notebook | Network | What it builds |
+| --- | --- | --- | --- |
+| 06 | [Downloading a street network](06-osmnx-download.qmd) | yes | Five download methods, simplification, consolidation, components, the round trip. |
+| 07 | [Street geometry and orientation](07-osmnx-geometry.qmd) | yes | Lengths, bearings, orientation entropy, imputed speeds, circuity. |
+| 08 | [Routing](08-osmnx-routing.qmd) | yes | Snapping, distance against travel time, k shortest, a thousand routes. |
+| 09 | [Accessibility and places](09-osmnx-accessibility.qmd) | yes | Isochrones, ego subgraphs, POIs on the network, clustering by network distance. |
+| 10 | [Centrality and export](10-osmnx-centrality-export.qmd) | yes | Betweenness of junctions and of streets, and what survives eight export routes. |
+| 11 | [Terrain](11-terrain.qmd) | yes | Elevation sources, draping against lifting, edge grades, grade-weighted routes. |
+| 12 | [Imagery](12-imagery.qmd) | yes | Tile and WMS basemaps, zoom against cost, and what a misaligned one looks like. |
+
+### City2Graph
+
+| # | Notebook | Network | What it builds |
+| --- | --- | --- | --- |
+| 13 | [Urban morphology](13-morphology.qmd) | yes | Primal graph, tessellation, heterogeneous morphological graph. |
+| 14 | [Public transport (GTFS)](14-transport-gtfs.qmd) | **no** | Stop-to-stop service network and origin-destination pairs. |
+| 15 | [Mobility (OD matrices)](15-mobility-od.qmd) | **no** | Flows between zones, from an edge list and from an adjacency matrix. |
+| 16 | [Proximity graphs](16-proximity.qmd) | yes | The seven point constructions, contiguity, and bridges between layers. |
+| 17 | [Metapaths and the 15-minute city](17-metapaths-15min.qmd) | yes | Dual graph, projection by accumulated cost, isochrones. |
+| 18 | [Functional clustering, end to end](18-case-study.qmd) | yes | Three relations, 23 attributes, clustering and evaluation. |
+| 19 | [Reproducible pipelines](19-repro-pipelines.qmd) | yes | Declarative specifications with hashes and provenance. |
+
+### Reproducibility
+
+| # | Notebook | Network | What it builds |
+| --- | --- | --- | --- |
+| 20 | [A local model writes the specification](20-pipeline-assistant.qmd) | yes | Ollama drafts a pipeline, three passes check it, one example is refused. |
+
+They are independent of each other, with two exceptions that reuse rather than
+repeat: 18 builds on ideas from 16 and 17, and 09 and 17 reach the same
+question, walking distance from a place, through different implementations, so
+the two are worth reading together.
+
+Eight of the twenty-one never touch the network: 00 works inside the running
+Blender, 14 and 15 from data shipped in `examples/`, and the five combinatorial
+notebooks from seeded generators. The rest download from OpenStreetMap and cache
+in `notebooks/data/cache/`, so a second run is offline as well.
+
+For the same constructions driven from the sidebar instead of from Python, see
+the [City2Graph panel reference](../panels/city2graph/index.qmd) and its
+[tutorials](../tutorials/panels/city2graph/data.qmd).
+
+## Re-running and verifying
+
+The `.ipynb` files are generated; the editable version is `notebooks/_src/*.py`
+in percent format. After changing a source, rebuild:
+
+```bash
+python3 notebooks/tools/build_notebooks.py
+```
+
+To check that all of them still run end to end:
+
+```bash
+python3 notebooks/tools/verify_notebooks.py
+```
+
+That runs each source in its own `blender -b` process and writes a report to
+`notebooks/out/verify/summary.json`. `--offline` skips the ones that download
+data. Under `blender -b` there is no IPython kernel, so `show()` prints the path
+instead of the image; the render and its check still happen.
+
+Every render is checked with `check_render()`, which measures the fraction
+of inked pixels and fails when the result is saturated or empty. That check
+found five failures that nothing else did, because none of them raises: nodes
+sized to zero from coincident vertices, polygonal nodes collapsed onto the
+origin, camera clipping planes, framing by the 3D diagonal, and a graph buried
+under a second one rendered at a different node size.
+
+Its upper bound is disabled on the figures that sit on ground, and only on
+those. The measure counts pixels that differ from the frame's top-left one, so
+a photograph that reaches the corner scores near zero and the same drawing with
+a margin scores 99 %: on a full-bleed figure it reports where the ground stops,
+not whether the graph can be read. The lower bound still applies, and that is
+the half that catches an empty render.
+
+## What cannot run here
+
+PyTorch is not installed in Blender's Python, so `gdf_to_pyg()` and anything
+that learns a graph embedding are out of reach. Notebook 18 still builds the
+full heterogeneous graph and clusters it with PCA + K-Means, evaluated by
+silhouette and by modularity per relation, which is enough to compare the
+homogeneous contiguity relation against the two accessibility ones, but not to
+produce learned embeddings.
+
+Installing PyTorch into Blender's Python is possible; `notebooks/README.md`
+records the command.

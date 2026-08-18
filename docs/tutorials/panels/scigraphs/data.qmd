@@ -1,0 +1,168 @@
+---
+title: "SciGraphs · Import an abstract graph"
+---
+
+::: {.lead}
+Turn a plain edge-list CSV into the Blender graph object every other SciGraphs
+panel operates on. An abstract graph brings no coordinates, so this walkthrough
+also decides where its nodes go.
+:::
+
+Mirrors the [Data panel](../../../panels/scigraphs/data.qmd).
+
+## Before you begin
+
+Open the 3D Viewport sidebar with `N`, pick the **SciGraphs** tab and expand
+**Data**. Have an edge list ready as a CSV; anything with two identifier columns
+works. This page uses a six-line `friends.csv`:
+
+```
+source,target,strength
+ana,bruno,3
+ana,carla,1
+bruno,carla,2
+carla,diego,5
+diego,elena,1
+elena,ana,4
+```
+
+## 1. Load the file
+
+Leave **Step 1: Select Data Source** on **File**; the alternatives are
+**Database** (a live `SELECT`), **SuiteSparse** (a matrix fetched by identifier)
+and **Repro** (replaying a saved pipeline).
+
+![Step 1 with the File source selected.](../../../assets/guides/scigraphs/01-data-source.png)
+
+Set the **Filepath**, leave **Delimiter** at `,`, and press **Load File**. The
+panel reads the header, tags each column as numeric, datetime or text, and
+unlocks Step 2. A GEXF file needs none of this: the panel reports *Native graph
+file detected* and maps the structure itself.
+
+![Load File reads the header and unlocks Step 2.](../../../assets/guides/scigraphs/01-load-file.png)
+
+::: {.callout-warning}
+## Check the Geospatial Options header before you continue
+
+**Load File** guesses whether your data is geographic from column names, by
+substring. The latitude patterns include a bare `y` and the longitude patterns a
+bare `x`, so ordinary numeric columns like `density`, `entropy`, `delay`,
+`max_load`, `index` or `flux` match. When one of each hits, the **Geospatial
+Options** checkbox switches itself on and stays on.
+
+That is not cosmetic. **Create Graph** then takes the geospatial branch: it
+builds an Earth globe, and because **Auto-Geocode Countries** is on by default
+it sends your node identifiers to Nominatim as if they were place names. After
+every **Load File**, glance at the **Geospatial Options** header and untick it
+unless you actually want a globe.
+[Notebook 01](../../../notebooks/01-abstract-graphs.qmd) reproduces the trap
+with two innocuous column names.
+:::
+
+## 2. Define the graph structure
+
+In **Step 2: Define Graph Structure**, set **Source Nodes** to `source` and
+**Target Nodes** to `target`. Two switches here change what later panels will
+let you do:
+
+- **Directed Graph** unlocks the directed analyses and the flow panels, and
+  changes what the hierarchical layouts can find. It is fixed at import time.
+- **Remove Self-Loops** should stay on unless a node pointing at itself is
+  meaningful in your data.
+
+![Mapping the source and target columns.](../../../assets/guides/scigraphs/01-structure.png)
+
+::: {.callout-important}
+## Node names must not contain commas
+
+SciGraphs stores the node and edge lists as one comma-joined string on the
+object, and splits them back on commas. A name like `Smith, J.` becomes two
+identifiers and shifts every identifier after it. With the automatic layout on,
+the import dies with an `IndexError` raised from inside the layout, several
+steps away from the cause. Rename or quote such identifiers out of the CSV
+first; integers and bare words are always safe.
+:::
+
+## 3. Pick the attributes to import
+
+Set **Weight Column** to `strength` if you want it treated as an edge weight,
+then use the **Import as Attributes** checklist for everything else. Only ticked
+columns reach the mesh, so tick what you intend to color or size by later.
+
+![The attribute checklist, with strength ticked.](../../../assets/guides/scigraphs/01-attributes.png)
+
+## 4. Create the graph object
+
+**Step 3: Create Graph Object** carries one decision, **Auto Layout on Import**,
+and it also decides the order of the rest of your session. Leave it on for a
+first look and the graph is created and immediately placed with the **Default
+Layout** (ForceAtlas2) at the given **Scale**. Turn it off if you are importing
+edge-valued attributes you intend to keep, for the reason below.
+
+Press **Create Graph**. The object appears in the viewport and the Layout
+panel's status card starts reporting its node and edge counts.
+
+![Create Graph builds the object and lays it out.](../../../assets/guides/scigraphs/01-create-graph.png)
+
+::: {.callout-important}
+## A layout zeroes every edge attribute on the mesh
+
+Applying a layout, including the automatic one on import, calls `rebuild_edges`,
+which deletes and recreates every mesh edge. Attributes on the `POINT` domain
+survive; attributes on the `EDGE` domain come back allocated, correctly named,
+the right length, and filled with zeros. Nothing raises, and the giveaway is a
+figure colored by an edge attribute that renders as one flat color.
+
+So the safe order is the opposite of the natural one: import with **Auto Layout
+on Import** off, lay the graph out in the [Layout panel](layout.qmd), then
+compute or import anything edge-valued.
+[Notebook 01](../../../notebooks/01-abstract-graphs.qmd) measures this on a real
+column, including the surviving `POINT` aggregates of the same data.
+:::
+
+## 5. Attach a node attribute table
+
+If your measurements live in a second file, keep the graph active and use
+**Import Node Attributes**. Rows are matched to nodes by name in the form
+`node_name <sep> value(s)`; any node missing from the file gets `NaN` rather
+than a silent zero. This route is on the node domain, so the layout warning
+above does not apply to it.
+
+## 6. Make it renderable
+
+**Step 4: Apply Visualization** runs **Setup Visual**, which adds the Geometry
+Nodes setup that draws node spheres and edge cylinders. Until you press it the
+object is topology only and renders as bare mesh.
+
+![Setup Visual adds the Geometry Nodes rendering setup.](../../../assets/guides/scigraphs/01-setup-visual.png)
+
+::: {.callout-tip}
+## No file to hand?
+
+Switch **Step 1** to **SuiteSparse**, type a **Matrix Identifier** such as
+`Grund/bayer09` and press **Download & Create Graph**. **Graph Representation**
+chooses between a symmetric adjacency and a bipartite reading, and **Giant
+Component Only** discards stray fragments.
+:::
+
+::: {.callout-note}
+## Two things this panel cannot do
+
+**An edge list cannot express an isolated node.** A node with no edges has no row
+to appear in, so it is absent after import, and the File source has no matrix
+mode: a square matrix handed to it is read as an edge list between its first two
+columns. Use **SuiteSparse** for matrix data, or add a placeholder edge and
+delete it afterwards.
+
+**There is no seed field anywhere in this panel.** With **Auto Layout on Import**
+on and a Spring algorithm selected, two identical imports of the same file
+produce two different drawings. The [Layout tutorial](layout.qmd) explains which
+algorithms are affected, and
+[Reproducible pipelines](../../../notebooks/19-repro-pipelines.qmd) covers the
+route that does give a fixed answer.
+:::
+
+## Next steps
+
+[Lay out a graph](layout.qmd) decides where the nodes go, which this panel only
+picked a default for.

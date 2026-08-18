@@ -1,0 +1,157 @@
+---
+title: "SciGraphs · Make a figure"
+---
+
+::: {.lead}
+Turn a graph into a figure you can trust: choose a display engine, size the nodes
+and edges, color by an attribute, thin a dense network, and label the nodes that
+carry the argument.
+:::
+
+Mirrors the [Visualization panel](../../../panels/scigraphs/visualization.qmd).
+
+## Before you begin
+
+Have a graph object active, and compute whatever you intend to encode first in
+[Analysis](analysis.qmd): color and size read attributes that already exist.
+
+## 1. Choose a display engine
+
+**Display Engine** offers **GPU (Fast)** and **CPU (Geometry Nodes)**. They are
+alternatives, not layers, and the switch is exclusive: choosing one clears the
+other's drawing.
+
+**GPU (Fast)** draws the graph directly from the viewport's buffers. It is
+immediate at any size and it is what every control in the **GPU Preview (Fast)**
+subpanel acts on. It also draws nothing but the graph: no terrain, no buildings,
+no basemap, no material, and it never appears in an EEVEE or Cycles render. To
+render it, set the scene's **Render Engine** to **SciGraphs**, and its settings
+appear in the Properties editor.
+
+**CPU (Geometry Nodes)** builds real meshes, instanced node glyphs and edge
+tubes, so EEVEE and Cycles see them, materials apply, and the graph shares a
+frame with everything else in the scene. If the graph has to sit on terrain or
+among buildings, this is the path (step 5).
+
+## 2. Size the nodes and edges
+
+Under **Nodes**, set **Style** (**Auto (LOD)**, **Point**, **Disk** or **Sphere
+Impostor**) and **Point Size**, or **Impostor Radius** for spheres. Under
+**Edges**, set **Style**, **Width**, **Radius Scale** and **Color**.
+
+One absolute radius cannot serve two scales. An abstract layout spans about ten
+Blender units; a neighborhood imported at the default meters-to-units scale
+spans barely one, so the default radius draws each node at 9 % of the whole city
+and the network disappears under a pile of spheres. Reduce the radius until the
+*edges* read, not the nodes. In the other direction, a graph whose vertices
+coincide (a heterograph, a GTFS feed with several stops at one interchange) can
+end up with a size of zero and an empty frame; raise it by hand.
+
+On a geospatial network also set the edge **Style** to **Line** explicitly:
+**Auto (LOD)** keeps drawing tubes after they have shrunk below a pixel, which
+returns a frame with nodes and no edges at all.
+
+::: {.callout-warning}
+On Blender's **Vulkan** backend, the default on Linux, point size is ignored for
+the add-on's shaders, so **Point** and **Disk** nodes rasterize at exactly one
+pixel in the viewport and in the render. Start Blender with
+`--gpu-backend opengl`, or use **Sphere Impostor**, which is real geometry.
+:::
+
+## 3. Color by an attribute
+
+Two routes, writing to different places. In the preview, set **Color** to
+**Attribute + Colormap**, pick the **Attribute** and a **Colormap**, and
+**Reverse** it if the high end should be dark; nothing is written to the mesh.
+On the mesh, use **Color Settings…** in the 3D-viewport header's **SciGraphs**
+menu, which writes a color attribute that the Geometry Nodes path renders and an
+export will later pick up.
+
+::: {.callout-warning}
+**`vmin` and `vmax` are accepted and immediately discarded.** Setting them and
+clearing **Auto Range** looks like the way to put two figures on one absolute
+scale. It is not: the coloring operator recomputes the range from the
+attribute's own extremes before it draws, and nothing reports that the request
+was dropped. Asked for `(0.0, 1.0)`, the render came back scaled to
+`(0.0, 0.362459)`. Two panels meant to be comparable are each silently
+normalized to themselves. The clip percentages are honored; for a real
+comparison, print the min / median / p98 / max beside each figure.
+:::
+
+::: {.callout-warning}
+**There is no per-edge color on a graph.** Blender color attributes live only on
+`POINT` or `CORNER`; a graph mesh has no faces, so an `EDGE` attribute is
+averaged onto the vertices and each tube is drawn as a gradient between two
+means. On a 6x6 lattice a 0/1 flag reached the shader as six distinct values,
+none of them any individual edge's. Where the attribute varies smoothly the
+picture is still informative, of a vertex-averaged field. Where a subset is the
+subject (a path, a spanning tree, a cut), stop asking color to carry membership:
+draw the subset as a second object with thicker tubes over a flattened context,
+as [notebook 04](../../../notebooks/04-paths-trees-flows.qmd) does.
+:::
+
+## 4. Thin a dense graph
+
+Under **Simplification**, set **Edges** to **All Edges**, **Local Top-k**,
+**Disparity Filter** or **Spanning Tree + Top-k**, then set **Top-k** and the
+**Weight** attribute to rank by.
+
+Density is often the data, not the drawing: a 15-minute accessibility graph over
+a 600 m radius is almost complete, 48 000 edges over 460 nodes, and comes out as
+a solid mass. Keeping the k cheapest links per node preserves the structure and
+returns a legible figure.
+
+::: {.callout-warning}
+**The backbone currently ranks by mesh order, not by your attribute.** The weight
+lookup misses the mesh's `edge_`-prefixed copy of the name, falls back to a
+column called `weight`, misses again, and ranks with ones, so every **Local
+Top-k** render is a slice of whichever edges came first in the buffer while
+reporting that it kept the k strongest. The tell is visual: regular vertical
+banding across the frame, because mesh order follows construction order. And
+where it does resolve, it keeps the largest weight, so on a cost like travel time
+it keeps each node's slowest links. Treat it as a preview sampler for now.
+Either way the thinning is a draw-time filter: EEVEE, Cycles and every export
+still see the whole graph.
+:::
+
+## 5. Build renderable geometry
+
+Switch **Display Engine** to **CPU (Geometry Nodes)**, or press **Setup Visual**
+in the [Data panel](data.qmd), and the graph becomes mesh. **Appearance** then
+sizes and shapes the node glyphs and edge tubes, with **Attr Mult** multipliers
+that scale glyphs by an attribute and **Show Arrows** for a directed graph;
+press **Update Appearance** to apply. **Scene Setup** applies a material preset
+and a lighting rig.
+
+**Edge Style** picks a **Type** or a one-click preset (**Gephi**,
+**Cytoscape**, **Schematic**, **Bundled**, **Flow**, **Minimal**); the eye icon
+previews without committing and the loop icon restores straight edges. For an
+OSMnx network, **Preserve Street Geometry** keeps the real curve of each street;
+on a dense graph, **Auto-Offset Parallel Edges** stops multi-edges overlapping.
+
+Render with EEVEE or Cycles. See
+[Elevation, DEM & 3D terrain](../osmnx/elevation.qmd) for putting the graph on
+terrain.
+
+## 6. Label the nodes that matter
+
+Enable **Text Labels**, set **Source** to **Attribute** and choose the
+**Attribute**, set the **Number Format** and a **Size Mode** (**Adaptive**
+compensates for perspective), and press **Generate**.
+
+Labeling every node is unreadable. Two controls make the overlay legible: the
+**Attribute Filter**, which shows labels only where a condition holds, and
+**Visibility**, whose **Max Distance** and **Depth Occlusion** drop labels that
+are far away or behind geometry.
+
+::: {.callout-note}
+The overlay is composited using the scene camera and the render resolution, so
+set both before pressing **Generate**; changing them afterwards needs an
+**Update**. Under the SciGraphs render engine, tick **Text Labels** in the Render
+Properties tab, and **Declutter Labels** with it, to have them appear in the
+render.
+:::
+
+## Next steps
+
+[Export a graph](export.qmd) takes the figure's numbers out of Blender.

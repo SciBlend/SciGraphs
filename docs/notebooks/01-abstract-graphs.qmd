@@ -1,0 +1,18 @@
+---
+title: "01 · Abstract graphs"
+execute:
+  enabled: false
+---
+
+A graph here is combinatorial, with no position until a layout gives it one,
+which is [notebook 02](02-layouts.qmd)'s subject. Getting one in while keeping
+its attributes intact is the hard part.
+
+Two innocuous column names, `density` and `max_load`, send the importer down its
+geospatial branch, because it matches latitude and longitude by the bare
+substrings `y` and `x`: it builds a globe and posts the node identifiers to a
+geocoder. The layout that runs on import zeroes every edge attribute it just
+read, and an edge list cannot express an isolated node, so one of three hundred
+quietly fails to arrive.
+
+{{< embed _ipynb/01_abstract_graphs.ipynb echo=true >}}

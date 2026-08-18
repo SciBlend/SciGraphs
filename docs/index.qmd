@@ -17,26 +17,17 @@ about:
       href: https://sciblend.github.io/SciGraphs/tutorials/panels/index.html
 ---
 
-**SciGraphs** is an open-source Blender extension that brings graph ingestion,
-analysis, and high-fidelity 3D rendering into a single, reproducible pipeline.
-It turns abstract networks and real-world spatial graphs into native Blender
-objects driven by Geometry Nodes, mapping analytical results (centralities,
-communities, topological invariants) to named attributes that procedurally
-drive colour, scale, and animation.
-
-It combines the analytical power of NetworkX, igraph, and Graphviz with
-Blender's Cycles and EEVEE path-traced rendering, supporting two complementary
-domains:
-
-- **Combinatorial graphs** — classical network metrics, community structure,
-  and algorithmic layouts mapped procedurally via attribute-driven properties.
-- **Spatial and geometric graphs** — networks visualized using their intrinsic
-  coordinate data (geospatial, sparse-matrix, mesh) or laid out via topological
-  analysis, including multi-layer urban morphologies through the City2Graph
-  module.
+SciGraphs is an open-source Blender extension for graph ingestion, analysis, and
+3D rendering. Networks become native Blender objects driven by Geometry Nodes,
+and analytical results (centralities, communities, topological invariants) are
+stored as named attributes that drive color, scale, and animation. Analysis
+comes from NetworkX, igraph, and Graphviz; rendering from Cycles and EEVEE.
+Node positions come either from a layout algorithm or from the data's own
+coordinates: geospatial, sparse-matrix, mesh, or the multi-layer urban graphs
+the City2Graph module builds.
 
 ::: {.hero}
-![Granada, Spain — a 37,814-intersection street network plus a 20-NN amenity proximity graph draped onto SRTM 30 m terrain.](assets/GRANADA13.png)
+![Granada, Spain: a 37,814-intersection street network plus a 20-NN amenity proximity graph draped onto SRTM 30 m terrain.](assets/GRANADA13.png)
 :::
 
 ## Where to start
@@ -51,15 +42,15 @@ Concepts, installation, and the end-to-end workflow.
 :::
 
 ::: {.g-col-12 .g-col-md-4}
-### Panel Reference
-A usage guide for every panel and subpanel in the sidebar.
+### Panel reference
+Every panel and subpanel in the sidebar.
 
 [Browse panels →](panels/overview.qmd)
 :::
 
 ::: {.g-col-12 .g-col-md-4}
 ### Tutorials
-Step-by-step walkthroughs of each panel, plus end-to-end examples.
+Walkthroughs of each panel, plus end-to-end examples.
 
 [Start a tutorial →](tutorials/panels/index.qmd)
 :::

@@ -4,8 +4,8 @@ tagline: "A rectangular constraint matrix as a bipartite graph, laid out the way
 ---
 
 `Meszaros/nemsafm` is a linear program in standard form: 334 constraints by 2348
-variables, 2826 nonzeros, 0.36 % dense. Read as a bipartite graph — one node per
-row, one per column, an edge per nonzero — that is 2682 nodes and 2826 edges.
+variables, 2826 nonzeros, 0.36 % dense. Read as a bipartite graph, one node per
+row, one per column, an edge per nonzero, that is 2682 nodes and 2826 edges.
 
 The structure the drawing shows is in the statistics the run exports. Clustering
 coefficient is exactly 0, as it must be for a bipartite graph: no triangles.
@@ -19,6 +19,6 @@ uses for its gallery, so the drawing is comparable with the collection's own. It
 places the graph in a plane with only slight relief, so `camera_direction` looks
 straight down that plane's normal; the default oblique view would foreshorten it.
 
-The matrix ships no coordinates, so a layout is required — unlike a structural
+The matrix ships no coordinates, so a layout is required, unlike a structural
 mesh, where the auxiliary coordinate file *is* the embedding and a layout would
 overwrite it.

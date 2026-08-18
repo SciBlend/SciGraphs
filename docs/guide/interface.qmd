@@ -3,10 +3,7 @@ title: "The sidebar interface"
 ---
 
 SciGraphs adds three tabs to the **3D Viewport sidebar** (press `N` to toggle).
-Each tab groups a set of panels; panels contain collapsible subpanels. This page
-gives the complete map of the interface so you can locate any control quickly.
-
-## Tabs
+Each tab groups a set of panels, and panels contain collapsible subpanels.
 
 | Tab | Purpose |
 | --- | --- |
@@ -15,9 +12,6 @@ gives the complete map of the interface so you can locate any control quickly.
 | **City2Graph** | Build heterogeneous urban graphs (morphology, proximity, transport, metapaths). |
 
 ## SciGraphs tab
-
-The main `SciGraphs` panel hosts the core workflow panels, each documented in
-the Panel Reference.
 
 ```
 SciGraphs
@@ -98,17 +92,13 @@ See [the City2Graph reference](../panels/city2graph/index.qmd).
 
 ## Conventions used in the Panel Reference
 
-Each panel page follows the same structure:
-
-- **What it does** — a short description of the panel's role.
-- **When it appears** — any conditions controlling visibility (some panels only
-  show for directed graphs, geospatial data, or after a graph exists).
-- **Controls** — a table of every field, toggle, and button with its meaning.
-- **Typical workflow** — the recommended order of operations.
+Every panel page describes what the panel does, when it appears (some are
+conditional), a table of every field, toggle and button, and the recommended
+order of operations.
 
 ::: {.callout-note}
-Many panels are hidden until they are relevant. For example, the **Network
-Flow** and **Directed Analysis** panels only appear when the active object is a
-*directed* graph, and **Geospatial Options** / **Temporal Data** only appear
-once a file is loaded or SQL columns are available.
+Many panels stay hidden until they are relevant. **Network Flow** and **Directed
+Analysis** appear only when the active object is a *directed* graph, and
+**Geospatial Options** and **Temporal Data** only once a file is loaded or SQL
+columns are available.
 :::

@@ -1,0 +1,58 @@
+---
+title: "SciGraphs panels"
+---
+
+::: {.lead}
+Seven walkthroughs of the **SciGraphs** tab, one per panel, each following a
+concrete case so you can reproduce the result button by button.
+:::
+
+These are the worked "typical workflows" referenced from the
+[Panel Reference](../../../panels/overview.qmd). Unlike the OSMnx and City2Graph
+sets, this one is not about real-world geography: the SciGraphs tab works on any
+graph, and its job is to give that graph positions, measurements, an appearance
+and a reproducible record.
+
+## The tutorials
+
+| # | Tutorial | Panel | After it you can |
+| --- | --- | --- | --- |
+| 1 | [Load a graph](data.qmd) | [Data](../../../panels/scigraphs/data.qmd) | Import a graph from a file, a SQL database, SuiteSparse or a pipeline, and build the Blender object every other panel operates on. |
+| 2 | [Lay it out](layout.qmd) | [Layout & Positioning](../../../panels/scigraphs/layout.qmd) | Give a graph with no coordinates a set of positions, in 2D or 3D, and pick an algorithm that finishes on the size you have. |
+| 3 | [Run algorithms](algorithms.qmd) | [Graph Algorithms](../../../panels/scigraphs/algorithms.qmd) | Traverse the graph, find shortest paths, build spanning trees, solve flows, and animate the result. |
+| 4 | [Measure the network](analysis.qmd) | [Analysis](../../../panels/scigraphs/analysis.qmd) | Compute centralities, detect communities and read global statistics, each stored as a mesh attribute you can encode visually. |
+| 5 | [Make it look right](visualization.qmd) | [Visualization](../../../panels/scigraphs/visualization.qmd) | Turn those attributes into node and edge geometry, color, materials, lighting and on-render labels. |
+| 6 | [Get it back out](export.qmd) | [Export & Tools](../../../panels/scigraphs/export.qmd) | Write the graph to a standard format, export node positions, and generate a statistics report. |
+| 7 | [Freeze and replay it](reproducibility.qmd) | [Reproducibility](../../../panels/scigraphs/reproducibility.qmd) | Capture the whole workflow in one JSON or YAML file, replay it deterministically, and audit the provenance manifest it writes. |
+
+::: {.callout-tip}
+New to the add-on? Enable SciGraphs (see
+[Installation](../../../guide/installation.qmd)), open the 3D Viewport sidebar
+with `N`, pick the **SciGraphs** tab, and start with [Load a graph](data.qmd).
+:::
+
+## The same ground from a console
+
+The [Jupyter notebooks](../../../notebooks/index.qmd) run inside Blender and
+cover this tab with the timings, distributions and failure modes measured rather
+than described. The tutorials show you where the buttons are; the notebooks show
+you what the numbers do.
+
+| Notebook | Covers |
+| --- | --- |
+| [01 Abstract graphs](../../../notebooks/01-abstract-graphs.qmd) | Importing and building graphs that carry no coordinates. |
+| [02 Layouts](../../../notebooks/02-layouts.qmd) | The layout algorithms, and what each one costs. |
+| [03 Centrality and communities](../../../notebooks/03-centrality-communities.qmd) | Centrality measures and community detection. |
+| [04 Paths, trees and flows](../../../notebooks/04-paths-trees-flows.qmd) | Traversal, shortest paths, spanning trees, network flow. |
+| [05 Topology](../../../notebooks/05-topology.qmd) | Topological invariants and structural analysis. |
+
+For scripting the add-on rather than clicking it, see the
+[Python API reference](../../../reference/python-api.qmd).
+
+## Where the other tabs fit
+
+A street network downloaded in the [OSMnx panels](../osmnx/download.qmd) or an
+urban graph built in the [City2Graph panels](../city2graph/data.qmd) arrives as
+an ordinary SciGraphs graph object, and everything from panel 3 onwards applies
+to it unchanged. The exception is [Layout](layout.qmd): geographic data already
+has positions, so that panel is for graphs that have none.

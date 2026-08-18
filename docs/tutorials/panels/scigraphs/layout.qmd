@@ -1,0 +1,162 @@
+---
+title: "SciGraphs · Lay out a graph"
+---
+
+::: {.lead}
+Choose where the nodes of an abstract graph go. The coordinates are not in your
+data, they are produced by an optimizer, so this walkthrough is as much about
+reading a layout as about running one.
+:::
+
+Mirrors the [Layout & Positioning panel](../../../panels/scigraphs/layout.qmd).
+
+## Before you begin
+
+Import a graph (see [Import an abstract graph](data.qmd)) and keep it active. If
+the header card says *No graph loaded*, select the graph object in the viewport.
+
+## 1. Read the status card first
+
+Above 1,000 nodes the card flags **Spring** and **Spring 3D** as slow; above
+10,000 it recommends **DrL**, **Yifan Hu** or **LGL** instead. Take it
+seriously: the NetworkX spring layouts are the slowest entries in the list and
+the ones most people reach for first.
+
+![The status card reporting counts and a large-graph warning.](../../../assets/guides/scigraphs/02-status.png)
+
+## 2. Pick an algorithm
+
+The **Algorithm Info** card under the dropdown reports dimensionality, an
+indicative speed and what the algorithm suits. Rather than working down the
+list, decide what the drawing has to answer:
+
+- **Is there community structure?** **ForceAtlas2** (the default), **Yifan Hu
+  (sfdp)** or **Spectral 3D**. Densely connected groups come out as visible
+  clumps.
+- **Is this a hierarchy or a process?** **Sugiyama** for a DAG, **Hierarchical
+  3D** for a tree, **Graphviz Dot** for the canonical layered drawing.
+- **Is it too big to be drawn at all?** **igraph DrL** or **igraph LGL**.
+- **Do I just need a reference frame?** **Grid**, **Sphere**, **Cube** or
+  **Random**. These ignore the edges entirely, which makes them useful as a
+  before-and-after baseline.
+
+![Algorithm Selection with the Algorithm Info card.](../../../assets/guides/scigraphs/02-algorithm.png)
+
+## 3. Apply it once
+
+In **Quick Settings**, set **Scale** (5.0 is the default and a good size for a
+few hundred nodes) and press **Apply Layout Now**.
+
+![Apply Layout Now computes the layout in one shot.](../../../assets/guides/scigraphs/02-apply.png)
+
+::: {.callout-important}
+## The layout has just zeroed your edge attributes
+
+Every layout operator calls `rebuild_edges`, which deletes and recreates the
+mesh edges. Any attribute on the `EDGE` domain survives as a correctly named,
+correctly sized layer of zeros. Node attributes are untouched.
+
+Lay the graph out before you compute or import anything edge-valued, and
+recompute anything edge-valued that predates the layout.
+[Notebook 01](../../../notebooks/01-abstract-graphs.qmd) demonstrates it on a
+real column.
+:::
+
+## 4. Tune the parameters
+
+**Algorithm Parameters** appears only for algorithms that expose any: Spring,
+ForceAtlas2, the igraph family, Yifan Hu and the Graphviz engines. These change
+what the algorithm is optimizing, not how the result is displayed.
+
+::: {.callout-warning}
+Some parameter groups, Fruchterman-Reingold's among them, say so in the panel
+itself: they are honored in **Interactive Mode** only, and **Apply Layout Now**
+uses defaults for those. If a slider appears to do nothing, check for that note
+above it.
+:::
+
+![Algorithm Parameters for the selected algorithm.](../../../assets/guides/scigraphs/02-parameters.png)
+
+## 5. Watch it converge
+
+For a force-directed layout, **Interactive Mode** computes positions iteratively
+across the timeline so you can stop when the picture is right rather than after
+a fixed iteration count. Press **Start Execution**; the **Current Status** box
+reports iteration and energy, and says *Converging* once the energy settles
+below **Auto-Stop Energy**. **Bake to Animation** keeps the motion as keyframes;
+**Reset** restores the positions the layout started from.
+
+![Interactive Mode converging, with the status box.](../../../assets/guides/scigraphs/02-interactive.png)
+
+## 6. Separate the layers
+
+**Network Splitter 3D** takes a finished layout and pulls it apart along Z by
+**Community**, **Attribute**, **Degree**, **Centrality** or connected component.
+Keep **Preserve XY Positions** on so the layout you just computed still reads
+inside each layer, then press **Split Network**. **Reset** flattens it again.
+
+![Splitting a layout into Z-layers by community.](../../../assets/guides/scigraphs/02-splitter.png)
+
+## What the panel will not tell you
+
+::: {.callout-important}
+## Most layouts here do not repeat
+
+Run the same algorithm on the same graph with the same parameters twice and the
+nodes are usually somewhere else. The add-on prepares a seeded generator on
+every layout call and then the algorithms that need it read a different one: the
+NetworkX spring layouts call `spring_layout` with no seed, igraph keeps its own
+RNG that is never seeded, and the cube layout draws from NumPy's global state.
+Measured on the karate club, two identical imports laid out with **Spring (2D,
+NetworkX)** came out 9.0 units apart on a drawing about 10 units across. There
+is no seed field in this panel, so it cannot be fixed from the sidebar.
+
+What does repeat, measured over three runs each in
+[Layouts](../../../notebooks/02-layouts.qmd): Grid, Sphere, Random, igraph
+Kamada-Kawai, Spectral 3D, MDS 3D, Graphviz Dot, and ForceAtlas2, the only force
+layout in the set that consults the seeded generator. Good reason to leave the
+default alone.
+
+Yifan Hu / Graphviz sfdp adds two of its own. The first sfdp call in a Blender
+session differs from every later one, so a figure made once and never remade is
+not the figure you get on a rerun. And its default **2D + Z depth** mode derives
+Z from an eigenvector whose sign is arbitrary, so the depth axis flips between
+runs; setting **Dimensions** to **2D (flat)** removes that one entirely.
+:::
+
+::: {.callout-warning}
+## The reported algorithm is not always the one that ran
+
+The dispatcher marks ForceAtlas2 as a *SPRING (2D fallback)* whenever the legacy
+`fa2` package is missing, but modern NetworkX has a real ForceAtlas2 and the
+layout uses it: the fallback is reported and did not happen. Separately, the
+graph object records the algorithm you requested on import, not the one that
+executed, so when a genuine fallback does occur the object still says what you
+asked for. If it matters which algorithm produced a figure, note it yourself.
+:::
+
+::: {.callout-note}
+## Two algorithms that surprise people
+
+**Circular Hierarchy** builds its concentric rings in the **XZ** plane with
+`y = 0`, while every other 2D layout here uses XY. From Blender's default top
+view it is a straight line. Look at it from the front (`Numpad 1`), or rotate
+the object 90 degrees about X.
+
+**Graphviz sfdp**, the engine behind both **Yifan Hu** and **Graphviz SFDP**,
+aborts the whole Blender process on a graph containing an isolated node, with no
+traceback and no chance to save: the bundled Graphviz asserts on a node whose
+only neighbor is itself, and an `abort()` inside a compiled library takes
+Blender with it. SciGraphs guards the case by downgrading **Smoothing** to
+*None*, so the layout completes but with a smoothing you did not choose. This
+tab has no drop-the-fragments button outside the SuiteSparse importer's **Giant
+Component Only**; on an existing graph object, City2Graph's
+[Graph Tools → Remove Isolated](../city2graph/graph-tools.qmd) does the job. An
+object whose stored edge list is empty reaches the layout as all isolated
+points, however many mesh edges you can see.
+:::
+
+## Next steps
+
+[Analyze a graph](analysis.qmd) computes the quantities you will color by, or go
+straight to [Style and render](visualization.qmd).

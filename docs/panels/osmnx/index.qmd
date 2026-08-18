@@ -2,12 +2,8 @@
 title: "OSMnx"
 ---
 
-::: {.lead}
 The OSMnx tab downloads and analyzes real-world street networks from
-OpenStreetMap. It exposes the full OSMnx toolbox — download, projection, routing,
-accessibility, statistics, features, and elevation/terrain — adapted to the
-Blender environment.
-:::
+OpenStreetMap.
 
 The root **OSMnx** panel is a status header: once a graph is imported it shows
 the active network's name, node/edge counts, place, and CRS. Most subpanels
@@ -15,8 +11,6 @@ require an imported OSMnx graph and display a hint pointing to **Download** unti
 one exists; subpanels appear in workflow order.
 
 ## Panels in this tab
-
-Each panel of the addon has its own reference page:
 
 | Panel | What it does |
 | --- | --- |
@@ -40,17 +34,3 @@ When an OSMnx network is active, the header reports:
 | **Nodes / Edges** | Node and edge counts. |
 | **Place** | The query/place name used to download it. |
 | **CRS** | The coordinate reference system (only shown once projected). |
-
-## Typical workflow
-
-1. **[Download](download.qmd)** a network by place, point, or bbox.
-2. **Project to CRS** in **[Graph Operations](graph-operations.qmd)**, then add
-   **Lengths**, **Speeds**, and **Travel Times** in
-   **[Network Attributes](attributes.qmd)**.
-3. Use **[Routing](routing.qmd)**, **[Accessibility](accessibility.qmd)**, and
-   **[Statistics & Centrality](statistics.qmd)** for analysis, mapping results to
-   attributes.
-4. Add **[Elevation & Terrain](elevation.qmd)** for 3D context and a basemap,
-   then visualize and render via the
-   [SciGraphs Visualization panel](../scigraphs/visualization.qmd).
-5. **[Export](io.qmd)** or cache the result.

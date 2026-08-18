@@ -2,11 +2,9 @@
 title: "Graph Operations"
 ---
 
-::: {.lead}
-The Graph Operations panel transforms the imported graph: project it to a metric
-CRS, convert between directed/undirected and GeoDataFrame representations,
-simplify and consolidate it, and truncate it to an area.
-:::
+The Graph Operations panel transforms the imported graph: projection to a metric
+CRS, conversion between directed/undirected and GeoDataFrame representations,
+simplification, consolidation, and truncation to an area.
 
 ::: {.callout-note}
 Requires an active OSMnx graph. Until one is imported the panel shows a hint
@@ -24,14 +22,14 @@ Project **before** computing lengths, speeds, statistics, or distances so that
 metric values are accurate.
 :::
 
-## Graph Type Conversion
+## Graph type conversion
 
 | Control | Description |
 | --- | --- |
 | **To Undirected** | Convert to an undirected graph. |
 | **To DiGraph** | Convert to a simple directed graph. |
 
-## GeoDataFrame Conversion
+## GeoDataFrame conversion
 
 | Control | Description |
 | --- | --- |

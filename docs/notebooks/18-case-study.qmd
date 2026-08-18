@@ -1,0 +1,29 @@
+---
+title: "18 · Functional clustering, end to end"
+execute:
+  enabled: false
+---
+
+A complete workflow, from raw data to an evaluated clustering. Small spatial
+units are grouped into functional clusters by combining three relations between
+them: `contig` (spatial contiguity, from `contiguity_graph()` over the
+polygons), `15_min_walk` (pedestrian accessibility, from `bridge_nodes()` plus
+`add_metapaths_by_weight()` over the street network), and `15_min_multi` (the
+same with the GTFS bus network added, excluding the pairs already reachable on
+foot). `contig` is the homogeneous reference, two units related if they touch;
+the other two carry a far less local hypothesis about what makes two units
+alike.
+
+The study area is central São Paulo, and the units are a 250 m grid rather than
+census tracts. A grid is a worse unit, respecting neither population nor
+morphology, but it plays the same role in the graph mechanics and needs no
+separate download. The last section records how to swap in real boundaries, a
+different transit feed and Overture place categories.
+
+PyTorch is not installed in Blender's Python, so `gdf_to_pyg()` and anything
+that learns an embedding cannot run here. The notebook builds the full
+heterogeneous graph with its 23 attributes anyway, then clusters it with
+PCA + K-Means and scores the result by silhouette and by modularity per
+relation.
+
+{{< embed _ipynb/18_case_study.ipynb echo=true >}}

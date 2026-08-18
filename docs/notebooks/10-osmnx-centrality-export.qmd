@@ -1,0 +1,24 @@
+---
+title: "10 · Centrality and export"
+execute:
+  enabled: false
+---
+
+Betweenness on a street network concentrates: the busiest 5 % of junctions carry
+23 % of it, and of streets, 26 %. The notebook computes it on intersections and,
+through the line graph, on the streets themselves, which is the reading most
+urban analysis wants.
+
+It also closes the suite by asking what survives leaving it. Of eight export
+routes tabulated, every GraphML, GEXF and JSON export comes out **undirected**
+regardless of the graph, one route loses 12 of 375 segments to a silent default,
+another turns every attribute into a string, and only the GeoPackage round trip
+returns float64 values unchanged.
+
+The finding easiest to miss: `Use Length Weight` does nothing at all while
+`Use Rustworkx (Fast)` is ticked, because the fast path loads the lengths and
+then calls a function that takes no weight argument. The weighted answer, which
+moves three of the top five junctions, sits behind what reads as a performance
+switch.
+
+{{< embed _ipynb/10_osmnx_centrality_export.ipynb echo=true >}}

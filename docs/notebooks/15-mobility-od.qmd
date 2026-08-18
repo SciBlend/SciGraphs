@@ -1,0 +1,22 @@
+---
+title: "15 · Mobility (origin-destination matrices)"
+execute:
+  enabled: false
+---
+
+`od_matrix_to_graph()` turns an origin-destination matrix into a directed,
+weighted graph whose nodes are zones, polygons or points, and whose edges are
+observed flows. Those edges presuppose no spatial relation at all, neither
+proximity nor physical connection: they are measured interactions, possibly
+asymmetric, and the asymmetry is information.
+
+Both accepted formats are covered: `matrix_type="edgelist"`, one row per pair
+with origin, destination and weight columns, starting from a 16-zone test grid
+small enough to read the function's contract without noise; and
+`matrix_type="adjacency"`, a square zones × zones matrix. The notebook also
+notes that the `c2g_od_to_graph` operator does not propagate `od_source_col` and
+`od_target_col`, always using `"source"` and `"target"`.
+
+No network access needed.
+
+{{< embed _ipynb/15_mobility_od.ipynb echo=true >}}

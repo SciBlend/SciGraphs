@@ -1,0 +1,23 @@
+---
+title: "14 · Public transport (GTFS)"
+execute:
+  enabled: false
+---
+
+The transport module starts from a GTFS feed, the standard format agencies
+publish timetables in. `load_gtfs()` opens the zip and exposes it as queryable
+DuckDB tables, adding geometry to stops and shapes without loading anything into
+memory, which is what makes million-row feeds workable inside Blender.
+`travel_summary_graph()` then aggregates the scheduled trips into a
+**stop-to-stop** network whose edges carry service frequency and mean travel
+time for the requested period.
+
+Those edges are **scheduled service**, not physical connection: two adjacent
+stops with no line joining them have no edge, however close they are. The
+notebook also documents where `c2g_get_od_pairs` diverges from the library,
+using its own SQL that assumes consecutive `stop_sequence` values and so returns
+zero pairs on feeds numbered 0, 10, 20.
+
+No network access needed; it uses the São Paulo feed shipped in the repository.
+
+{{< embed _ipynb/14_transport_gtfs.ipynb echo=true >}}

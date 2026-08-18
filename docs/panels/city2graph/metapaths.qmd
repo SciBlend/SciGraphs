@@ -2,17 +2,11 @@
 title: "Metapath Analysis"
 ---
 
-::: {.lead}
 The Metapath Analysis panel connects amenities through the street network using
 city2graph's metapath workflow. It builds a *street dual graph* (segments as
 nodes), bridges amenities to their nearest segments, and materializes
-amenity-to-amenity paths — either by a fixed number of street **hops**
+amenity-to-amenity paths, either by a fixed number of street **hops**
 (`add_metapaths`) or by an accumulated **cost** band (`add_metapaths_by_weight`).
-:::
-
-The panel is organized as a root with shared inputs and four subpanels that
-follow the city2graph pipeline: choose a materialization strategy, inspect the
-result, or drive the raw stages.
 
 ::: {.callout-important}
 **Two inputs are required:** an **OSMnx street network** must be the *active*
@@ -23,7 +17,10 @@ checkmark with the feature count confirms a valid choice. Denser amenity sets
 (e.g. **buildings**) produce many more edges than sparse POI tags.
 :::
 
-## Root — shared inputs
+## Root: shared inputs
+
+The dual graph and the KNN bridge are built automatically by both strategies, so
+these inputs are shared.
 
 | Section | Control | Description |
 | --- | --- | --- |
@@ -32,19 +29,16 @@ checkmark with the feature count confirms a valid choice. Denser amenity sets
 | **Graph Construction** | **Bridge K** | Nearest segments each amenity is bridged to (KNN). |
 | **Graph Construction** | **Amenity Limit** | Maximum amenities analyzed, for performance. |
 
-The dual graph and the KNN bridge are built automatically by both strategies, so
-these inputs are shared.
-
-## Subpanel — Materialize by Hops {#hops}
+## Subpanel: Materialize by Hops {#hops}
 
 Implements `add_metapaths`: the `amenity → segment (×N) → amenity` sequence.
 
 | Control | Description | Default |
 | --- | --- | --- |
-| **Street Hops** | Number of segment-to-segment hops in each metapath. | 3 (1–10) |
-| **Viz Limit** | Maximum metapaths drawn as curves. | 200 (10–1000) |
+| **Street Hops** | Number of segment-to-segment hops in each metapath. | 3 (1-10) |
+| **Viz Limit** | Maximum metapaths drawn as curves. | 200 (10-1000) |
 | **Curve Thickness** | Bevel depth of the metapath curves. | 0.0002 |
-| **Materialize Metapaths** | Builds the dual graph, bridges amenities, and computes the hop-based metapaths in one run. | — |
+| **Materialize Metapaths** | Builds the dual graph, bridges amenities, and computes the hop-based metapaths in one run. | (none) |
 
 ::: {.callout-tip}
 More edges come from more amenities and more connectivity: raise **Street Hops**,
@@ -52,7 +46,7 @@ More edges come from more amenities and more connectivity: raise **Street Hops**
 (buildings).
 :::
 
-## Subpanel — Materialize by Weight {#weight}
+## Subpanel: Materialize by Weight {#weight}
 
 Implements `add_metapaths_by_weight`: connect endpoints reachable within an
 accumulated cost band (Dijkstra).
@@ -70,7 +64,7 @@ This strategy reuses the bridged dual graph. Run **Materialize by Hops** (or the
 step-by-step bridge stage) at least once so the bridges exist.
 :::
 
-## Subpanel — Result & Inspect {#result}
+## Subpanel: Result & Inspect {#result}
 
 Appears only when a dual graph or metapath object is active.
 
@@ -84,7 +78,7 @@ Appears only when a dual graph or metapath object is active.
 **edge** domain carries a `multiplicity` attribute, inspectable in the
 Spreadsheet editor (set the domain to *Edge*).
 
-## Subpanel — Advanced (Step-by-Step) {#advanced}
+## Subpanel: Advanced (Step-by-Step) {#advanced}
 
 Run the individual pipeline stages on the active object for debugging or fine
 control:

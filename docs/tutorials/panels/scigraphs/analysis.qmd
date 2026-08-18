@@ -1,0 +1,198 @@
+---
+title: "SciGraphs · Analyze a graph"
+---
+
+::: {.lead}
+Rank nodes by centrality, split the graph into communities, read the global
+descriptors, and on a directed graph measure the structure direction actually
+creates. Every result lands as a named mesh attribute you can encode.
+:::
+
+Mirrors the [Analysis panel](../../../panels/scigraphs/analysis.qmd).
+
+::: {.callout-warning}
+**Read step 3 before you press Detect Communities.** The clustering backend the
+panel selects by default does not return on graphs as small as 34 nodes, and it
+runs on Blender's main thread, so it is a frozen Blender with no way back rather
+than a slow call. Change the dropdown first.
+:::
+
+## Before you begin
+
+Create a graph first (see [Import an abstract graph](data.qmd)) and lay it out
+with [Lay out a graph](layout.qmd) so each result is legible as you compute it.
+The examples below use the SuiteSparse source with **Matrix Identifier**
+`Newman/karate` and **Graph Representation** set to **Symmetric (A+A^T)**:
+Zachary's karate club, 34 nodes, and the one graph in this documentation with a
+recorded ground truth.
+
+**Directed Analysis** appears only when the active object was imported with
+**Directed Graph** enabled.
+
+## 1. Rank nodes by centrality
+
+**Calculate** under *Node Importance Metrics* writes a POINT attribute named
+after the **Method**: `centrality_degree`, `centrality_betweenness`, and so on.
+The confirmation dialog is pre-filled from the dropdown.
+
+::: {.callout-important}
+**On a directed graph this operator silently symmetrizes.** It builds an
+undirected graph unconditionally and never consults the object's directed flag,
+so every reciprocal pair collapses onto one edge and direction is discarded with
+no warning. Measured against PageRank on the same directed graph, the two
+rankings agree at a Spearman rho of 0.565: they share about half their
+information and are answering different questions.
+
+On a directed graph, use **Directed Centrality** (step 4) instead. Betweenness
+and closeness are also computed unweighted here, so they count hops rather than
+distance; [Run graph algorithms](algorithms.qmd) explains why.
+:::
+
+## 2. Local clustering coefficient
+
+**Calculate** under *Local Clustering* writes the POINT attribute `clustering`,
+the fraction of each node's neighbors that are themselves connected. Expect it
+to run against degree rather than with it: a hub joins parts of the graph that
+are not otherwise joined, so most of its neighbors do not know each other.
+[Notebook 03](../../../notebooks/03-centrality-communities.qmd) measures the
+anti-correlation.
+
+## 3. Detect communities
+
+::: {.callout-warning}
+**Change the backend before you press the button.** **Clustering Algorithm**
+defaults to **RN**, which is implemented as a scan over 25 resolution values
+through a Leiden call that does not terminate. Measured at over 400 seconds on
+the 34-node karate club against 0.00007 s for the same call with a bounded
+iteration count, and gamma = 1.0 is the sixteenth step of the scan, so every RN
+run on any graph reaches it and stops there. The 300-second timeout the add-on
+passes in is not honored on this path, and the operator runs on Blender's main
+thread: no cancel, no progress, no recovery.
+
+**Set Clustering Algorithm to `Infomap` first.** The other six backends (`CPM`,
+`Infomap`, `RB`, `RNSC`, `SCluster`, `UVCluster`) all return in under 3.2 s on
+the same graph.
+:::
+
+With the dropdown moved off `RN`, press **Detect Communities**. A dialog opens
+with **Algorithm**, pre-filled from the panel so check it once more here, and
+**Resolution**.
+
+The panel reports the cluster count, the modularity and the Surprise score, and
+writes five POINT attributes: `cluster_id`, `cluster_size`, `node_clustering`,
+`modularity` and `surprise`. Color by `cluster_id`, or stratify the communities
+in space with the
+[Network Splitter 3D](../../../panels/scigraphs/layout.qmd#splitter).
+
+::: {.callout-note}
+`modularity` and `surprise` are single numbers describing the whole partition,
+broadcast to every vertex. They appear in the attribute menus beside the real
+per-node quantities, and coloring by either gives a graph of one uniform color.
+`node_clustering` is the same quantity as `clustering` from step 2 under a
+second name.
+:::
+
+::: {.callout-important}
+**Resolution does not reach the detection, and Seed does nothing at all.**
+
+**Resolution** is described as *"higher = more communities"*, but it is handed
+to the scoring call only, never to the detection. Swept from gamma = 0.25 to
+gamma = 4 on the karate club the partition was identical at every step while the
+reported modularity marched from +0.716 to -0.853: the same clustering scored
+under a harsher null model. Leave it at 1.0 and read the modularity as a plain
+modularity.
+
+The **Random Seed** in the scene properties is accepted, stored, passed in, and
+its name never appears in the function that receives it. Three different seeds
+returned one partition. The results are reproducible, because the library seeds
+itself from a fixed internal constant, but not by the control that claims to do
+it, and you cannot get a second sample by changing it.
+
+The seven backends are not variations on a theme: on this 34-node graph they
+return between three and nineteen groups, and modularity and Surprise do not
+rank them the same way.
+[Notebook 03](../../../notebooks/03-centrality-communities.qmd) has the
+per-backend table and the comparison against the split the club actually went
+through.
+:::
+
+## 4. Directed analysis
+
+**Directed Analysis ▸ Directed Centrality** offers `PageRank`, `Hub Score`,
+`Authority Score`, `In-Degree`, `Out-Degree` and `Katz Centrality`, written as
+`directed_pagerank`, `directed_in_degree`, and so on. This is the operator that
+reads direction; expect PageRank and authority score to track in-degree, and hub
+score to track out-degree.
+
+::: {.callout-note}
+Hub and authority come from the same HITS iteration, and each is computed by its
+own separate call, so asking for both runs the iteration twice and discards half
+of each result. That iteration starts from an unseeded random vector, which
+makes hub and authority the two methods here that are not reproducible run to
+run.
+:::
+
+**Detect Patterns** classifies the graph as acyclic or not, with a cycle count
+and strong connectivity, and **Find SCCs** labels the strongly connected
+components as `scc_id`.
+
+**Analyze Flow** classifies every node as a source, a sink or an intermediary.
+**Create Flow Animation** then writes `flow_activation` (the animated value) and
+`flow_distance` (static hop distance from the sources). This is a propagation
+along the directed topology, not the network flow of
+[Run graph algorithms](algorithms.qmd); no capacity is involved.
+
+## 5. Global statistics
+
+**Calculate Statistics** reports density, global clustering, diameter, average
+path length, assortativity and the degree distribution inline, and stores them
+as `stat_*` object properties.
+
+**Global Clustering** is the transitivity, the ratio of triangles to connected
+triples over the whole graph, not the mean of the per-node coefficients from
+step 2. The two differ substantially on most real graphs, so do not compare
+them.
+
+## 6. Topological analysis
+
+Set **Topological Analysis** to `Surface` and use **Check Planarity**,
+**Calculate Genus**, **Compute Faces**, **Create Dual Graph**, **Compute
+Embedding** and **Validate Crossings**. Results accumulate in the read-only
+**Results Summary** subpanel.
+
+**Check Planarity** is the part to trust: a real Boyer-Myrvold test, 13 of 13
+correct against the literature, and it reads the graph rather than the drawing,
+so the same graph laid out badly and well gives the same verdict.
+
+::: {.callout-important}
+Three things built on top of it are not sound.
+
+- **The Kuratowski type is always "unknown"** for non-planar graphs. The lookup
+  calls a function that does not exist and the failure is swallowed, so the
+  panel never distinguishes a $K_5$ from a $K_{3,3}$.
+- **The genus figure ignores the planarity result** it has just computed. It
+  returns 0 for $K_{3,3}$ and for the Petersen graph, both of genus at least 1.
+  Treat any genus of 0 on a graph the panel has just called non-planar as no
+  information.
+- **`face_id` is not a face coloring.** Each node is labeled with the
+  lowest-numbered face touching it, collapsing 14 faces to 6 labels on a test
+  grid. **Create Dual Graph** also drops parallel dual edges and puts the outer
+  face's dual vertex in the middle of the drawing.
+:::
+
+::: {.callout-warning}
+**Do not apply a layout after a topology operator has rebuilt the mesh.**
+**Compute Embedding** and **Create Dual Graph** rebuild the mesh and leave the
+object's stored node positions holding the previous coordinates. Every layout
+operator copies those stored positions back over the mesh, so the crossing-free
+embedding you just computed is silently replaced by the drawing you had before.
+Lay the graph out first, compute the embedding last.
+:::
+
+[Notebook 05](../../../notebooks/05-topology.qmd) has the measurements and the
+checks behind each of these.
+
+## Next steps
+
+[Make a figure](visualization.qmd) maps these attributes onto color, size and
+labels.

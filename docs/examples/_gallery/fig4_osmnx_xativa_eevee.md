@@ -9,7 +9,7 @@ analysis, color and glyph fields produce the same geometry, and only the last
 section differs from a Cycles specification.
 
 Nodes are colored by closeness centrality under `QUANTILE` normalization, which
-ranks unique values rather than samples — appropriate here because a grid-like
+ranks unique values rather than samples, appropriate here because a grid-like
 street plan produces large groups of nodes with identical closeness.
 
 `ambient_occlusion` darkens the crevices between clustered nodes, which is what

@@ -2,17 +2,14 @@
 title: "Features & POIs"
 ---
 
-::: {.lead}
 The Features & POIs panel downloads OpenStreetMap features (points of interest,
 buildings, and other tagged geometry), snaps them to the street network, and
-provides geocoding/geometry helpers.
-:::
+provides geocoding and geometry helpers.
 
-## Download OSM Features
+## Download OSM features
 
-Download features by area; each button uses the corresponding query type. The
-feature source/type selector is shared with **City2Graph ▸ Data Import**, so the
-same preset or custom tags drive both entry points.
+The feature source/type selector is shared with **City2Graph ▸ Data Import**, so
+the same preset or custom tags drive both entry points.
 
 | Selector | Description |
 | --- | --- |
@@ -20,6 +17,8 @@ same preset or custom tags drive both entry points.
 | **Feature** | Shared preset such as Buildings, Amenities, Restaurant, Shop, Health, Water, Highway, or Custom Tags. |
 | **Tags** | For **Custom Tags**, enter comma-separated `key=value` pairs such as `amenity=restaurant`. |
 | **Max Features** | Limit used by sources that support capping returned features. |
+
+Each button below downloads features using the corresponding query type.
 
 | Control | Description |
 | --- | --- |
@@ -30,14 +29,14 @@ same preset or custom tags drive both entry points.
 | **Polygon (active obj)** | Download features within the active mesh's polygon. |
 | **From XML File** | Load features from a local `.osm` XML file. |
 
-## Snap POIs to Street Network
+## Snap POIs to street network
 
 | Control | Description |
 | --- | --- |
 | **Mode** | How POIs attach to the network (e.g. nearest node or edge). |
 | **Snap Active POIs** | Snaps the active POI object to the nearest network element. |
 
-## Geocoding & Geometry
+## Geocoding & geometry
 
 | Control | Description |
 | --- | --- |

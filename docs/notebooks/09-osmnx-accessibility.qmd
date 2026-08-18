@@ -1,0 +1,15 @@
+---
+title: "09 · Accessibility and places"
+execute:
+  enabled: false
+---
+
+Reachability, and the places you can reach: isochrones, ego subgraphs, points of
+interest snapped onto the network, and clustering that measures distance along
+streets rather than across them.
+
+[Notebook 17](17-metapaths-15min.qmd) answers the same fifteen-minute question
+about the same place through City2Graph instead, and where the two disagree the
+disagreement is the finding.
+
+{{< embed _ipynb/09_osmnx_accessibility.ipynb echo=true >}}

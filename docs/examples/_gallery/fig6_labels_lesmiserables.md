@@ -1,10 +1,10 @@
 ---
-title: "Labelled characters"
+title: "Labeled characters"
 tagline: "Ranking, occlusion and collision, in that order"
 ---
 
 The same 77-node network with the eighteen highest-betweenness characters
-labelled.
+labeled.
 
 Three filters run in sequence, and the run reports each: 77 nodes projected, 77
 inside the frame, 59 not hidden behind geometry, 18 kept. `rank_by` decides the

@@ -2,17 +2,15 @@
 title: "Statistics & Centrality"
 ---
 
-::: {.lead}
 The Statistics & Centrality panel reports network-wide metrics, node centrality,
 street orientation, and node-pair distances.
-:::
 
 ::: {.callout-note}
 Requires an active OSMnx graph. Project the graph and add edge lengths first for
 accurate metric results.
 :::
 
-## Basic Stats
+## Basic stats
 
 | Control | Description |
 | --- | --- |
@@ -34,7 +32,7 @@ accurate metric results.
 | **Fast** | Use a fast approximation. |
 | **Compute Centrality** | Computes the chosen measure onto the nodes. |
 
-## Orientation Analysis
+## Orientation analysis
 
 | Control | Description |
 | --- | --- |
@@ -43,7 +41,7 @@ accurate metric results.
 | **Bins** | Bin count for the orientation rose. |
 | **Render Rose to Image** | Render an orientation rose as an image. |
 
-## Node-Pair Distances
+## Node-pair distances
 
 | Control | Description |
 | --- | --- |

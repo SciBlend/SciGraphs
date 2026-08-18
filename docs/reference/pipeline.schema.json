@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sciblend.github.io/SciGraphs/pipeline.schema.json",
   "title": "SciGraphs pipeline specification",
-  "description": "A declarative description of a graph visualization workflow: ingest, analyse, lay out, style, light, render and export.",
+  "description": "A declarative description of a graph visualization workflow: ingest, analyze, lay out, style, light, render and export.",
   "type": "object",
   "properties": {
     "meta": {
@@ -114,6 +114,20 @@
         },
         "matrix_name": {
           "type": "string"
+        },
+        "matrix_mode": {
+          "type": "string",
+          "enum": [
+            "BIPARTITE",
+            "SYMMETRIC"
+          ],
+          "description": "BIPARTITE duplicates every index as a row node and a column node; the auxiliary coordinate file indexes rows only, so a matrix carrying coordinates must be read as SYMMETRIC or both copies land on the same point",
+          "default": "BIPARTITE"
+        },
+        "giant_only": {
+          "type": "boolean",
+          "description": "Keep only the largest connected component",
+          "default": true
         },
         "bbox": {
           "type": "array",

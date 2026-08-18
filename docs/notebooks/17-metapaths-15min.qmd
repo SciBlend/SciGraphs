@@ -1,0 +1,28 @@
+---
+title: "17 · Metapaths and the 15-minute city"
+execute:
+  enabled: false
+---
+
+A metapath is a semantic relation between two nodes established through a
+sequence of intermediate steps: instead of "restaurant A touches segment 7,
+which touches segment 8, which touches bar B" you get a direct
+**restaurant A → bar B** edge labeled with what it cost to get there. The
+clustering workflow of notebook 18 rests on it.
+
+The street network is built as a graph of connectors weighted by walking time,
+then both implementations are applied: `add_metapaths()`, controlled by hop
+count over a given sequence of relations, and `add_metapaths_by_weight()`, which
+projects by **accumulated cost**, connecting two nodes when a path exists whose
+total weight stays under a threshold. With the weight set to travel time and the
+threshold at 900 s, that projection *is* the 15-minute city.
+
+Two operator divergences show up here: `create_street_dual_graph` drops the
+`key` level of the OSMnx index and collapses parallel segments, and
+`c2g_graph_tool_apply` with `ISOCHRONE` works on local Blender coordinates with
+no cost attribute, so its threshold counts hops rather than time. Because
+15-minute accessibility over a neighborhood is very nearly a complete graph,
+the renders use the edge backbone materialized in the data
+(`SciGraphs.api.thin`), so every renderer sees the same sparsification.
+
+{{< embed _ipynb/17_metapaths_15min.ipynb echo=true >}}

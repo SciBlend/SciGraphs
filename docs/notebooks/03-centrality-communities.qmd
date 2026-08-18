@@ -1,0 +1,20 @@
+---
+title: "03 · Centrality and communities"
+execute:
+  enabled: false
+---
+
+Four centralities on the same graph, and the interesting figure is where they
+disagree. On Zachary's karate club, eigenvector and betweenness correlate at
+0.694, the weakest pair in the set; closeness spans a factor of two where degree
+spans seventeen.
+
+The community half is judged, not just displayed. Against the faction split
+Zachary recorded, only one of the three detected groups is pure and two members
+land on the wrong side; seven backends give partitions of 3, 5, 7, 12, 17 and 19
+groups, ranked differently by modularity and by surprise. Three of the interface
+controls do not work: the resolution parameter never reaches the detection, the
+seed is accepted and unused, and the default backend does not return at all on a
+thirty-four-node graph.
+
+{{< embed _ipynb/03_centrality_communities.ipynb echo=true >}}

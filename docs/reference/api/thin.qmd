@@ -1,0 +1,93 @@
+---
+title: "sg.thin"
+---
+
+::: {.lead}
+Materialize a top, k edge backbone as a second, thinner graph object.
+:::
+
+Auto-generated from `SciGraphs/api/thin.py`. Regenerate it with
+`python3 scripts/docs/write_api_reference.py`, which also runs on every
+`quarto render docs`. Edits made here are overwritten.
+
+## The rule
+
+### `topk_mask`
+
+```python
+def topk_mask(edges, weights, k, sense='high')
+```
+
+Boolean mask keeping edges in the top, `k` at either endpoint.
+
+### `verify_against_engine`
+
+```python
+def verify_against_engine(edges, weights, k)
+```
+
+Compare `topk_mask` to the engine's `backbone_mask` on the same input.
+
+## Reproducing the mesh the GPU filtered
+
+### `mesh_edge_rows`
+
+```python
+def mesh_edge_rows(nodes_gdf, edges_gdf)
+```
+
+Rows of `edges_gdf` that become mesh edges, as `(rows, pairs)`.
+
+### `gpu_weights`
+
+```python
+def gpu_weights(obj, attribute)
+```
+
+What `simplify.edge_weights_raw` would hand the backbone for this mesh, as `name`, `uniform`, `values`, and the EDGE, domain scalar `candidates`.
+
+### `mesh_edges`
+
+```python
+def mesh_edges(obj)
+```
+
+(E, 2) vertex, index array the GPU backbone ranks over.
+
+### `gpu_backbone`
+
+```python
+def gpu_backbone(obj, attribute, k, sense='high')
+```
+
+TOPK mask the GPU engine would produce for `obj`.
+
+## Thinning the data
+
+### `top_k`
+
+```python
+def top_k(nodes_gdf, edges_gdf, weight, k=3, sense='high', verbose=True)
+```
+
+Top, k, per, node subset of `edges_gdf` as `(kept_edges_gdf, report)`.
+
+### `graph`
+
+```python
+def graph(nodes_gdf, edges_gdf, name, weight, k=3, sense='high',
+          ref=None, coll=None, markers=None, verbose=True)
+```
+
+Build a graph object with the unpruned node set and only the top, k edges.
+
+## Proving the two agree
+
+### `verify`
+
+```python
+def verify(thin_obj, full_obj, nodes_gdf, edges_gdf, weight, k=3, sense='high',
+           verbose=True)
+```
+
+Compare the materialized backbone to the GPU filter, edge for edge.

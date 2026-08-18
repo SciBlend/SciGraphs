@@ -1,0 +1,180 @@
+---
+title: "sg.render"
+---
+
+::: {.lead}
+EEVEE render path for SciGraphs graphs (Geometry Nodes, not the GPU preview).
+:::
+
+Auto-generated from `SciGraphs/api/render.py`. Regenerate it with
+`python3 scripts/docs/write_api_reference.py`, which also runs on every
+`quarto render docs`. Edits made here are overwritten.
+
+### `preset`
+
+```python
+def preset(name=DEFAULT_PRESET)
+```
+
+Named look as a shallow copy (mutating one key does not edit PRESETS).
+
+### `node_cloud`
+
+```python
+def node_cloud(obj)
+```
+
+Node positions in object space as `(positions, source)`, preferring `node_positions`, else `is_intersection` (OSMnx street meshes), else all vertices.
+
+### `measure`
+
+```python
+def measure(obj)
+```
+
+Like `preview.extent(obj)`, but over `node_cloud()` (OSMnx, safe).
+
+### `autoscale_geometry`
+
+```python
+def autoscale_geometry(obj, node_fraction=NODE_FRACTION, node_resolution=16,
+                       edge_resolution=8, edge_ratio=None, verbose=True)
+```
+
+Size GN glyphs from median nearest, neighbor distance and rebuild the tree.
+
+### `geometry_nodes`
+
+```python
+def geometry_nodes(obj, rebuild=True)
+```
+
+Switch to the Geometry Nodes path, rebuilding SciGraphs_Viz when sizes change, and set `show_render`, which `apply_display_engine` leaves alone.
+
+### `attribute_domain`
+
+```python
+def attribute_domain(obj, attribute)
+```
+
+`'POINT'`, `'EDGE'` ... or None if absent.
+
+### `protect_attribute`
+
+```python
+def protect_attribute(obj, attribute)
+```
+
+Set `scigraphs_color_attr` so GN rebuild does not strip this attribute.
+
+### `color_graph`
+
+```python
+def color_graph(obj, attribute, colormap="viridis", reverse=False, norm=None,
+                gamma=None, vmin=None, vmax=None, clip_low_pct=None,
+                clip_high_pct=None, nodes_only=None, edge_color=None,
+                verbose=True)
+```
+
+Map a mesh attribute through a colormap for EEVEE, returning its name or None.
+
+### `color_range`
+
+```python
+def color_range(obj)
+```
+
+Mapped range after clipping/log, or None.
+
+### `material`
+
+```python
+def material(obj, color=(0.55, 0.60, 0.68), roughness=0.42, metallic=0.0)
+```
+
+Ensure a material, never overwriting a slot 0 this module does not own.
+
+### `sun_direction`
+
+```python
+def sun_direction(azimuth_deg, elevation_deg)
+```
+
+Unit vector toward the sun; azimuth clockwise from north (+Y).
+
+### `light_rig`
+
+```python
+def light_rig(center, diagonal, key=2.1, fill=0.55, rim=0.75, softness=6.0,
+              azimuth=None, elevation=None)
+```
+
+Create or update three named SUN lamps (irradiance, so scale, independent).
+
+### `world`
+
+```python
+def world(background=(0.055, 0.060, 0.075), ambient=(0.42, 0.45, 0.52),
+          ambient_strength=0.45)
+```
+
+World that splits the camera backdrop from the lighting through Light Path / Is Camera Ray, so no film_transparent pass is needed.
+
+### `frame_camera`
+
+```python
+def frame_camera(obj, direction=None, margin=FRAME_MARGIN, lens=50.0,
+                 projection=None, view='TOP', pushback=1.0, ground=None,
+                 verbose=False)
+```
+
+Frame the camera for EEVEE, orthographic top, down by default.
+
+### `eevee_settings`
+
+```python
+def eevee_settings(scene, samples=32, shadows=True, raytracing=False,
+                   ao_distance=None)
+```
+
+Set EEVEE Next (5.x) properties through a guarded setattr, since the 4.x names raise.
+
+### `eevee`
+
+```python
+def eevee(obj, filename, resolution=(1000, 750), samples=32,
+          direction=None, background=None,
+          ambient=None, ambient_strength=None,
+          node_fraction=NODE_FRACTION, node_resolution=16,
+          edge_resolution=8, edge_ratio=None, autosize=True,
+          isolate=True, hide=None,
+          shadows=True, raytracing=False, view_transform='Standard',
+          exposure=0.0, color=None, lens=50.0,
+          verbose=True, shrink=True,
+          look=DEFAULT_PRESET, view='TOP', projection=None,
+          pushback=1.0, margin=FRAME_MARGIN, ground=None,
+          color_attribute=None, colormap=None, color_reverse=False,
+          color_norm=None, color_gamma=None, vmin=None, vmax=None,
+          clip_low_pct=None, clip_high_pct=None, nodes_only=None,
+          edge_color=None,
+          key=None, fill=None, rim=None,
+          azimuth=None, elevation=None, softness=None)
+```
+
+Render the graph with EEVEE and return the output path.
+
+### `relief_contrast`
+
+```python
+def relief_contrast(path)
+```
+
+Luminance std and spread, on a 0 to 255 scale, of a ground, only frame.
+
+### `differing_fraction`
+
+```python
+def differing_fraction(path, reference, threshold=24, sign='any')
+```
+
+Fraction of pixels differing from a reference frame; sign='brighter' excludes shadows cast by a low sun.

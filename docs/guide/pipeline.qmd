@@ -2,9 +2,7 @@
 title: "The end-to-end workflow"
 ---
 
-Whatever the data source, a SciGraphs project follows the same five-stage
-pipeline. This page is the conceptual backbone; each stage links to the panels
-that implement it.
+Whatever the data source, a SciGraphs project follows the same five stages.
 
 ```{mermaid}
 flowchart LR
@@ -22,32 +20,29 @@ handled in the **[Data panel](../panels/scigraphs/data.qmd)**; spatial sources
 have their own tabs ([OSMnx](../panels/osmnx/index.qmd),
 [City2Graph](../panels/city2graph/index.qmd)).
 
-The result is a single Blender object carrying the graph as mesh topology
-(vertices = nodes, edges = edges) plus custom properties such as `num_nodes`,
-`num_edges`, and `is_directed`.
+The result is one Blender object carrying the graph as mesh topology (vertices
+= nodes, edges = edges) plus custom properties such as `num_nodes`, `num_edges`
+and `is_directed`.
 
 ## 2. Analyze
 
-Compute centrality, community structure, statistics, and topology. Results are
-stored as **named mesh attributes** on the graph object, which become available
-to colour and size mappings later. See the
+Compute centrality, community structure, statistics and topology in the
 **[Analysis panel](../panels/scigraphs/analysis.qmd)** and the
-**[Graph Algorithms panel](../panels/scigraphs/algorithms.qmd)**.
-
-This stage is optional but generally precedes visualization, because the metrics
-it produces inform the visual encoding.
+**[Graph Algorithms panel](../panels/scigraphs/algorithms.qmd)**. Results are
+stored as named mesh attributes. The stage is optional, but the metrics it
+produces are exactly what the color and size mappings read later.
 
 ## 3. Lay out
 
-Arrange nodes with any of the 2D/3D force-directed, spectral, geometric, or
-Graphviz layout algorithms — or skip layout entirely when the data carries
-intrinsic coordinates (geospatial, sparse-matrix). See the
+Arrange nodes with any of the 2D/3D force-directed, spectral, geometric or
+Graphviz algorithms, or skip layout entirely when the data carries intrinsic
+coordinates (geospatial, sparse-matrix). See the
 **[Layout & Positioning panel](../panels/scigraphs/layout.qmd)**.
 
 ## 4. Visualize
 
-Apply Geometry Nodes via **Setup Visual**, then drive node/edge colour and size
-from attributes using scientific colormaps and edge-style presets. See the
+Apply Geometry Nodes via **Setup Visual**, then drive node and edge color and
+size from attributes using scientific colormaps and edge-style presets. See the
 **[Visualization panel](../panels/scigraphs/visualization.qmd)**.
 
 ## 5. Render & export
@@ -58,8 +53,8 @@ Pajek), node positions, or a statistics report. See the
 
 ## Reproducing the whole pipeline
 
-SciGraphs can replay an entire pipeline — dataset, analysis, layout,
-visualization, render, and export — from a short declarative JSON or YAML file:
+SciGraphs can replay a whole pipeline, dataset through export, from a short
+declarative JSON or YAML file:
 
 ```json
 {
@@ -93,13 +88,14 @@ visualization, render, and export — from a short declarative JSON or YAML file
 ```
 
 Note what is *not* there: no `layout` block. A street network arrives with real
-coordinates, and those coordinates are the data — a force-directed layout would
-throw the geography away. Layouts are for graphs with no positions of their own.
+coordinates, and those coordinates are the data, so a force-directed layout
+would throw the geography away. Layouts are for graphs with no positions of
+their own.
 
-Each run emits a canonical specification, a provenance manifest (with
-input/output hashes and timing), and an execution log, so the same seed and
-inputs reproduce the same result. To author your own files, see
-**[Writing pipeline files](pipeline-schema.qmd)** for the full schema and the
-`ops` escape hatch that exposes every SciGraphs parameter. See also the
+Each run emits a canonical specification, a provenance manifest with
+input/output hashes and timing, and an execution log, so the same seed and
+inputs reproduce the same result. For the full schema and the `ops` escape
+hatch that exposes every SciGraphs parameter, see
+**[Writing pipeline files](pipeline-schema.qmd)**, the
 **[Reproducibility panel](../panels/scigraphs/reproducibility.qmd)** and the
 **[reproducible-pipeline example](../examples/05-reproducible-pipeline.qmd)**.

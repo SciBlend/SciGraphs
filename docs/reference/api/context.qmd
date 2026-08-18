@@ -1,0 +1,271 @@
+---
+title: "sg.context"
+---
+
+::: {.lead}
+Terrain, buildings, and imagery context under a notebook graph.
+:::
+
+Auto-generated from `SciGraphs/api/context.py`. Regenerate it with
+`python3 scripts/docs/write_api_reference.py`, which also runs on every
+`quarto render docs`. Edits made here are overwritten.
+
+## The georeference
+
+### `frame`
+
+```python
+def frame(ref)
+```
+
+(center_lat, center_lon, scale) from an anchor or geo object, raising if missing.
+
+### `project`
+
+```python
+def project(lat, lon, ref)
+```
+
+(lat, lon), > Blender (x, y) through `ref`.
+
+### `bounds_around`
+
+```python
+def bounds_around(center, radius_m)
+```
+
+N/S/E/W dict `radius_m` around (lat, lon), using the same projection as `project`.
+
+## Building heights
+
+### `height_report`
+
+```python
+def height_report(gdf, meters_per_level=METERS_PER_LEVEL)
+```
+
+Tagged, height counts, median, and untagged fraction for a footprint GDF.
+
+## Buildings
+
+### `buildings`
+
+```python
+def buildings(source, ref, radius_m=None, default_height="auto",
+              meters_per_level=METERS_PER_LEVEL, vertical_scale=1.0,
+              terrain=None, base_m=0.0, jitter=0.0, tags=None,
+              name="Context_Buildings", coll=COLLECTION, verbose=True)
+```
+
+Extrude footprints against `ref` into one mesh, optionally sampling terrain for Z.
+
+## Terrain
+
+### `sample_elevation`
+
+```python
+def sample_elevation(terrain_obj, lat, lon)
+```
+
+Elevation (m) at (lat, lon), bilinear; None if no stored grid.
+
+### `surface_z`
+
+```python
+def surface_z(terrain_obj, lat, lon)
+```
+
+Object, local surface Z at (lat, lon); ignores location.z so settle() stays glued.
+
+### `ground`
+
+```python
+def ground(ref, radius_m, name="Context_Ground", coll=COLLECTION, verbose=True)
+```
+
+Flat plane via the same path as real terrain (zeros grid); real_elevation=False.
+
+### `probe_elevation_api`
+
+```python
+def probe_elevation_api(api="open-elevation", timeout=10.0)
+```
+
+Cheap up/down check returning (ok, seconds, detail), which is not a speed estimate.
+
+### `terrain`
+
+```python
+def terrain(center, radius_m, ref, source="flat", api="open-elevation",
+            resolution=24, vertical_scale=1.0, workers=5, probe_timeout=10.0,
+            imagery=None, imagery_zoom=17, imagery_brightness=1.0,
+            name="Context_Terrain", coll=COLLECTION, verbose=True)
+```
+
+Ground surface: `flat` (default), `dem`, or `auto` (dem with flat fallback).
+
+### `is_real_elevation`
+
+```python
+def is_real_elevation(obj)
+```
+
+True only for a surface built from fetched elevation data.
+
+## Z: where the context sits relative to the graph
+
+### `settle`
+
+```python
+def settle(objects, plane_z=0.0, clearance_m=CLEARANCE_M, scale=0.001,
+           reference="terrain", verbose=True)
+```
+
+Translate context in Z so the reference top clears the graph plane by clearance_m.
+
+## Materials
+
+### `material`
+
+```python
+def material(kind, name=None)
+```
+
+Matte Principled material for one context kind, cached by name.
+
+### `hypsometric`
+
+```python
+def hypsometric(surface, stops=HYPSOMETRIC, roughness=0.94, floor=None,
+                ceiling=None, verbose=True)
+```
+
+Color surface by object, local Z. floor/ceiling override mesh extremes.
+
+### `style_context`
+
+```python
+def style_context(objects, kind=None, shade_smooth=False, keep_imagery=True)
+```
+
+Assign palette materials, skipping draped surfaces unless keep_imagery=False.
+
+## Imagery
+
+### `imagery_sources`
+
+```python
+def imagery_sources(verbose=True)
+```
+
+Keyless sources: {key: name, provider, attribution, max_zoom}.
+
+### `imagery_cache_dir`
+
+```python
+def imagery_cache_dir()
+```
+
+($TMPDIR/scigraphs_basemaps, file_count, bytes), surviving a restart, not a reboot.
+
+### `clear_imagery_cache`
+
+```python
+def clear_imagery_cache()
+```
+
+Delete every cached tile and return the number of files removed.
+
+### `imagery_estimate`
+
+```python
+def imagery_estimate(bounds, source="ESRI_IMAGERY", zoom=17, verbose=True)
+```
+
+Pre, flight tile cost, clamped to the source max_zoom and flagged over MAX_TILES.
+
+### `imagery_material`
+
+```python
+def imagery_material(image_path, name, brightness=1.0, saturation=1.0,
+                     roughness=0.94)
+```
+
+Principled Base Color from the photograph; low specular to avoid haze sheen.
+
+### `imagery`
+
+```python
+def imagery(terrain_obj, source="ESRI_IMAGERY", zoom=17, padding=0.0,
+            brightness=1.0, saturation=1.0, roughness=0.94,
+            max_tiles=MAX_TILES, workers=8, wms_url=None, wms_layer=None,
+            fallback=True, verbose=True)
+```
+
+Drape map imagery over terrain using dem_bounds_* and fetch metadata for UVs.
+
+### `has_imagery`
+
+```python
+def has_imagery(obj)
+```
+
+True only for a surface wearing fetched imagery.
+
+### `attribution`
+
+```python
+def attribution(objects, verbose=True)
+```
+
+Distinct imagery credit lines from context objects.
+
+## Alignment
+
+### `bbox`
+
+```python
+def bbox(obj)
+```
+
+World, space bbox via matrix_world: min, max, size, center.
+
+### `align_surface`
+
+```python
+def align_surface(surface, graph_obj, verbose=True)
+```
+
+Translate surface XY onto the graph's projection origin (dem_center vs frame).
+
+### `check_alignment`
+
+```python
+def check_alignment(graph_obj, context_objs, offset_tolerance=0.05,
+                    coverage_minimum=0.95, verbose=True)
+```
+
+XY center, offset and coverage checks; terrain can pass at the wrong origin.
+
+### `report`
+
+```python
+def report(objects)
+```
+
+One line per context object: kind, size, provenance.
+
+## Notebook entry point
+
+### `add_context`
+
+```python
+def add_context(graph_obj, center, radius_m, ref, buildings_gdf=None,
+                terrain_source="flat", api="open-elevation", resolution=24,
+                vertical_scale=1.0, default_height="auto", coll=COLLECTION,
+                clearance_m=CLEARANCE_M, reference="terrain",
+                imagery=None, imagery_zoom=17, imagery_brightness=1.0,
+                verbose=True)
+```
+
+Terrain, buildings, style, imagery, then settle, in that order: style clears materials.

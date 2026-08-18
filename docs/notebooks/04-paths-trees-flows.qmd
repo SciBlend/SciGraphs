@@ -1,0 +1,22 @@
+---
+title: "04 · Paths, trees and flows"
+execute:
+  enabled: false
+---
+
+Shortest paths, minimum spanning trees, maximum flow and minimum cut, with every
+claim checked against an answer worked out independently.
+
+The generic algorithm operators **never read an edge weight**. There is no field
+for one to travel in, so every weighted branch is guarded by a test that is
+always false and every edge is worth 1.0. Shortest path reports a hop count as a
+distance, and deleting the weights from the mesh changes nothing; max-flow and
+min-cut return 3 = 3 where the answer is 19 = 19.
+
+It also solves a problem the whole suite shares: showing a *subset* (a path, a
+tree, a cut) when color cannot carry membership, because an edge attribute is
+averaged onto the vertices and a two-valued flag lands on the two darkest ends
+of the ramp. Letting geometry carry membership and color carry magnitude is
+worth 90 levels of separation for a path, against −15 for the obvious approach.
+
+{{< embed _ipynb/04_paths_trees_flows.ipynb echo=true >}}

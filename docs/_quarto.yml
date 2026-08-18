@@ -1,6 +1,19 @@
 project:
   type: website
   output-dir: _site
+  pre-render:
+    # Refreshes notebooks/_ipynb/ from ../notebooks/. Without it the embed
+    # copies go stale (or missing) and every notebook page fails to build.
+    - _sync_notebooks.py
+    # Rewrites reference/api/*.qmd from the source of SciGraphs/api/. Reads it
+    # with ast rather than importing it, so this costs no Blender and runs on
+    # every build: the signatures on the site are the signatures in the tree.
+    - ../scripts/docs/write_api_reference.py
+  post-render:
+    # Quarto stamps the build machine's absolute path into every embedded
+    # notebook's wrapper div, and offers no option to stop it. This makes those
+    # relative and fails the build if any absolute path survives.
+    - _scrub_paths.py
   resources:
     # Served so an editor's $schema key and a model's constrained decoding can
     # both point at a URL rather than a copy.
@@ -28,8 +41,14 @@ website:
         href: panels/overview.qmd
       - text: "Tutorials"
         href: tutorials/panels/index.qmd
+      - text: "Notebooks"
+        href: notebooks/index.qmd
       - text: "Examples"
         href: examples/index.qmd
+      # Points at the narrative page, not at one of the generated module pages:
+      # the sidebar opens on the whole API section from there.
+      - text: "API"
+        href: reference/python-api.qmd
     right:
       - icon: github
         href: https://github.com/SciBlend/SciGraphs
@@ -84,6 +103,16 @@ website:
       - section: "Tutorials"
         contents:
           - tutorials/panels/index.qmd
+          - section: "SciGraphs panels"
+            contents:
+              - tutorials/panels/scigraphs/index.qmd
+              - tutorials/panels/scigraphs/data.qmd
+              - tutorials/panels/scigraphs/layout.qmd
+              - tutorials/panels/scigraphs/algorithms.qmd
+              - tutorials/panels/scigraphs/analysis.qmd
+              - tutorials/panels/scigraphs/visualization.qmd
+              - tutorials/panels/scigraphs/export.qmd
+              - tutorials/panels/scigraphs/reproducibility.qmd
           - section: "OSMnx panels"
             contents:
               - tutorials/panels/osmnx/download.qmd
@@ -106,6 +135,40 @@ website:
               - tutorials/panels/city2graph/mobility.qmd
               - tutorials/panels/city2graph/graph-tools.qmd
               - tutorials/panels/city2graph/export.qmd
+      - section: "Jupyter Notebooks"
+        contents:
+          - notebooks/index.qmd
+          - notebooks/00-setup-check.qmd
+          - section: "SciGraphs"
+            contents:
+              - notebooks/01-abstract-graphs.qmd
+              - notebooks/02-layouts.qmd
+              - notebooks/03-centrality-communities.qmd
+              - notebooks/04-paths-trees-flows.qmd
+              - notebooks/05-topology.qmd
+          - section: "OSMnx"
+            contents:
+              - notebooks/06-osmnx-download.qmd
+              - notebooks/07-osmnx-geometry.qmd
+              - notebooks/08-osmnx-routing.qmd
+              - notebooks/09-osmnx-accessibility.qmd
+              - notebooks/10-osmnx-centrality-export.qmd
+              - notebooks/11-terrain.qmd
+              - notebooks/12-imagery.qmd
+          - section: "City2Graph"
+            contents:
+              - notebooks/13-morphology.qmd
+              - notebooks/14-transport-gtfs.qmd
+              - notebooks/15-mobility-od.qmd
+              - notebooks/16-proximity.qmd
+              - notebooks/17-metapaths-15min.qmd
+              - notebooks/18-case-study.qmd
+          # Neither of these is a City2Graph notebook. They are about recording
+          # what was run and replaying it, which is the same subject twice.
+          - section: "Reproducibility"
+            contents:
+              - notebooks/19-repro-pipelines.qmd
+              - notebooks/20-pipeline-assistant.qmd
       - section: "Examples"
         contents:
           - examples/index.qmd
@@ -114,6 +177,17 @@ website:
           - examples/03-urban-terrain.qmd
           - examples/04-sparse-matrix.qmd
           - examples/05-reproducible-pipeline.qmd
+      - section: "API"
+        contents:
+          # The narrative introduction comes first. The five pages under it are
+          # generated from SciGraphs/api/*.py on every render, so they list what
+          # exists rather than what someone remembered to write down.
+          - reference/python-api.qmd
+          - reference/api/graphs.qmd
+          - reference/api/preview.qmd
+          - reference/api/render.qmd
+          - reference/api/context.qmd
+          - reference/api/thin.qmd
       - section: "Reference"
         contents:
           - reference/pipeline-options.qmd
@@ -125,6 +199,13 @@ website:
 
 format:
   html:
+    # The `embed` shortcode links each embedded notebook to a rendered preview
+    # of its source. Quarto never builds those previews, because the notebooks
+    # live in `notebooks/_ipynb/` and a leading underscore keeps a directory out
+    # of the site, so every one of the links 404s. Publishing the previews would
+    # add twenty pages that duplicate what the embed already shows on the page
+    # the reader is on.
+    notebook-links: false
     theme:
       light:
         - cosmo

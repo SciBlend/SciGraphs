@@ -1,0 +1,24 @@
+---
+title: "06 · Downloading a street network"
+execute:
+  enabled: false
+---
+
+Get a street network in, clean it, know what you have. The other four OSMnx
+notebooks assume it.
+
+The same neighborhood downloaded as `drive`, `bike`, `walk` and `all` gives
+243, 814, 1582 and 1894 intersections, and comparing their lengths naively
+inflates the walk-to-drive ratio from 2.4× to 4.6×, because summing a directed
+multigraph double-counts two-way streets and a drive network here is 98 %
+one-way. Simplification removes 79 % of the nodes without changing a meter of
+length; consolidation at a 40 m tolerance moves one node 302 m, since a chain of
+intersections collapses to a point that need not lie near any of its members.
+
+Several operators are wrong, and the notebook says so where it meets them: a
+bounding box passed in the wrong order silently reduces a 243-node network to 2
+while reporting success, a cache key omits the radius so six downloads overwrite
+one file, and a family of cleaning operators replace the graph and never rebuild
+the mesh you are looking at.
+
+{{< embed _ipynb/06_osmnx_download.ipynb echo=true >}}

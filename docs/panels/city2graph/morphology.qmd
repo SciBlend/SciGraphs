@@ -2,14 +2,11 @@
 title: "Urban Morphology"
 ---
 
-::: {.lead}
-The Urban Morphology panel builds morphological representations of the city: it
-turns processed street segments into a graph, generates morphological
-tessellations around buildings, and wires the building–street relationship graph
-used in urban form analysis.
-:::
+The Urban Morphology panel turns processed street segments into a graph,
+generates morphological tessellations around buildings, and wires the
+building/street relationship graph used in urban form analysis.
 
-## Segments → Graph
+## Segments to graph
 
 Converts a **processed segments** object (see *Process Segments* in
 [Data Import](data.qmd)) into a graph.
@@ -25,13 +22,13 @@ buildings.
 
 | Control | Description |
 | --- | --- |
-| **Shrink Factor** | Morphological tessellation shrink factor (0–1). |
+| **Shrink Factor** | Morphological tessellation shrink factor (0-1). |
 | **Segment Length** | Discretization segment length for the tessellation boundaries. |
 | **Generate Tessellation** | Select the buildings (and optional barrier objects), then build the cells. |
 
-## Morphological Graph
+## Morphological graph
 
-Builds the heterogeneous building/street relationship graph.
+Select the **buildings + street network**, then run **Morphological Graph**.
 
 | Control | Description |
 | --- | --- |
@@ -43,11 +40,9 @@ Builds the heterogeneous building/street relationship graph.
 
 ### Relations to include
 
-Pick which relation types the graph should contain:
-
 | Relation | Meaning |
 | --- | --- |
-| **Private ↔ Private** | Adjacency between tessellation cells (parcel neighbours). |
+| **Private ↔ Private** | Adjacency between tessellation cells (parcel neighbors). |
 | **Public ↔ Public** | Connectivity between street segments. |
 | **Private ↔ Public** | Interface (façade) between parcels and street segments. |
 
@@ -57,8 +52,6 @@ Enabling **all three** relations produces a single coherent heterogeneous graph
 requested relations and produces **one Blender object per active relation type**.
 At least one relation must be enabled.
 :::
-
-Select the **buildings + street network**, then run **Morphological Graph**.
 
 ## Step-by-step tutorial
 

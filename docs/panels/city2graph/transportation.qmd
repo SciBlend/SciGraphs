@@ -2,29 +2,25 @@
 title: "Transportation"
 ---
 
-::: {.lead}
 The Transportation panel turns a loaded GTFS transit feed into graphs: a
-travel-summary graph for a chosen service window, and an origin–destination
+travel-summary graph for a chosen service window, and an origin-destination
 graph aggregated from trip legs.
-:::
 
 ::: {.callout-note}
 **Requires GTFS data.** Import a feed first with **Import GTFS** in the
 [Data Import](data.qmd) panel. Until then this panel only shows a reminder.
 :::
 
-## Travel Summary Graph
-
-Builds a transit travel-summary graph over an optional service-date window.
+## Travel summary graph
 
 | Control | Description |
 | --- | --- |
 | **Calendar Start / Calendar End** | First and last service day to include. The choices are populated from the dates discovered in the feed; pick **All** to use the full calendar range. |
 | **Travel Summary Graph** | Builds the graph (leave the dates empty/All to use all data). |
 
-## GTFS OD Graph
+## GTFS OD graph
 
-Aggregates individual trip legs into an origin–destination graph.
+Aggregates individual trip legs into an origin-destination graph.
 
 | Control | Description |
 | --- | --- |
@@ -34,7 +30,7 @@ Aggregates individual trip legs into an origin–destination graph.
 
 ::: {.callout-important}
 Big feeds can produce millions of OD pairs. Setting **Top N Pairs** to `0`
-(no limit) can exhaust memory — a warning appears when it is unset.
+(no limit) can exhaust memory; a warning appears when it is unset.
 :::
 
 ## Step-by-step tutorial
