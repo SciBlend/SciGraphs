@@ -1,9 +1,6 @@
-"""Basemap imagery for OSMnx terrain meshes.
-
-Downloads slippy-map (XYZ) tiles or WMS images for a geographic bounding box
-and stitches them into one PNG ready to be UV-mapped onto a terrain object.
-
-"""
+"""Basemap imagery for OSMnx terrain meshes: downloads slippy-map (XYZ) tiles or
+WMS images for a geographic bounding box and stitches them into one PNG ready to
+be UV-mapped onto a terrain object."""
 
 from __future__ import annotations
 
@@ -20,13 +17,9 @@ from typing import Callable, Optional
 from scigraphs_core.logger import log
 
 
-# --- Tile source registry ---
-
-#: Each TILE_SOURCES entry describes one slippy-map XYZ style. ``url`` is a
-#: ``str.format`` template over ``{z}`` ``{x}`` ``{y}`` and optionally ``{key}``.
-#: ``key_pref`` names the :class:`AddonPreferences` attribute holding that key,
-#: so a caller can resolve it without knowing the provider. ``provider`` groups
-#: styles for the UI and for attribution.
+#: One slippy-map XYZ style per TILE_SOURCES entry. ``url`` is a ``str.format``
+#: template over ``{z}`` ``{x}`` ``{y}`` and optionally ``{key}``, and ``key_pref``
+#: names the :class:`AddonPreferences` attribute holding that key.
 ESRI_ATTRIBUTION = (
     'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, '
     'and the GIS User Community'
@@ -48,7 +41,6 @@ def _carto_style(style: str) -> str:
 
 
 TILE_SOURCES: dict[str, dict] = {
-    # --- Esri (no key required) -------------------------------------------
     'ESRI_IMAGERY': {
         'name': 'Esri · Satellite (World Imagery)',
         'provider': 'Esri',
@@ -114,7 +106,6 @@ TILE_SOURCES: dict[str, dict] = {
         'key_pref': None, 'extension': 'jpg',
     },
 
-    # --- OpenStreetMap (no key required) ----------------------------------
     'OSM': {
         'name': 'OpenStreetMap · Standard',
         'provider': 'OpenStreetMap',
@@ -134,7 +125,6 @@ TILE_SOURCES: dict[str, dict] = {
         'key_pref': None, 'extension': 'png',
     },
 
-    # --- CARTO (no key required for fair use) -----------------------------
     'CARTO_VOYAGER': {
         'name': 'CARTO · Voyager',
         'provider': 'CARTO',
@@ -162,15 +152,13 @@ TILE_SOURCES: dict[str, dict] = {
 }
 
 
-#: Older source keys are stored in saved .blend scenes, so they have to keep
-#: resolving. Map them onto current TILE_SOURCES keys here.
+#: Old source keys live in saved .blend scenes, so they must keep resolving.
 _LEGACY_SOURCE_ALIASES: dict[str, str] = {
     'ESRI': 'ESRI_IMAGERY',
 }
 
 
 def resolve_source(source: str) -> str:
-    """Map a (possibly legacy) source key onto a current :data:`TILE_SOURCES` key."""
     if source in TILE_SOURCES:
         return source
     return _LEGACY_SOURCE_ALIASES.get(source, source)
@@ -182,13 +170,8 @@ _USER_AGENT = (
 )
 
 
-# --- Web Mercator math ---
-
 def _lonlat_to_tile(lon: float, lat: float, zoom: int) -> tuple[float, float]:
-    """Convert WGS84 lon/lat to fractional XYZ tile coordinates.
-
-    Returns floats so callers can compute pixel-perfect crops inside a tile.
-    """
+    """WGS84 lon/lat to fractional XYZ tile coordinates, for pixel-exact crops."""
     lat = max(min(lat, 85.05112878), -85.05112878)
     lat_rad = math.radians(lat)
     n = 2 ** zoom
@@ -214,18 +197,13 @@ def estimate_tiles(bounds: dict, zoom: int) -> int:
     )
 
 
-# --- Cache helpers ---
-
 def _default_cache_dir() -> str:
-    """Cache root used when caller does not provide one."""
     return os.path.join(tempfile.gettempdir(), "scigraphs_basemaps")
 
 
 def _tile_cache_path(cache_dir: str, source: str, z: int, x: int, y: int, ext: str) -> str:
     return os.path.join(cache_dir, source.lower(), str(z), str(x), f"{y}.{ext}")
 
-
-# --- Public API ---
 
 def fetch_basemap(
     bounds: dict,
@@ -240,24 +218,15 @@ def fetch_basemap(
     max_workers: int = 8,
     progress_cb: Optional[Callable[[int, int], None]] = None,
 ) -> tuple[str, dict]:
-    """Download a basemap image covering ``bounds``.
-
-    Args:
-        bounds: WGS84 ``{north, south, east, west}``.
-        source: a :data:`TILE_SOURCES` key, or ``'WMS'``.
-        zoom: slippy-map zoom, ignored for WMS.
-        out_path: ``None`` writes into the cache dir.
-        cache_dir: ``None`` uses a temp folder.
-        wms_url: only read when ``source='WMS'``.
-        max_tiles: hard cap, so a mistyped zoom cannot queue thousands.
-        progress_cb: called as ``(done, total)``.
-
-    Returns ``(image_path, metadata)``. The metadata bounds are the image's
-    own, which XYZ rounding may push outside the requested area.
-
-    Raises ValueError on bad bounds, an unknown source or too many tiles,
-    RuntimeError if every download failed, and re-raises KeyboardInterrupt.
-    """
+    """Download a basemap image covering ``bounds``, a WGS84 north/south/east/west.
+    ``source`` is a :data:`TILE_SOURCES` key or ``'WMS'``; ``zoom`` is ignored for
+    WMS, which reads ``wms_url``/``wms_layer`` instead. ``out_path`` and
+    ``cache_dir`` default into a temp folder, ``max_tiles`` caps the queue so a
+    mistyped zoom cannot ask for thousands, and ``progress_cb`` takes
+    ``(done, total)``. Returns ``(image_path, metadata)``, whose bounds are the
+    image's own and which XYZ rounding may push outside the request. Raises
+    ValueError on bad bounds, an unknown source or too many tiles, RuntimeError if
+    every download failed, and re-raises KeyboardInterrupt."""
     _validate_bounds(bounds)
 
     if source == 'WMS':
@@ -306,8 +275,6 @@ def clear_cache(cache_dir: Optional[str] = None) -> int:
                 pass
     return deleted
 
-
-# --- XYZ implementation ---
 
 def _fetch_xyz_basemap(
     *,
@@ -413,8 +380,8 @@ def _fetch_xyz_basemap(
         )
 
     # Tiles align to integer XYZ indices, so the canvas overshoots the request.
-    # Crop in pixel space, rounding the edges rather than letting Pillow shift
-    # them silently. The rounded values go back into the metadata below, which
+    # Crop in pixel space with the edges rounded here rather than shifted
+    # silently by Pillow; the rounded values go into the metadata below, which
     # is what keeps per-vertex UV mapping exact.
     pix_left_f = (x0_f - x_min) * tile_size
     pix_top_f = (y0_f - y_min) * tile_size
@@ -436,12 +403,12 @@ def _fetch_xyz_basemap(
 
     # XYZ tiles live in Web Mercator, where the WGS84 bbox is non-linear in
     # pixels. Publish the rounded pixel rectangle in tile units instead, so
-    # downstream UV code can invert it exactly.
+    # downstream UV code can invert it exactly. y_min is the north edge.
     mercator_bounds = {
-        'x_min': x_min + pix_left / tile_size,   # left edge in tile units
-        'x_max': x_min + pix_right / tile_size,  # right edge in tile units
-        'y_min': y_min + pix_top / tile_size,    # top edge (north)
-        'y_max': y_min + pix_bottom / tile_size, # bottom edge (south)
+        'x_min': x_min + pix_left / tile_size,
+        'x_max': x_min + pix_right / tile_size,
+        'y_min': y_min + pix_top / tile_size,
+        'y_max': y_min + pix_bottom / tile_size,
     }
 
     metadata = {
@@ -507,8 +474,6 @@ def _fetch_tile(
 
     return data
 
-
-# --- WMS implementation (single GetMap request) ---
 
 def _fetch_wms_basemap(
     bounds: dict,
@@ -585,19 +550,11 @@ def _fetch_wms_basemap(
     return out_path, metadata
 
 
-# --- Misc ---
-
 def latlon_to_image_uv(lat: float, lon: float, metadata: dict) -> tuple[float, float]:
-    """Convert a WGS84 ``(lat, lon)`` to UV coordinates on the basemap image.
-
-    ``WEB_MERCATOR`` images invert through the spherical Web Mercator
-    definition every major tile provider shares, exact except for the pixel
-    rounding already baked into ``mercator_tile_bounds``. ``WGS84_LINEAR``
-    images are a plain bbox rescale.
-
-    Returns ``(u, v)`` in ``[0, 1]`` with ``v=1`` at the top of the image,
-    which is Blender's Image Texture convention.
-    """
+    """WGS84 ``(lat, lon)`` to UV coordinates on the basemap image. ``WEB_MERCATOR``
+    inverts through the spherical Web Mercator definition every major tile provider
+    shares, exact but for the rounding baked into ``mercator_tile_bounds``, while
+    ``WGS84_LINEAR`` is a plain bbox rescale. ``v=1`` is the top of the image."""
     projection = metadata.get('projection', 'WGS84_LINEAR')
 
     if projection == 'WEB_MERCATOR':

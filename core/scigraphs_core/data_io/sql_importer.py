@@ -16,11 +16,7 @@ from scigraphs_core.logger import log
 
 
 def load_graph_from_sql(profile, sql_query, source_col, target_col):
-    """Run a SELECT and build a graph from two of its columns.
-
-    source_col and target_col are column indices into the result, not names.
-    Returns None on any failure.
-    """
+    """Build a graph from two columns of a SELECT; source_col/target_col are indices."""
     if not sql_query or not sql_query.strip():
         log("Error: No SQL query provided")
         return None
@@ -74,11 +70,7 @@ def load_graph_from_sql(profile, sql_query, source_col, target_col):
 
 
 def get_columns_from_query(profile, sql_query):
-    """Get a query's column names without fetching its rows.
-
-    Wraps the query in a one-row limit, since the caller only needs the header.
-    Returns an empty list on failure.
-    """
+    """A query's column names, from wrapping it in a one-row limit. [] on failure."""
     if not sql_query or not sql_query.strip():
         return []
     
@@ -116,11 +108,9 @@ def load_geospatial_graph_from_sql(
     lon_col=None,
     weight_col=None
 ):
-    """Load a graph whose nodes carry latitude and longitude.
-
-    All the *_col arguments are column indices into the result. The returned
-    GraphData gains node_coordinates, keyed by str(node), plus edge_weights.
-    """
+    """Load a graph whose nodes carry latitude and longitude. Every *_col argument
+    is a column index into the result, and the returned GraphData gains
+    node_coordinates keyed by str(node), plus edge_weights."""
     if not sql_query or not sql_query.strip():
         return None
     
@@ -189,10 +179,7 @@ def load_geospatial_graph_from_sql(
 
 
 def preview_query(profile, sql_query, max_rows=10):
-    """Preview a query. Returns (DataFrame, total_rows, error_message).
-
-    total_rows falls back to the preview length when the COUNT(*) fails.
-    """
+    """(DataFrame, total_rows, error); total_rows falls back to the preview length."""
     if not sql_query or not sql_query.strip():
         return None, 0, "No query provided"
     

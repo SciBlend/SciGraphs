@@ -3,12 +3,9 @@ from .get_osmnx import get_osmnx
 
 
 def ensure_multidigraph(G):
-    """Return a MultiDiGraph equivalent of G, or G itself if it is already one.
-
-    OSMnx's convert, bearing and add_edge_speeds helpers require a MultiDiGraph
-    and use ``G.edges(keys=True)`` and ``G.has_edge(u, v, k)``, so anything that
-    has been through to_digraph or to_undirected has to come back through here.
-    """
+    """A MultiDiGraph equivalent of G, or G itself if it is already one. OSMnx's
+    convert, bearing and add_edge_speeds helpers use ``G.edges(keys=True)`` and
+    ``G.has_edge(u, v, k)``, so to_digraph output must come back through here."""
     if G is None:
         return None
     try:
@@ -42,11 +39,9 @@ def ensure_multidigraph(G):
 
 
 def graph_to_gdfs(G, nodes=True, edges=True, node_geometry=True, fill_edge_geometry=True):
-    """Convert a MultiDiGraph to node and edge GeoDataFrames.
-
-    Asking for both returns ``(nodes_gdf, edges_gdf)``; asking for one returns it
-    bare. fill_edge_geometry draws straight lines for edges that have no geometry.
-    """
+    """Convert a MultiDiGraph to node and edge GeoDataFrames. Asking for both
+    returns ``(nodes_gdf, edges_gdf)``, asking for one returns it bare;
+    fill_edge_geometry draws straight lines for edges with no geometry."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")
@@ -66,7 +61,6 @@ def graph_to_gdfs(G, nodes=True, edges=True, node_geometry=True, fill_edge_geome
 
 
 def graph_from_gdfs(gdf_nodes, gdf_edges, graph_attrs=None):
-    """Rebuild a MultiDiGraph from node and edge GeoDataFrames."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -82,9 +76,7 @@ def graph_from_gdfs(gdf_nodes, gdf_edges, graph_attrs=None):
 
 
 def to_digraph(G, weight="length"):
-    """Collapse a MultiDiGraph to a DiGraph, keeping the parallel edge with the
-    smallest ``weight`` attribute.
-    """
+    """Collapse a MultiDiGraph to a DiGraph, keeping the lightest parallel edge."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")
@@ -105,7 +97,6 @@ def to_digraph(G, weight="length"):
 
 
 def to_undirected(G):
-    """Convert a directed MultiDiGraph to an undirected MultiGraph."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")

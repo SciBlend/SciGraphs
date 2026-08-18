@@ -1,14 +1,10 @@
 """Metapath analysis for heterogeneous urban graphs: dual graphs from street
-networks, amenities bridged to street segments, metapaths between amenities.
-"""
+networks, amenities bridged to street segments, metapaths between amenities."""
 
 def create_street_dual_graph_c2g(osmnx_graph):
-    """Build the dual graph of a street network, with segments as nodes.
-
-    city2graph hands back a 3-level MultiIndex ``(x, y, nan)`` for the dual
-    nodes; the third level is dropped here, on the node and the edge index
-    alike, or nothing downstream can match the two up.
-    """
+    """Build the dual graph of a street network, with segments as nodes. city2graph
+    returns a 3-level MultiIndex ``(x, y, nan)`` for the dual nodes; the third level
+    is dropped on node and edge index alike, or nothing downstream can match up."""
     import pandas as pd
     import city2graph as c2g
     
@@ -34,11 +30,7 @@ def create_street_dual_graph_c2g(osmnx_graph):
 
 
 def _amenities_from_cached_gdf(features_obj):
-    """Rebuild a GeoDataFrame from an object's ``_c2g_gdf_pickle`` cache.
-
-    The best source available: no network access, and the original geometry
-    survives intact. Returns None when the cache is absent or undecodable.
-    """
+    """The ``_c2g_gdf_pickle`` cache: no network, geometry intact. None if unusable."""
     cached = features_obj.get("_c2g_gdf_pickle")
     if not cached:
         return None
@@ -62,11 +54,9 @@ def _amenities_from_cached_gdf(features_obj):
 
 
 def _amenities_from_place(features_obj):
-    """Re-download amenity features for the object's ``place_name``.
-
-    Only works for OSMnx objects geocoded from a place name; a point or bbox
-    query leaves a place_name this cannot geocode, so those return None.
-    """
+    """Re-download amenity features for the object's ``place_name``. Only works for
+    OSMnx objects geocoded from a place name; a point or bbox query leaves a
+    place_name this cannot geocode, so those return None."""
     place = features_obj.get("place_name", "")
 
     if not place or place.startswith("Point") or place.startswith("BBox"):
@@ -103,14 +93,9 @@ def _amenities_from_mesh(features_obj):
 
 
 def prepare_amenities_from_features(features_obj, target_crs, limit=None):
-    """Convert a features object to an amenities GeoDataFrame in ``target_crs``.
-
-    Tries the pickled GeoDataFrame cache first, then re-downloads amenities for
-    the object's place name, then falls back to the raw mesh vertices. Raises
-    ValueError when all three come up empty. ``target_crs`` should match the
-    dual graph the amenities will be bridged to. The result is Point geometry
-    with a clean integer index.
-    """
+    """Convert a features object to Point-geometry amenities in ``target_crs``,
+    which must match the dual graph they get bridged to. Tries the pickled cache,
+    then a re-download by place name, then raw mesh vertices; ValueError if none."""
     import geopandas as gpd
 
     amenities_gdf = _amenities_from_cached_gdf(features_obj)
@@ -138,11 +123,9 @@ def prepare_amenities_from_features(features_obj, target_crs, limit=None):
 
 
 def bridge_amenities_to_segments(amenities_gdf, dual_nodes_gdf, k=1):
-    """Connect each amenity to its ``k`` nearest street segments.
-
-    Returns the ``(nodes_dict, edges_dict)`` pair a heterogeneous graph takes.
-    Both input frames gain a ``node_type`` column in place if they lack one.
-    """
+    """Connect each amenity to its ``k`` nearest street segments, returning the
+    ``(nodes_dict, edges_dict)`` pair a heterogeneous graph takes. Both input
+    frames gain a ``node_type`` column in place if they lack one."""
     import city2graph as c2g
 
     if 'node_type' not in amenities_gdf.columns:
@@ -173,12 +156,9 @@ def bridge_amenities_to_segments(amenities_gdf, dual_nodes_gdf, k=1):
 
 
 def compute_metapaths(nodes_dict, edges_dict, hops=3, directed=False):
-    """Add amenity-to-amenity metapath edges across ``hops`` street segments.
-
-    The sequence built here runs amenity to segment, then ``hops`` segment to
-    segment steps, then segment back to amenity. Returns
-    ``(result_nodes, result_edges)`` with the metapath edges added.
-    """
+    """Add amenity-to-amenity metapath edges across ``hops`` street segments: the
+    sequence runs amenity to segment, ``hops`` segment-to-segment steps, then
+    segment back to amenity."""
     import city2graph as c2g
     
     sequence = [("amenity", "is_nearby", "segment")]
@@ -203,13 +183,9 @@ def compute_metapaths(nodes_dict, edges_dict, hops=3, directed=False):
 def compute_metapaths_by_weight(nodes_dict, edges_dict, weight_attr, threshold, 
                                  endpoint_type="amenity", min_threshold=0.0,
                                  directed=False, new_relation_name=None):
-    """Connect ``endpoint_type`` nodes reachable within a cost band.
-
-    Needs city2graph 0.3.1 or newer, and searches with Dijkstra. Cost is read
-    from the ``weight_attr`` edge attribute, and a pair is connected when its
-    cost falls between ``min_threshold`` and ``threshold``. Returns
-    ``(result_nodes, result_edges)``.
-    """
+    """Connect ``endpoint_type`` nodes reachable within a cost band, by Dijkstra and
+    needing city2graph 0.3.1 or newer. Cost comes from the ``weight_attr`` edge
+    attribute, and a pair connects when it falls between the two thresholds."""
     import city2graph as c2g
     
     result_nodes, result_edges = c2g.add_metapaths_by_weight(
@@ -229,14 +205,10 @@ def compute_metapaths_by_weight(nodes_dict, edges_dict, weight_attr, threshold,
 
 def extract_metapath_connections(result_edges, metapath_key=('amenity', 'metapath_0', 'amenity'), 
                                  add_multiplicity=True):
-    """Pull the metapath edges out of an ``add_metapaths`` result.
-
-    Falls back to the first key whose relation name contains 'metapath' when
-    ``metapath_key`` is absent. With ``add_multiplicity``, paths sharing a pair
-    of endpoints collapse to one row carrying how many there were, matched on
-    endpoint coordinates rounded to 6 decimal places and sorted so direction
-    does not matter.
-    """
+    """Pull the metapath edges out of an ``add_metapaths`` result, falling back to
+    the first key whose relation name contains 'metapath'. ``add_multiplicity``
+    collapses paths sharing endpoints into one row carrying how many there were,
+    matched on coordinates rounded to 6 decimals and sorted, so direction is free."""
     import geopandas as gpd
     import pandas as pd
     
@@ -280,7 +252,6 @@ def extract_metapath_connections(result_edges, metapath_key=('amenity', 'metapat
 
     unique_rows = []
     for key, items in key_to_data.items():
-        # The first path of the group stands in for the whole group.
         first_item = items[0]
         multiplicity = len(items)
 

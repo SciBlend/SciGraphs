@@ -76,11 +76,8 @@ def find_nearest_edge(G, x, y, is_projected=None):
 
 
 def _find_nearest_edge_numpy(G, x, y):
-    """Nearest edge without scikit-learn.
-
-    Measures to each edge's midpoint, not to the segment, so a long edge passing
-    close by can lose to a short one whose center happens to be nearer.
-    """
+    """Nearest edge without scikit-learn, by midpoint, so a long edge passing close
+    by can lose to one whose center is nearer."""
     import numpy as np
     
     if G is None or G.number_of_edges() == 0:
@@ -141,7 +138,6 @@ def get_node_coordinates(G, node_id):
 
 
 def get_edge_info(G, u, v, key=0):
-    """Return an edge's attributes as a dict, or None if the edge is absent."""
     if G is None:
         return None
     

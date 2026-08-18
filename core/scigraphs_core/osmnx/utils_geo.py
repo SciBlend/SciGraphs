@@ -3,11 +3,9 @@ from .get_osmnx import get_osmnx
 
 
 def bbox_from_point(point, dist=1000, project_utm=True, return_crs=False):
-    """A ``(north, south, east, west)`` box dist meters around a ``(lat, lon)`` point.
-
-    project_utm buffers in UTM rather than in degrees, which is the accurate way
-    to do it. return_crs gives back ``(bbox, crs)`` instead of the bare box.
-    """
+    """A ``(north, south, east, west)`` box dist meters around a ``(lat, lon)``
+    point. project_utm buffers in UTM rather than in degrees, which is the accurate
+    way; return_crs gives back ``(bbox, crs)`` instead of the bare box."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -27,7 +25,6 @@ def bbox_from_point(point, dist=1000, project_utm=True, return_crs=False):
 
 
 def bbox_to_poly(bbox):
-    """Turn a ``(north, south, east, west)`` box into a rectangular shapely Polygon."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -43,11 +40,7 @@ def bbox_to_poly(bbox):
 
 
 def buffer_geometry(geom, dist):
-    """Buffer a shapely geometry by dist meters.
-
-    A lat/lon geometry goes through UTM and back, so the buffer really is in
-    meters rather than in degrees.
-    """
+    """Buffer a shapely geometry by dist meters, via UTM when the input is lat/lon."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")

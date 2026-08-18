@@ -18,7 +18,6 @@ def save_graph_graphml(G, filepath):
 
 
 def load_graph_graphml(filepath):
-    """Read a graph back from GraphML, or None on any failure."""
     ox = get_osmnx()
     if ox is None:
         return None

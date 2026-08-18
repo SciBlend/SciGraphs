@@ -1,22 +1,15 @@
-"""Incremental force-directed layout, vectorized and steppable.
+"""Incremental force-directed layout in numpy, steppable without touching bpy.
 
-State lives in numpy; advance a few iterations at a time without touching bpy:
-
-    sim = ForceSim(coords, edges)
-    for _ in range(frames):
-        sim.step(iterations_per_frame)
-        upload(sim.positions)
-
-Repulsion: near-field exact over a bounded neighbor list, far-field from a
-coarse monopole grid. Integrator is ForceAtlas2's.
+``ForceSim.step(n)`` advances the state and ``positions`` returns the array to
+upload. Repulsion is exact near-field over a bounded neighbor list plus a coarse
+monopole grid far-field; the integrator is ForceAtlas2's.
 """
 
 import numpy as np
 
 DTYPE = np.float32
 
-# Below this, exact all-pairs; above, near/far split.
-DIRECT_MAX = 1000
+DIRECT_MAX = 1000  # above this, the near/far split replaces all-pairs
 
 NEAR_K = 16
 NEAR_REFRESH = 8
@@ -27,7 +20,7 @@ CHUNK = 2048
 FAR_RES = 8
 FAR_SOFTEN = 0.5  # as a fraction of cell size
 
-# Monopole gravity estimate underpredicts; fitted across n and scale.
+# Corrects the monopole gravity underestimate; fitted across n and scale.
 _GRAVITY_FIT = 0.38
 
 
@@ -40,11 +33,6 @@ def _as_coords(coords):
 
 def _pair_force(targets, sources, t_mass, s_mass, coeff_scale, soften,
                 skip_self=False):
-    """Repulsion on ``targets`` from ``sources``, in row strips.
-
-    ForceAtlas2 ``k_r m_i m_j / d`` via GEMMs on squared norms, not a
-    (rows, cols, 3) tensor. Softening + clamp keep near-coincident points stable.
-    """
     out = np.empty((targets.shape[0], 3), dtype=DTYPE)
     s2 = np.einsum("ij,ij->i", sources, sources)
     for lo in range(0, targets.shape[0], CHUNK):
@@ -79,14 +67,11 @@ def _as_edges(edges, num_nodes):
 
 
 class ForceSim:
-    """Force-directed layout advanced a few iterations at a time.
+    """Steppable force-directed layout; parameter names match ForceAtlas2
+    and the scene properties."""
 
-    Parameter names match ForceAtlas2 / scene properties.
-    """
-
-    #: FA2 — mass = deg+1, repulsion k_r m_i m_j / d (Gephi look).
-    #: FR  — no mass, repulsion k²/d, attraction d²/k.
-    #: LINLOG — FA2 masses + log attraction (sharper clusters).
+    #: FA2: mass = deg+1, repulsion k_r m_i m_j / d. FR: no mass, repulsion
+    #: k²/d, attraction d²/k. LINLOG: FA2 masses with log attraction.
     MODELS = ('FA2', 'FR', 'LINLOG')
 
     def __init__(self, coords, edges, weights=None, *, seed=None,
@@ -125,7 +110,6 @@ class ForceSim:
         if lin_log and self.model == 'FA2':
             self.model = 'LINLOG'
 
-        # Mass = degree + 1 (FA2/LinLog). FR uses ones.
         deg = np.bincount(self.edges.ravel(), minlength=self.n) \
             if self.edges.size else np.zeros(self.n, dtype=np.int64)
         self.degree = deg.astype(DTYPE)
@@ -155,8 +139,8 @@ class ForceSim:
                 self.pos[:, 2] += (self.rng.standard_normal(self.n)
                                    * DTYPE(0.05 * self.k)).astype(DTYPE)
 
-        # Scale forces so edges settle near k. Balance repulsion vs attraction
-        # at d = k; gravity vs whole-graph monopole at R = scale/2.
+        # Edges settle near k: repulsion balances attraction at d = k, gravity
+        # balances the whole-graph monopole at R = scale/2.
         mean_mass = float(self.mass.mean()) if self.n else 1.0
         m2 = max(mean_mass ** 2, 1e-9)
         m3 = max(mean_mass ** 3, 1e-9)
@@ -169,29 +153,22 @@ class ForceSim:
         self.repulsion *= self._repulsion_norm
         self.gravity *= self._gravity_norm
 
-    # -- geometry -----------------------------------------------------------
-
     @property
     def positions(self):
         """(N, 3) float32 copy, ready to upload."""
         return self.pos.copy()
 
     def _flatten_z(self, arr):
-        """Zero Z for 2D layouts, in place."""
         if self.dimensions < 3:
             arr[:, 2] = 0.0
         return arr
 
-    # -- forces -------------------------------------------------------------
-
     def _repulsion_direct(self):
-        """Exact all-pairs repulsion."""
         return _pair_force(self.pos, self.pos, self.mass, self.mass,
                            self.repulsion, DTYPE((0.01 * self.k) ** 2),
                            skip_self=True)
 
     def _refresh_near(self):
-        """Rebuild the K-nearest neighbor list (every NEAR_REFRESH steps)."""
         try:
             from scipy.spatial import cKDTree
         except ImportError:
@@ -206,7 +183,6 @@ class ForceSim:
         self._near_idx = np.ascontiguousarray(idx[:, 1:])
 
     def _repulsion_near(self):
-        """Exact repulsion over the K nearest nodes (fixed-width gather)."""
         if self._near_idx is None:
             return np.zeros((self.n, 3), dtype=DTYPE)
         nbr = self._near_idx
@@ -240,11 +216,9 @@ class ForceSim:
         return out
 
     def _repulsion_far(self):
-        """Monopole repulsion from a coarse grid (O(occupied²), not O(N²)).
-
-        Own-cell pairs are left to the near field. Neighbor cells overlap a bit;
-        ~6% magnitude error vs exact, direction under half a degree.
-        """
+        """Monopole repulsion from a coarse grid, own-cell pairs left to the
+        near field. Overlapping neighbor cells cost ~6% magnitude error against
+        exact, direction under half a degree."""
         lo = self.pos.min(axis=0)
         span = np.maximum(self.pos.max(axis=0) - lo, DTYPE(1e-9))
         cell = np.clip(((self.pos - lo) / span * FAR_RES).astype(np.int32),
@@ -271,7 +245,6 @@ class ForceSim:
         return cell_force[inverse] * self.mass[:, None]
 
     def _attraction(self):
-        """Edge attraction via bincount (faster than np.add.at)."""
         force = np.zeros((self.n, 3), dtype=DTYPE)
         if not self.edges.size:
             return force
@@ -279,7 +252,6 @@ class ForceSim:
         src, dst = self.edges[:, 0], self.edges[:, 1]
         diff = self.pos[dst] - self.pos[src]
 
-        # Magnitude: d (FA2), d²/k (FR), log(1+d) (LinLog).
         if self.model == 'LINLOG':
             dist = np.sqrt(np.einsum("ij,ij->i", diff, diff))
             factor = np.log1p(dist) / np.maximum(dist, DTYPE(1e-9))
@@ -300,7 +272,7 @@ class ForceSim:
             acc -= np.bincount(dst, weights=pull[:, ax], minlength=self.n)
             force[:, ax] = acc.astype(DTYPE)
 
-        # Divide by receiving mass after scatter (FA2); not per-edge by source.
+        # FA2 divides by receiving mass after the scatter, not per edge.
         if self.model != 'FR':
             force /= self.mass[:, None]
         return force
@@ -314,10 +286,7 @@ class ForceSim:
         scale = -(self.gravity * self.mass / np.maximum(dist, DTYPE(1e-9)))
         return (scale[:, None] * delta).astype(DTYPE)
 
-    # -- integration --------------------------------------------------------
-
     def _integrate(self, force):
-        """FA2 adaptive step: swing vs traction, then per-node speed."""
         swing_v = force - self._prev_force
         swing = np.sqrt(np.einsum("ij,ij->i", swing_v, swing_v))
         trac_v = 0.5 * (force + self._prev_force)
@@ -330,7 +299,7 @@ class ForceSim:
             self.speed = self.fixed_speed
         elif total_swing > 0.0:
             target = self.jitter_tolerance * total_traction / total_swing
-            # Cap speed jumps at 50% so one noisy step does not oscillate.
+            # Cap speed jumps at 50% so one noisy step cannot oscillate.
             self.speed = float(np.clip(target, self.speed * 0.5,
                                        self.speed * 1.5))
         self.speed = float(np.clip(self.speed, 1e-4, 10.0))
@@ -338,7 +307,6 @@ class ForceSim:
         factor = self.speed / (1.0 + self.speed * np.sqrt(swing))
         disp = force * factor[:, None]
 
-        # Cap displacement at one optimal distance (FR rule).
         norm = np.sqrt(np.einsum("ij,ij->i", disp, disp))
         cap = self.k
         over = norm > cap

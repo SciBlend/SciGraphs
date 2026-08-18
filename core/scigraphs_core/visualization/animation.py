@@ -1,12 +1,8 @@
-# Frame-change handlers for graph animation (traversal & flow propagation).
-#
-# These functions are registered as ``bpy.app.handlers.frame_change_post``
-# callbacks and update mesh attributes on every frame so that Geometry Nodes
-# or shader-based visualizations can react to the animation progress.
+# ``bpy.app.handlers.frame_change_post`` handlers: they rewrite mesh attributes
+# every frame so Geometry Nodes and shaders can follow the animation progress.
 
 
 def update_flow_activation(scene):
-    """Update ``flow_activation`` attribute from ``flow_distance`` and ``flow_time``."""
     for obj in scene.objects:
         if "flow_time" not in obj or "num_nodes" not in obj:
             continue
@@ -51,7 +47,6 @@ def update_flow_activation(scene):
 
 
 def update_traversal_activation(scene):
-    """Update ``traversal_activation`` attribute from ``traversal_order`` and ``traversal_time``."""
     for obj in scene.objects:
         if "traversal_time" not in obj or "num_nodes" not in obj:
             continue

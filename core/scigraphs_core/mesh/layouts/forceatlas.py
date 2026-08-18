@@ -3,8 +3,7 @@
 from .common import *
 from .networkx_layouts import _spring_layout_2d
 
-# NetworkX 3.4 added a real ForceAtlas2, and it is the preferred backend: it
-# takes a ``dim`` argument, so it is the only one here that can be 3D.
+# NetworkX 3.4+ ForceAtlas2 is preferred: it takes ``dim``, so only it is 3D.
 NX_FA2 = getattr(nx, "forceatlas2_layout", None)
 
 
@@ -12,11 +11,8 @@ def _forceatlas2_layout(G, iterations, scale, scaling_ratio=2.0, gravity=1.0,
                         strong_gravity=False, lin_log_mode=False, barnes_hut_optimize=True,
                         barnes_hut_theta=1.2, jitter_tolerance=1.0, edge_weight_influence=1.0,
                         dim=3):
-    """ForceAtlas2 (Jacomy et al. 2014), the algorithm Gephi uses.
-
-    Prefers NetworkX's implementation, falls back to the ``fa2`` package in 2D,
-    and failing both runs a spring layout that is not ForceAtlas2 at all.
-    """
+    """ForceAtlas2 (Jacomy et al. 2014), as Gephi uses. Prefers NetworkX, falls
+    back to the ``fa2`` package in 2D, then to a spring layout that is not it."""
     import time
     start = time.time()
     n = len(G.nodes())
@@ -41,8 +37,7 @@ def _forceatlas2_layout(G, iterations, scale, scaling_ratio=2.0, gravity=1.0,
         for node, coord in pos.items():
             c = np.asarray(coord, dtype=np.float64)
             arr[node, :c.size] = c
-        # Normalize to the requested scale. NetworkX returns whatever size the
-        # simulation reached, which for a force layout is arbitrary.
+        # NetworkX returns whatever size the simulation reached, so rescale.
         span = float(np.abs(arr - arr.mean(axis=0)).max())
         if span > 1e-9:
             arr = (arr - arr.mean(axis=0)) * (scale / span)
@@ -77,9 +72,7 @@ def _forceatlas2_layout(G, iterations, scale, scaling_ratio=2.0, gravity=1.0,
     return _spring_layout_2d(G, iterations, scale)
 
 def _forceatlas2_iteration(G, current_pos, scale, props=None):
-    """Advance ForceAtlas2 a few iterations from *current_pos*, returning
-    ``(new_positions, energy)``.
-    """
+    """Advance ForceAtlas2 from *current_pos*, returning (positions, energy)."""
     iters = int(getattr(props, "iterations_per_frame", 5)) if props else 5
 
     if NX_FA2 is not None:
@@ -152,7 +145,6 @@ def _forceatlas2_iteration(G, current_pos, scale, props=None):
     for node, (x, y) in new_pos_dict.items():
         new_pos[node] = [x, y, current_pos[node][2]]
 
-    # "Energy" here is just how far the batch moved things.
     energy = np.linalg.norm(new_pos - current_pos)
 
     return new_pos, energy

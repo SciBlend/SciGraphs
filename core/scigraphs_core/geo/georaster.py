@@ -12,11 +12,7 @@ except ImportError:
 
 
 class GeoRaster:
-    """Reader for georeferenced raster files (GeoTIFF).
-
-    Uses GDAL when it is installed. Otherwise falls back to PIL for the pixels
-    and hand-parsed TIFF tags for the geographic metadata.
-    """
+    """GeoTIFF reader: GDAL when installed, else PIL plus hand-parsed TIFF tags."""
     
     def __init__(self, filepath):
         self.filepath = filepath
@@ -32,20 +28,17 @@ class GeoRaster:
         # usually negative, since y increases downward in image space.
         self.geotransform = None
         
-        # In CRS coordinates.
         self.bounds = None
         
         self._load()
     
     def _load(self):
-        """Load raster data and metadata."""
         if _HAS_GDAL:
             self._load_gdal()
         else:
             self._load_pure_python()
     
     def _load_gdal(self):
-        """Load using GDAL."""
         try:
             ds = gdal.Open(self.filepath)
             if ds is None:
@@ -82,7 +75,6 @@ class GeoRaster:
             self._load_pure_python()
     
     def _load_pure_python(self):
-        """Load using pure Python (PIL + custom TIFF tag parsing)."""
         try:
             from PIL import Image
             
@@ -103,7 +95,6 @@ class GeoRaster:
                 self.data = np.array(img, dtype=np.uint8)
                 self.dtype = 'uint8'
             elif mode in ['RGB', 'RGBA']:
-                # Color image: flatten to grayscale and read it as elevation.
                 self.data = np.array(img.convert('L'), dtype=np.uint8)
                 self.dtype = 'uint8'
                 self.bands = 3 if mode == 'RGB' else 4
@@ -122,7 +113,6 @@ class GeoRaster:
             raise
     
     def _extract_geotiff_tags(self, img):
-        """Extract GeoTIFF tags from a PIL image."""
         MODEL_TIEPOINT_TAG = 33922
         MODEL_PIXEL_SCALE_TAG = 33550
         GEO_KEY_DIRECTORY_TAG = 34735
@@ -130,8 +120,8 @@ class GeoRaster:
         try:
             tiff_tags = img.tag_v2 if hasattr(img, 'tag_v2') else img.tag
             
-            # Tie point (i, j, k, x, y, z) maps pixel i, j (usually 0, 0) to the
-            # geographic coordinate x, y. Scale is the pixel size in CRS units.
+            # Tie point (i,j,k,x,y,z) maps pixel i,j to geographic x,y; scale is
+            # the pixel size in CRS units.
             tiepoint = tiff_tags.get(MODEL_TIEPOINT_TAG)
             scale = tiff_tags.get(MODEL_PIXEL_SCALE_TAG)
             
@@ -141,7 +131,6 @@ class GeoRaster:
                     x, y = tiepoint[3], tiepoint[4]
                     sx, sy = scale[0], scale[1]
                     
-                    # Top-left corner.
                     origin_x = x - (i * sx)
                     origin_y = y + (j * sy)  # Note: y increases upward in geo coords
                     
@@ -150,8 +139,7 @@ class GeoRaster:
             
             geokeys = tiff_tags.get(GEO_KEY_DIRECTORY_TAG)
             if geokeys and len(geokeys) >= 4:
-                # Entries run in groups of four. A projected CRS (3072) wins over
-                # a geographic one (2048).
+                # Entries run in groups of four; projected (3072) beats geographic (2048).
                 for i in range(4, len(geokeys), 4):
                     if i + 3 < len(geokeys):
                         key_id = geokeys[i]
@@ -166,13 +154,11 @@ class GeoRaster:
             log(f"Could not extract GeoTIFF tags: {e}")
     
     def _calculate_bounds(self):
-        """Calculate bounding box from geotransform."""
         if self.geotransform is None:
             return
         
         ox, sx, _, oy, _, sy = self.geotransform
         
-        # sy is usually negative.
         west = ox
         east = ox + self.width * sx
         north = oy
@@ -201,7 +187,6 @@ class GeoRaster:
         return None, None
     
     def pixel_to_geo(self, col, row):
-        """Convert pixel coordinates to geographic coordinates."""
         if self.geotransform is None:
             return None, None
         
@@ -211,7 +196,6 @@ class GeoRaster:
         return x, y
     
     def geo_to_pixel(self, x, y):
-        """Convert geographic coordinates to pixel coordinates."""
         if self.geotransform is None:
             return None, None
         
@@ -221,7 +205,6 @@ class GeoRaster:
         return col, row
     
     def get_elevation_at(self, x, y):
-        """Get elevation value at geographic coordinates."""
         col, row = self.geo_to_pixel(x, y)
         if col is None:
             return None
@@ -234,7 +217,6 @@ class GeoRaster:
         return None
     
     def get_statistics(self):
-        """Get statistics of elevation data."""
         valid_data = self.data
         if self.nodata is not None:
             valid_data = self.data[self.data != self.nodata]
@@ -250,12 +232,11 @@ class GeoRaster:
         }
     
     def is_geographic_crs(self):
-        """Check if CRS is geographic (lat/lon) or projected."""
         if self.crs is None:
             return True  # Assume geographic if unknown
         
-        # WGS84 and the two NAD codes. Web Mercator (3857) and the UTM zones
-        # (326xx, 327xx) are projected, so they fall through as False.
+        # WGS84 and the two NAD codes; Web Mercator (3857) and UTM (326xx, 327xx)
+        # are projected, so they fall through as False.
         geographic_codes = {'4326', '4269', '4267'}
         
         code = self.crs.replace('EPSG:', '')

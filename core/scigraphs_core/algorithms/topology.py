@@ -1,6 +1,6 @@
-# Surface embeddings: planarity, genus, Euler characteristic, face detection.
-# Planarity, the Kuratowski subgraph, the Chrobak-Payne drawing and the spectral
-# layout all come from networkx.
+# Surface embeddings: planarity, genus, Euler characteristic, faces. Planarity,
+# the Kuratowski subgraph, Chrobak-Payne drawing and spectral layout come from
+# networkx; without it every entry point returns None or a failure dict.
 
 import numpy as np
 
@@ -20,17 +20,13 @@ except ImportError:
 
 
 def _networkx_missing(feature, empty=None):
-    """Log why `feature` did not run and return its no-result value."""
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return empty
 
 
 def _layout_unavailable():
-    """The failure dict compute_planar_layout and compute_tutte_layout return.
-
-    Reuses the existing 'error' slot rather than adding a key, so operators that
-    already report `layout_result['error']` name the missing extra unchanged.
-    """
+    """Failure dict for the planar layouts. Reuses the existing 'error' slot so
+    operators already reporting `layout_result['error']` need no change."""
     log(f"Planar layout unavailable: {NETWORKX_REASON}")
     return {
         'positions': None,
@@ -40,7 +36,7 @@ def _layout_unavailable():
 
 
 def build_networkx_graph(graph_data, directed=False):
-    """Build a NetworkX Graph or DiGraph from GraphData; None without networkx."""
+    """Build a NetworkX Graph or DiGraph from GraphData."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("NetworkX graph construction")
 
@@ -61,11 +57,8 @@ def build_networkx_graph(graph_data, directed=False):
 
 
 def check_planarity_nx(graph_data):
-    """Test planarity with networkx's Boyer-Myrvold algorithm.
-
-    Returns ``(is_planar, embedding)``, the combinatorial embedding being None
-    for a non-planar graph, and ``(None, None)`` without networkx.
-    """
+    """Boyer-Myrvold planarity test. Returns ``(is_planar, embedding)``, the
+    combinatorial embedding being None for a non-planar graph."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Planarity test", empty=(None, None))
 
@@ -80,12 +73,9 @@ def check_planarity_nx(graph_data):
 
 
 def get_euler_characteristic(graph_data, embedding=None):
-    """Calculate the Euler characteristic chi = V - E + F.
-
-    Returns a dict of V, E, F, chi and faces_computed, or None without
-    networkx. Without an ``embedding``, F is the planar estimate 2 - V + E and
-    faces_computed is False, so chi comes back as 2 whatever the graph is.
-    """
+    """Euler characteristic chi = V - E + F, as a dict of V, E, F, chi and
+    faces_computed. Without an ``embedding`` F is the planar estimate 2 - V + E
+    and faces_computed is False, so chi comes back 2 whatever the graph is."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Euler characteristic")
 
@@ -114,11 +104,8 @@ def get_euler_characteristic(graph_data, embedding=None):
 
 
 def compute_faces_from_embedding(embedding):
-    """Extract every face of a planar embedding as a list of vertex indices.
-
-    The embedding stores each vertex's neighbors in clockwise order, so a face
-    is traced by walking edges and always turning right.
-    """
+    """Every face of a planar embedding as a list of vertex indices. Neighbors
+    are stored clockwise, so a face is traced by always turning right."""
     if embedding is None:
         return []
     
@@ -150,13 +137,10 @@ def compute_faces_from_embedding(embedding):
 
 
 def compute_geometric_dual_3d(graph_data, positions, embedding=None):
-    """Construct the geometric 3D dual graph G*, after Mohar and Thomassen 2.6.
-
-    Dual vertices are face centroids of G, joined when their faces share an
-    edge. ``positions`` is an (N, 3) array of vertex positions. Returns a dict
-    of nodes, edges, positions, face_to_nodes, success and error; the embedding
-    is computed here when not supplied, which requires a planar graph.
-    """
+    """Geometric 3D dual graph G*, after Mohar and Thomassen 2.6: dual vertices
+    are face centroids of G, joined where their faces share an edge.
+    ``positions`` is (N, 3); ``embedding`` is computed here when omitted, which
+    requires a planar graph. Returns nodes, edges, positions and face_to_nodes."""
 
     if embedding is None:
         if not NETWORKX_AVAILABLE:
@@ -195,8 +179,7 @@ def compute_geometric_dual_3d(graph_data, positions, embedding=None):
     num_faces = len(faces)
     dual_positions = np.zeros((num_faces, 3))
     
-    # edge (u, v) -> indices of the faces containing it
-    edge_to_faces = {}
+    edge_to_faces = {}  # edge (u, v) -> indices of the faces containing it
 
     for face_idx, face_nodes in enumerate(faces):
         face_coords = []
@@ -226,8 +209,7 @@ def compute_geometric_dual_3d(graph_data, positions, embedding=None):
         if len(adjacent_faces) == 2:
             dual_edges.append((adjacent_faces[0], adjacent_faces[1]))
         elif len(adjacent_faces) > 2:
-            # Should not happen on a simple planar graph. Connect every pair
-            # rather than dropping the edge from the dual.
+            # Impossible on a simple planar graph; pair them all rather than drop.
             for i in range(len(adjacent_faces)):
                 for j in range(i + 1, len(adjacent_faces)):
                     dual_edges.append((adjacent_faces[i], adjacent_faces[j]))
@@ -249,13 +231,9 @@ def compute_geometric_dual_3d(graph_data, positions, embedding=None):
 
 
 def calculate_genus(graph_data):
-    """Compute the genus of the minimal surface embedding the graph without crossings.
-
-    Returns a dict of is_planar, genus_lower_bound, genus_exact and euler_data,
-    or None without networkx. Only planar graphs get an exact genus, which is
-    0; everything else gets the lower bound ceil((E - 3V + 6) / 6) from Euler's
-    formula for orientable surfaces, and genus_exact stays None.
-    """
+    """Genus of the minimal surface embedding the graph without crossings. Exact
+    only for planar graphs, where it is 0; otherwise genus_exact is None and
+    genus_lower_bound is ceil((E - 3V + 6) / 6) from Euler's formula."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Genus")
 
@@ -280,7 +258,6 @@ def calculate_genus(graph_data):
     else:
         genus_lower = max(0, int(np.ceil((E - 3 * V + 6) / 6)))
 
-    # No embedding, so no face count and no chi.
     euler_data = {
         'V': V,
         'E': E,
@@ -298,12 +275,9 @@ def calculate_genus(graph_data):
 
 
 def detect_kuratowski_subgraph(graph_data):
-    """Find a Kuratowski subgraph (a K5 or K3,3 subdivision) in a non-planar graph.
-
-    By Kuratowski's theorem a graph is planar exactly when it has neither.
-    Returns a dict of is_planar, kuratowski_type ('K5', 'K3,3', 'unknown' or
-    None) and subgraph_nodes; None without networkx.
-    """
+    """Find a Kuratowski subgraph, a K5 or K3,3 subdivision, in a non-planar
+    graph; by Kuratowski's theorem a graph is planar exactly when it has
+    neither. Returns is_planar, kuratowski_type and subgraph_nodes."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Kuratowski subgraph")
 
@@ -324,8 +298,7 @@ def detect_kuratowski_subgraph(graph_data):
         nodes = list(kuratowski.nodes())
         edges = kuratowski.number_of_edges()
 
-        # A K5 subdivision carries at least 10 edges (5 choose 2), a K3,3
-        # subdivision exactly 9, which is enough to tell them apart.
+        # A K5 subdivision carries at least 10 edges, a K3,3 subdivision 9.
         if len(nodes) >= 5 and edges >= 10:
             k_type = 'K5'
         else:
@@ -345,12 +318,9 @@ def detect_kuratowski_subgraph(graph_data):
 
 
 def get_face_node_assignments(graph_data, embedding=None):
-    """Assign each node the lowest id among the faces containing it.
-
-    Returns a dict of node_face_ids, faces and num_faces. Nodes in no face keep
-    -1. The embedding is computed here when not supplied, which needs a planar
-    graph.
-    """
+    """Assign each node the lowest id among the faces containing it; nodes in
+    no face keep -1. Returns node_face_ids, faces and num_faces. The embedding
+    is computed here when not supplied, which needs a planar graph."""
 
     if embedding is None:
         if not NETWORKX_AVAILABLE:
@@ -388,11 +358,9 @@ def get_face_node_assignments(graph_data, embedding=None):
 
 
 def compute_graph_connectivity(graph_data):
-    """Return is_connected, num_components and vertex/edge connectivity.
-
-    The two connectivity numbers are 0 for a disconnected or single-node graph,
-    where they are not defined. None without networkx.
-    """
+    """Return is_connected, num_components and vertex/edge connectivity. The
+    two connectivity numbers are 0 for a disconnected or single-node graph,
+    where they are undefined."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Connectivity metrics")
 
@@ -429,12 +397,9 @@ def compute_graph_connectivity(graph_data):
 
 
 def compute_planar_layout(graph_data, scale=5.0):
-    """Lay the graph out with no edge crossings, via Chrobak-Payne straight-line drawing.
-
-    Returns a dict of positions (an (N, 3) array with Z=0), success and error.
-    Only planar graphs can be drawn this way; anything else fails with a
-    message, as does a missing networkx, which names the extra to install.
-    """
+    """Crossing-free layout via Chrobak-Payne straight-line drawing. Returns
+    positions (an (N, 3) array with Z=0), success and error. Only planar graphs
+    can be drawn this way; anything else fails with a message."""
     if not NETWORKX_AVAILABLE:
         return _layout_unavailable()
 
@@ -473,14 +438,10 @@ def compute_planar_layout(graph_data, scale=5.0):
 
 
 def compute_tutte_layout(graph_data, scale=5.0):
-    """Lay the graph out barycentrically, approximating a Tutte embedding.
-
-    The real Tutte construction needs an outer face pinned to a convex polygon,
-    which nothing here picks, so this substitutes a 2D spectral layout and
-    reports ``method: 'spectral_2d'``. Output may still cross, even on the
-    3-connected planar graphs Tutte would guarantee. Needs 3 nodes; without
-    networkx the 'error' slot names the extra to install.
-    """
+    """Barycentric layout approximating a Tutte embedding; needs 3 nodes. Not a
+    real Tutte embedding: that needs an outer face pinned to a convex polygon,
+    which nothing here picks, so this substitutes a 2D spectral layout, reports
+    ``method: 'spectral_2d'``, and may cross where Tutte would not."""
     if not NETWORKX_AVAILABLE:
         return _layout_unavailable()
 
@@ -518,13 +479,9 @@ def compute_tutte_layout(graph_data, scale=5.0):
 
 
 def detect_edge_crossings_3d(vertices, edges, tolerance=1e-6):
-    """Find edges that cross in 3D, testing every pair of segments.
-
-    ``tolerance`` is the distance in scene units below which two segments count
-    as crossing. Edges sharing a vertex are skipped. Returns a dict of
-    has_crossings, num_crossings and crossing_pairs. Quadratic in the edge
-    count, so it gets slow on large graphs.
-    """
+    """Find edges that cross in 3D by testing every pair of segments, quadratic
+    in the edge count. ``tolerance`` is the distance in scene units below which
+    two segments cross; edges sharing a vertex are skipped."""
     crossing_pairs = []
     
     num_edges = len(edges)
@@ -537,7 +494,6 @@ def detect_edge_crossings_3d(vertices, edges, tolerance=1e-6):
         for j in range(i + 1, num_edges):
             e2_start, e2_end = edges[j]
             
-            # Edges sharing a vertex meet there by construction.
             if e1_start in (e2_start, e2_end) or e1_end in (e2_start, e2_end):
                 continue
 
@@ -555,15 +511,12 @@ def detect_edge_crossings_3d(vertices, edges, tolerance=1e-6):
 
 
 def _segments_intersect_3d(p1, p2, p3, p4, tolerance=1e-6):
-    """True when two 3D segments pass within ``tolerance`` of each other.
-
-    Solves for the closest point on each infinite line, then rejects the pair
-    if either lands outside its segment. Parallel lines always return False,
-    so a genuine overlap along the same line is missed.
-    """
-    d1 = p2 - p1  # direction of segment 1
-    d2 = p4 - p3  # direction of segment 2
-    d3 = p1 - p3  # between the start points
+    """True when two 3D segments pass within ``tolerance``, from the closest
+    point on each infinite line. Parallel lines always return False, so a
+    genuine overlap along the same line is missed."""
+    d1 = p2 - p1
+    d2 = p4 - p3
+    d3 = p1 - p3
     
     a = np.dot(d1, d1)
     b = np.dot(d1, d2)
@@ -573,13 +526,13 @@ def _segments_intersect_3d(p1, p2, p3, p4, tolerance=1e-6):
     
     denom = a * c - b * b
     
-    if abs(denom) < 1e-10:  # parallel
+    if abs(denom) < 1e-10:
         return False
 
     s = (b * e - c * d) / denom
     t = (a * e - b * d) / denom
 
-    if s < 0 or s > 1 or t < 0 or t > 1:  # closest point past a segment end
+    if s < 0 or s > 1 or t < 0 or t > 1:
         return False
 
     closest1 = p1 + s * d1

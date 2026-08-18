@@ -1,14 +1,9 @@
-"""Betweenness and closeness centrality, with a rustworkx fast path when that
-module is installed and NetworkX otherwise.
-
-Also holds the value-to-RGBA mapping and the orientation-rose mesh builder that
-the centrality operators use to display their results.
-"""
+"""Betweenness and closeness centrality, through rustworkx when it is installed
+and NetworkX otherwise, plus the value-to-RGBA mapping and the orientation-rose
+mesh builder the centrality operators use to display their results."""
 
 from scigraphs_core.logger import log
 
-
-# --- Rustworkx interop helpers ---
 
 def _try_rustworkx_digraph(G, weight_attr):
     """Convert a (Multi)DiGraph to a rustworkx PyDiGraph, or return None."""
@@ -53,13 +48,8 @@ def _try_rustworkx_digraph(G, weight_attr):
         return None, None, None
 
 
-# --- Node betweenness centrality ---
-
 def node_betweenness(G, weight="length", fast=True):
-    """Node betweenness centrality as ``{node_id: value}``, normalized.
-
-    With ``fast``, goes through rustworkx when it is importable.
-    """
+    """Normalized node betweenness as ``{node_id: value}``; ``fast`` uses rustworkx."""
     if G is None:
         return {}
 
@@ -80,8 +70,6 @@ def node_betweenness(G, weight="length", fast=True):
         log(f"NetworkX betweenness failed: {e}")
         return {}
 
-
-# --- Edge betweenness via line graph ---
 
 def edge_betweenness_line(G, weight="length", fast=True):
     """Edge betweenness as ``{(u, v): value}``, computed on the line graph."""
@@ -131,8 +119,6 @@ def edge_betweenness_line(G, weight="length", fast=True):
         return {}
 
 
-# --- Closeness centrality ---
-
 def node_closeness(G, weight="length", fast=True):
     """Node closeness centrality as ``{node_id: value}``."""
     if G is None:
@@ -155,8 +141,6 @@ def node_closeness(G, weight="length", fast=True):
         log(f"NetworkX closeness failed: {e}")
         return {}
 
-
-# --- Colormap utilities ---
 
 # RGB control points at t = 0, 0.25, 0.5, 0.75, 1, for installs with numpy but
 # no matplotlib.
@@ -243,10 +227,7 @@ def _fallback_colormap(name, arr_norm):
 
 
 def get_colors_by_values(values, cmap_name="viridis", vmin=None, vmax=None):
-    """Map floats to an ``(N, 4)`` RGBA array, normalized over vmin to vmax.
-
-    Non-finite values come out mid-gray rather than dropping out of the array.
-    """
+    """Floats to an ``(N, 4)`` RGBA array over vmin..vmax; non-finite comes out gray."""
     try:
         import numpy as np
     except ImportError as e:
@@ -283,15 +264,10 @@ def get_colors_by_values(values, cmap_name="viridis", vmin=None, vmax=None):
     return rgba
 
 
-# --- Orientation rose mesh ---
-
 def orientation_rose_mesh_data(bearings, bins=36, radius=2.0, height_scale=1.0):
     """Vertices and faces for a 3D polar histogram of edge bearings, in degrees.
-
-    Each angular bin becomes a wedge whose height is its share of the busiest
-    bin, times height_scale. Returns ``{"verts", "faces", "counts"}``, with verts
-    and faces shaped for ``mesh.from_pydata``.
-    """
+    Each angular bin is a wedge whose height is its share of the busiest bin times
+    height_scale. ``{"verts", "faces", "counts"}``, shaped for ``from_pydata``."""
     import math
 
     if not bearings:
@@ -323,19 +299,19 @@ def orientation_rose_mesh_data(bearings, bins=36, radius=2.0, height_scale=1.0):
         z = heights[i]
         base_i = len(verts)
         verts.extend([
-            (0.0, 0.0, 0.0),     # base center 0
-            (x0, y0, 0.0),       # base outer 1
-            (x1, y1, 0.0),       # base outer 2
-            (0.0, 0.0, z),       # top center 3
-            (x0, y0, z),         # top outer 4
-            (x1, y1, z),         # top outer 5
+            (0.0, 0.0, 0.0),
+            (x0, y0, 0.0),
+            (x1, y1, 0.0),
+            (0.0, 0.0, z),
+            (x0, y0, z),
+            (x1, y1, z),
         ])
         faces.extend([
-            (base_i + 0, base_i + 1, base_i + 2),           # bottom
-            (base_i + 3, base_i + 5, base_i + 4),           # top
-            (base_i + 0, base_i + 2, base_i + 5, base_i + 3),  # side1
-            (base_i + 0, base_i + 3, base_i + 4, base_i + 1),  # side2
-            (base_i + 1, base_i + 4, base_i + 5, base_i + 2),  # outer
+            (base_i + 0, base_i + 1, base_i + 2),
+            (base_i + 3, base_i + 5, base_i + 4),
+            (base_i + 0, base_i + 2, base_i + 5, base_i + 3),
+            (base_i + 0, base_i + 3, base_i + 4, base_i + 1),
+            (base_i + 1, base_i + 4, base_i + 5, base_i + 2),
         ])
 
     return {"verts": verts, "faces": faces, "counts": counts}

@@ -7,10 +7,7 @@ from .get_osmnx import get_osmnx
 
 
 def euclidean(y1, x1, y2, x2):
-    """Euclidean distance between points in a projected CRS.
-
-    Scalars or numpy arrays, vectorized either way.
-    """
+    """Euclidean distance between points in a projected CRS. Scalars or arrays."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -24,10 +21,7 @@ def euclidean(y1, x1, y2, x2):
 
 
 def great_circle(lat1, lon1, lat2, lon2, earth_radius=6371009):
-    """Haversine distance in meters between lat/lon points, in decimal degrees.
-
-    Scalars or numpy arrays, vectorized either way.
-    """
+    """Haversine distance in meters between lat/lon points; scalars or numpy arrays."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -41,11 +35,9 @@ def great_circle(lat1, lon1, lat2, lon2, earth_radius=6371009):
 
 
 def nearest_nodes(G, X, Y, return_dist=False):
-    """Nearest node(s) to one point or many.
-
-    X/Y are lon/lat when the graph is unprojected, easting/northing when it is.
-    With return_dist, the result becomes a ``(node_ids, distances)`` tuple.
-    """
+    """Nearest node(s) to one point or many. X/Y are lon/lat when the graph is
+    unprojected and easting/northing when it is; with return_dist the result
+    becomes a ``(node_ids, distances)`` tuple."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")
@@ -65,11 +57,9 @@ def nearest_nodes(G, X, Y, return_dist=False):
 
 
 def nearest_edges(G, X, Y, return_dist=False):
-    """Nearest edge(s), as ``(u, v, key)``, to one point or many.
-
-    X/Y follow the graph's CRS as in nearest_nodes. With return_dist, the result
-    becomes an ``(edge_ids, distances)`` tuple.
-    """
+    """Nearest edge(s), as ``(u, v, key)``, to one point or many. X/Y follow the
+    graph's CRS as in nearest_nodes; with return_dist the result becomes an
+    ``(edge_ids, distances)`` tuple."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")

@@ -17,7 +17,6 @@ except ImportError:
 
 
 class ParseError(Exception):
-    """Raised when pipeline parsing fails."""
     pass
 
 
@@ -61,7 +60,6 @@ def _parse_scalar(value: str) -> Any:
 
 
 def _split_yaml_key_value(text: str) -> Tuple[str, str]:
-    """Split a YAML key/value line on the first colon."""
     if ":" not in text:
         raise ParseError(f"Invalid YAML line: {text}")
     key, value = text.split(":", 1)
@@ -72,11 +70,7 @@ def _split_yaml_key_value(text: str) -> Tuple[str, str]:
 
 
 def _minimal_yaml_load(content: str) -> Dict[str, Any]:
-    """Parse the pipeline YAML subset with no external dependency.
-
-    Covers what hand-written pipelines actually use: nested mappings, simple
-    and inline lists, booleans, numbers, strings, and empty dict/list literals.
-    """
+    """The pipeline YAML subset with no dependency: mappings, lists, scalars."""
     lines = []
     for raw_line in content.splitlines():
         if not raw_line.strip() or raw_line.lstrip().startswith("#"):
@@ -155,11 +149,8 @@ def _minimal_yaml_load(content: str) -> Dict[str, Any]:
 
 
 def _resolve_path(filepath: str, base_dir: Optional[str] = None) -> str:
-    """Resolve a path, including the Blender-style // relative form.
-
-    base_dir is normally the blend file's directory. Without it, // paths fall
-    back to being relative to the current directory.
-    """
+    """Resolve a path, including the Blender-style // form. base_dir is normally the
+    blend file's directory; without it, // paths go relative to the cwd."""
     if filepath.startswith("//"):
         if base_dir:
             return os.path.join(base_dir, filepath[2:])
@@ -185,10 +176,7 @@ def load_file(filepath: str) -> str:
 
 
 def parse_content(content: str, format_hint: Optional[str] = None) -> Dict[str, Any]:
-    """Parse a YAML or JSON string. format_hint is 'yaml', 'json' or None.
-
-    Raises ParseError if neither parser accepts the content.
-    """
+    """Parse YAML or JSON; format_hint 'yaml'/'json'/None, ParseError if neither fits."""
     # JSON first: always available, and stricter, so a false positive is unlikely.
     if format_hint == "json" or not format_hint:
         try:
@@ -196,7 +184,6 @@ def parse_content(content: str, format_hint: Optional[str] = None) -> Dict[str, 
         except json.JSONDecodeError as e:
             if format_hint == "json":
                 raise ParseError(f"Invalid JSON: {e}")
-            # Fall through to YAML.
 
     if HAS_YAML:
         try:
@@ -216,7 +203,6 @@ def parse_content(content: str, format_hint: Optional[str] = None) -> Dict[str, 
 
 
 def detect_format(filepath: str) -> str:
-    """Detect file format from extension."""
     ext = Path(filepath).suffix.lower()
     if ext in ('.yaml', '.yml'):
         return 'yaml'
@@ -230,11 +216,8 @@ def parse_pipeline(
     source: Union[str, Path, Dict[str, Any]],
     base_dir: Optional[str] = None,
 ) -> Tuple[PipelineSchema, Dict[str, Any], str]:
-    """Parse a pipeline from a file path, a content string, or a dict.
-
-    Returns (PipelineSchema, spec as written, canonical_hash). Raises
-    ParseError or ValidationError.
-    """
+    """Parse a pipeline from a file path, a content string, or a dict, into
+    (PipelineSchema, spec as written, canonical_hash)."""
     raw_dict: Dict[str, Any]
 
     if isinstance(source, dict):
@@ -258,10 +241,9 @@ def parse_pipeline(
 
     validate_pipeline(raw_dict)
 
-    # Hash the spec as written, before any path resolution. Resolution mixes the
-    # local directory layout into meta.output_dir and dataset.filepath, and
-    # hashing afterwards gave one file two hashes depending on whether it was
-    # reached by a relative or an absolute path.
+    # Hash the spec as written: resolution mixes the local directory layout into
+    # meta.output_dir and dataset.filepath, and hashing afterwards gave one file
+    # two hashes, relative path versus absolute.
     spec_as_written = copy.deepcopy(raw_dict)
     canonical_hash = compute_pipeline_hash(spec_as_written)
 
@@ -284,10 +266,7 @@ def parse_pipeline(
 
 
 def canonicalize_pipeline(data: Dict[str, Any]) -> str:
-    """Serialize a pipeline dict to canonical JSON.
-
-    Sorted keys and fixed separators, so the same pipeline always hashes alike.
-    """
+    """Canonical JSON: sorted keys, fixed separators, so equal pipelines hash alike."""
     return json.dumps(
         data,
         sort_keys=True,

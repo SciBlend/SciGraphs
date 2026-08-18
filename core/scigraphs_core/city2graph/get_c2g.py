@@ -2,7 +2,6 @@ from scigraphs_core.logger import log
 
 
 def get_city2graph():
-    """Import and return the city2graph module, or None if it is not installed."""
     try:
         import city2graph as c2g
         return c2g

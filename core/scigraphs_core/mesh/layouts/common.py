@@ -1,9 +1,6 @@
-"""Shared layout imports, dependency checks, logging, and graph helpers.
-
-Keep Blender out of this file: every layout does ``from .common import *``.
-Also keep out anything that reads a mesh datablock (e.g. ``mesh_edge_pairs``);
-pass edge lists in from the caller instead.
-"""
+"""Shared layout imports, dependency checks, logging and graph helpers. Keep
+Blender out: every layout does ``from .common import *``, so anything reading a
+mesh datablock (``mesh_edge_pairs``) stays out too; pass edge lists in instead."""
 
 import numpy as np
 import time
@@ -15,8 +12,7 @@ import json
 import tempfile
 from ...repro.determinism import get_layout_seed
 
-# Optional deps: bind to None on ImportError so ``from .common import *``
-# still works and layouts can test ``if nx is None``.
+# Optional deps bind to None on ImportError, so layouts can test ``if nx is None``.
 try:
     import networkx as nx
     NETWORKX_AVAILABLE = True
@@ -43,7 +39,6 @@ except ImportError:
 _layout_rng = None
 
 def _get_layout_rng(seed=None):
-    """Shared layout RNG."""
     global _layout_rng
     if seed is not None:
         _layout_rng = np.random.RandomState(seed)
@@ -67,7 +62,6 @@ except ImportError:
     print("Warning: python-igraph not available. Some fast layouts will be disabled.")
 
 def _log_layout(algorithm, num_nodes, num_edges, params=None, start_time=None, success=True, error=None, actual_algorithm=None):
-    """Log one layout run."""
     separator = "=" * 70
     print(f"\n{separator}")
 
@@ -122,14 +116,10 @@ except ImportError:
     pass
 
 def _build_networkx_graph(obj, edge_pairs=None):
-    """Build a NetworkX graph from object data.
-
-    *obj* needs ``num_nodes`` and optionally ``nodes_data``/``edges_data``.
-    For mesh-native objects, pass ``mesh_edge_pairs(...)`` as *edge_pairs*.
-
-    Returns ``(None, 0)`` on refusal (missing networkx, no edges source, etc.).
-    ``edge_pairs=None`` means "not supplied" and is refused; ``[]`` means empty.
-    """
+    """Build a NetworkX graph from object data, ``(None, 0)`` on refusal. *obj*
+    needs ``num_nodes`` plus ``nodes_data``/``edges_data``; mesh-native objects
+    instead pass ``mesh_edge_pairs(...)`` as *edge_pairs*, where None means "not
+    supplied" and is refused while ``[]`` means empty."""
     if not NETWORKX_AVAILABLE:
         print("Layout unavailable: %s" % NETWORKX_REASON)
         return None, 0
@@ -208,7 +198,6 @@ def _get_drl_kwargs_from_props(props):
     )
 
 def _nx_to_igraph(G):
-    """NetworkX graph -> igraph."""
     g_igraph = ig.Graph()
     g_igraph.add_vertices(len(G.nodes()))
     g_igraph.add_edges(list(G.edges()))

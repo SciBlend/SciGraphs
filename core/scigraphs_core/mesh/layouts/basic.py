@@ -3,14 +3,12 @@
 from .common import *
 
 def _random_layout(num_nodes, scale, seed=None):
-    """Random 3D positions with reproducible seed."""
     if seed is None:
         seed = get_layout_seed()
     rng = np.random.RandomState(seed)
     return rng.rand(num_nodes, 3) * scale
 
 def _grid_layout(num_nodes, scale):
-    """2D grid layout."""
     grid_size = int(np.ceil(np.sqrt(num_nodes)))
     positions = np.zeros((num_nodes, 3))
 
@@ -25,7 +23,7 @@ def _sphere_layout(num_nodes, scale):
     """Even distribution over a sphere, by the Fibonacci sphere construction."""
     positions = np.zeros((num_nodes, 3))
 
-    phi = np.pi * (3.0 - np.sqrt(5.0))  # Golden angle
+    phi = np.pi * (3.0 - np.sqrt(5.0))
 
     for i in range(num_nodes):
         y = 1 - (i / float(num_nodes - 1 if num_nodes > 1 else 1)) * 2
@@ -47,7 +45,7 @@ def _spiral_layout_3d(num_nodes, scale):
     for i in range(num_nodes):
         t = i / max(1, num_nodes - 1)
 
-        angle = t * 4 * np.pi  # Two full turns
+        angle = t * 4 * np.pi
         height = t * scale * 2 - scale
         radius = scale * 0.5 * (1 + t)
 
@@ -69,7 +67,7 @@ def _helix_layout(num_nodes, scale):
         strand = i % 2
         t = (i // 2) / max(1, nodes_per_strand - 1)
 
-        angle = t * 4 * np.pi + strand * np.pi  # Half a turn between strands
+        angle = t * 4 * np.pi + strand * np.pi
         height = t * scale * 2 - scale
         radius = scale * 0.3
 

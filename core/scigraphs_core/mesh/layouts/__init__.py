@@ -1,5 +1,4 @@
-# Layout algorithm package for SciGraphs.
-# Public API is re-exported through SciGraphs.core.mesh.layout for compatibility.
+# Layout algorithms; the public API is re-exported through mesh.layout too.
 
 from .dispatcher import apply_graph_layout
 from .interactive import execute_layout_iteration

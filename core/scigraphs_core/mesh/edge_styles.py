@@ -1,9 +1,6 @@
-"""Edge styling: curved edges, bundling, tapered edges and geometric styles.
-
-Styles work by adding intermediate vertices along each edge. In the resulting
-mesh, `is_intersection=1` marks the real graph nodes (drawn as spheres) and
-`is_intersection=0` marks the control points that shape the curve.
-"""
+"""Edge styling: curved, bundled, tapered and geometric edges. Styles add
+intermediate vertices along each edge; `is_intersection=1` marks the real graph
+nodes in the resulting mesh and 0 marks the control points shaping the curve."""
 
 import numpy as np
 from typing import List, Tuple, Dict, Optional, Any
@@ -11,8 +8,6 @@ from collections import defaultdict
 
 from scigraphs_core.logger import log
 
-
-# --- Presets Configuration ---
 
 EDGE_STYLE_PRESETS = {
     'GEPHI_DEFAULT': {
@@ -85,15 +80,12 @@ def apply_preset(props, preset_name: str) -> bool:
     return True
 
 
-# --- Bezier Curve Utilities ---
-
 def quadratic_bezier(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray, 
                      num_points: int) -> List[np.ndarray]:
     """Sample a quadratic Bezier with control point p1, endpoints included."""
     points = []
     for i in range(num_points):
         t = i / (num_points - 1)
-        # B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
         point = (1 - t)**2 * p0 + 2 * (1 - t) * t * p1 + t**2 * p2
         points.append(point)
     return points
@@ -105,7 +97,6 @@ def cubic_bezier(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray,
     points = []
     for i in range(num_points):
         t = i / (num_points - 1)
-        # B(t) = (1-t)³P0 + 3(1-t)²tP1 + 3(1-t)t²P2 + t³P3
         point = ((1 - t)**3 * p0 + 
                  3 * (1 - t)**2 * t * p1 + 
                  3 * (1 - t) * t**2 * p2 + 
@@ -118,11 +109,8 @@ def compute_perpendicular_offset(p0: np.ndarray, p1: np.ndarray,
                                   offset: float, direction: str = 'AUTO',
                                   edge_index: int = 0) -> np.ndarray:
     """Offset vector perpendicular to the edge p0 -> p1, for a control point.
-
-    direction is 'AUTO', 'CLOCKWISE', 'COUNTER_CLOCKWISE' or 'ALTERNATING'; only
-    ALTERNATING reads edge_index. AUTO derives the sign from the endpoints, so
-    the same edge always bends the same way.
-    """
+    ``direction`` is AUTO, CLOCKWISE, COUNTER_CLOCKWISE or ALTERNATING; only
+    ALTERNATING reads ``edge_index``, and AUTO bends an edge the same way twice."""
     d = p1 - p0
     length = np.linalg.norm(d)
     
@@ -137,7 +125,6 @@ def compute_perpendicular_offset(p0: np.ndarray, p1: np.ndarray,
     perp_len = np.linalg.norm(perp)
     
     if perp_len < 1e-10:
-        # Edge is vertical, use X-axis as reference
         perp = np.cross(d, np.array([1.0, 0.0, 0.0]))
         perp_len = np.linalg.norm(perp)
     
@@ -158,8 +145,6 @@ def compute_perpendicular_offset(p0: np.ndarray, p1: np.ndarray,
     return perp * offset * sign
 
 
-# --- Edge Style Generators ---
-
 def generate_straight_edge(p0: np.ndarray, p1: np.ndarray, 
                            segments: int = 1) -> List[np.ndarray]:
     """Intermediate points along a straight edge; empty when segments <= 1."""
@@ -179,12 +164,9 @@ def generate_curved_edge(p0: np.ndarray, p1: np.ndarray,
                          direction: str = 'AUTO',
                          edge_index: int = 0,
                          use_cubic: bool = True) -> List[np.ndarray]:
-    """Bezier-curved edge, returning the intermediate points only.
-
-    curvature runs 0 to 1 and scales the bend by the edge length; below 0.001
-    the edge comes back straight. use_cubic picks a two-control-point cubic over
-    a quadratic bulging at the midpoint.
-    """
+    """Bezier-curved edge, intermediate points only. ``curvature`` runs 0 to 1
+    and scales the bend by edge length; below 0.001 the edge comes back
+    straight. ``use_cubic`` picks a cubic over a quadratic bulging at midpoint."""
     if curvature < 0.001 or segments < 2:
         return generate_straight_edge(p0, p1, segments)
 
@@ -210,11 +192,8 @@ def generate_arc_edge(p0: np.ndarray, p1: np.ndarray,
                       curvature: float, segments: int,
                       direction: str = 'AUTO',
                       edge_index: int = 0) -> List[np.ndarray]:
-    """Circular arc edge, returning the intermediate points only.
-
-    curvature sets the sagitta as a fraction of the chord; too flat an arc
-    degrades to a straight edge.
-    """
+    """Circular arc edge, intermediate points only. ``curvature`` sets the
+    sagitta as a fraction of the chord; too flat an arc degrades to straight."""
     if curvature < 0.001 or segments < 2:
         return generate_straight_edge(p0, p1, segments)
 
@@ -251,9 +230,7 @@ def generate_arc_edge(p0: np.ndarray, p1: np.ndarray,
         cos_t = np.cos(theta)
         sin_t = np.sin(theta)
 
-        # Lerp the two radius vectors and renormalize instead of doing a real
-        # slerp: same plane, no rotation basis to build per point, but the
-        # spacing along the arc is only approximately uniform.
+        # Lerp and renormalize rather than slerp: arc spacing only roughly uniform.
         v0_norm = v0 / np.linalg.norm(v0)
         v1_norm = v1 / np.linalg.norm(v1)
 
@@ -269,11 +246,8 @@ def generate_arc_edge(p0: np.ndarray, p1: np.ndarray,
 def generate_orthogonal_edge(p0: np.ndarray, p1: np.ndarray,
                              style: str = 'CENTERED',
                              segments: int = 3) -> List[np.ndarray]:
-    """Right-angle edge, returning the bend points.
-
-    style is 'CENTERED', 'HORIZONTAL_FIRST', 'VERTICAL_FIRST' or 'SHORTEST'.
-    Two bends need segments >= 3.
-    """
+    """Right-angle edge returning the bend points. ``style`` is CENTERED,
+    HORIZONTAL_FIRST, VERTICAL_FIRST or SHORTEST; two bends need segments >= 3."""
     dx = p1[0] - p0[0]
     dy = p1[1] - p0[1]
     dz = p1[2] - p0[2]
@@ -281,7 +255,6 @@ def generate_orthogonal_edge(p0: np.ndarray, p1: np.ndarray,
     points = []
     
     if style == 'CENTERED':
-        # Two bends meeting at the midpoint.
         mid_x = (p0[0] + p1[0]) / 2
         mid_y = (p0[1] + p1[1]) / 2
         mid_z = (p0[2] + p1[2]) / 2
@@ -313,10 +286,8 @@ def generate_orthogonal_edge(p0: np.ndarray, p1: np.ndarray,
 def generate_self_loop(center: np.ndarray, radius: float,
                        segments: int = 12,
                        normal: np.ndarray = None) -> List[np.ndarray]:
-    """Points forming a loop from a node back to itself.
-
-    normal is the loop plane's normal and defaults to Z-up.
-    """
+    """Points forming a loop from a node back to itself; ``normal`` is the loop
+    plane's normal and defaults to Z-up."""
     if normal is None:
         normal = np.array([0.0, 0.0, 1.0])
 
@@ -338,15 +309,10 @@ def generate_self_loop(center: np.ndarray, radius: float,
     return points
 
 
-# --- EDGE BUNDLING (Force-Directed Edge Bundling - FDEB) ---
-
 def edge_compatibility(e1_start: np.ndarray, e1_end: np.ndarray,
                        e2_start: np.ndarray, e2_end: np.ndarray) -> float:
-    """Bundling compatibility of two edges, 0 (none) to 1 (high).
-
-    Follows Holten and van Wijk's force-directed edge bundling, minus the
-    visibility term.
-    """
+    """Bundling compatibility of two edges, 0 to 1, following Holten and van
+    Wijk's force-directed edge bundling minus the visibility term."""
     d1 = e1_end - e1_start
     d2 = e2_end - e2_start
     
@@ -369,9 +335,7 @@ def edge_compatibility(e1_start: np.ndarray, e1_end: np.ndarray,
     mid_dist = np.linalg.norm(mid1 - mid2)
     pos_compat = l_avg / (l_avg + mid_dist)
 
-    # Visibility compatibility asks whether bundling the pair would make them
-    # cross. It is pinned to 1.0 because the test costs more than it is worth
-    # here; the factor stays so it can be filled in later.
+    # Visibility compatibility pinned to 1.0; the crossing test is not worth it.
     vis_compat = 1.0
 
     return angle_compat * scale_compat * pos_compat * vis_compat
@@ -382,12 +346,9 @@ def bundle_edges_fdeb(edges: List[Tuple[np.ndarray, np.ndarray]],
                       iterations: int = 6,
                       segments: int = 10,
                       compatibility_threshold: float = 0.6) -> List[List[np.ndarray]]:
-    """Bundle a set of (start, end) edges, returning intermediate points per edge.
-
-    Pairs scoring below compatibility_threshold never attract each other. Cost
-    is quadratic in the edge count: the compatibility matrix is dense and the
-    inner loop walks every other edge.
-    """
+    """Bundle (start, end) edges, returning intermediate points per edge. Pairs
+    scoring below ``compatibility_threshold`` never attract. Quadratic in the
+    edge count: the matrix is dense and the inner loop walks every other edge."""
     if not edges:
         return []
 
@@ -418,21 +379,16 @@ def bundle_edges_fdeb(edges: List[Tuple[np.ndarray, np.ndarray]],
         current_step = step_size * (1 - iteration / iterations)
 
         for i in range(num_edges):
-            # Endpoints are pinned; only the internal points move.
             for p in range(1, segments):
                 force = np.zeros(3)
 
-                # Spring force, keeping the points evenly spaced along the edge.
                 prev_point = edge_points[i][p - 1]
                 next_point = edge_points[i][p + 1]
                 spring_force = (prev_point + next_point) / 2 - edge_points[i][p]
                 force += spring_force * 0.5
                 
-                # Attraction pulls toward the compatibility-weighted mean of the
-                # other edges, not the sum. Summing lets the gain grow with the
-                # number of edges past the threshold, and beyond a few hundred
-                # the update overshoots and the points diverge. The mean keeps
-                # each step a convex combination at any edge count.
+                # Weighted mean, not sum: summing grows the gain with the
+                # compatible-edge count until the update overshoots.
                 attraction = np.zeros(3)
                 total = 0.0
                 for j in range(num_edges):
@@ -459,8 +415,6 @@ def bundle_edges_fdeb(edges: List[Tuple[np.ndarray, np.ndarray]],
     return result
 
 
-# --- Parallel Edge Handling ---
-
 def identify_parallel_edges(edges: List[Tuple[int, int]]) -> Dict[Tuple[int, int], List[int]]:
     """Group edge indices by node pair, keyed (lower, higher) so direction is ignored."""
     parallel_groups = defaultdict(list)
@@ -475,11 +429,9 @@ def identify_parallel_edges(edges: List[Tuple[int, int]]) -> Dict[Tuple[int, int
 def offset_parallel_edge(p0: np.ndarray, p1: np.ndarray,
                          edge_num: int, total_parallel: int,
                          base_offset: float) -> Tuple[np.ndarray, np.ndarray]:
-    """Shift one of several parallel edges sideways, returning its new endpoints.
-
-    edge_num is 0-based within the group; base_offset is the spacing between
-    neighbors. The fan comes out centered on the original edge.
-    """
+    """Shift one of several parallel edges sideways, returning new endpoints.
+    ``edge_num`` is 0-based in the group, ``base_offset`` the neighbor spacing,
+    and the fan comes out centered on the original edge."""
     if total_parallel <= 1:
         return p0, p1
 
@@ -491,8 +443,6 @@ def offset_parallel_edge(p0: np.ndarray, p1: np.ndarray,
     return p0 + perp, p1 + perp
 
 
-# --- Main Edge Style Application ---
-
 def compute_styled_edge_points(p0: np.ndarray, p1: np.ndarray,
                                style_type: str,
                                curvature: float = 0.3,
@@ -502,11 +452,9 @@ def compute_styled_edge_points(p0: np.ndarray, p1: np.ndarray,
                                orthogonal_style: str = 'CENTERED',
                                self_loop_radius: float = 0.2) -> List[np.ndarray]:
     """Intermediate points for one styled edge, all marked is_intersection=0.
-
-    style_type is 'STRAIGHT', 'CURVED', 'QUADRATIC', 'ARC', 'ORTHOGONAL',
-    'TAPERED', 'BUNDLED' or 'HIERARCHICAL'. Anything else logs and falls back to
-    straight. Coincident endpoints become a self-loop.
-    """
+    ``style_type`` is STRAIGHT, CURVED, QUADRATIC, ARC, ORTHOGONAL, TAPERED,
+    BUNDLED or HIERARCHICAL; anything else logs and falls back to straight.
+    Coincident endpoints become a self-loop."""
     if np.allclose(p0, p1, atol=1e-6):
         return generate_self_loop(p0, self_loop_radius, segments)
     
@@ -539,8 +487,7 @@ def compute_styled_edge_points(p0: np.ndarray, p1: np.ndarray,
                                     direction, edge_index, use_cubic=True)
 
     elif style_type == 'HIERARCHICAL':
-        # Routing through the cluster tree needs the communities, and this
-        # function only ever sees one edge. GPU engine only.
+        # Routing through the cluster tree needs the communities; GPU only.
         log("Hierarchical bundling is GPU-only, baking straight edges")
         return generate_straight_edge(p0, p1, segments)
 

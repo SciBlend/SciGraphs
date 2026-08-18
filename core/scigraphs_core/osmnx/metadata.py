@@ -34,12 +34,8 @@ def get_graph_extent(G):
 
 
 def estimate_network_area(G):
-    """Area of the convex hull of the nodes, in square kilometers.
-
-    An unprojected graph is reprojected into the UTM zone under its centroid.
-    Without pyproj the fallback scales the bounding box by degrees-to-km at the
-    mid latitude, then keeps 70 percent of it as a stand-in for the hull.
-    """
+    """Convex-hull area of the nodes in km2, via the UTM zone under the centroid;
+    without pyproj, 70 percent of the degrees-to-km bounding box stands in."""
     if G is None:
         return None
     

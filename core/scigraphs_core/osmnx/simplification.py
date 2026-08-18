@@ -4,11 +4,8 @@ from .get_osmnx import get_osmnx
 
 def simplify_graph(G, node_attrs_include=None, strict=True, remove_rings=True, track_merged=False):
     """Drop degree-2 nodes, merging their two edges into one that keeps the geometry.
-
-    Which keywords OSMnx accepts moves between releases, so the installed
-    signature is inspected and only the supported ones are passed through.
-    ``strict`` is one of the casualties.
-    """
+    Which keywords OSMnx accepts moves between releases, so the installed signature
+    is inspected and only supported ones passed; ``strict`` is one casualty."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")
@@ -54,13 +51,9 @@ def simplify_graph(G, node_attrs_include=None, strict=True, remove_rings=True, t
 
 
 def consolidate_intersections(G, tolerance=10, rebuild_graph=True, dead_ends=False, reconnect_edges=True):
-    """Merge clusters of nodes within tolerance into one node each, so a big
-    junction stops counting as a dozen intersections.
-
-    Project the graph first: tolerance is in meters, and on a lat/lon graph it
-    would be read as degrees. Without rebuild_graph the return is a GeoSeries of
-    the consolidated points rather than a graph.
-    """
+    """Merge clusters of nodes within tolerance into one node each, so a big junction
+    stops counting as a dozen intersections. Project first: tolerance is in meters
+    and a lat/lon graph reads it as degrees. Without rebuild_graph, a GeoSeries."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")

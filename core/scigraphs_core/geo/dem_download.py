@@ -7,7 +7,6 @@ import urllib.error
 from scigraphs_core.logger import log
 
 
-# Available DEM datasets from OpenTopography
 DEM_DATASETS = {
     'SRTMGL1': {
         'name': 'SRTM GL1 (30m)',
@@ -55,11 +54,8 @@ API_KEY_ENV_VAR = "OPENTOPOGRAPHY_API_KEY"
 
 
 def get_api_key(api_key=None):
-    """Normalize an OpenTopography API key, stripped of whitespace.
-
-    Tries the explicit argument, then OPENTOPOGRAPHY_API_KEY. Returns None when
-    neither is set; the caller reports that as "no key configured".
-    """
+    """An OpenTopography API key stripped of whitespace: the explicit argument, then
+    OPENTOPOGRAPHY_API_KEY, then None, which the caller calls "no key configured"."""
     for candidate in (api_key, os.environ.get(API_KEY_ENV_VAR)):
         if candidate and candidate.strip():
             return candidate.strip()
@@ -68,17 +64,9 @@ def get_api_key(api_key=None):
 
 def download_from_opentopography(bounds, dataset='SRTMGL1', output_dir=None, 
                                   api_key=None, progress_callback=None):
-    """Download DEM data from the OpenTopography API.
-
-    Returns the path to the GeoTIFF, or None on any error.
-
-    Args:
-        bounds: 'north', 'south', 'east', 'west' in WGS84 degrees
-        output_dir: None writes to the system temp dir
-        api_key: None falls back to OPENTOPOGRAPHY_API_KEY. The add-on operator
-            passes the preference in; core does not know that preference exists.
-        progress_callback: called with a percentage, 0 to 100
-    """
+    """Download DEM data from the OpenTopography API, returning the GeoTIFF path or
+    None on error. ``bounds`` is north/south/east/west in WGS84 degrees, and
+    ``api_key`` None falls back to OPENTOPOGRAPHY_API_KEY, which core can see."""
     if bounds is None:
         log("Error: No bounds provided")
         return None
@@ -221,12 +209,8 @@ def estimate_download_size(bounds, dataset='SRTMGL1'):
 
 
 def validate_api_key(api_key):
-    """Validate an OpenTopography API key by requesting a tiny tile.
-
-    Returns (is_valid, error_message). is_valid is None when the request could
-    not settle the question, such as a connection failure, so callers can tell
-    "key is bad" apart from "could not check".
-    """
+    """Validate an OpenTopography API key by requesting a tiny tile. is_valid is None
+    when the request could not settle it: "key is bad" is not "could not check"."""
     if not api_key or not api_key.strip():
         return False, "API key is empty"
     

@@ -1,9 +1,7 @@
-# The mesh layer: edge styling, geospatial meshes, node/edge geometry, layouts.
-#
+# Mesh layer; Blender-bound modules live in the add-on as SciGraphs.core.<name>.
 
 
 _LAZY = {
-    # Blender-bound modules live in the add-on, as SciGraphs.core.<name>.
     "edge_styles": ".edge_styles",
     "layout": ".layout",
     "layouts": ".layouts",

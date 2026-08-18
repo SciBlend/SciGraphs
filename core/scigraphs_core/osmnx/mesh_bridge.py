@@ -6,11 +6,9 @@ from collections import defaultdict
 
 
 def _iter_edges_with_data(G):
-    """Yield ``(u, v, data)`` whether G is a multigraph or not.
-
-    OSMnx hands out a MultiDiGraph, but ``to_digraph`` and ``to_undirected``
-    produce graphs where ``G.edges(keys=True)`` raises TypeError.
-    """
+    """Yield ``(u, v, data)`` whether G is a multigraph or not. OSMnx hands out a
+    MultiDiGraph, but ``to_digraph`` and ``to_undirected`` produce graphs where
+    ``G.edges(keys=True)`` raises TypeError."""
     if getattr(G, "is_multigraph", lambda: False)():
         for u, v, _k, data in G.edges(keys=True, data=True):
             yield u, v, data
@@ -21,16 +19,9 @@ def _iter_edges_with_data(G):
 
 def build_edge_mapping(obj):
     """Map each graph edge ``(u, v)`` to its mesh edge indices, keyed both ways.
-
-    One graph edge can span several mesh edges, since curve points sit between
-    the two intersection vertices.
-
-    This reads the ``nodes_data`` and ``edges_data`` strings on the object and
-    has no mesh-native fallback, which is enough: callers arrive through
-    ``get_osmnx_graph``, which returns None unless ``obj["is_osmnx"]`` is set,
-    and the only writer of that flag (``create_osmnx_graph_object``) writes both
-    strings. A mesh-native object cannot get here.
-    """
+    Reads the ``nodes_data`` and ``edges_data`` strings with no mesh-native
+    fallback, which is safe because ``get_osmnx_graph`` returns None unless
+    ``obj["is_osmnx"]`` is set, and the only writer of that flag writes both."""
     mesh = obj.data
     nodes_str = obj.get("nodes_data", "")
     edges_str = obj.get("edges_data", "")
@@ -77,9 +68,7 @@ def build_edge_mapping(obj):
 
 
 def find_mesh_edge_path(mesh_adj, src_vert, tgt_vert, num_intersections):
-    """Mesh-edge path between two intersection vertices, found by breadth-first
-    search that may only pass through non-intersection vertices.
-    """
+    """Mesh-edge path between two intersections, breadth-first via non-intersections."""
     if src_vert == tgt_vert:
         return []
 
@@ -109,9 +98,7 @@ def find_mesh_edge_path(mesh_adj, src_vert, tgt_vert, num_intersections):
 
 
 def transfer_edge_attribute_to_mesh(obj, G, attr_name, mesh_attr_name=None):
-    """Copy a graph edge attribute onto the mesh as an EDGE-domain FLOAT, and
-    return how many mesh edges got a value.
-    """
+    """Copy a graph edge attribute to an EDGE-domain FLOAT; returns edges written."""
     mesh = obj.data
     if mesh_attr_name is None:
         mesh_attr_name = attr_name
@@ -147,9 +134,7 @@ def transfer_edge_attribute_to_mesh(obj, G, attr_name, mesh_attr_name=None):
 
 
 def transfer_node_attribute_to_mesh(obj, G, attr_name, mesh_attr_name=None):
-    """Copy a graph node attribute onto the mesh as a POINT-domain FLOAT, and
-    return how many vertices got a value.
-    """
+    """Copy a graph node attribute to a POINT-domain FLOAT; returns vertices written."""
     mesh = obj.data
     if mesh_attr_name is None:
         mesh_attr_name = attr_name
@@ -186,8 +171,7 @@ def transfer_node_attribute_to_mesh(obj, G, attr_name, mesh_attr_name=None):
 def mark_shortest_path_attributes(obj, path_nodes):
     """Flag the path's geometry with ``on_path`` (POINT, INT) and ``on_path_edge``
     (EDGE, INT). Both names land in the .blend and are looked up by name from
-    notebooks and color-by-attribute calls, so neither can be renamed here alone.
-    """
+    notebooks and color-by-attribute calls, so neither can be renamed here alone."""
     mesh = obj.data
     nodes_str = obj.get("nodes_data", "")
 
@@ -213,7 +197,6 @@ def mark_shortest_path_attributes(obj, path_nodes):
         path_edges.add((u, v))
         path_edges.add((v, u))
 
-    # -- point attribute --
     attr_name_point = "on_path"
     if attr_name_point in mesh.attributes:
         mesh.attributes.remove(mesh.attributes[attr_name_point])
@@ -242,7 +225,6 @@ def mark_shortest_path_attributes(obj, path_nodes):
 
     point_attr.data.foreach_set("value", point_values)
 
-    # -- edge attribute --
     attr_name_edge = "on_path_edge"
     if attr_name_edge in mesh.attributes:
         mesh.attributes.remove(mesh.attributes[attr_name_edge])

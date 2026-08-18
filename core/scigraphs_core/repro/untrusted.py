@@ -1,13 +1,7 @@
-# Bounds on a pipeline spec from an untrusted source (model, drop, email).
-# Four passes: sanitize, normalize, describe_effects, check_semantics.
-
-"""What a generated specification is allowed to contain.
-
-A spec is not inert: the executor runs it. Strip unbounded parts before a
-human approves. ``ops`` is arbitrary Blender operators; ``connection_string``
-(and related SQL fields) carry credentials. Paths and place names stay —
-inspectable in the panel as absolute resolved values.
-"""
+"""Bounds on a pipeline spec from an untrusted source (model, drop, email). A spec
+is not inert, the executor runs it, so unbounded parts go before a human approves:
+``ops`` is arbitrary operators, ``connection_string`` and its SQL siblings carry
+credentials. Paths and place names stay."""
 
 import copy
 import os
@@ -28,8 +22,6 @@ EFFECT_FIELDS = (
 
 
 class SafetyReport:
-    """What was removed, and what the spec would touch if it runs."""
-
     def __init__(self):
         self.removed = []
         self.effects = []
@@ -43,10 +35,7 @@ class SafetyReport:
 
 
 def sanitize(spec):
-    """Copy with unbounded parts stripped, plus a report.
-
-    Strip rather than reject: keep a useful spec that also invented ``ops``.
-    """
+    """Copy with unbounded parts stripped, plus a report; strip rather than reject."""
     report = SafetyReport()
     if not isinstance(spec, dict):
         return {}, report
@@ -123,10 +112,7 @@ POSITIONED_SOURCES = ("osmnx", "city2graph")
 
 
 def normalize(spec):
-    """Drop inapplicable fields and common model mistakes.
-
-    Returns (clean, notes).
-    """
+    """Drop inapplicable fields and common model mistakes. Returns (clean, notes)."""
     notes = []
     if not isinstance(spec, dict):
         return {}, notes
@@ -199,7 +185,6 @@ def check_semantics(spec):
     if source == "suitesparse" and not dataset.get("matrix_name"):
         problems.append("dataset.matrix_name is empty; nothing to download")
 
-    # max_distance is camera distance, not "label N nodes".
     labels = spec.get("labels") or {}
     if labels.get("max_distance") and not labels.get("max_count"):
         problems.append(

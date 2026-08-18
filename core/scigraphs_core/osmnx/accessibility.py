@@ -1,19 +1,12 @@
 """Accessibility analysis: isochrones, ego subgraphs and clustering by network
-distance. Everything here takes an OSMnx MultiDiGraph already in memory.
-"""
+distance. Everything here takes an OSMnx MultiDiGraph already in memory."""
 
 from scigraphs_core.logger import log
 
 
-# --- Travel-time attribute injection ---
-
 def add_travel_time_from_speed(G, travel_speed_kph):
-    """Give every edge a ``travel_time`` in seconds at one uniform speed.
-
-    For walking and cycling isochrones, where the edges carry a length and
-    nothing else. Existing travel times are left alone; the return is a count of
-    edges filled in.
-    """
+    """A ``travel_time`` in seconds per edge at one uniform speed, for walking and
+    cycling isochrones. Existing travel times are left alone; returns the count."""
     if G is None:
         return 0
     meters_per_minute = travel_speed_kph * 1000.0 / 60.0
@@ -29,12 +22,8 @@ def add_travel_time_from_speed(G, travel_speed_kph):
     return updated
 
 
-# --- Ego-graph truncation ---
-
 def ego_subgraph(G, center_node, radius, distance_attr="length"):
-    """Subgraph of everything within ``radius`` of ``center_node``, by hops if
-    ``distance_attr`` is None.
-    """
+    """Subgraph within ``radius`` of ``center_node``, by hops if distance_attr None."""
     try:
         import networkx as nx
         sub = nx.ego_graph(G, center_node, radius=radius, distance=distance_attr)
@@ -43,8 +32,6 @@ def ego_subgraph(G, center_node, radius, distance_attr="length"):
         log(f"Error building ego subgraph: {e}")
         return None
 
-
-# --- Isochrones ---
 
 def make_iso_polygons(
     G,
@@ -55,14 +42,9 @@ def make_iso_polygons(
     buffer_m=25.0,
 ):
     """Concentric isochrone polygons around ``center_node``, one per threshold in
-    ``trip_times_minutes``.
-
-    Edges with no ``travel_time`` get one imputed from their length at
-    ``travel_speed_kph``, which defaults to a walking pace. 'CONVEX_HULL' is the
-    fast mode and 'BUFFER_UNION' the accurate one. Returns
-    ``[{"time": t, "polygon": poly_or_None}, ...]`` largest first, so they stack
-    correctly when drawn in order.
-    """
+    ``trip_times_minutes``. Edges with no ``travel_time`` get one imputed from their
+    length at ``travel_speed_kph``; 'CONVEX_HULL' is the fast mode, 'BUFFER_UNION'
+    the accurate one. Largest first, so drawing them in order stacks correctly."""
     import networkx as nx
 
     if G is None or center_node is None or not trip_times_minutes:
@@ -162,16 +144,10 @@ def make_iso_polygons(
     return results
 
 
-# --- Network-constrained DBSCAN ---
-
 def network_dbscan(G, eps_meters=500.0, min_samples=5, weight="length"):
-    """DBSCAN over network distance between nodes, not straight-line distance.
-
-    Feeds scikit-learn a precomputed matrix from ``all_pairs_dijkstra_path_length``,
-    so memory is O(n^2) and large graphs will not fit. eps_meters is the
-    neighborhood radius along ``weight``. Returns ``{node_id: cluster_label}``,
-    where -1 means noise.
-    """
+    """DBSCAN over network distance, not straight-line. Feeds scikit-learn a
+    precomputed all-pairs Dijkstra matrix, so memory is O(n^2) and big graphs
+    will not fit; label -1 means noise."""
     try:
         import networkx as nx
         import numpy as np
@@ -190,7 +166,6 @@ def network_dbscan(G, eps_meters=500.0, min_samples=5, weight="length"):
 
     idx = {node: i for i, node in enumerate(nodes)}
 
-    # Dense n-by-n distance matrix.
     INF = float("inf")
     dist = np.full((n, n), INF, dtype=np.float32)
     try:

@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class EnvironmentInfo:
-    """Captured environment information."""
     platform: str
     platform_version: str
     python_version: str
@@ -29,14 +28,12 @@ class EnvironmentInfo:
 
 @dataclass
 class DependencyInfo:
-    """Package dependency information."""
     name: str
     version: str
 
 
 @dataclass
 class ArtifactInfo:
-    """Information about a generated artifact."""
     path: str
     hash: str
     size: int
@@ -45,7 +42,6 @@ class ArtifactInfo:
 
 @dataclass
 class InputInfo:
-    """Information about an input file/resource."""
     path: str
     hash: Optional[str]
     source: str  # 'file', 'network', 'cache'
@@ -54,7 +50,6 @@ class InputInfo:
 
 @dataclass
 class StepInfo:
-    """Information about an execution step."""
     name: str
     operator: str
     start_time: str
@@ -66,7 +61,6 @@ class StepInfo:
 
 @dataclass
 class ProvenanceManifest:
-    """Complete provenance manifest for a pipeline run."""
     pipeline_hash: str
     pipeline_title: str
     seed: int
@@ -86,21 +80,14 @@ class ProvenanceManifest:
     output_dir: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
 
 def _detect_blender_version() -> str:
-    """Return the host Blender's version, or "unknown" outside Blender.
-
-    Reads sys.modules instead of importing bpy, so this module stays importable
-    from a notebook or a test process. Inside Blender the answer is the same,
-    since bpy is already imported before any add-on code runs.
-
-    A plain python3 process with the bpy PyPI wheel installed but not imported
-    gets "unknown". That wheel is not the Blender that ran the pipeline, and
-    recording its version would make the manifest claim something untrue.
-    """
+    """The host Blender's version, or "unknown" outside Blender. Reads sys.modules
+    instead of importing bpy, so this module stays importable from a notebook; a
+    process holding an unimported bpy PyPI wheel gets "unknown", because that wheel
+    is not the Blender that ran the pipeline."""
     bpy = sys.modules.get("bpy")
     app = getattr(bpy, "app", None)
     version = getattr(app, "version", None)
@@ -146,17 +133,13 @@ _CRITICAL_DISTRIBUTIONS = (
 
 
 def _get_dependency_versions() -> List[DependencyInfo]:
-    """Resolve versions of the distributions this process actually imported.
-
-    Keeps the installed distributions backing a top-level module already in
+    """Versions of the distributions backing a top-level module already in
     sys.modules, so the manifest records what the run used rather than a fixed
-    list. _CRITICAL_DISTRIBUTIONS are always included when installed.
-    """
+    list, plus _CRITICAL_DISTRIBUTIONS whenever installed."""
     import importlib.metadata as importlib_metadata
 
     versions: Dict[str, str] = {}
 
-    # dist name -> version, for everything visible to this interpreter.
     installed: Dict[str, str] = {}
     try:
         for dist in importlib_metadata.distributions():
@@ -167,7 +150,6 @@ def _get_dependency_versions() -> List[DependencyInfo]:
     except Exception:
         pass
 
-    # top-level module name -> [distribution names].
     try:
         module_map = importlib_metadata.packages_distributions()
     except Exception:
@@ -200,7 +182,6 @@ def _get_libc_version() -> str:
 
 
 def compute_file_hash(filepath: str) -> str:
-    """Compute SHA256 hash of a file."""
     hasher = hashlib.sha256()
     with open(filepath, 'rb') as f:
         for chunk in iter(lambda: f.read(8192), b''):
@@ -209,11 +190,7 @@ def compute_file_hash(filepath: str) -> str:
 
 
 def get_environment_info(blender_version: Optional[str] = None) -> EnvironmentInfo:
-    """Capture current environment information.
-
-    blender_version comes from the Blender-side caller, for example "5.2.0".
-    None reads it off the host interpreter instead.
-    """
+    """Capture the environment; blender_version None reads it off this interpreter."""
     import socket
     if blender_version is None:
         blender_version = _detect_blender_version()
@@ -236,11 +213,7 @@ def create_manifest(
     seed: int,
     blender_version: Optional[str] = None,
 ) -> ProvenanceManifest:
-    """Create a provenance manifest for a pipeline run.
-
-    blender_version is supplied by the caller that has one. None falls back to
-    _detect_blender_version.
-    """
+    """Create a provenance manifest; blender_version None uses _detect_blender_version."""
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     return ProvenanceManifest(
         pipeline_hash=pipeline_hash,
@@ -264,11 +237,7 @@ def add_input(
     source: str = "file",
     pinned: bool = True,
 ) -> None:
-    """Record an input file or resource.
-
-    source is 'file', 'network' or 'cache'. pinned means the data is frozen and
-    so reproducible.
-    """
+    """Record an input; source is 'file', 'network' or 'cache', pinned means frozen."""
     file_hash = None
     if os.path.isfile(path):
         try:
@@ -289,10 +258,7 @@ def add_output(
     path: str,
     artifact_type: str = "file",
 ) -> None:
-    """Record an output artifact, hashed and sized.
-
-    artifact_type is free text such as 'render', 'export' or 'blend'.
-    """
+    """Record an output artifact, hashed and sized; artifact_type is free text."""
     if not os.path.isfile(path):
         return
 
@@ -316,11 +282,9 @@ def add_step(
     status: str = "success",
     error: Optional[str] = None,
 ) -> None:
-    """Record one execution step, with its duration in milliseconds.
-
-    operator is the Blender operator's bl_idname. status is 'success', 'error'
-    or 'skipped'; error carries the message when it is 'error'.
-    """
+    """Record one execution step, with its duration in milliseconds. operator is
+    the Blender operator's bl_idname; status is 'success', 'error' or 'skipped',
+    and error carries the message when it is 'error'."""
     duration_ms = int((end_time - start_time).total_seconds() * 1000)
     manifest.steps.append(StepInfo(
         name=name,
@@ -338,9 +302,9 @@ def finalize_manifest(
     success: bool,
 ) -> None:
     """Close out a manifest after execution: timings, success, dependencies."""
-    # Re-read the dependencies. Layout and analysis backends load lazily, so the
-    # list taken at create_manifest() time misses exactly the native libraries
-    # whose build decides the result.
+    # Layout and analysis backends load lazily, so the list taken at
+    # create_manifest() time misses the native libraries whose build decides
+    # the result.
     manifest.dependencies = _get_dependency_versions()
 
     started = datetime.datetime.fromisoformat(manifest.started_at)
@@ -352,7 +316,6 @@ def finalize_manifest(
 
 
 def save_manifest(manifest: ProvenanceManifest, filepath: str) -> None:
-    """Write a manifest to a JSON file."""
     os.makedirs(os.path.dirname(filepath) or '.', exist_ok=True)
 
     with open(filepath, 'w', encoding='utf-8') as f:
@@ -360,7 +323,6 @@ def save_manifest(manifest: ProvenanceManifest, filepath: str) -> None:
 
 
 def load_manifest(filepath: str) -> ProvenanceManifest:
-    """Read a manifest back from a JSON file."""
     with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -393,11 +355,9 @@ def compare_manifests(
     manifest1: ProvenanceManifest,
     manifest2: ProvenanceManifest,
 ) -> Dict[str, Any]:
-    """Compare two manifests and report whether the run reproduced.
-
-    The report flags pipeline, seed and environment equality, lists per-path
-    input and output differences, and sets "reproducible" when nothing differs.
-    """
+    """Compare two manifests and report whether the run reproduced. The report
+    flags pipeline, seed and environment equality, lists per-path input and output
+    differences, and sets "reproducible" when nothing differs."""
     report = {
         "same_pipeline": manifest1.pipeline_hash == manifest2.pipeline_hash,
         "same_seed": manifest1.seed == manifest2.seed,

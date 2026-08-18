@@ -1,6 +1,5 @@
-# Bridge between graph data and Blender mesh objects: reading topology off an
-# object, expanding per-node values over the curve vertices OSMnx meshes carry,
-# and reading or writing point attributes.
+# Bridge between graph data and Blender mesh objects: reading topology, spreading
+# per-node values over the curve vertices OSMnx meshes carry, point attributes.
 
 import json
 
@@ -9,15 +8,9 @@ from ..algorithms.graph import GraphData
 
 
 def mesh_edge_pairs(obj, num_nodes):
-    """Read ``[v0, v1]`` index pairs straight from the mesh.
-
-    Graph objects store topology one of two ways: in the
-    ``nodes_data``/``edges_data`` name strings, or, for mesh-native objects like
-    everything ``scripts/showcase/build_showcase.py`` writes, in ``mesh.edges``
-    with only ``num_nodes``/``num_edges`` as properties. This reads the second.
-    Node vertices occupy indices ``0..num_nodes-1``, so an edge touching a higher
-    index is edge-style curve geometry and gets dropped.
-    """
+    """Read ``[v0, v1]`` index pairs from the mesh, where mesh-native objects
+    keep topology rather than in ``nodes_data``/``edges_data``. Node vertices
+    occupy ``0..num_nodes-1``; a higher index is curve geometry and is dropped."""
     mesh = getattr(obj, "data", None)
     if mesh is None or not hasattr(mesh, "edges") or len(mesh.edges) == 0:
         return []
@@ -30,16 +23,10 @@ def mesh_edge_pairs(obj, num_nodes):
 
 
 def layout_edge_pairs(obj):
-    """``mesh_edge_pairs`` for a caller about to run a layout.
-
-    Nothing under ``core/mesh/layouts/`` may call ``mesh_edge_pairs`` directly:
-    it duck-types a Blender datablock (``obj.data.edges.foreach_get`` exists
-    nowhere else), which keeps any module that calls it out of the Blender-free
-    wheel however clean its import list looks. Operators call this instead and
-    pass the result down as ``edge_pairs``. Returns ``[]`` for a non-graph
-    object, which ``_build_networkx_graph`` reads as "looked, found none" rather
-    than "nobody looked".
-    """
+    """``mesh_edge_pairs`` for a caller about to run a layout. Nothing under
+    ``core/mesh/layouts/`` may call ``mesh_edge_pairs`` directly: it duck-types a
+    Blender datablock, which keeps its callers out of the Blender-free wheel.
+    Returns ``[]`` for a non-graph object, read as "looked, found none"."""
     try:
         num_nodes = int(obj.get("num_nodes", 0) or 0)
     except (AttributeError, TypeError, ValueError):
@@ -50,13 +37,10 @@ def layout_edge_pairs(obj):
 
 
 def resolve_node_labels(obj, num_nodes):
-    """Node identifiers in vertex order for an object with no ``nodes_data``.
-
-    Mesh-native objects keep their names in a ``node_names`` JSON list. Falls
-    back to stringified vertex indices when that property is missing,
-    unparseable, the wrong length, or has duplicates: :class:`GraphData` keys
-    lookups by node identity, so repeated labels would silently merge nodes.
-    """
+    """Node identifiers in vertex order for an object with no ``nodes_data``,
+    read from a ``node_names`` JSON list. Falls back to stringified vertex
+    indices when that is missing, unparseable, the wrong length or duplicated,
+    since repeated labels would silently merge nodes in :class:`GraphData`."""
     raw = obj.get("node_names")
     if raw:
         try:
@@ -70,10 +54,8 @@ def resolve_node_labels(obj, num_nodes):
 
 
 def _mesh_native_topology(obj, nodes_list):
-    """``(nodes, edges)`` for an object whose edges live in the mesh, not in
-    ``edges_data``. Edges use the same identifiers as *nodes* so callers can
-    still go through :attr:`GraphData.node_to_index`.
-    """
+    """``(nodes, edges)`` for an object whose edges live in the mesh. Edges use
+    the same identifiers as *nodes*, so :attr:`GraphData.node_to_index` works."""
     num_nodes = obj.get("num_nodes")
     if num_nodes is None:
         mesh = getattr(obj, "data", None)
@@ -105,11 +87,8 @@ def parse_graph_data(obj):
 
 
 def parse_graph_data_filtered(obj):
-    """Parse graph topology, keeping only the real nodes.
-
-    In an OSMnx mesh only vertices with ``is_intersection == 1`` are network
-    nodes; the rest are curve interpolation points.
-    """
+    """Parse graph topology keeping only the real nodes: in an OSMnx mesh only
+    vertices with ``is_intersection == 1`` are network nodes."""
     mesh = obj.data
 
     nodes_str = obj.get("nodes_data", "")
@@ -124,8 +103,7 @@ def parse_graph_data_filtered(obj):
         nodes_list, edges_list = _mesh_native_topology(obj, nodes_list)
         return GraphData(nodes=nodes_list, edges=edges_list)
     else:
-        # OSMnx mesh with no stored edges. Its real nodes are not the first
-        # num_nodes vertices, so mesh edges cannot be mapped back safely.
+        # OSMnx: real nodes are not the first num_nodes vertices, so no map.
         edges_list = []
 
     if "is_intersection" in mesh.attributes:
@@ -146,12 +124,9 @@ def parse_graph_data_filtered(obj):
 
 
 def expand_node_values_to_mesh(obj, node_values, default_value=0.0):
-    """Spread per-node values over every mesh vertex.
-
-    OSMnx meshes carry curve-point vertices on top of the real nodes, so each
-    node value lands on its intersection vertex and the rest get
-    *default_value*. Numpy arrays and scalars are converted to Python types.
-    """
+    """Spread per-node values over every mesh vertex. OSMnx meshes carry
+    curve-point vertices on top of the real nodes, so each node value lands on
+    its intersection vertex and the rest get *default_value*."""
     mesh = obj.data
     num_mesh_verts = len(mesh.vertices)
 
@@ -203,9 +178,8 @@ def get_vertex_positions(obj):
 
 
 def collect_mesh_attributes(obj):
-    """Numeric point-domain attributes as ``{name: values}``, or ``None`` if there
-    are none. Color attributes are flattened to the mean of their RGB channels.
-    """
+    """Numeric point-domain attributes as ``{name: values}``, or ``None``. Color
+    attributes flatten to the mean of their RGB channels."""
     mesh = obj.data
     attributes = {}
 
@@ -228,12 +202,8 @@ def collect_mesh_attributes(obj):
 
 def create_or_update_attribute(mesh, name, attr_type, values, obj=None):
     """Create or replace a point attribute, fitting *values* to the vertex count.
-
-    attr_type is ``'FLOAT'`` or ``'INT'``. Short value lists are padded with
-    zero, long ones truncated. Pass *obj* to run the values through
-    :func:`expand_node_values_to_mesh` first, which is what you want when they
-    are per graph node rather than per vertex.
-    """
+    ``attr_type`` is 'FLOAT' or 'INT'; short lists pad with zero, long ones
+    truncate. Pass *obj* to expand per-node values to per-vertex first."""
     if obj is not None:
         values = expand_node_values_to_mesh(obj, values)
 

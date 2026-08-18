@@ -1,9 +1,7 @@
 # Reading graphs in and writing them out: files, databases, SuiteSparse.
-#
 
 _LAZY = {
-    # Blender-bound modules stayed with the add-on; reach them from that side
-    # as SciGraphs.core.<name>.
+    # Blender-bound modules stayed with the add-on, as SciGraphs.core.<name>.
     "db_connector": ".db_connector",
     "export_utils": ".export_utils",
     "sql_importer": ".sql_importer",

@@ -3,10 +3,7 @@ from .get_osmnx import get_osmnx
 
 
 def get_basic_stats(G, area_km2=None):
-    """Basic network statistics, renamed from OSMnx's abbreviations into full words.
-
-    Pass area_km2 to also get node, edge and street densities.
-    """
+    """Basic network statistics in full words; area_km2 also gives the densities."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -42,12 +39,9 @@ def get_basic_stats(G, area_km2=None):
 
 
 def get_bearing_distribution(G, num_bins=36):
-    """Histogram of edge bearings, with its entropy and its dominant directions.
-
-    num_bins splits 360 degrees, so the default 36 gives 10-degree bins. A bin
-    counts as dominant when it holds more than 1.5 times the mean bin count.
-    Returns None when no edge carries a bearing.
-    """
+    """Histogram of edge bearings, with its entropy and dominant directions. num_bins
+    splits 360 degrees, so the default 36 gives 10-degree bins, and a bin counts as
+    dominant above 1.5 times the mean. None when no edge carries a bearing."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -127,11 +121,8 @@ def get_elevation_stats(G):
 
 
 def get_grade_stats(G):
-    """Summary statistics over edge grades, or None if no edge carries one.
-
-    Where 'grade_abs' is present this also reports the share of edges steeper
-    than 5 percent and than 10 percent.
-    """
+    """Summary statistics over edge grades, or None if no edge carries one; with
+    'grade_abs', also the share of edges steeper than 5 and than 10 percent."""
     if G is None:
         return None
     

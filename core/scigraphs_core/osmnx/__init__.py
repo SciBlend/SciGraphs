@@ -1,24 +1,14 @@
 # OSMnx: street networks, projection, routing, elevation, stats.
 #
-# Flat public API on purpose so callers need not know which submodule owns a
-# name. Everything is lazy except get_osmnx (see below): importing one name
-# must not pull osmnx/geopandas/networkx/shapely for the whole package.
-#
-# _LAZY: attribute is the submodule.
-# _LAZY_SYMBOLS: attribute is getattr(module, name). Plain strings (not
-# (module, attr) pairs) so the purity test sees every edge; every target also
-# appears in _LAZY. Names keep the spelling they have in their own module.
-#
-# get_osmnx is eager: it is both a module and a function in that module, and
-# `from .get_osmnx import get_osmnx` must win. Seventeen modules open with that
-# import; the first would overwrite a __getattr__ cache with the submodule.
-# Cheap (logger only; third-party osmnx loads inside the function).
-#
-# centrality is in _LAZY for UI operators that bind it on the parent; cache is
-# not (callers import the submodule directly). __all__ omits the accessibility
-# re-exports: star-import is not the same set as attributes this package answers.
+# Flat public API on purpose, and lazy: importing one name must not pull
+# osmnx/geopandas/networkx/shapely for the whole package. _LAZY maps an attribute
+# to its submodule, _LAZY_SYMBOLS to the module its getattr comes from; both hold
+# plain strings, not (module, attr) pairs, so the purity test sees every edge.
+# get_osmnx is the one eager import, because it is both a module and a function in
+# it, and the seventeen modules opening `from .get_osmnx import get_osmnx` would
+# otherwise overwrite the __getattr__ cache with the submodule.
 
-from .get_osmnx import get_osmnx        # noqa: F401  (eager, see above)
+from .get_osmnx import get_osmnx        # noqa: F401
 
 _LAZY = {
     "accessibility": ".accessibility",
@@ -143,7 +133,6 @@ def __getattr__(name):
             raise AttributeError(
                 f"module {__name__!r} has no attribute {name!r}")
         module = importlib.import_module(target, __name__)
-        # Name in the table but missing from the module = stale table.
         try:
             value = getattr(module, name)
         except AttributeError:

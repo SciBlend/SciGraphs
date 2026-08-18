@@ -9,23 +9,13 @@ def apply_network_splitter_3d(obj, criterion='COMMUNITY', attribute=None,
                                preserve_xy=True, center_layers=False,
                                scale_by_size=False, base_z=0.0,
                                edge_pairs=None):
-    """Stack an existing layout into Z-layers, returning
-    ``(success, num_layers, layer_info)``.
-
-    *criterion* is 'COMMUNITY', 'ATTRIBUTE', 'DEGREE', 'COMPONENT' or
-    'CENTRALITY'. *layer_order* is 'SIZE_ASC', 'SIZE_DESC', 'VALUE_ASC',
-    'VALUE_DESC' or 'ALPHA'. *community_algorithm* picks among pySurprise's
-    'CPM', 'INFOMAP', 'RB', 'RN', 'RNSC', 'SCLUSTER' and 'UVCLUSTER'.
-
-    *edge_pairs* carries the topology of a mesh-native graph object, which keeps
-    its edges in ``mesh.edges`` rather than in an ``edges_data`` string; this
-    package never reads meshes, so the caller passes
-    ``mesh_utils.mesh_edge_pairs(obj, obj["num_nodes"])``. Getting it wrong
-    matters more here than anywhere else in the package: COMMUNITY, DEGREE,
-    COMPONENT and CENTRALITY are all functions of the edges, and on an edgeless
-    graph every one of them degrades to a single component of n singletons,
-    which looks like an answer and is not.
-    """
+    """Stack an existing layout into Z-layers, as ``(success, num_layers,
+    layer_info)``. *criterion*: 'COMMUNITY', 'ATTRIBUTE', 'DEGREE', 'COMPONENT',
+    'CENTRALITY'. *layer_order*: 'SIZE_ASC', 'SIZE_DESC', 'VALUE_ASC',
+    'VALUE_DESC', 'ALPHA'. *community_algorithm*: 'CPM', 'INFOMAP', 'RB', 'RN',
+    'RNSC', 'SCLUSTER', 'UVCLUSTER'. *edge_pairs* carries a mesh-native object's
+    topology; every criterion but ATTRIBUTE is a function of the edges, so an
+    edgeless graph degrades to n singletons that look like an answer."""
     import time
     start_time = time.time()
 
@@ -177,11 +167,9 @@ def _split_by_community(G, algorithm='RN', resolution=1.0):
             pass
 
         if pysurprise_ok:
-            # Three dots, not two. This module is
+            # Three dots, not two: this module is
             # SciGraphs.core.mesh.layouts.splitter, so `..` lands on
-            # SciGraphs.core.mesh, which has no `algorithms`. Two dots made this
-            # branch raise ImportError whenever pySurprise was installed, which
-            # is the only time it runs.
+            # SciGraphs.core.mesh, which has no `algorithms`.
             from ...algorithms.analysis import _ensure_pysurprise_bin_permissions
             _ensure_pysurprise_bin_permissions(ps_algo._PKG_BIN_DIR)
             algo_key = algorithm.lower()
@@ -206,8 +194,7 @@ def _split_by_community(G, algorithm='RN', resolution=1.0):
                     if 0 <= idx < num_nodes:
                         layer_assignments[idx] = comm_id
 
-                # pySurprise hands back arbitrary community IDs; layer ordering
-                # below needs them contiguous from 0.
+                # pySurprise IDs are arbitrary; layer ordering needs 0-based.
                 unique_ids = sorted(set(layer_assignments))
                 remap = {old: new for new, old in enumerate(unique_ids)}
                 layer_assignments = [remap[c] for c in layer_assignments]
@@ -233,7 +220,6 @@ def _split_by_community(G, algorithm='RN', resolution=1.0):
         return None, {}
 
 def _split_by_attribute(obj, attribute):
-    """Bin nodes by the values of a mesh attribute."""
     if not attribute or attribute == 'NONE':
         print("Network Splitter: No attribute specified")
         return None, {}
@@ -278,7 +264,6 @@ def _split_by_attribute(obj, attribute):
     return layer_assignments, layer_names
 
 def _split_by_degree(G, num_bins=3):
-    """Bin nodes into *num_bins* degree ranges."""
     degrees = dict(G.degree())
     degree_values = [degrees[n] for n in range(len(G.nodes()))]
 
@@ -329,9 +314,7 @@ def _split_by_component(G):
     return layer_assignments, layer_names
 
 def _split_by_centrality(G, num_bins=3, method='betweenness'):
-    """Bin nodes into *num_bins* centrality ranges, betweenness where possible
-    and degree centrality when that fails.
-    """
+    """Bin nodes into *num_bins* centrality ranges, betweenness or degree."""
     try:
         centrality = nx.betweenness_centrality(G)
     except:

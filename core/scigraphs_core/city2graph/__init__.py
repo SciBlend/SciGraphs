@@ -1,21 +1,13 @@
-# city2graph: graphs built out of urban data, including streets, buildings,
-# GTFS feeds, Overture extracts and metapaths.
-#
-# Nothing is imported eagerly; `scigraphs_core/__init__.py` holds the
-# lazy-attribute contract. With bpy blocked, seven names here import: the
-# package itself, the four modules below, and area_resolver and proximity,
-# whose bpy sits inside a function.
-#
-# `overture_api` belongs in the table even though nothing here imports it
-# directly. It has always been reachable as an attribute of this package, bound
-# as a side effect of importing `data`, and that surface must not shrink now
-# that `data` is not imported on the way in. `area_resolver` is deliberately
-# absent: callers spell it `from ..core.city2graph.area_resolver import ...`,
-# which resolves as a submodule with no help from this file.
+# city2graph: graphs built out of urban data, including streets, buildings, GTFS
+# feeds, Overture extracts and metapaths. Nothing is imported eagerly;
+# `scigraphs_core/__init__.py` holds the lazy-attribute contract. `overture_api`
+# belongs in the table although nothing here imports it: it has always been
+# reachable as an attribute of this package, and that surface must not shrink.
+# `area_resolver` is deliberately absent, because callers spell it
+# `from ..core.city2graph.area_resolver import ...`, which needs no help here.
 
 _LAZY = {
-    # Blender-bound modules stayed with the add-on; reach them from that side
-    # as SciGraphs.core.<name>.
+    # Blender-bound modules stayed with the add-on, as SciGraphs.core.<name>.
     "get_c2g": ".get_c2g",
     "metapaths": ".metapaths",
     "mobility": ".mobility",

@@ -10,11 +10,8 @@ from .hierarchical import *
 from .yifan_hu import *
 
 def _compute_layout_for_algorithm(G, num_nodes, algorithm, scale, props=None):
-    """Full layout for one algorithm, as an (num_nodes, 3) array.
-
-    *props* supplies the algorithm-specific parameters; without it every
-    algorithm runs on its own defaults.
-    """
+    """Full layout for one algorithm, as an (num_nodes, 3) array. *props*
+    supplies algorithm-specific parameters; without it each uses its defaults."""
     iterations = 50
 
     if algorithm == 'FORCEATLAS2':
@@ -33,8 +30,7 @@ def _compute_layout_for_algorithm(G, num_nodes, algorithm, scale, props=None):
         return _forceatlas2_layout(G, iterations, scale)
 
     elif algorithm == 'IGRAPH_FR':
-        # The configured FR parameters are deliberately not passed: igraph only
-        # accepts them alongside a seed, which is the interactive path.
+        # FR parameters are not passed: igraph accepts them only with a seed.
         return _igraph_fruchterman_reingold(G, iterations, scale)
 
     elif algorithm == 'IGRAPH_KK':
@@ -169,11 +165,8 @@ def execute_layout_iteration(obj, algorithm='SPRING_3D', scale=5.0, current_fram
                             cooling=0.95, initial_temp=1.0, edge_dist=1.0,
                             auto_stop=0.0, props=None, edge_pairs=None):
     """Run one step of a layout, Gephi-style, returning ``(success, energy)``.
-
-    *edge_pairs* is as in :func:`dispatcher.apply_graph_layout`. The modal
-    operator recomputes it each iteration, costing one array read against a mesh
-    it is about to rebuild anyway.
-    """
+    *edge_pairs* is as in :func:`dispatcher.apply_graph_layout`; the modal
+    operator recomputes it each iteration, which costs one array read."""
     start_time = time.time()
 
     G, num_nodes = _build_networkx_graph(obj, edge_pairs)
@@ -211,8 +204,7 @@ def execute_layout_iteration(obj, algorithm='SPRING_3D', scale=5.0, current_fram
                        'GRAPHVIZ_FDP', 'GRAPHVIZ_SFDP', 'GRAPHVIZ_TWOPI',
                        'GRAPHVIZ_CIRCO', 'GRAPHVIZ_OSAGE',
                        'GRAPHVIZ_PATCHWORK', 'SPECTRAL_3D', 'MDS_3D']:
-        # None of these can be stepped: they compute a whole layout at once. So
-        # solve once and ease the nodes toward the answer over 50 frames.
+        # Not steppable: solve once, then ease toward the answer over 50 frames.
         if iteration == 0:
             final_pos = _compute_layout_for_algorithm(G, num_nodes, algorithm, scale, props)
 
@@ -236,8 +228,7 @@ def execute_layout_iteration(obj, algorithm='SPRING_3D', scale=5.0, current_fram
             return False, energy
 
     else:
-        # Static layouts (grid, random, sphere, circle packing and friends): one
-        # shot on the first iteration, then nothing left to do.
+        # Static layouts: one shot on the first iteration, nothing after.
         if iteration == 0:
             new_pos = _compute_static_layout(G, algorithm, num_nodes, scale, obj=obj)
             energy = 0.0
@@ -296,15 +287,13 @@ def _spring_iteration_advanced(G, current_pos, algorithm, scale, iteration,
                               repulsion_strength=1.0, attraction_strength=1.0,
                               gravity_strength=0.1, cooling_factor=0.95,
                               initial_temperature=1.0, edge_distance=1.0):
-    """One step of a spring layout, returning ``(new_positions, total_energy)``.
-
-    An interpreted double loop over all node pairs, so it is only viable to a
-    couple of thousand nodes. :mod:`simulation` is the vectorized replacement.
-    """
+    """One step of a spring layout, as ``(new_positions, total_energy)``. An
+    interpreted double loop over all node pairs, so it is viable only to a few
+    thousand nodes; :mod:`simulation` is the vectorized replacement."""
     num_nodes = len(G.nodes())
     new_pos = current_pos.copy()
 
-    k = edge_distance * scale / np.sqrt(num_nodes)  # Optimal distance
+    k = edge_distance * scale / np.sqrt(num_nodes)
 
     temperature = initial_temperature * (cooling_factor ** iteration)
 
@@ -352,11 +341,8 @@ def _spring_iteration_advanced(G, current_pos, algorithm, scale, iteration,
     return new_pos, total_energy
 
 def _compute_static_layout(G, algorithm, num_nodes, scale, obj=None):
-    """Layouts with no iterative form, computed in one shot.
-
-    Pass *obj* for algorithms that produce more than positions: circle packing
-    stores its radii on it.
-    """
+    """Layouts with no iterative form, computed in one shot. Pass *obj* for
+    algorithms producing more than positions: circle packing stores radii on it."""
     if algorithm == 'RANDOM':
         return _random_layout(num_nodes, scale)
     elif algorithm == 'GRID':

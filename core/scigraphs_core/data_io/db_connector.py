@@ -1,5 +1,6 @@
 # One connection interface over PostgreSQL (psycopg), MySQL and MariaDB
-# (mysql-connector-python), SQLite (stdlib) and SQL Server (pymssql).
+# (mysql-connector-python), SQLite (stdlib), SQL Server (pymssql). Every
+# connect_* and query function returns (result, error_message).
 
 import os
 
@@ -49,12 +50,10 @@ except ImportError:
 
 
 def get_available_drivers():
-    """Database type to driver availability, as a copy."""
     return DRIVER_AVAILABLE.copy()
 
 
 def get_driver_status_message():
-    """One line naming which database drivers are installed."""
     messages = []
     for db_type, available in DRIVER_AVAILABLE.items():
         status = "available" if available else "not installed"
@@ -63,17 +62,13 @@ def get_driver_status_message():
 
 
 def get_password_from_profile(profile):
-    """Read a profile's password, from its environment variable if it uses one.
-
-    A missing environment variable yields an empty string, not an error.
-    """
+    """A profile's password, from its environment variable if it uses one, else ""."""
     if profile.use_env_password:
         return os.environ.get(profile.env_password_var, "")
     return profile.password
 
 
 def connect_postgresql(profile):
-    """Connect to PostgreSQL. Returns (connection, error_message)."""
     if not DRIVER_AVAILABLE['POSTGRESQL']:
         return None, "PostgreSQL driver not installed. Install with: pip install psycopg[binary]"
     
@@ -102,7 +97,6 @@ def connect_postgresql(profile):
 
 
 def connect_mysql(profile):
-    """Connect to MySQL or MariaDB. Returns (connection, error_message)."""
     if not DRIVER_AVAILABLE['MYSQL']:
         return None, "MySQL driver not installed. Install with: pip install mysql-connector-python"
     
@@ -128,7 +122,6 @@ def connect_mysql(profile):
 
 
 def connect_sqlite(profile):
-    """Connect to SQLite. Returns (connection, error_message)."""
     db_path = profile.sqlite_path
     
     if not db_path:
@@ -147,7 +140,6 @@ def connect_sqlite(profile):
 
 
 def connect_sqlserver(profile):
-    """Connect to SQL Server. Returns (connection, error_message)."""
     if not DRIVER_AVAILABLE['SQLSERVER']:
         return None, "SQL Server driver not installed. Install with: pip install pymssql"
     
@@ -215,11 +207,8 @@ def test_connection(profile):
 
 
 def execute_query(profile, sql_query):
-    """Run a read-only query. Returns (DataFrame, error_message).
-
-    Anything that is not a bare SELECT is refused, as is any query mentioning a
-    write or grant keyword.
-    """
+    """Run a read-only query. Anything that is not a bare SELECT is refused, as is
+    any query mentioning a write or grant keyword."""
     sql_stripped = sql_query.strip().upper()
     if not sql_stripped.startswith('SELECT'):
         return None, "Only SELECT queries are allowed for security reasons"
@@ -282,10 +271,7 @@ def get_tables(profile):
 
 
 def get_columns(profile, table_name):
-    """List a table's columns as {'name', 'type'} dicts.
-
-    Each backend answers in its own shape, so the rows are unpacked per type.
-    """
+    """A table's columns as {'name', 'type'} dicts, unpacked per backend shape."""
     if profile.db_type == 'POSTGRESQL':
         query = f"""
             SELECT column_name, data_type 
@@ -314,7 +300,6 @@ def get_columns(profile, table_name):
     columns = []
     if df is not None and len(df) > 0:
         if profile.db_type == 'SQLITE':
-            # PRAGMA gives cid, name, type, notnull, dflt_value, pk.
             for _, row in df.iterrows():
                 columns.append({
                     'name': row['name'],

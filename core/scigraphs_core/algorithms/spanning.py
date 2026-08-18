@@ -1,4 +1,5 @@
-# Spanning tree algorithms
+# Spanning tree algorithms. Without networkx each returns None, kept distinct
+# from the empty tree an edgeless graph genuinely has.
 
 import numpy as np
 
@@ -17,24 +18,14 @@ except ImportError:
 
 
 def _networkx_missing(feature):
-    """Log why `feature` did not run and return None.
-
-    Not an exception, which would reach the operator as a traceback about an
-    import, and not a zero-filled dict either: an empty spanning tree is the
-    right answer for an edgeless graph, so sharing that value would let a
-    figure ship with an empty backbone and no way to tell why.
-    """
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return None
 
 
 def minimum_spanning_tree_kruskal(graph_data):
-    """Minimum spanning tree by Kruskal's algorithm; None without networkx.
-
-    Returns 'edges', 'total_weight', 'num_edges', and 'edge_in_mst', a 0/1
-    array parallel to ``graph_data.edges``. Weights default to 1.0. A
-    disconnected graph yields a spanning forest, not a tree.
-    """
+    """Minimum spanning tree by Kruskal: 'edges', 'total_weight', 'num_edges'
+    and 'edge_in_mst', a 0/1 array parallel to ``graph_data.edges``. Weights
+    default to 1.0; a disconnected graph yields a forest, not a tree."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Minimum spanning tree (Kruskal)")
 
@@ -75,12 +66,9 @@ def minimum_spanning_tree_kruskal(graph_data):
 
 
 def minimum_spanning_tree_prim(graph_data, start_node=0):
-    """Minimum spanning tree by Prim's algorithm; None without networkx.
-
-    Same return shape as :func:`minimum_spanning_tree_kruskal`. ``start_node``
-    is accepted for symmetry but not passed on, so the tree matches Kruskal's
-    whenever the edge weights are distinct.
-    """
+    """Minimum spanning tree by Prim, same return shape as
+    :func:`minimum_spanning_tree_kruskal`. ``start_node`` is accepted for
+    symmetry but not passed on, so distinct weights give Kruskal's tree."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Minimum spanning tree (Prim)")
 
@@ -121,10 +109,7 @@ def minimum_spanning_tree_prim(graph_data, start_node=0):
 
 
 def maximum_spanning_tree(graph_data):
-    """Maximum spanning tree; None without networkx.
-
-    Same return shape as :func:`minimum_spanning_tree_kruskal`.
-    """
+    """Maximum spanning tree, shaped like :func:`minimum_spanning_tree_kruskal`."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Maximum spanning tree")
 
@@ -165,12 +150,9 @@ def maximum_spanning_tree(graph_data):
 
 
 def steiner_tree(graph_data, terminal_nodes):
-    """Approximate the smallest tree connecting every node in ``terminal_nodes``.
-
-    Returns 'edges', 'total_weight' and 'num_edges'; None without networkx.
-    Exact Steiner trees are NP-hard, so this is networkx's approximation and
-    the weight is an upper bound.
-    """
+    """Approximate the smallest tree connecting every node in ``terminal_nodes``,
+    as 'edges', 'total_weight' and 'num_edges'. Exact Steiner trees are NP-hard,
+    so this is networkx's approximation and the weight is an upper bound."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Steiner tree")
 

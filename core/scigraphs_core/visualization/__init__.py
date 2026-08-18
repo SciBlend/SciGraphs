@@ -1,9 +1,7 @@
 # Visualization: keyframe animation and viewport text overlays.
-#
 
 _LAZY = {
-    # Blender-bound modules stayed with the add-on; reach them from that side
-    # as SciGraphs.core.<name>.
+    # Blender-bound modules stayed with the add-on, as SciGraphs.core.<name>.
     "animation": ".animation",
 }
 

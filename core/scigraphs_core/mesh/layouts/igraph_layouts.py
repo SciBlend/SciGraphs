@@ -5,11 +5,8 @@ from .basic import _random_layout
 from .networkx_layouts import _spring_layout_2d
 
 def _igraph_fruchterman_reingold(G, iterations, scale):
-    """Fruchterman-Reingold via igraph, much faster than the NetworkX version.
-
-    This is the one-shot form. start_temp, coolexp and the rest are reachable
-    only from :func:`_igraph_fr_iteration`.
-    """
+    """Fruchterman-Reingold via igraph, much faster than NetworkX. One-shot form:
+    start_temp, coolexp and the rest only reach :func:`_igraph_fr_iteration`."""
     if not IGRAPH_AVAILABLE:
         print("igraph not available, falling back to Spring 2D")
         return _spring_layout_2d(G, iterations, scale)
@@ -20,8 +17,7 @@ def _igraph_fruchterman_reingold(G, iterations, scale):
 
     g_igraph = _nx_to_igraph(G)
 
-    # Without a seed, igraph's FR takes only niter and dim. coolexp, maxdelta,
-    # area, repulserad and start_temp are rejected unless a seed is given.
+    # Unseeded, igraph's FR takes only niter and dim; the rest are rejected.
     params = {'niter': iterations, 'dim': 3}
 
     layout = g_igraph.layout_fruchterman_reingold(**params)
@@ -72,18 +68,12 @@ def _build_drl_options(preset='default',
                        crunch_attraction=None, crunch_damping_mult=None,
                        simmer_iterations=None, simmer_temperature=None,
                        simmer_attraction=None, simmer_damping_mult=None):
-    """Build a DrL options dict, or pass a bare preset name through.
-
-    With no phase parameter set, returns *preset* unchanged ('default',
-    'coarsen', 'coarsest', 'refine', 'final'). Set any one and you get that
-    preset's defaults as a dict with your values on top.
-
-    DrL runs six phases in order: init places nodes at random, liquid moves them
-    coarsely, expansion spreads the clusters, cooldown damps the motion, crunch
-    tightens dense areas and simmer settles the result. Each takes iterations,
-    temperature, attraction and damping_mult. edge_cut is global, 0 to 1, and
-    cuts more edges late as it rises.
-    """
+    """Build a DrL options dict, or pass a bare preset name through. With no
+    phase parameter set, returns *preset* unchanged ('default', 'coarsen',
+    'coarsest', 'refine', 'final'); set one and you get that preset's defaults
+    with your values on top. The six phases run init, liquid, expansion,
+    cooldown, crunch, simmer, each taking iterations, temperature, attraction
+    and damping_mult; edge_cut is global, 0 to 1, cutting more edges as it rises."""
     overrides = {}
     local = locals()
     for phase in ('init', 'liquid', 'expansion', 'cooldown', 'crunch', 'simmer'):
@@ -196,14 +186,9 @@ def _igraph_drl(G, iterations, scale, options='default',
                 crunch_attraction=None, crunch_damping_mult=None,
                 simmer_iterations=None, simmer_temperature=None,
                 simmer_attraction=None, simmer_damping_mult=None):
-    """DrL (Distributed Recursive Layout) in 3D via igraph. Multilevel, and the
-    fastest thing here on large graphs.
-
-    *iterations* is ignored, since DrL counts iterations per phase; it stays for
-    API symmetry with the other layouts. *options* takes a preset name or a
-    dict, and any explicit phase parameter overrides it. *seed* is a list of
-    [x, y, z] per node. See :func:`_build_drl_options` for the phases.
-    """
+    """DrL (Distributed Recursive Layout) in 3D via igraph, multilevel and the
+    fastest thing here on large graphs. *iterations* is ignored (DrL counts per
+    phase); *options* is a preset name or dict; *seed* is [x, y, z] per node."""
     if not IGRAPH_AVAILABLE:
         print("igraph not available, falling back to Random")
         return _random_layout(len(G.nodes()), scale)
@@ -258,8 +243,7 @@ def _igraph_drl(G, iterations, scale, options='default',
     t_layout = time.time() - t0
     print(f"  [DEBUG] DrL layout computation: {t_layout:.3f}s")
 
-    # Centered and scaled, but not std-normalized: DrL's own proportions carry
-    # the cluster structure and rescaling them flattens it.
+    # Not std-normalized: DrL's own proportions carry the cluster structure.
     positions = np.array(layout.coords)
     positions = positions - positions.mean(axis=0)
     positions = positions * scale
@@ -283,9 +267,7 @@ def _igraph_drl_2d(G, iterations, scale, options='default',
                    crunch_attraction=None, crunch_damping_mult=None,
                    simmer_iterations=None, simmer_temperature=None,
                    simmer_attraction=None, simmer_damping_mult=None):
-    """:func:`_igraph_drl` in 2D, with z = 0. Roughly 5 to 6 times faster than
-    the 3D version; same parameters.
-    """
+    """:func:`_igraph_drl` in 2D with z = 0, 5 to 6 times faster; same params."""
     if not IGRAPH_AVAILABLE:
         print("igraph not available, falling back to Random")
         return _random_layout(len(G.nodes()), scale)
@@ -294,7 +276,6 @@ def _igraph_drl_2d(G, iterations, scale, options='default',
     start_total = time.time()
     print(f"Computing igraph DrL 2D layout for {len(G.nodes())} nodes, {len(G.edges())} edges...")
 
-    # Build options dict from individual params or preset
     drl_options = _build_drl_options(
         preset=options if isinstance(options, str) else 'default',
         edge_cut=edge_cut,
@@ -322,7 +303,6 @@ def _igraph_drl_2d(G, iterations, scale, options='default',
     if seed is not None:
         layout_kwargs['seed'] = seed
 
-    # Compute layout
     t0 = time.time()
     layout = g_igraph.layout_drl(**layout_kwargs)
     t_layout = time.time() - t0
@@ -341,7 +321,6 @@ def _igraph_drl_2d(G, iterations, scale, options='default',
 
 def _igraph_lgl(G, scale, maxiter=150, maxdelta=None, area=None, coolexp=1.5,
                 repulserad=None, cellsize=None):
-    """Large Graph Layout via igraph, built for very large graphs."""
     if not IGRAPH_AVAILABLE:
         print("igraph not available, falling back to Random")
         return _random_layout(len(G.nodes()), scale)
@@ -393,7 +372,6 @@ def _igraph_davidson_harel(G, iterations, scale, maxiter=10, fineiter=0, cool_fa
 
     g_igraph = _nx_to_igraph(G)
 
-    # 2D only in most igraph versions.
     layout = g_igraph.layout_davidson_harel(
         maxiter=maxiter, fineiter=fineiter, cool_fact=cool_fact,
         weight_node_dist=weight_node_dist, weight_border=weight_border,
@@ -421,7 +399,6 @@ def _igraph_graphopt(G, iterations, scale, niter=500, node_charge=0.001, node_ma
 
     g_igraph = _nx_to_igraph(G)
 
-    # Graphopt is 2D only.
     layout = g_igraph.layout_graphopt(
         niter=niter, node_charge=node_charge, node_mass=node_mass,
         spring_length=spring_length, spring_constant=spring_constant,
@@ -437,11 +414,9 @@ def _igraph_graphopt(G, iterations, scale, niter=500, node_charge=0.001, node_ma
 
 def _igraph_fr_iteration(G, current_pos, scale, iteration, props=None):
     """A short batch of Fruchterman-Reingold, as ``(new_positions, energy)``.
-
     Seeded FR in igraph takes only niter, seed, dim and optionally start_temp,
-    and rejects maxdelta, area, repulserad and coolexp. The seed must be 2D, so
-    dim is 2 and Z carries over untouched.
-    """
+    rejecting maxdelta, area, repulserad and coolexp; the seed must be 2D, so
+    dim is 2 and Z carries over untouched."""
     if not IGRAPH_AVAILABLE:
         return _spring_layout_2d(G, 50, scale), 0.0
 
@@ -466,7 +441,6 @@ def _igraph_fr_iteration(G, current_pos, scale, iteration, props=None):
     new_pos[:, :2] = coords_2d
     new_pos[:, 2] = current_pos[:, 2]
 
-    # "Energy" here is just how far the batch moved things.
     energy = np.linalg.norm(new_pos - current_pos)
 
     return new_pos, energy

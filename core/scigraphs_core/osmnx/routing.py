@@ -1,15 +1,10 @@
 """OSMnx routing: single-pair and k-shortest paths, many-to-many batches, route
-summaries, elevation profiles and random OD sampling.
-
-Routes weigh by length, travel_time, or an elevation impedance of
-``length * (1 + alpha * |grade|)``.
-"""
+summaries, elevation profiles and random OD sampling. Routes weigh by length,
+travel_time, or an elevation impedance of ``length * (1 + alpha * |grade|)``."""
 
 from scigraphs_core.logger import log
 from .get_osmnx import get_osmnx
 
-
-# --- Helpers ---
 
 def _iter_edge_dicts(G):
     """Yield edge data dicts over G regardless of (Multi)Graph / (Multi)DiGraph."""
@@ -34,7 +29,6 @@ def _get_first_edge_data(G, u, v):
 
 
 def _path_has_attribute(G, path, attr):
-    """Return True iff every consecutive edge on ``path`` carries ``attr``."""
     for a, b in zip(path[:-1], path[1:]):
         data = _get_first_edge_data(G, a, b)
         if data is None or attr not in data or data.get(attr) in (None, ""):
@@ -43,10 +37,7 @@ def _path_has_attribute(G, path, attr):
 
 
 def _ensure_impedance_weight(G, alpha=5.0, attr_name="_elevation_impedance"):
-    """Write ``length * (1 + alpha * |grade|)`` onto each edge, returning the attribute name.
-
-    Edges with no ``length`` are skipped; a missing grade counts as zero.
-    """
+    """Write ``length * (1 + alpha * |grade|)`` per edge; no ``length`` skips the edge."""
     try:
         for data in _iter_edge_dicts(G):
             length = data.get("length")
@@ -69,15 +60,10 @@ def _resolve_weight(G, weight, impedance_alpha=5.0):
     return weight
 
 
-# --- Single shortest path ---
-
 def calculate_shortest_path(G, orig_node, dest_node, weight="length", impedance_alpha=5.0):
-    """Shortest path between two nodes.
-
-    weight is 'length', 'travel_time' or 'elevation_impedance'; impedance_alpha
-    applies only to the last. Returns the path and its aggregates as a dict, or
-    a dict carrying an 'error' key.
-    """
+    """Shortest path between two nodes. weight is 'length', 'travel_time' or
+    'elevation_impedance', and impedance_alpha applies only to the last. Returns
+    the path and its aggregates as a dict, or a dict carrying an 'error' key."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -141,14 +127,8 @@ def calculate_shortest_path(G, orig_node, dest_node, weight="length", impedance_
         return {"error": str(e)}
 
 
-# --- K-shortest alternative routes ---
-
 def k_shortest_paths(G, orig_node, dest_node, k=3, weight="length", impedance_alpha=5.0):
-    """The k shortest simple paths between two nodes.
-
-    Prefers ``ox.routing.k_shortest_paths``, falling back to Yen-like
-    ``networkx.shortest_simple_paths``.
-    """
+    """The k shortest simple paths, via ox.routing or nx.shortest_simple_paths."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -200,14 +180,8 @@ def k_shortest_paths(G, orig_node, dest_node, k=3, weight="length", impedance_al
         return None
 
 
-# --- Many-to-many (batch) routing ---
-
 def batch_shortest_paths(G, origs, dests, weight="length", cpus=None, impedance_alpha=5.0):
-    """Shortest paths for parallel lists of origins and destinations.
-
-    Mirrors ``ox.routing.shortest_path(G, origs, dests, cpus=cpus)``. Unreachable
-    pairs come back as None, alongside aggregate stats.
-    """
+    """Shortest paths over parallel origin/destination lists; unreachable pairs None."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -261,12 +235,9 @@ def batch_shortest_paths(G, origs, dests, weight="length", cpus=None, impedance_
         return None
 
 
-# --- Route summary (route_to_gdf equivalent) ---
-
 def summarize_route(G, path):
     """Aggregate metrics for a route: length, travel time, length-weighted mean
-    absolute grade, and rise (the positive elevation differences only).
-    """
+    absolute grade, and rise (the positive elevation differences only)."""
     if G is None or not path or len(path) < 2:
         return None
 
@@ -278,7 +249,6 @@ def summarize_route(G, path):
 
         has_elev = True
         for a, b in zip(path[:-1], path[1:]):
-            # Pick the edge with the minimum length between this pair.
             if not G.has_edge(a, b):
                 continue
             candidates = G.get_edge_data(a, b)
@@ -320,8 +290,6 @@ def summarize_route(G, path):
         return None
 
 
-# --- Elevation profile (vertices = cumulative distance, Z = elevation) ---
-
 def route_elevation_profile(G, path):
     """``[(cum_distance_m, elevation_m), ...]`` along a path, or None without node elevations."""
     if G is None or not path:
@@ -347,10 +315,7 @@ def route_elevation_profile(G, path):
         return None
 
 
-# --- Random OD sampling ---
-
 def sample_random_od_pairs(G, n=10, seed=None):
-    """Return ``n`` random (orig, dest) node-id pairs from G."""
     try:
         import random
         nodes = list(G.nodes)

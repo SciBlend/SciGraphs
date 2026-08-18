@@ -3,7 +3,6 @@ from .get_osmnx import get_osmnx
 
 
 def _ensure_bearings(G):
-    """Ensure edges carry a 'bearing' attribute; compute if missing."""
     if G is None:
         return G
     try:
@@ -47,10 +46,7 @@ def _ensure_bearings(G):
 
 
 def calculate_bearing(lat1, lon1, lat2, lon2):
-    """Initial compass bearing from one lat/lon point to another, in decimal degrees.
-
-    Measured clockwise from north, 0 to 360. Vectorizes over arrays.
-    """
+    """Initial compass bearing between two lat/lon points, degrees clockwise from north."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -85,13 +81,9 @@ def add_edge_bearings(G):
 
 
 def orientation_entropy(G, num_bins=36, min_length=0, weight=None):
-    """Shannon entropy of the street orientation distribution.
-
-    Low entropy means a few dominant headings, so a grid; high entropy means the
-    streets point every which way. num_bins splits the full 360 degrees, weight
-    names an edge attribute to weight by, and edges shorter than min_length drop
-    out.
-    """
+    """Shannon entropy of the street orientation distribution: low means a few
+    dominant headings, so a grid. num_bins splits the full 360 degrees, weight
+    names an edge attribute, and edges shorter than min_length drop out."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")
@@ -108,11 +100,9 @@ def orientation_entropy(G, num_bins=36, min_length=0, weight=None):
 
 
 def get_bearings_distribution(G, num_bins=36, min_length=0, weight=None):
-    """Edge bearings binned uniformly over 360 degrees, as ``(counts, bin_centers)``.
-
-    Wraps the private ``ox.bearing._bearings_distribution``, so it can vanish in
-    any OSMnx release; returns ``(None, None)`` when it does.
-    """
+    """Edge bearings binned uniformly over 360 degrees as ``(counts, centers)``.
+    Wraps the private ``ox.bearing._bearings_distribution``, which can vanish in
+    any OSMnx release; returns ``(None, None)`` when it does."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")

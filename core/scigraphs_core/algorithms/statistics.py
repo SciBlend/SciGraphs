@@ -1,4 +1,5 @@
-# Global graph statistics and metrics
+# Global graph statistics. Without networkx each returns None, kept distinct
+# from the 0.0 that is a real measurement of zero density or clustering.
 
 import numpy as np
 
@@ -26,21 +27,13 @@ except ImportError:
 
 
 def _networkx_missing(feature):
-    """Log why `feature` did not run and return None.
-
-    None rather than 0.0, because functions below already return 0.0 for a real
-    measurement of zero density or assortativity. Sharing the value would let a
-    caption read "clustering: 0.00" for a library that was never installed.
-    """
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return None
 
 
 def calculate_degree_distribution(graph_data):
-    """Return mean, median, std, min, max, the degrees and a histogram of them.
-
-    At most 20 histogram bins. None without networkx.
-    """
+    """Mean, median, std, min, max, the degrees and a histogram of them, in at
+    most 20 bins."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Degree distribution")
 
@@ -93,7 +86,7 @@ def calculate_degree_distribution(graph_data):
 
 
 def calculate_global_clustering(graph_data):
-    """Return the global clustering coefficient (transitivity); None without networkx."""
+    """The global clustering coefficient (transitivity)."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Global clustering coefficient")
 
@@ -112,7 +105,7 @@ def calculate_global_clustering(graph_data):
 
 
 def calculate_density(graph_data):
-    """Return graph density from 0 to 1; None without networkx."""
+    """Graph density, 0 to 1."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Density")
 
@@ -131,12 +124,9 @@ def calculate_density(graph_data):
 
 
 def calculate_diameter(graph_data):
-    """Return the diameter, the longest shortest path; None without networkx.
-
-    A disconnected graph is measured on its largest component. inf when the
-    graph has fewer than two nodes, no edges, or that component is a single
-    node.
-    """
+    """The diameter, the longest shortest path. A disconnected graph is measured
+    on its largest component; inf when the graph has fewer than two nodes, no
+    edges, or that component is a single node."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Diameter")
 
@@ -171,12 +161,8 @@ def calculate_diameter(graph_data):
 
 
 def calculate_average_path_length(graph_data):
-    """Return the average shortest path length; None without networkx.
-
-    A disconnected graph is measured on its largest component. inf when the
-    graph has fewer than two nodes, no edges, or that component is a single
-    node.
-    """
+    """The average shortest path length, over the largest component and inf in
+    the same cases as :func:`calculate_diameter`."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Average path length")
 
@@ -211,11 +197,8 @@ def calculate_average_path_length(graph_data):
 
 
 def calculate_assortativity(graph_data):
-    """Return the degree assortativity coefficient, -1 to 1; None without networkx.
-
-    0.0 stands in for an empty graph and for the NaN networkx returns when the
-    degree variance is zero.
-    """
+    """The degree assortativity coefficient, -1 to 1. 0.0 stands in for an empty
+    graph and for the NaN networkx returns when the degree variance is zero."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Degree assortativity")
 
@@ -243,11 +226,8 @@ def calculate_assortativity(graph_data):
 
 
 def calculate_all_statistics(graph_data):
-    """Run every statistic in this module and return them in one dict.
-
-    Rebuilds the networkx graph once per metric, so this is slower than calling
-    the one metric you need.
-    """
+    """Every statistic in this module in one dict. Rebuilds the networkx graph
+    once per metric, so it is slower than calling the one you need."""
     return {
         'num_nodes': len(graph_data.nodes),
         'num_edges': len(graph_data.edges),
@@ -261,11 +241,9 @@ def calculate_all_statistics(graph_data):
 
 
 def power_law_fit(degrees):
-    """Fit a power law to a degree sequence by least squares on the log-log counts.
-
-    Returns 'alpha' (the exponent) and 'fit_quality' (R-squared). `alpha` is
-    None below 10 nonzero degrees and when scipy is missing, which is logged.
-    """
+    """Fit a power law to a degree sequence by least squares on the log-log
+    counts: 'alpha' (the exponent) and 'fit_quality' (R-squared). `alpha` is
+    None below 10 nonzero degrees and when scipy is missing."""
     if not SCIPY_AVAILABLE:
         log(f"Power-law fit unavailable: {SCIPY_REASON}")
         return {

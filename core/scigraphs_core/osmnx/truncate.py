@@ -3,13 +3,10 @@ from .get_osmnx import get_osmnx
 
 
 def truncate_graph_bbox(G, bbox, truncate_by_edge=False, quadrat_width=0.05, min_num=3):
-    """Drop nodes outside a ``(north, south, east, west)`` box.
-
-    truncate_by_edge keeps any edge with one endpoint still inside. quadrat_width
-    and min_num are accepted and ignored; OSMnx dropped them. OSMnx also swapped
-    from four positional coordinates to a single ``bbox`` argument, so the call
-    is chosen by inspecting the installed signature.
-    """
+    """Drop nodes outside a ``(north, south, east, west)`` box. truncate_by_edge
+    keeps edges with one endpoint inside; quadrat_width and min_num are ignored
+    because OSMnx dropped them, and swapped four coordinates for one ``bbox``, so
+    the installed signature is inspected."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")
@@ -47,11 +44,8 @@ def truncate_graph_bbox(G, bbox, truncate_by_edge=False, quadrat_width=0.05, min
 
 
 def truncate_graph_polygon(G, polygon, truncate_by_edge=False, quadrat_width=0.05, min_num=3):
-    """Drop nodes outside a shapely Polygon or MultiPolygon.
-
-    truncate_by_edge keeps any edge with one endpoint still inside. quadrat_width
-    and min_num are accepted and ignored; OSMnx dropped them.
-    """
+    """Drop nodes outside a shapely Polygon or MultiPolygon; truncate_by_edge keeps
+    edges with one endpoint inside, quadrat_width and min_num are ignored."""
     ox = get_osmnx()
     if ox is None or G is None:
         log("OSMnx not available or graph is None")

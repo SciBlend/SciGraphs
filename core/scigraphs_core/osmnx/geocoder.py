@@ -3,10 +3,7 @@ from .get_osmnx import get_osmnx
 
 
 def geocode(query):
-    """Geocode a place name or address to ``(latitude, longitude)`` through Nominatim.
-
-    Nominatim rate-limits, so respect its usage policy when calling in a loop.
-    """
+    """Geocode a place or address to ``(lat, lon)``; Nominatim rate-limits, so pace it."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -26,11 +23,9 @@ def geocode(query):
 
 
 def geocode_to_gdf(query, which_result=None, by_osmid=False):
-    """Geocode a query to a GeoDataFrame carrying the place boundary.
-
-    which_result is 1-indexed among Nominatim's matches. With by_osmid the query
-    is read as an OSM ID instead of as a name.
-    """
+    """Geocode a query to a GeoDataFrame carrying the place boundary. which_result
+    is 1-indexed among Nominatim's matches; by_osmid reads the query as an OSM ID
+    instead of a name."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")

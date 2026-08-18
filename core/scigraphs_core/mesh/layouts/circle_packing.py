@@ -4,9 +4,8 @@ from .common import *
 from .basic import _random_layout
 
 def _store_radii_as_mesh_attribute(obj, radii):
-    """Write the packing radii to a ``circle_radius`` point attribute for
-    Geometry Nodes. Short lists are padded with the mean radius.
-    """
+    """Write packing radii to a ``circle_radius`` point attribute, padding short
+    lists with the mean radius."""
     if obj is None or obj.data is None:
         return
 
@@ -32,15 +31,9 @@ def _store_radii_as_mesh_attribute(obj, radii):
     print(f"  Mesh attribute 'circle_radius' created on {num_verts} vertices")
 
 def _circle_packing_layout(G, iterations=500, scale=5.0):
-    """Circle packing by the Collins-Stephenson algorithm (Koebe's theorem).
-
-    Koebe requires a maximal planar triangulation, so the graph is completed
-    with Delaunay first unless its own faces are already all triangles. A
-    non-planar graph falls through to :func:`_circle_packing_force_directed`.
-
-    Returns ``(positions, radii)``: an (N, 3) array with Z = 0, and one circle
-    radius per node.
-    """
+    """Circle packing by Collins-Stephenson (Koebe's theorem), returning
+    ``(positions, radii)`` with Z = 0. Koebe needs a maximal planar triangulation,
+    so Delaunay completes the graph; a non-planar one goes force-directed."""
     import time
     import math
     import cmath
@@ -76,7 +69,6 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         print("  Graph is NOT planar - using force-directed fallback")
         return _circle_packing_force_directed(G, iterations, scale)
 
-    # Walk the planar embedding's half-edges to recover its faces.
     all_faces = []
     visited_half_edges = set()
 
@@ -149,10 +141,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         triangles = [tuple(simplex) for simplex in tri.simplices]
         boundary_nodes = set(np.unique(tri.convex_hull))
 
-    # Collins-Stephenson: boundary radii stay fixed and define the outer shape,
-    # internal radii iterate until the angles around each one sum to 2*pi. The
-    # sign is the part that is easy to get backwards: angle_sum above 2*pi means
-    # the radius is too small.
+    # Boundary radii fixed; internal seek angle sum 2*pi, above it = too small.
     internal_nodes = [i for i in range(num_nodes) if i not in boundary_nodes]
     nodes_to_update = internal_nodes.copy()
 
@@ -187,9 +176,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
 
     radii = np.ones(num_nodes, dtype=float)
 
-    # Rough starting guess: the more triangles meet at a node, the smaller its
-    # radius has to be for their angles to fit into 2*pi. Six is the equilateral
-    # case, so nodes below that keep radius 1.
+    # More triangles at a node, smaller radius; six is the equilateral case.
     for i in internal_nodes:
         k = len(triangles_at_vertex[i])
         if k > 0:
@@ -226,8 +213,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
                 max_error = error
                 worst_node = i
 
-            # Stephenson's multiplicative update, damped harder while the error
-            # is large so it does not overshoot on the way in.
+            # Stephenson's update, damped harder while the error is large.
             if angle_sum > 1e-9:
                 ratio = angle_sum / target
                 if error > 1.0:
@@ -237,8 +223,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
                 else:
                     damping = 0.3
                 new_radii[i] = radii[i] * (1.0 - damping + damping * ratio)
-                # Bounds this wide because an Apollonian packing genuinely
-                # reaches radius ratios around 1000:1.
+                # Wide bounds: Apollonian packings reach ratios near 1000:1.
                 new_radii[i] = max(1e-6, min(1e6, new_radii[i]))
 
         radii = new_radii
@@ -270,8 +255,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         A, B, C = points[a], points[b], points[c]
         return (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]) > 0
 
-    # Half-edge map: (u, v) -> w means w lies to the left of directed edge u->v.
-    # Consistent winding is what makes the placement below deterministic.
+    # (u, v) -> w: w lies left of u->v; consistent winding keeps this stable.
     half_edge_map = {}
 
     for triangle in triangles:
@@ -284,7 +268,6 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         half_edge_map[(v, w)] = u
         half_edge_map[(w, u)] = v
 
-    # Place nodes by breadth-first walk over the oriented edges.
     positions_complex = {}
     placed = [False] * num_nodes
 
@@ -302,8 +285,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
     positions_complex[w] = cmath.rect(radii[u] + radii[w], angle_u)
     placed[w] = True
 
-    # Queue the seed triangle's edges reversed, since the adjacent triangle sits
-    # on the other side of each one.
+    # Seed edges reversed: the adjacent triangle sits on the other side.
     edge_queue = deque()
     edge_queue.append((v, u))
     edge_queue.append((w, v))
@@ -330,17 +312,13 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         d_ac = r_a + r_c
         d_bc = r_b + r_c
 
-        # Measure a to b rather than assuming r_a + r_b. The two drift apart as
-        # rounding accumulates, and using the measured base is what lets the
-        # packing still close up geometrically.
+        # Measure a to b, not r_a + r_b: rounding drift must not break closure.
         vec_ab = positions_complex[b] - positions_complex[a]
         dist_ab = abs(vec_ab)
 
         if dist_ab < 1e-10:
             continue
 
-        # Law of cosines at a:
-        # cos(theta) = (d_ac^2 + dist_ab^2 - d_bc^2) / (2 * d_ac * dist_ab)
         denom = 2.0 * d_ac * dist_ab
         if denom < 1e-12:
             theta = math.pi / 3.0
@@ -372,8 +350,7 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         p = positions_complex.get(i, 0j)
         positions[i] = [p.real, p.imag]
 
-    # The walk accumulates rounding error, so finish with gradient descent that
-    # pushes adjacent circles back to true tangency.
+    # The walk accumulates rounding error; descent restores true tangency.
     edges_idx = [(node_to_idx[u], node_to_idx[v]) for u, v in G.edges()]
 
     def compute_tangency_error(pos, rad, edges):
@@ -462,10 +439,8 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
     return positions_3d, radii
 
 def _circle_packing_force_directed(G, iterations=500, scale=5.0):
-    """Circle packing by force simulation, for graphs Collins-Stephenson cannot
-    take: adjacent circles pull toward tangency, overlapping ones push apart, and
-    radius follows degree.
-    """
+    """Circle packing by force simulation for graphs Collins-Stephenson cannot
+    take: adjacent circles pull to tangency, overlaps push apart."""
     import time
     import math
 

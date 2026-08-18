@@ -1,4 +1,5 @@
-# Network flow algorithms
+# Network flow algorithms. Without networkx each returns None, kept distinct
+# from a genuine zero flow or empty cut.
 
 import numpy as np
 
@@ -16,24 +17,14 @@ except ImportError:
 
 
 def _networkx_missing(feature):
-    """Log why `feature` did not run and return None.
-
-    The `except nx.NetworkXError` handlers below return zero-valued results, a
-    max_flow of 0.0 or an empty cut, which is the right answer for a graph
-    whose flow really is zero. None has to differ from those: "not computed"
-    must stay distinguishable from "computed, and it was nothing".
-    """
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return None
 
 
 def maximum_flow_ford_fulkerson(graph_data, source, sink):
-    """Maximum flow from ``source`` to ``sink`` by Ford-Fulkerson.
-
-    Returns 'max_flow', 'flow_dict' and 'edge_flow', an array parallel to
-    ``graph_data.edges``. Capacities come from edge weights, defaulting to 1.0.
-    None without networkx.
-    """
+    """Maximum flow from ``source`` to ``sink`` by Ford-Fulkerson: 'max_flow',
+    'flow_dict' and 'edge_flow' parallel to ``graph_data.edges``. Capacities are
+    edge weights, default 1.0."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Maximum flow (Ford-Fulkerson)")
 
@@ -77,12 +68,9 @@ def maximum_flow_ford_fulkerson(graph_data, source, sink):
 
 
 def minimum_cut(graph_data, source, sink):
-    """Find the minimum cut separating ``source`` from ``sink``.
-
-    Returns 'cut_value', the 'reachable' and 'non_reachable' node lists,
-    'cut_edges', and 'edge_in_cut', a 0/1 array parallel to
-    ``graph_data.edges``. None without networkx.
-    """
+    """Minimum cut separating ``source`` from ``sink``: 'cut_value', the
+    'reachable' and 'non_reachable' node lists, 'cut_edges', and 'edge_in_cut',
+    a 0/1 array parallel to ``graph_data.edges``."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Minimum cut")
 
@@ -138,13 +126,10 @@ def minimum_cut(graph_data, source, sink):
 
 
 def min_cost_flow(graph_data, demands):
-    """Compute the minimum cost flow satisfying ``demands``.
-
-    ``demands`` maps node index to demand, positive for a sink and negative for
-    a source; nodes left out get 0. Edge weights are read as cost, with every
-    capacity fixed at 1.0. Returns 'cost' and 'flow_dict', cost being inf when
-    the demands cannot be met. None without networkx.
-    """
+    """Minimum cost flow satisfying ``demands``, a node index to demand map,
+    positive for a sink and negative for a source, omitted nodes at 0. Edge
+    weights are cost, every capacity 1.0. Returns 'cost' (inf when the demands
+    cannot be met) and 'flow_dict'."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Minimum cost flow")
 
@@ -180,7 +165,7 @@ def min_cost_flow(graph_data, demands):
 
 
 def edge_connectivity(graph_data):
-    """Return the fewest edges whose removal disconnects the graph; None without networkx."""
+    """The fewest edges whose removal disconnects the graph."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Edge connectivity")
 
@@ -202,7 +187,7 @@ def edge_connectivity(graph_data):
 
 
 def node_connectivity(graph_data):
-    """Return the fewest nodes whose removal disconnects the graph; None without networkx."""
+    """The fewest nodes whose removal disconnects the graph."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Node connectivity")
 

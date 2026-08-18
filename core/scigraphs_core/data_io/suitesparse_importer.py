@@ -21,10 +21,7 @@ SUITESPARSE_MM_URL = "https://sparse.tamu.edu/MM"
 
 
 def parse_matrix_id(identifier):
-    """Split a matrix identifier into (group, name), or (None, None).
-
-    Accepts "Grund/bayer09", the collection URL for it, or the .tar.gz URL.
-    """
+    """Split "Grund/bayer09", its collection URL or its .tar.gz URL into (group, name)."""
     identifier = identifier.strip()
     
     for prefix in [
@@ -47,11 +44,8 @@ def parse_matrix_id(identifier):
 
 
 def download_matrix(group, name, timeout=120):
-    """Download a matrix in Matrix Market format.
-
-    Returns (mtx_text, coord_text); coord_text is None when the archive
-    carries no coordinate file. Both are None if the download fails.
-    """
+    """Download a matrix as (mtx_text, coord_text); coord_text is None when the
+    archive carries no coordinate file, and both are None if the download fails."""
     import requests
     import tarfile
     
@@ -96,11 +90,7 @@ def download_matrix(group, name, timeout=120):
 
 
 def parse_mtx(mtx_text):
-    """Parse Matrix Market text.
-
-    Returns (nrows, ncols, entries, is_symmetric). entries are 0-indexed
-    (row, col) tuples; the file itself counts from 1.
-    """
+    """Matrix Market text to (nrows, ncols, entries, is_symmetric); entries 0-indexed."""
     lines = mtx_text.strip().split('\n')
     
     header = lines[0].lower()
@@ -138,11 +128,8 @@ def parse_mtx(mtx_text):
 
 
 def parse_coord_mtx(coord_text):
-    """Parse a Matrix Market coordinate file into an (N, D) array, or None.
-
-    Array format: a header, then "N D", then one value per line in
-    column-major order, so all of column 0 precedes all of column 1.
-    """
+    """A Matrix Market coordinate file to an (N, D) array, or None. Array format: a
+    header, then "N D", then one value per line, column-major."""
     if not coord_text:
         return None
     
@@ -186,10 +173,7 @@ def parse_coord_mtx(coord_text):
 
 
 def build_symmetric_graph(nrows, ncols, entries, giant_only=True, coords=None):
-    """Build an undirected graph, reading the matrix as an adjacency matrix.
-
-    Nodes are row indices. Self-loops are dropped.
-    """
+    """Undirected graph over row indices, matrix read as adjacency, self-loops gone."""
     import time
     start = time.time()
     log("  Building symmetric (A+A^T) graph...")
@@ -229,10 +213,7 @@ def build_symmetric_graph(nrows, ncols, entries, giant_only=True, coords=None):
 
 
 def build_bipartite_graph(nrows, ncols, entries, giant_only=True, coords=None):
-    """Build a bipartite graph of row nodes R0, R1, ... against columns C0, C1, ...
-
-    This keeps the original matrix structure, which lays out elongated.
-    """
+    """Row nodes R0, R1, ... against columns C0, C1, ..., which lays out elongated."""
     import time
     start = time.time()
     log("  Building bipartite graph...")
@@ -332,12 +313,9 @@ def _extract_giant_component(nodes, edges):
 
 
 def load_suitesparse_graph(identifier, mode='BIPARTITE', giant_only=True):
-    """Download a SuiteSparse matrix and build a graph. None on failure.
-
-    identifier is "Group/Name" or a full URL. mode is 'SYMMETRIC' for A+A^T or
-    'BIPARTITE' for rows against columns. giant_only keeps only the largest
-    connected component.
-    """
+    """Download a SuiteSparse matrix and build a graph, None on failure. identifier
+    is "Group/Name" or a full URL, mode is 'SYMMETRIC' for A+A^T or 'BIPARTITE'
+    for rows against columns, and giant_only keeps the largest component only."""
     import time
     start = time.time()
     

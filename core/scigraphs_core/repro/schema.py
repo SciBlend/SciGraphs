@@ -7,7 +7,6 @@ import os
 
 
 class ValidationError(Exception):
-    """Raised when pipeline validation fails."""
     pass
 
 
@@ -81,27 +80,21 @@ SCHEMA = {
         "required": ["source"],
         "properties": {
             "source": {"type": "string", "enum": [e.value for e in DatasetSource]},
-            # OSMnx-specific
             "method": {"type": "string", "enum": ["PLACE", "BBOX", "POINT", "ADDRESS", "POLYGON"]},
             "query": {"type": "string"},
             "network_type": {"type": "string", "default": "drive", "enum": ["drive", "walk", "bike", "all", "all_public", "all_private", "drive_service"]},
             "simplify": {"type": "boolean", "default": True},
             "cache": {"type": "boolean", "default": True},
             "retain_all": {"type": "boolean", "default": False},
-            # File-based
             "filepath": {"type": "string"},
-            # GEXF/GraphML specifics
             "auto_layout": {"type": "boolean", "default": True},
-            # SQL-specific
             "connection_string": {"type": "string"},
             "nodes_query": {"type": "string"},
             "edges_query": {"type": "string"},
-            # SuiteSparse-specific
             "matrix_name": {"type": "string"},
             "matrix_mode": {"type": "string", "default": "BIPARTITE", "enum": ["BIPARTITE", "SYMMETRIC"],
                             "description": "BIPARTITE duplicates every index as a row node and a column node; the auxiliary coordinate file indexes rows only, so a matrix carrying coordinates must be read as SYMMETRIC or both copies land on the same point"},
             "giant_only": {"type": "boolean", "default": True, "description": "Keep only the largest connected component"},
-            # City2Graph-specific
             "bbox": {"type": "array", "items": {"type": "number"}},
             "layers": {"type": "array", "items": {"type": "string"}},
         }
@@ -129,9 +122,7 @@ SCHEMA = {
             "iterations": {"type": "integer", "default": 50},
             "seed": {"type": "integer", "description": "Override meta.seed for layout only"},
             "dimension": {"type": "integer", "default": 3, "enum": [2, 3]},
-            # Spring-specific
             "k": {"type": "number", "description": "Optimal distance between nodes"},
-            # Force Atlas 2-specific
             "gravity": {"type": "number", "default": 1.0},
             "scaling_ratio": {"type": "number", "default": 2.0},
         }
@@ -154,9 +145,8 @@ SCHEMA = {
             "rendering_preset": {"type": "string", "enum": ["BASIC", "GLASS", "METALLIC", "EMISSION", "SCIENTIFIC"]},
             "edge_style": {"type": "string", "enum": ["GEPHI_DEFAULT", "CYTOSCAPE_BEZIER", "SCHEMATIC", "BUNDLED_DENSE", "FLOW_DIAGRAM", "MINIMAL"]},
 
-            # Color mapping. A linear ramp over a heavy-tailed measure, such as
-            # betweenness or degree on a scale-free graph, buries almost every
-            # node in the bottom bin.
+            # A linear ramp over a heavy-tailed measure such as betweenness or
+            # degree on a scale-free graph buries almost every node in one bin.
             "color_norm": {"type": "string", "default": "LINEAR", "enum": ["LINEAR", "LOG", "RANK", "QUANTILE"], "description": "Value-to-color transform; RANK equalizes the histogram for skewed measures"},
             "color_gamma": {"type": "number", "default": 1.0, "description": "Applied after normalization as norm**(1/gamma); >1 brightens the low end"},
             "color_clip_percentile": {"type": "array", "items": {"type": "number"}, "default": [0.0, 100.0], "description": "Percentile clip before normalizing, e.g. [2, 98]"},
@@ -166,14 +156,12 @@ SCHEMA = {
             "color_opacity": {"type": "number", "default": 1.0},
             "edge_base_color": {"type": "array", "items": {"type": "number"}, "description": "Flat RGBA for edges when nodes carry the colormap"},
 
-            # Glyph geometry
             "node_glyph": {"type": "string", "enum": ["SPHERE", "ICOSPHERE", "CUBE", "CONE", "CYLINDER"], "description": "Node primitive; ICOSPHERE is more uniform than SPHERE at low resolution"},
             "node_resolution": {"type": "integer", "description": "Segments of the node primitive; below ~12 the silhouette is visibly faceted"},
             "node_shade_smooth": {"type": "boolean", "default": True, "description": "Smooth normals; turn off for CUBE/CONE/CYLINDER, whose hard edges get averaged away"},
             "edge_profile": {"type": "string", "default": "ROUND", "enum": ["ROUND", "RIBBON"], "description": "Cross-section swept along each edge"},
             "edge_resolution": {"type": "integer", "description": "Sides of the edge cross-section, not segments along the curve"},
 
-            # Size
             "node_radius": {"type": "number", "description": "Absolute node radius in world units"},
             "node_radius_rel": {"type": "number", "description": "Node radius as a fraction of the graph radius; overrides node_radius"},
             "edge_radius": {"type": "number", "description": "Absolute edge radius in world units"},
@@ -181,7 +169,6 @@ SCHEMA = {
             "node_size_range": {"type": "array", "items": {"type": "number"}, "default": [0.5, 3.0], "description": "Multiplier range when node_size drives radius from an attribute"},
             "edge_width_range": {"type": "array", "items": {"type": "number"}, "default": [0.5, 2.5]},
 
-            # Material
             "material_roughness": {"type": "number", "description": "Principled BSDF roughness; the Blender default of 0.5 reads plasticky"},
             "material_metallic": {"type": "number"},
         }
@@ -242,26 +229,23 @@ SCHEMA = {
             "camera_margin": {"type": "number", "default": 1.15, "description": "Fraction of the graph radius left as empty border"},
             "camera_direction": {"type": "array", "items": {"type": "number"}, "default": [0.48, -0.72, 0.50], "description": "Direction from graph center to camera; normalized on use"},
 
-            # Camera intrinsics
             "camera_lens": {"type": "number", "description": "Focal length in mm -- what Blender calls the camera lens. The framing distance compensates automatically"},
             "camera_ortho": {"type": "boolean", "default": False, "description": "Orthographic projection; node radius stays constant with depth"},
             "dof_fstop": {"type": "number", "description": "Depth of field: the aperture f-number, focused on the framing distance. There is no separate depth_of_field toggle -- setting this enables it"},
 
-            # Color management. AgX, Blender's default view transform, tone-maps
-            # the image, so a rendered node no longer matches its colormap entry.
+            # AgX, Blender's default view transform, tone-maps the image, so a
+            # rendered node no longer matches its colormap entry.
             "view_transform": {"type": "string", "description": "Standard, AgX, Filmic, Khronos PBR Neutral or Raw; use Standard for color-encoded figures"},
             "look": {"type": "string"},
             "exposure": {"type": "number", "description": "Stops"},
             "gamma": {"type": "number"},
 
-            # Image quality
             "filter_width": {"type": "number", "description": "Reconstruction filter width in px; the 1.5 default softens thin edges, 1.0 keeps them crisp"},
             "resolution_percentage": {"type": "integer", "description": "Render scale in percent; inherited from the startup file when unset"},
             "file_format": {"type": "string", "enum": ["PNG", "OPEN_EXR", "TIFF", "JPEG"]},
             "color_depth": {"type": "string", "enum": ["8", "16", "32"], "description": "Bits per channel; 16 removes banding in smooth colormap gradients"},
             "dpi": {"type": "number", "description": "Pixel density metadata written into the image"},
 
-            # Engine specific
             "adaptive_threshold": {"type": "number", "description": "Cycles noise target"},
             "max_bounces": {"type": "integer", "description": "Cycles light bounces; 3-4 is usually indistinguishable for mostly-diffuse figures"},
             "denoiser": {"type": "string", "enum": ["AUTO", "OPENIMAGEDENOISE", "OPTIX"], "description": "Cycles denoiser; `denoise: true` alone picks a machine-dependent default"},
@@ -375,7 +359,6 @@ class VisualSpec:
     colormap: str = "viridis"
     rendering_preset: Optional[str] = None
     edge_style: Optional[str] = None
-    # color mapping
     color_norm: str = "LINEAR"
     color_gamma: float = 1.0
     color_clip_percentile: List[float] = field(default_factory=lambda: [0.0, 100.0])
@@ -384,20 +367,17 @@ class VisualSpec:
     colormap_reverse: bool = False
     color_opacity: float = 1.0
     edge_base_color: Optional[List[float]] = None
-    # glyph geometry
     node_glyph: Optional[str] = None
     node_resolution: Optional[int] = None
     node_shade_smooth: bool = True
     edge_profile: str = "ROUND"
     edge_resolution: Optional[int] = None
-    # size
     node_radius: Optional[float] = None
     node_radius_rel: Optional[float] = None
     edge_radius: Optional[float] = None
     edge_radius_rel: Optional[float] = None
     node_size_range: List[float] = field(default_factory=lambda: [0.5, 3.0])
     edge_width_range: List[float] = field(default_factory=lambda: [0.5, 2.5])
-    # material
     material_roughness: Optional[float] = None
     material_metallic: Optional[float] = None
 
@@ -452,22 +432,18 @@ class RenderSpec:
     camera_direction: List[float] = field(
         default_factory=lambda: [0.48, -0.72, 0.50]
     )
-    # camera intrinsics
     camera_lens: Optional[float] = None
     camera_ortho: bool = False
     dof_fstop: Optional[float] = None
-    # color management
     view_transform: Optional[str] = None
     look: Optional[str] = None
     exposure: Optional[float] = None
     gamma: Optional[float] = None
-    # image quality
     filter_width: Optional[float] = None
     resolution_percentage: Optional[int] = None
     file_format: Optional[str] = None
     color_depth: Optional[str] = None
     dpi: Optional[float] = None
-    # engine specific
     adaptive_threshold: Optional[float] = None
     max_bounces: Optional[int] = None
     denoiser: Optional[str] = None
@@ -494,7 +470,6 @@ class OpSpec:
 
 @dataclass
 class PipelineSchema:
-    """Complete pipeline specification."""
     meta: MetaSpec
     dataset: Optional[DatasetSpec] = None
     analysis: Optional[AnalysisSpec] = None
@@ -508,7 +483,6 @@ class PipelineSchema:
     ops: List[OpSpec] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to a dictionary for serialization."""
         from dataclasses import asdict
         result = {}
         result["meta"] = asdict(self.meta)
@@ -549,7 +523,6 @@ def _apply_defaults(data: Dict[str, Any], schema_section: Dict) -> Dict[str, Any
 
 
 def _validate_type(value: Any, expected_type: str, path: str) -> None:
-    """Raise ValidationError if a value does not match its schema type."""
     type_map = {
         "string": str,
         "integer": int,
@@ -564,13 +537,11 @@ def _validate_type(value: Any, expected_type: str, path: str) -> None:
 
 
 def _validate_enum(value: Any, enum_values: List[str], path: str) -> None:
-    """Raise ValidationError if a value is outside its enum."""
     if value not in enum_values:
         raise ValidationError(f"{path}: '{value}' not in {enum_values}")
 
 
 def _validate_section(data: Dict[str, Any], schema_section: Dict, path: str) -> None:
-    """Validate a section of the pipeline against its schema."""
     props = schema_section.get("properties", {})
     required = schema_section.get("required", [])
 
@@ -598,11 +569,9 @@ def _validate_section(data: Dict[str, Any], schema_section: Dict, path: str) -> 
 
 
 def validate_pipeline(data: Dict[str, Any]) -> List[str]:
-    """Validate a parsed pipeline against the schema.
-
-    Returns warning messages, empty when there is nothing to flag. Raises
-    ValidationError on anything that makes the pipeline unrunnable.
-    """
+    """Validate a parsed pipeline against the schema. Returns warning messages,
+    empty when there is nothing to flag; raises ValidationError on anything that
+    makes the pipeline unrunnable."""
     warnings = []
 
     if not isinstance(data, dict):
@@ -639,7 +608,6 @@ def validate_pipeline(data: Dict[str, Any]) -> List[str]:
 
 
 def get_default_pipeline(title: str = "untitled") -> Dict[str, Any]:
-    """Get a minimal default pipeline structure."""
     return {
         "meta": {
             "title": title,
@@ -650,7 +618,6 @@ def get_default_pipeline(title: str = "untitled") -> Dict[str, Any]:
 
 
 def _dataclass_kwargs(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Filter a dictionary to keyword arguments accepted by a dataclass."""
     field_names = {item.name for item in fields(cls)}
     return {key: value for key, value in data.items() if key in field_names}
 

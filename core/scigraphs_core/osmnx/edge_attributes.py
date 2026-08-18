@@ -14,7 +14,6 @@ def _iter_edges(G):
 
 
 def _edge_access(G, u, v, k, attr, value):
-    """Set an edge attribute tolerantly whether or not G is a multigraph."""
     if k is not None and getattr(G, "is_multigraph", lambda: False)():
         if G.has_edge(u, v, k):
             G.edges[u, v, k][attr] = value
@@ -27,11 +26,7 @@ def _edge_access(G, u, v, k, attr, value):
 
 
 def add_edge_lengths(G):
-    """Add a 'length' to every edge, from its geometry or from straight-line node distance.
-
-    Lengths come out in the graph's own units, so project the graph first if you
-    want meters.
-    """
+    """Add 'length' per edge from geometry or node distance, in the graph's own units."""
     if G is None:
         return None
     
@@ -54,12 +49,9 @@ def add_edge_lengths(G):
 
 
 def add_edge_bearings(G, unprojected_G=None):
-    """Add a compass 'bearing' in degrees (0-360) to every edge.
-
-    True bearings need lat/lon, so pass the unprojected graph as unprojected_G
-    when G is projected. Without it, projected graphs fall back to grid angles
-    off the projected coordinates, which is not the same thing.
-    """
+    """Add a compass 'bearing' in degrees (0-360) to every edge. True bearings need
+    lat/lon, so pass the unprojected graph as unprojected_G when G is projected;
+    without it, projected graphs fall back to grid angles, which are not bearings."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -125,12 +117,9 @@ def add_edge_bearings(G, unprojected_G=None):
 
 
 def add_edge_speeds(G, fallback_speed=30):
-    """Add 'speed_kph' to every edge from its OSM maxspeed and highway type.
-
-    fallback_speed, in km/h, covers edges with neither. A download made with a
-    custom_filter can carry no 'highway' tag at all, and then every edge gets the
-    fallback.
-    """
+    """Add 'speed_kph' per edge from OSM maxspeed and highway type; fallback_speed,
+    in km/h, covers edges with neither, and a custom_filter download can carry no
+    'highway' tag at all, so every edge gets it."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -139,9 +128,8 @@ def add_edge_speeds(G, fallback_speed=30):
         from . import convert as _convert
         G = _convert.ensure_multidigraph(G)
 
-        # OSMnx's add_edge_speeds only fills in missing values, so recalculating
-        # with a different fallback would skip every edge that already has a
-        # speed. Purge first.
+        # OSMnx's add_edge_speeds only fills in missing values, so a different
+        # fallback would skip every edge that already has a speed. Purge first.
         for _u, _v, _k, data in _iter_edges(G):
             data.pop("speed_kph", None)
             data.pop("travel_time", None)
@@ -187,10 +175,7 @@ def add_edge_travel_times(G):
 
 
 def add_edge_grades(G, add_absolute=True):
-    """Add 'grade' (rise over length) to every edge, plus 'grade_abs' if add_absolute.
-
-    Needs 'elevation' on the nodes and 'length' on the edges.
-    """
+    """Add 'grade', and 'grade_abs' if add_absolute; needs node elevation and length."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None

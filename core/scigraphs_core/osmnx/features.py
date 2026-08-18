@@ -3,10 +3,8 @@ from .get_osmnx import get_osmnx
 
 
 def features_from_place(query, tags, which_result=None):
-    """Download OSM features inside a place boundary, e.g. "Piedmont, California, USA".
-
-    which_result picks among the geocoder's matches; None takes the first.
-    """
+    """Download OSM features inside a place boundary, e.g. "Piedmont, California,
+    USA". which_result picks among the geocoder's matches, None takes the first."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -30,7 +28,6 @@ def features_from_place(query, tags, which_result=None):
 
 
 def features_from_point(center_point, tags, dist=1000):
-    """Download OSM features within dist meters of a (latitude, longitude) point."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -54,7 +51,6 @@ def features_from_point(center_point, tags, dist=1000):
 
 
 def features_from_address(address, tags, dist=1000):
-    """Download OSM features within dist meters of a geocoded address."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -79,13 +75,9 @@ def features_from_address(address, tags, dist=1000):
 
 def _normalize_bbox_for_osmnx(bbox, ox):
     """Reorder an ``(n, s, e, w)`` bbox into the order the installed OSMnx wants.
-
-    OSMnx 1.x took ``bbox=(north, south, east, west)``; 2.0 unified every
-    spatial helper on ``bbox=(west, south, east, north)``. A v1-style tuple
-    handed to v2 raises nothing: it builds a degenerate polygon spanning the
-    hemisphere, which Overpass then splits into thousands of sub-queries before
-    timing out.
-    """
+    OSMnx 1.x took ``(north, south, east, west)`` and 2.0 unified on
+    ``(west, south, east, north)``; a v1 tuple handed to v2 raises nothing, but
+    builds a hemisphere-wide polygon Overpass splits into thousands of sub-queries."""
     n, s, e, w = bbox
     try:
         version = getattr(ox, "__version__", "1.0")
@@ -99,7 +91,6 @@ def _normalize_bbox_for_osmnx(bbox, ox):
 
 
 def features_from_bbox(bbox, tags):
-    """Download OSM features inside a ``(north, south, east, west)`` bounding box."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -125,7 +116,6 @@ def features_from_bbox(bbox, tags):
 
 
 def features_from_polygon(polygon, tags):
-    """Download OSM features inside a shapely Polygon or MultiPolygon."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")
@@ -149,7 +139,6 @@ def features_from_polygon(polygon, tags):
 
 
 def features_from_xml(filepath, polygon=None, tags=None, encoding="utf-8"):
-    """Read features from an OSM XML file, optionally filtered by polygon and tags."""
     ox = get_osmnx()
     if ox is None:
         log("OSMnx not available")

@@ -22,9 +22,7 @@ UNSAFE_SFDP_SMOOTHING = {'spring', 'avg_dist', 'graph_dist', 'power_dist'}
 
 
 def _has_isolated_node(G):
-    """True when some node has no neighbor but itself: degree 0, or self-loops
-    only. sfdp aborts on these under several smoothing modes.
-    """
+    """True for a degree-0 or self-loop-only node; sfdp aborts on these."""
     directed = G.is_directed()
     for node in G.nodes():
         linked = any(other != node for other in G.neighbors(node))
@@ -36,7 +34,6 @@ def _has_isolated_node(G):
 
 
 def _graphviz_edges(G):
-    """Return Graphviz-compatible edge indices for scigraphs-utils."""
     num_nodes = len(G.nodes())
     nodes_list = list(G.nodes())
     node_to_idx = {n: i for i, n in enumerate(nodes_list)}
@@ -80,7 +77,6 @@ def _optional_string(value):
 
 
 def _graphviz_default_attrs(engine, iterations, props=None, dimension=None):
-    """Map SciGraphs layout settings to Graphviz graph attributes."""
     K = getattr(props, "sfdp_k", 0.3) if props else 0.3
     maxiter = getattr(props, "sfdp_maxiter", iterations) if props else iterations
     overlap = getattr(props, "sfdp_overlap", "prism") if props else "prism"
@@ -146,7 +142,6 @@ def _graphviz_default_attrs(engine, iterations, props=None, dimension=None):
 
 
 def _scigraphs_utils_graphviz_layout(G, engine, iterations, scale, props=None, dimension=None):
-    """Run a Graphviz layout through the bundled scigraphs-utils wheel."""
     from scigraphs_utils import graphviz_layout
 
     num_nodes, edges = _graphviz_edges(G)
@@ -207,16 +202,13 @@ def _scigraphs_utils_graphviz_layout(G, engine, iterations, scale, props=None, d
 
 
 def _graphviz_engine_layout(G, algorithm, iterations, scale, props=None):
-    """Compute any Graphviz layout exposed by scigraphs-utils."""
     engine = GRAPHVIZ_ENGINES[algorithm]
     return _scigraphs_utils_graphviz_layout(G, engine, iterations, scale, props)
 
 def _yifan_hu_layout(G, iterations, scale, props=None):
     """Yifan Hu scalable force-directed placement, via scigraphs-utils sfdp.
-
     ``props.sfdp_dim`` picks the mode: '2' is flat with Z = 0, '2Z' runs sfdp in
-    2D and derives Z from graph structure, '3' asks Graphviz for native 3D.
-    """
+    2D and derives Z from graph structure, '3' asks Graphviz for native 3D."""
     import time
     start = time.time()
 

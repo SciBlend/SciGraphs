@@ -74,9 +74,7 @@ def _hierarchical_layout_3d(G, scale):
     return positions
 
 def _bipartite_layout_3d(G, scale):
-    """Two node sets on parallel planes. Falls back to a degree split when the
-    graph turns out not to be bipartite.
-    """
+    """Two node sets on parallel planes; degree split when not bipartite."""
     import time
     start = time.time()
     print(f"Computing Bipartite 3D layout for {len(G.nodes())} nodes...")
@@ -118,9 +116,7 @@ def _bipartite_layout_3d(G, scale):
     return positions
 
 def _sugiyama_layout(G, scale):
-    """Layered Sugiyama layout for DAGs, which suits workflow and process
-    diagrams. Cyclic input has edges removed until it is acyclic.
-    """
+    """Layered Sugiyama for DAGs, planar with z = 0; cyclic input loses edges."""
     import time
     start = time.time()
     print(f"Computing Sugiyama layout for {len(G.nodes())} nodes...")
@@ -134,7 +130,6 @@ def _sugiyama_layout(G, scale):
         G = G.to_directed()
 
     if not nx.is_directed_acyclic_graph(G):
-        # Drop a feedback arc set until the graph is acyclic.
         try:
             feedback_edges = list(nx.edge_dfs(G, orientation='reverse'))
             G_dag = G.copy()
@@ -150,16 +145,13 @@ def _sugiyama_layout(G, scale):
     try:
         layers_dict = {}
         for node in nx.topological_sort(G):
-            # Layer is the longest path from any source, so an edge never points
-            # backward or within a layer.
             predecessors = list(G.predecessors(node))
             if not predecessors:
                 layers_dict[node] = 0
             else:
                 layers_dict[node] = max(layers_dict.get(pred, 0) for pred in predecessors) + 1
     except:
-        # BFS from the sources instead, which tolerates a graph the cycle
-        # removal above failed to flatten.
+        # BFS from the sources instead, tolerating a graph still not acyclic.
         layers_dict = {}
         sources = [n for n in G.nodes() if G.in_degree(n) == 0]
         if not sources:
@@ -187,7 +179,6 @@ def _sugiyama_layout(G, scale):
     for layer_idx, layer_nodes in enumerate(layers):
         y = (layer_idx / max(1, max_layer)) * scale * 2 - scale
 
-        # Spread evenly across the layer; Sugiyama stays planar, so z is 0.
         num_in_layer = len(layer_nodes)
         for i, node in enumerate(layer_nodes):
             x = ((i / max(1, num_in_layer - 1)) if num_in_layer > 1 else 0.5) * scale * 2 - scale
@@ -261,7 +252,6 @@ def _circular_hierarchy_layout(G, scale):
             if num_at_level == 1 and level == 0:
                 x, y, z = 0, 0, 0
             else:
-                # The whole figure stays in the XZ plane.
                 angle = (i / num_at_level) * 2 * np.pi
                 x = radius * np.cos(angle)
                 z = radius * np.sin(angle)

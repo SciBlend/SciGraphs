@@ -17,28 +17,20 @@ except ImportError:
                        "extra to enable centrality, clustering, traversal and "
                        "flow analysis")
 
-# Fixed seed for the randomized community algorithms, so the same graph always
-# gives the same partition. See _seeded_igraph.
+# Fixed seed for the randomized community algorithms; see _seeded_igraph.
 COMMUNITY_SEED = 20240517
 
 
 def _networkx_missing(feature, empty=None):
-    """Log why `feature` did not run and return its no-result value.
-
-    `empty` is per-call because these functions do not share a return shape.
+    """Log why `feature` did not run and return `empty`, its no-result value.
     Pass a zero-filled list of the right length wherever the caller writes a
-    mesh attribute: a wrong-length write corrupts the mesh, while an all-zero
-    channel is visibly flat and the log says why.
-    """
+    mesh attribute, since a wrong-length write corrupts the mesh."""
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return empty
 
 def calculate_centrality(graph_data, method='degree'):
-    """Return one centrality value per node, or zeros when networkx is missing.
-
-    `method` is degree, betweenness, closeness or eigenvector. Eigenvector
-    falls back to the numpy solver, then to degree, if it fails to converge.
-    """
+    """One centrality value per node by degree, betweenness, closeness or
+    eigenvector; eigenvector falls back to the numpy solver, then to degree."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Centrality",
                                  empty=[0.0] * len(graph_data.nodes))
@@ -111,7 +103,6 @@ def _build_edge_list(graph_data):
 
 
 def _pysurprise_available():
-    """Check whether the pysurprise package can be imported."""
     try:
         import pysurprise  # noqa: F401
         return True
@@ -138,11 +129,8 @@ _BIN_PERMISSIONS_FIXED = False
 
 
 def _ensure_pysurprise_bin_permissions(bin_dir):
-    """Give the pySurprise compiled binaries execute permission, once per session.
-
-    Blender's extension installer unpacks wheels without preserving the UNIX
-    execute bit, so the SurpriseMe binaries need chmod +x at runtime.
-    """
+    """Chmod +x the pySurprise binaries once per session: Blender's extension
+    installer unpacks wheels without preserving the UNIX execute bit."""
     global _BIN_PERMISSIONS_FIXED
     if _BIN_PERMISSIONS_FIXED:
         return
@@ -159,18 +147,9 @@ def _ensure_pysurprise_bin_permissions(bin_dir):
 
 @contextlib.contextmanager
 def _seeded_igraph(seed):
-    """Pin igraph's random source so community detection is reproducible.
-
-    Several of these algorithms are randomized, so a graph with no single best
-    partition, a ring of communities say, splits into equally good arcs that
-    land differently every run and nothing keyed to them reproduces.
-
-    igraph wants a generator object rather than a seed and defaults to the
-    ``random`` module, so this installs a private ``Random`` and restores the
-    default afterwards, leaving other random streams alone. A no-op without
-    igraph, and it does not reach the pySurprise backends that shell out to
-    their own binaries.
-    """
+    """Pin igraph's random source so community detection is reproducible. It
+    wants a generator object rather than a seed, so this installs a private
+    ``Random`` and restores the default after. No-op without igraph."""
     try:
         import igraph
     except Exception:
@@ -185,13 +164,9 @@ def _seeded_igraph(seed):
 
 def communities_from_edges(edges_int, num_nodes, algorithm='rn', timeout=300,
                            seed=COMMUNITY_SEED):
-    """Return a contiguous community id per node, or None if every backend failed.
-
-    ``edges_int`` is a sequence of (u, v) with 0 <= u, v < num_nodes. Separate
-    from ``detect_communities`` so callers that already hold an edge list, such
-    as the recursive coarsening in the GPU render, do not have to build a
-    graph_data object per level.
-    """
+    """A contiguous community id per node, or None if every backend failed.
+    ``edges_int`` is (u, v) pairs with 0 <= u, v < num_nodes; kept separate from
+    ``detect_communities`` so callers holding an edge list skip graph_data."""
     if not edges_int or num_nodes <= 0:
         return [0] * max(num_nodes, 0)
 
@@ -223,7 +198,6 @@ def communities_from_edges(edges_int, num_nodes, algorithm='rn', timeout=300,
                 if 0 <= idx < num_nodes:
                     cluster_ids[idx] = comm_id
 
-            # Remap arbitrary community IDs to contiguous 0..N-1
             unique_ids = sorted(set(cluster_ids))
             remap = {old: new for new, old in enumerate(unique_ids)}
             return [remap[c] for c in cluster_ids]
@@ -231,10 +205,7 @@ def communities_from_edges(edges_int, num_nodes, algorithm='rn', timeout=300,
             print(f"pySurprise {algorithm} failed: {e}; falling back to networkx")
 
     if not NETWORKX_AVAILABLE:
-        # Last backend, so this is where the function gives up. None is the
-        # documented "everything failed" answer and detect_communities turns it
-        # into one community; this only trades an AttributeError about NoneType
-        # for a message naming the missing extra.
+        # Last backend: None is the documented "everything failed" answer.
         return _networkx_missing("NetworkX community detection")
 
     try:
@@ -261,15 +232,12 @@ def detect_communities(graph_data, algorithm='rn'):
     if not edges_int:
         return [0] * num_nodes
 
-    # None means both backends were unavailable or failed: one group for all.
     result = communities_from_edges(edges_int, num_nodes, algorithm)
     return result if result is not None else [0] * num_nodes
 
 def calculate_shortest_paths(graph_data, source_idx=0):
-    """Return hop counts from ``source_idx`` to every node, zeros without networkx.
-
-    Unreachable nodes get the largest reachable distance plus one.
-    """
+    """Hop counts from ``source_idx`` to every node, zeros without networkx.
+    Unreachable nodes get the largest reachable distance plus one."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Shortest path lengths",
                                  empty=[0] * len(graph_data.nodes))
@@ -296,13 +264,9 @@ def calculate_shortest_paths(graph_data, source_idx=0):
         return [0] * len(graph_data.nodes)
 
 def apply_advanced_clustering(graph_data, algorithm='rn', resolution=1.0, seed=0, threshold=1e-7):
-    """Detect communities (CPM, Infomap, RB, RN, RNSC, SCluster, UVCluster) and score them.
-
-    Returns a dict of cluster_ids, cluster_sizes, surprise, modularity,
-    clustering_coefficients and num_clusters. None without networkx, which owns
-    both the modularity and the clustering coefficients: the alternative is a
-    partition with no quality metric attached.
-    """
+    """Detect communities (CPM, Infomap, RB, RN, RNSC, SCluster, UVCluster) and
+    score them: cluster_ids, cluster_sizes, surprise, modularity,
+    clustering_coefficients, num_clusters. None without networkx."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Advanced clustering")
 
@@ -346,11 +310,9 @@ def apply_advanced_clustering(graph_data, algorithm='rn', resolution=1.0, seed=0
     }
 
 def calculate_directed_centrality(graph_data, method='pagerank'):
-    """Return one directed-graph centrality value per node, zeros without networkx.
-
+    """One directed-graph centrality value per node, zeros without networkx.
     `method` is pagerank, hub_score, authority_score (HITS), in_degree,
-    out_degree or katz. Non-converging methods come back as zeros.
-    """
+    out_degree or katz; non-converging methods come back as zeros."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Directed centrality",
                                  empty=[0.0] * len(graph_data.nodes))
@@ -402,11 +364,8 @@ def calculate_directed_centrality(graph_data, method='pagerank'):
     return [centrality.get(i, 0.0) for i in range(len(graph_data.nodes))]
 
 def detect_graph_patterns(graph_data):
-    """Return structural flags for a directed graph (DAG, tree, connectivity, cycles).
-
-    None without networkx: every entry is a networkx predicate, so there is no
-    partial answer to give.
-    """
+    """Structural flags for a directed graph: DAG, tree, connectivity, cycles.
+    None without networkx, every entry being a networkx predicate."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Graph pattern detection")
 
@@ -443,12 +402,9 @@ def detect_graph_patterns(graph_data):
     return patterns
 
 def analyze_flow_structure(graph_data):
-    """Classify nodes as sources, sinks, bottlenecks or intermediaries.
-
-    Returns a dict of those lists plus per-node ``node_types`` codes and
-    betweenness, or None without networkx. Bottlenecks are the ten highest
-    betweenness scores above zero.
-    """
+    """Classify nodes as sources, sinks, bottlenecks or intermediaries, with
+    per-node ``node_types`` codes and betweenness. Bottlenecks are the ten
+    highest betweenness scores above zero. None without networkx."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Flow structure analysis")
 
@@ -475,19 +431,20 @@ def analyze_flow_structure(graph_data):
     sorted_betweenness = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
     top_bottlenecks = [node for node, score in sorted_betweenness[:10] if score > 0]
 
-    # Codes are part of the return contract; do not renumber them.
+    # Codes 1 source, 2 sink, 3 bottleneck, 4 intermediary: return contract,
+    # do not renumber.
     node_types = []
     for i in range(len(graph_data.nodes)):
         if i in sources:
-            node_types.append(1)  # Source
+            node_types.append(1)
         elif i in sinks:
-            node_types.append(2)  # Sink
+            node_types.append(2)
         elif i in top_bottlenecks:
-            node_types.append(3)  # Bottleneck
+            node_types.append(3)
         elif i in intermediaries:
-            node_types.append(4)  # Intermediary
+            node_types.append(4)
         else:
-            node_types.append(0)  # Isolated
+            node_types.append(0)  # isolated
     
     return {
         'sources': sources,
@@ -537,12 +494,9 @@ def find_strongly_connected_components(graph_data):
 
 
 def calculate_flow_distances(graph_data):
-    """Return each node's distance in propagation steps from the nearest source.
-
-    Sources are the nodes with no incoming edges and sit at 0. With no such
-    node, the top decile by out-degree stands in. Unreachable nodes get the
-    largest distance plus one, so the flow animation has no gaps.
-    """
+    """Distance in propagation steps from the nearest source. Sources have no
+    incoming edges and sit at 0; with no such node the top decile by out-degree
+    stands in. Unreachable nodes get the largest distance plus one."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Flow distances",
                                  empty=[0] * len(graph_data.nodes))
@@ -561,8 +515,6 @@ def calculate_flow_distances(graph_data):
     sources = [node for node in G.nodes() if G.in_degree(node) == 0]
 
     if not sources:
-        # A cyclic graph has no source at all, so stand in the top decile by
-        # out-degree rather than returning nothing.
         out_degrees = [(node, G.out_degree(node)) for node in G.nodes()]
         out_degrees.sort(key=lambda x: x[1], reverse=True)
         num_sources = max(1, len(G.nodes()) // 10)
@@ -602,10 +554,8 @@ def calculate_flow_distances(graph_data):
 
 def calculate_bfs_traversal(graph_data, start_nodes=None, is_directed=False):
     """Breadth-first traversal returning per-node order, depth and parent.
-
-    ``start_nodes`` of None picks the highest-degree node. Nodes never reached
-    keep -1 in all three lists. None without networkx.
-    """
+    ``start_nodes`` of None picks the highest-degree node; nodes never reached
+    keep -1 in all three lists. None without networkx."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("BFS traversal")
 
@@ -678,11 +628,9 @@ def calculate_bfs_traversal(graph_data, start_nodes=None, is_directed=False):
 
 def calculate_dfs_traversal(graph_data, start_nodes=None, is_directed=False):
     """Depth-first traversal returning per-node order, depth and parent.
-
-    ``start_nodes`` of None picks the highest-degree node. Nodes never reached
-    keep -1 in all three lists. None without networkx. Recursive, so very deep
-    graphs can hit the interpreter recursion limit.
-    """
+    ``start_nodes`` of None picks the highest-degree node; nodes never reached
+    keep -1 in all three lists. Recursive, so very deep graphs can hit the
+    interpreter recursion limit."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("DFS traversal")
 

@@ -40,32 +40,21 @@ class SeedContext:
 
 @contextmanager
 def get_seed_context(seed: int) -> Generator[SeedContext, None, None]:
-    """Run a block deterministically, then put the previous state back.
-
-        with get_seed_context(42):
-            value = random.random()
-    """
+    """Run a block deterministically, then put the previous state back."""
     ctx = SeedContext(seed)
     with ctx:
         yield ctx
 
 
 def set_deterministic_seed(seed: int) -> None:
-    """Seed Python and NumPy globally, until something reseeds them.
-
-    Use get_seed_context() when the effect should be temporary.
-    """
+    """Seed Python and NumPy globally; use get_seed_context() for a temporary effect."""
     random.seed(seed)
     if HAS_NUMPY:
         np.random.seed(seed)
 
 
 def derive_seed(base_seed: int, *components: str) -> int:
-    """Derive a seed from a base seed and string components.
-
-    Gives layout, sampling and geometry seeds that are independent of each
-    other but reproducible from the same base.
-    """
+    """Independent but reproducible seeds from a base seed and string components."""
     import hashlib
     combined = f"{base_seed}:" + ":".join(components)
     hash_bytes = hashlib.sha256(combined.encode()).digest()
@@ -84,43 +73,34 @@ class DeterministicGenerator:
             self._np_rng = None
 
     def random(self) -> float:
-        """Return random float in [0, 1)."""
         return self._rng.random()
 
     def randint(self, a: int, b: int) -> int:
-        """Return random integer in [a, b]."""
         return self._rng.randint(a, b)
 
     def choice(self, seq):
-        """Return random element from sequence."""
         return self._rng.choice(seq)
 
     def shuffle(self, seq) -> None:
-        """Shuffle sequence in place."""
         self._rng.shuffle(seq)
 
     def uniform(self, a: float, b: float) -> float:
-        """Return random float in [a, b]."""
         return self._rng.uniform(a, b)
 
     def gauss(self, mu: float, sigma: float) -> float:
-        """Return Gaussian random value."""
         return self._rng.gauss(mu, sigma)
 
     def numpy_random(self, *args, **kwargs):
-        """NumPy-compatible random array."""
         if self._np_rng is None:
             raise RuntimeError("NumPy not available")
         return self._np_rng.random(*args, **kwargs)
 
     def numpy_normal(self, loc: float = 0.0, scale: float = 1.0, size=None):
-        """NumPy-compatible normal distribution."""
         if self._np_rng is None:
             raise RuntimeError("NumPy not available")
         return self._np_rng.normal(loc, scale, size)
 
     def numpy_uniform(self, low: float = 0.0, high: float = 1.0, size=None):
-        """NumPy-compatible uniform distribution."""
         if self._np_rng is None:
             raise RuntimeError("NumPy not available")
         return self._np_rng.uniform(low, high, size)
@@ -131,12 +111,10 @@ _current_pipeline_seed: Optional[int] = None
 
 
 def get_pipeline_seed() -> Optional[int]:
-    """Get the current pipeline seed, if set."""
     return _current_pipeline_seed
 
 
 def set_pipeline_seed(seed: Optional[int]) -> None:
-    """Set the current pipeline seed (used by executor)."""
     global _current_pipeline_seed
     _current_pipeline_seed = seed
     if seed is not None:

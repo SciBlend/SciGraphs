@@ -1,18 +1,10 @@
-"""Compact exports of the pipeline schema, for tools that generate specs.
-
-Both artifacts derive from ``SCHEMA``, so neither can describe a field that no
-longer exists. ``build_digest`` is a prose listing: each field's type, default
-and allowed values, plus the one-line description saying when the default is
-the wrong choice. ``build_json_schema`` is the same thing as JSON Schema, fit
-for editor autocompletion or for constrained generation. Neither includes the
-``ops`` section: it executes operators, and nothing that writes a spec from
-outside should know it exists.
-"""
+"""Compact exports of the pipeline schema, for tools that generate specs. Both
+derive from ``SCHEMA``, so neither can name a field that no longer exists;
+``build_digest`` is prose and ``build_json_schema`` is JSON Schema. No ``ops``."""
 
 from .schema import SCHEMA
 
-# Sections a generated specification may use. `ops` is absent by design; see
-# safety.py for why.
+# Sections a generated specification may use; `ops` is absent by design.
 ALLOWED_SECTIONS = (
     "meta", "dataset", "analysis", "layout",
     "visual", "labels", "world", "lighting", "render", "exports",
@@ -78,8 +70,8 @@ def build_json_schema():
         "type": "object",
         "properties": properties,
         "required": ["meta"],
-        # A generated spec must not invent sections; `ops` in particular would be
-        # stripped afterwards, so there is no point letting it be produced.
+        # A generated spec must not invent sections, and `ops` would be stripped
+        # afterwards anyway.
         "additionalProperties": False,
     }
 

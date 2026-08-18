@@ -4,10 +4,8 @@ from .get_osmnx import get_osmnx
 
 def project_graph(G, to_crs=None):
     """Project a lat/lon graph, to to_crs or to the local UTM zone when it is None.
-
     to_crs takes 'EPSG:27700', '27700' or 27700 alike. Returns
-    ``(projected_graph, crs_string)``, or ``(None, message)`` on failure.
-    """
+    ``(projected_graph, crs_string)``, or ``(None, message)`` on failure."""
     ox = get_osmnx()
     if ox is None:
         return None, "OSMnx not available"
@@ -35,11 +33,8 @@ def project_graph(G, to_crs=None):
 
 
 def is_graph_projected(G):
-    """True if the graph's CRS is projected, False if it is lat/lon.
-
-    Falls back to reading the first node's coordinates when pyproj is missing,
-    on the assumption that anything inside +/-180 by +/-90 is degrees.
-    """
+    """True if the graph's CRS is projected. Without pyproj it reads the first node's
+    coordinates, assuming anything inside +/-180 by +/-90 is degrees."""
     if G is None:
         return False
     crs = G.graph.get("crs")

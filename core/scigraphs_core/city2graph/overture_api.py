@@ -5,8 +5,7 @@ import os
 from scigraphs_core.logger import log
 
 
-# The public rate-limited key Overture hands out for evaluation, and what the
-# add-on preference ships with, so it is also the right default here.
+# Overture's public rate-limited evaluation key, which the add-on preference ships.
 DEMO_API_KEY = "DEMO-API-KEY"
 
 # Fallback channel outside Blender (notebooks, CI, the standalone wheel).
@@ -14,12 +13,9 @@ API_KEY_ENV_VAR = "OVERTURE_API_KEY"
 
 
 def get_api_key(api_key=None):
-    """Resolve the Overture Maps API key for a request.
-
-    Tries the explicit argument, then the OVERTURE_API_KEY environment
-    variable, then DEMO_API_KEY. Never returns None. Callers supply the key
-    because this module knows nothing about the add-on preferences.
-    """
+    """The Overture Maps API key: explicit argument, then OVERTURE_API_KEY, then
+    DEMO_API_KEY. Never None; callers supply it because this module knows nothing
+    about add-on preferences."""
     for candidate in (api_key, os.environ.get(API_KEY_ENV_VAR)):
         if candidate and candidate.strip():
             return candidate.strip()
@@ -80,13 +76,10 @@ def _make_api_request(endpoint, params, api_key=None):
 
 
 def query_overture_buildings(bbox, limit=10000, api_key=None):
-    """Query building footprints from Overture Maps within ``bbox``.
-
-    ``bbox`` is (north, south, east, west); the endpoint takes a center and a
-    radius instead, capped at 5 km, so the results are filtered back to the
-    bbox on their centroids. ``limit`` requests that many features and the
-    server cap still applies on top; 0 or less means the API default.
-    """
+    """Query building footprints within ``bbox``, which is (north, south, east,
+    west). The endpoint takes a center and a radius capped at 5 km instead, so
+    results are filtered back to the bbox on their centroids. ``limit`` asks for
+    that many features with the server cap on top; 0 or less means the default."""
     north, south, east, west = bbox
     
     center_lat = (north + south) / 2
@@ -173,11 +166,8 @@ def query_overture_buildings(bbox, limit=10000, api_key=None):
 
 
 def _place_category_text(value):
-    """Flatten an Overture category value into one lowercase searchable string.
-
-    Depending on the serialization, place categories arrive as a dict of
-    ``primary`` plus ``alternate``, a list, or a plain string.
-    """
+    """Flatten an Overture category into one lowercase searchable string: depending
+    on the serialization it arrives as a dict, a list, or a plain string."""
     if value is None:
         return ""
     if isinstance(value, dict):
@@ -194,7 +184,6 @@ def _place_category_text(value):
 
 
 def _filter_places_by_keywords(gdf, keywords):
-    """Filter a places GeoDataFrame to rows whose category matches a keyword."""
     if not keywords:
         return gdf
 
@@ -219,11 +208,7 @@ def _filter_places_by_keywords(gdf, keywords):
 
 
 def query_overture_places(bbox, categories=None, limit=10000, api_key=None):
-    """Query places (POIs) from Overture Maps within ``bbox``.
-
-    ``categories`` filters client-side: a place is kept when its category text
-    contains any of the keywords.
-    """
+    """Places (POIs) within ``bbox``; ``categories`` filters client-side on keywords."""
     north, south, east, west = bbox
     
     center_lat = (north + south) / 2
@@ -293,7 +278,6 @@ def query_overture_places(bbox, categories=None, limit=10000, api_key=None):
 
 
 def query_overture_addresses(bbox, limit=10000, api_key=None):
-    """Query addresses from Overture Maps within ``bbox``."""
     north, south, east, west = bbox
     
     center_lat = (north + south) / 2
@@ -347,11 +331,9 @@ def query_overture_addresses(bbox, limit=10000, api_key=None):
 
 
 def query_overture_transportation(bbox, limit=10000, api_key=None):
-    """Query transportation infrastructure from Overture Maps.
-
-    Unlike the other queries here, the results are not filtered back to
-    ``bbox``, so features from the surrounding radius come through too.
-    """
+    """Query transportation infrastructure from Overture Maps. Unlike the other
+    queries here the results are not filtered back to ``bbox``, so features from
+    the surrounding radius come through too."""
     north, south, east, west = bbox
     
     center_lat = (north + south) / 2

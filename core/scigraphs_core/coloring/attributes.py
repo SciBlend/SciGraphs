@@ -1,9 +1,5 @@
-"""Helpers to enumerate scalar mesh attributes and read their numeric range.
-
-Coloring only handles scalar attributes (``FLOAT``, ``INT``, ``INT8``) on the
-POINT/EDGE/CORNER/FACE domains. Everything returned is a plain Python type, so
-the UI can build enums and labels without holding live RNA structs.
-"""
+"""Scalar mesh attributes and their numeric range: FLOAT/INT/INT8 on
+POINT/EDGE/CORNER/FACE only, returned as plain Python types, never live RNA."""
 
 from __future__ import annotations
 
@@ -18,13 +14,11 @@ SCALAR_DATA_TYPES = ("FLOAT", "INT", "INT8")
 
 COLORABLE_DOMAINS = ("POINT", "EDGE", "CORNER", "FACE")
 
-# Attributes SciGraphs bakes itself. They are normalized derivatives of a real
-# attribute, so coloring by them would be a lossy round-trip.
+# SciGraphs bakes these normalized derivatives; coloring by them is lossy.
 INTERNAL_ATTRIBUTE_SUFFIXES = (NORM_ATTRIBUTE_SUFFIX,)
 
 
 def is_internal_attribute(name: str) -> bool:
-    """True for attributes SciGraphs generates and hides from the UI."""
     if not name:
         return True
     if name.startswith("."):
@@ -32,15 +26,9 @@ def is_internal_attribute(name: str) -> bool:
     return any(name.endswith(suffix) for suffix in INTERNAL_ATTRIBUTE_SUFFIXES)
 
 
-# --- Discovery ---
-
 def list_scalar_attributes(mesh) -> List[Tuple[str, str, str]]:
-    """List ``(name, data_type, domain)`` for every scalar attribute on the mesh.
-
-    Skips Blender internals (``.position``, ``.corner_vert`` and anything else
-    starting with a dot) and the helpers SciGraphs bakes itself. Order follows
-    ``mesh.attributes``, so the UI can count on it being stable across calls.
-    """
+    """``(name, data_type, domain)`` per scalar attribute, skipping dot-prefixed
+    Blender internals and SciGraphs' helpers. Order follows ``mesh.attributes``."""
     if mesh is None or not hasattr(mesh, "attributes"):
         return []
 
@@ -74,14 +62,9 @@ def find_attribute(mesh, name: str):
     return mesh.attributes.get(name)
 
 
-# --- Value extraction ---
-
 def read_attribute_values(mesh, name: str) -> np.ndarray:
-    """Return the attribute values as a 1D float ``numpy`` array.
-
-    Empty when the attribute is missing, has no data, or has an unsupported
-    type. Non-finite samples are kept; ``values_to_rgba`` handles them.
-    """
+    """Attribute values as a 1D float ``numpy`` array, empty when missing or
+    unsupported. Non-finite samples are kept; ``values_to_rgba`` handles them."""
     attr = find_attribute(mesh, name)
     if attr is None:
         return np.zeros(0, dtype=float)
@@ -90,8 +73,7 @@ def read_attribute_values(mesh, name: str) -> np.ndarray:
     if not data:
         return np.zeros(0, dtype=float)
 
-    # ``data`` is an RNA collection and always iterable, but Pylint only infers
-    # ``Optional[Any]`` through ``getattr``, hence the manual guard.
+    # RNA collections are always iterable; the guard is for Pylint's inference.
     try:
         count = len(data)  # type: ignore[arg-type]
     except TypeError:
@@ -126,14 +108,9 @@ def attribute_value_range(
     return (float(values[finite].min()), float(values[finite].max()))
 
 
-# --- Domain mapping ---
-
 def color_domain_for(source_domain: str, mesh=None) -> str:
-    """Pick a color-attribute domain compatible with a source attribute domain.
-
-    Blender color attributes only live on ``POINT`` or ``CORNER``, so ``EDGE``
-    and ``FACE`` sources get promoted to ``CORNER``.
-    """
+    """Pick a color-attribute domain for a source domain. Blender color
+    attributes live only on POINT or CORNER, so EDGE and FACE become CORNER."""
     domain = (source_domain or "POINT").upper()
     if domain == "POINT":
         return "POINT"
@@ -149,12 +126,8 @@ def expand_to_loops(
     mesh,
     edge_values: Iterable[float],
 ) -> np.ndarray:
-    """Convert per-edge values into per-loop values for a Blender mesh.
-
-    Works through ``loop.edge_index``, which only meshes built with faces
-    (most City2Graph polygon graphs) populate. Loops without a valid edge
-    get ``0.0``.
-    """
+    """Convert per-edge values into per-loop values through ``loop.edge_index``,
+    which only meshes built with faces populate; loops without one get 0.0."""
     edge_arr = np.asarray(list(edge_values), dtype=float)
     loops = getattr(mesh, "loops", None)
     if loops is None or len(loops) == 0 or edge_arr.size == 0:
@@ -208,8 +181,7 @@ def values_for_color_domain(
     if target == "POINT":
         if src == "POINT":
             return arr
-        # Nothing exact for non-POINT -> POINT, so average each vertex's
-        # incident edges or faces.
+        # No exact non-POINT -> POINT, so average each vertex's incidences.
         if src == "EDGE":
             verts = getattr(mesh, "vertices", None)
             edges = getattr(mesh, "edges", None)

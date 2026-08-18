@@ -1,14 +1,7 @@
 # Declarative pipeline system for reproducible graph visualization and analysis.
-#
-# Nothing is imported eagerly (see scigraphs_core/__init__.py). Eagerly pulling
-# Blender-bound siblings would make schema/parser/determinism unusable outside
-# Blender.
-#
-# Two tables: callers need re-exported names (PipelineSchema, …), and _LAZY must
-# stay string-valued — tests/purity/test_core_purity.py follows strings only via
-# ast.literal_eval; tuples would silently drop edges from the purity graph.
-
-# Submodule -> relative import path (purity test reads these).
+# Nothing imports eagerly: Blender-bound siblings would make schema, parser and
+# determinism unusable outside Blender. _LAZY must stay string-valued, because
+# test_core_purity.py reads it with ast.literal_eval.
 _LAZY = {
     'determinism': '.determinism',
     'digest': '.digest',
@@ -18,9 +11,9 @@ _LAZY = {
     'schema': '.schema',
 }
 
-# Re-exported name -> (submodule, attribute).
-# Executor/registry stay out: they need a live scene; import from
-# SciGraphs.core.repro.executor instead.
+# Re-exported name -> (submodule, attribute). Executor and registry stay out:
+# they need a live Blender scene, and listing them here once made every lookup
+# raise from inside an operator. Import from SciGraphs.core.repro.executor.
 _LAZY_ATTRS = {
     'PipelineSchema': ('.schema', 'PipelineSchema'),
     'validate_pipeline': ('.schema', 'validate_pipeline'),

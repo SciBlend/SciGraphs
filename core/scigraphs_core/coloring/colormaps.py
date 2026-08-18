@@ -1,8 +1,5 @@
-"""Colormap catalog and value-to-RGBA helpers.
-
-Colors come from matplotlib when it is installed, otherwise from numpy
-interpolation over hard-coded stops, so this works in a vanilla Blender.
-"""
+"""Colormap catalog and value-to-RGBA helpers. Colors come from matplotlib when
+installed, otherwise from numpy interpolation over hard-coded stops."""
 
 from __future__ import annotations
 
@@ -13,18 +10,13 @@ from typing import Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 
 
-# --- Colormap metadata ---
-
-# Each entry: (identifier, label, family).
 COLORMAP_CATALOG: Tuple[Tuple[str, str, str], ...] = (
-    # Perceptual sequential
     ("viridis", "Viridis", "Perceptual"),
     ("plasma", "Plasma", "Perceptual"),
     ("inferno", "Inferno", "Perceptual"),
     ("magma", "Magma", "Perceptual"),
     ("cividis", "Cividis", "Perceptual"),
     ("turbo", "Turbo", "Perceptual"),
-    # Sequential
     ("Greys", "Greys", "Sequential"),
     ("Blues", "Blues", "Sequential"),
     ("Greens", "Greens", "Sequential"),
@@ -39,7 +31,6 @@ COLORMAP_CATALOG: Tuple[Tuple[str, str, str], ...] = (
     ("cool", "Cool", "Sequential"),
     ("copper", "Copper", "Sequential"),
     ("bone", "Bone", "Sequential"),
-    # Diverging
     ("coolwarm", "Cool-Warm", "Diverging"),
     ("bwr", "Blue-White-Red", "Diverging"),
     ("seismic", "Seismic", "Diverging"),
@@ -50,15 +41,13 @@ COLORMAP_CATALOG: Tuple[Tuple[str, str, str], ...] = (
     ("PiYG", "Pink-Yellow-Green", "Diverging"),
     ("PRGn", "Purple-Green", "Diverging"),
     ("BrBG", "Brown-Blue-Green", "Diverging"),
-    # Cyclic
     ("hsv", "HSV", "Cyclic"),
     ("twilight", "Twilight", "Cyclic"),
     ("twilight_shifted", "Twilight Shifted", "Cyclic"),
 )
 
 
-# Subset surfaced as instant chips in the floating toolbar. Every entry needs a
-# _FALLBACK_STOPS definition or its chip renders nothing without matplotlib.
+# Toolbar chips; each needs a _FALLBACK_STOPS entry or renders nothing.
 QUICK_COLORMAPS: Tuple[str, ...] = (
     "viridis",
     "plasma",
@@ -84,10 +73,8 @@ COLORMAP_ICONS = {
 }
 
 
-# --- Numpy-only fallback control points ---
-
-# Uniformly spaced control stops np.interp rebuilds a gradient from. Colors are
-# taken from the matplotlib LUTs, same orientation (low value -> first stop).
+# Uniformly spaced stops np.interp rebuilds a gradient from, taken from the
+# matplotlib LUTs in the same orientation (low value -> first stop).
 _FALLBACK_STOPS: dict = {
     "viridis": [
         (0.267, 0.005, 0.329),
@@ -325,8 +312,6 @@ _FALLBACK_STOPS: dict = {
 }
 
 
-# --- Public API ---
-
 def colormap_items_for_enum() -> List[Tuple[str, str, str]]:
     """Return ``(identifier, label, description)`` tuples for an EnumProperty."""
     items = []
@@ -350,9 +335,6 @@ def sample_colormap(name: str, samples: int = 8, reverse: bool = False) -> np.nd
     return _resolve_rgba(name, norm)
 
 
-# --- Normalization ---
-
-# EnumProperty-ready description of every normalization mode.
 NORM_MODES: Tuple[Tuple[str, str, str], ...] = (
     (
         "LINEAR",
@@ -387,20 +369,16 @@ NORM_MODE_IDS: Tuple[str, ...] = tuple(mode[0] for mode in NORM_MODES)
 
 DEFAULT_NORM_MODE = "LINEAR"
 
-# These depend on the whole distribution, not one sample, so no shader math can
-# express them. The result is baked into a helper attribute the material reads.
+# Depend on the whole distribution, so no shader math expresses them; the
+# result is baked into a helper attribute the material reads.
 BAKED_NORM_MODES: Tuple[str, ...] = ("RANK", "QUANTILE")
 
-# Suffix of the baked helper attribute written for BAKED_NORM_MODES.
-NORM_ATTRIBUTE_SUFFIX = "_scignorm"
+NORM_ATTRIBUTE_SUFFIX = "_scignorm"  # suffix of that baked attribute
 
-# log10 is undefined at 0 and below, so LOG floors every sample at ``eps`` and
-# zeros/negatives share the lowest color. How far below the data ``eps`` sits
-# matters: a fixed floor three decades under the smallest positive sample handed
-# 54% of the ramp to a dozen zeros. Solving gap / (gap + span) = f for
-# span = log10(hi) - log10(min_positive) gives gap = f * span / (1 - f) decades,
-# which bounds the non-positive bucket at ``_LOG_ZERO_RAMP_FRACTION`` of the
-# ramp whatever the data span.
+# LOG floors every sample at ``eps``, so zeros and negatives share the lowest
+# color. A fixed floor three decades under the smallest positive sample handed
+# 54% of the ramp to a dozen zeros; eps is solved from
+# gap = f * span / (1 - f) decades to bound them at _LOG_ZERO_RAMP_FRACTION.
 _LOG_EPS_DECADES = 1e-3
 _LOG_EPS_FLOOR = 1e-30
 _LOG_ZERO_RAMP_FRACTION = 0.1
@@ -409,12 +387,9 @@ _LOG_MIN_GAP_DECADES = 0.05
 
 @dataclass
 class NormalizationPlan:
-    """Bounds and parameters the shader needs to reproduce :func:`normalize_values`.
-
-    ``lo``/``hi`` are post-transform ``Map Range`` bounds: raw units for
-    ``LINEAR``, log10 units for ``LOG``, ``(0.0, 1.0)`` when baked.
-    ``data_lo``/``data_hi`` stay in raw data units for the UI.
-    """
+    """Bounds the shader needs to reproduce :func:`normalize_values`. ``lo``/``hi``
+    are post-transform Map Range bounds (raw for LINEAR, log10 for LOG,
+    ``(0, 1)`` when baked); ``data_lo``/``data_hi`` stay in raw data units."""
 
     mode: str = DEFAULT_NORM_MODE
     lo: float = 0.0
@@ -441,12 +416,9 @@ def _effective_bounds(
     clip_low_pct: float,
     clip_high_pct: float,
 ) -> Tuple[float, float]:
-    """Return data bounds after optional percentile clipping.
-
-    The percentile pass runs only when a slider moved, so the default path
-    stays bit-for-bit identical to plain ``nanmin``/``nanmax`` rather than
-    trusting ``nanpercentile(x, 0) == nanmin(x)``.
-    """
+    """Data bounds after optional percentile clipping. The percentile pass runs
+    only when a slider moved, so the default path stays bit-for-bit identical to
+    plain ``nanmin``/``nanmax``."""
     low = float(clip_low_pct)
     high = float(clip_high_pct)
 
@@ -488,11 +460,8 @@ def _log_epsilon(values: np.ndarray, upper: float) -> float:
 
 
 def _average_ranks(values: np.ndarray) -> np.ndarray:
-    """Return the mid-rank of every sample, ties sharing their average rank.
-
-    Ordinal ranking (``argsort(argsort(x))``) gives two identical values two
-    different colors, which the shader cannot reproduce.
-    """
+    """Mid-rank of every sample, ties sharing their average rank. Ordinal
+    ranking gives two identical values two colors the shader cannot match."""
     _uniq, inverse, counts = np.unique(values, return_inverse=True, return_counts=True)
     cumulative = np.cumsum(counts)
     starts = cumulative - counts
@@ -509,13 +478,9 @@ def normalize_values(
     clip_low_pct: float = 0.0,
     clip_high_pct: float = 100.0,
 ) -> Tuple[np.ndarray, np.ndarray, NormalizationPlan]:
-    """Normalize ``values`` into ``[0, 1]``.
-
-    Returns ``(norm, finite_mask, plan)``, non-finite samples coming back as
-    ``NaN`` and ``False``. The shader mirrors this order: percentile clip,
-    ``vmin``/``vmax`` override, transform, gamma. Colormap reversal happens at
-    sampling time, not here.
-    """
+    """Normalize ``values`` into ``[0, 1]``, returning ``(norm, finite_mask,
+    plan)`` with non-finite samples as ``NaN`` and ``False``. The shader mirrors
+    this order: percentile clip, vmin/vmax override, transform, gamma."""
     arr = _as_float_array(values)
     mode = (mode or DEFAULT_NORM_MODE).upper()
     if mode not in NORM_MODE_IDS:
@@ -630,11 +595,8 @@ def values_to_rgba(
     clip_low_pct: float = 0.0,
     clip_high_pct: float = 100.0,
 ) -> np.ndarray:
-    """Map a sequence of floats to an ``(N, 4)`` RGBA array.
-
-    Non-finite values become ``nan_color`` instead of raising, and empty
-    ``values`` gives an empty ``(0, 4)`` array.
-    """
+    """Map a sequence of floats to an ``(N, 4)`` RGBA array, non-finite values
+    becoming ``nan_color`` instead of raising."""
     arr = _as_float_array(values)
     if arr.size == 0:
         return np.zeros((0, 4), dtype=float)
@@ -664,11 +626,8 @@ def normalize_range(
     clip_low_pct: float = 0.0,
     clip_high_pct: float = 100.0,
 ) -> Tuple[float, float]:
-    """Return the ``(vmin, vmax)`` pair used by ``values_to_rgba``.
-
-    Always raw data units, whatever the normalization mode, and
-    ``(0.0, 1.0)`` when no sample is finite.
-    """
+    """The ``(vmin, vmax)`` pair used by ``values_to_rgba``, always raw data
+    units whatever the mode, and ``(0.0, 1.0)`` when no sample is finite."""
     arr = _as_float_array(values)
     if arr.size == 0:
         return (0.0, 1.0)
@@ -685,10 +644,7 @@ def norm_mode_items_for_enum() -> List[Tuple[str, str, str]]:
     return [(ident, label, description) for ident, label, description in NORM_MODES]
 
 
-# --- Internals ---
-
 def _resolve_rgba(cmap_name: str, norm: np.ndarray) -> np.ndarray:
-    """Try matplotlib first, otherwise interpolate the fallback stops."""
     try:
         from matplotlib import colormaps as mpl_colormaps
 
@@ -701,8 +657,7 @@ def _resolve_rgba(cmap_name: str, norm: np.ndarray) -> np.ndarray:
             rgba = rgba.reshape(1, -1)
         return rgba
     except Exception:  # pylint: disable=broad-except
-        # Missing install, incompatible version, deprecated API: all the same
-        # answer here.
+        # Missing install, bad version, deprecated API: same answer here.
         return _fallback_rgba(cmap_name, norm)
 
 

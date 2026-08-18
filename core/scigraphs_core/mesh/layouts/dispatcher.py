@@ -11,16 +11,10 @@ from .yifan_hu import *
 
 def apply_graph_layout(obj, algorithm='SPRING_3D', iterations=50, scale=5.0, props=None,
                        edge_pairs=None):
-    """Run a layout algorithm and store the result in ``obj["node_positions"]``.
-
-    *props* supplies the algorithm-specific parameters and may be None.
-    *edge_pairs* carries the topology of a mesh-native graph object, which keeps
-    its edges in ``mesh.edges`` rather than in an ``edges_data`` string; this
-    package never reads meshes, so the caller passes
-    ``mesh_utils.mesh_edge_pairs(obj, obj["num_nodes"])``. It is ignored when
-    ``edges_data`` exists, and an object with neither is refused rather than laid
-    out as isolated points.
-    """
+    """Run a layout and store the result in ``obj["node_positions"]``. *props*
+    supplies algorithm-specific parameters and may be None. *edge_pairs* carries
+    a mesh-native object's topology, since this package never reads meshes; an
+    object with neither it nor ``edges_data`` is refused, not laid out flat."""
     start_time = time.time()
     _reset_layout_rng()
 

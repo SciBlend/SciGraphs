@@ -1,13 +1,8 @@
-"""SciGraphs core: analysis with no Blender.
-
-Graph algorithms, layouts, color, I/O, OSMnx/city2graph. Mesh/scene code stays
-in the add-on. This package must never import the add-on
-(``scripts/extract/test_core_standalone.py``).
-
-Submodules load on first use. Keep ``_LAZY`` values as plain strings — the
-purity test follows strings only via ``literal_eval``. numpy is required;
-everything else is optional and guarded.
-"""
+"""SciGraphs core: analysis with no Blender. Graph algorithms, layouts, color,
+I/O, OSMnx and city2graph; mesh and scene code stays in the add-on, which this
+package must never import (``scripts/extract/test_core_standalone.py``). numpy is
+required and the rest optional. Submodules load on first use, and ``_LAZY`` values
+must stay plain strings: the purity test reads the table with ``literal_eval``."""
 
 _LAZY = {
     'algorithms': '.algorithms',

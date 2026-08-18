@@ -4,11 +4,8 @@ from .projection import is_graph_projected
 
 
 def add_node_elevations_raster(G, filepath, band=1):
-    """Sample node elevations from a local DEM raster, or a list of them.
-
-    Nothing reprojects on the way in, so the graph has to already be in the
-    raster's CRS or the samples land in the wrong place.
-    """
+    """Sample node elevations from a local DEM raster, or a list of them. Nothing
+    reprojects, so a graph not already in the raster's CRS samples the wrong place."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -31,12 +28,9 @@ def add_node_elevations_raster(G, filepath, band=1):
 
 
 def _add_elevations_from_raster_manual(G, filepath, band=1):
-    """Sample a raster with rasterio when OSMnx cannot.
-
-    A list of files is mosaicked into a VRT through GDAL; without GDAL only the
-    first file is read. Nodata and misses become 0.0, not None, so callers cannot
-    tell a sea-level node from an unsampled one.
-    """
+    """Sample a raster with rasterio when OSMnx cannot. A list of files is mosaicked
+    into a VRT through GDAL, and without GDAL only the first file is read. Nodata
+    and misses become 0.0, so a sea-level node reads like an unsampled one."""
     try:
         import rasterio
         from rasterio.sample import sample_gen
@@ -78,11 +72,8 @@ def _add_elevations_from_raster_manual(G, filepath, band=1):
 
 
 def add_node_elevations_google(G, api_key=None, batch_size=350, pause=0.1):
-    """Add node elevations from the Google Elevation API. G should be in lat/lon.
-
-    Without an api_key, and on any Google failure, this falls through to
-    Open-Elevation instead. pause is seconds of sleep between batches.
-    """
+    """Node elevations from the Google Elevation API; G should be in lat/lon. No
+    api_key, or any Google failure, falls through to Open-Elevation."""
     ox = get_osmnx()
     if ox is None or G is None:
         return None
@@ -118,10 +109,8 @@ def add_node_elevations_google(G, api_key=None, batch_size=350, pause=0.1):
 
 def _add_elevations_from_open_elevation(G, batch_size=100, pause=0.5):
     """Add node elevations from Open-Elevation, which is free and needs no key.
-
     Failed batches fill with 0 rather than aborting, so a partial outage leaves a
-    graph that looks flat instead of one that raises.
-    """
+    graph that looks flat instead of one that raises."""
     import requests
     import time
     

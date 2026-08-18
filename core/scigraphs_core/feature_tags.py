@@ -31,13 +31,9 @@ FEATURE_TYPE_ITEMS = [
 
 
 def feature_type_items_for_source(source):
-    """Return the feature-type enum items supported by a given source.
-
-    OSMnx supports every preset plus custom tags. Overture only exposes the
-    presets that map to one of its native layers (building, places, segment,
-    water, land); presets without an Overture mapping, and custom tags, are
-    omitted so the list never offers an option the source cannot serve.
-    """
+    """The feature-type enum items a source supports. OSMnx takes every preset plus
+    custom tags, Overture only those mapping to a native layer (building, places,
+    segment, water, land), so the list never offers what the source cannot serve."""
     if source == 'OSMNX':
         return list(FEATURE_TYPE_ITEMS)
 
@@ -105,14 +101,9 @@ def resolve_feature_tags(props):
 
 
 def overture_type_from_preset(preset):
-    """Return the closest City2Graph/Overture feature type for a preset."""
     return OVERTURE_PRESET_TYPES.get(preset)
 
 
 def overture_place_keywords(preset):
-    """Return category keywords used to filter Overture places for a preset.
-
-    Returns ``None`` for presets that should not be filtered (e.g. the broad
-    ``AMENITY`` preset, which maps to all places).
-    """
+    """Keywords filtering Overture places for a preset; None for unfiltered presets."""
     return OVERTURE_PLACE_CATEGORY_KEYWORDS.get(preset)

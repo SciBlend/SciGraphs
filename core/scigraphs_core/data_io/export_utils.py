@@ -1,4 +1,6 @@
-# Writes graphs out to the common interchange formats.
+# Writes graphs out to the common interchange formats: GraphML, GEXF (Gephi),
+# JSON, a CSV edge list, Pajek NET. Every writer returns False and prints the
+# error rather than raising.
 
 import os
 import json
@@ -6,10 +8,7 @@ import xml.etree.ElementTree as ET
 
 
 def export_to_graphml(graph_data, filepath, node_attributes=None):
-    """Write a graph as GraphML. node_attributes are typed as double.
-
-    Returns False and prints the error rather than raising.
-    """
+    """Write a graph as GraphML, with node_attributes typed as double."""
     try:
         graphml = ET.Element('graphml')
         graphml.set('xmlns', 'http://graphml.graphdrawing.org/xmlns')
@@ -52,10 +51,6 @@ def export_to_graphml(graph_data, filepath, node_attributes=None):
 
 
 def export_to_gexf(graph_data, filepath, node_attributes=None):
-    """Write a graph as GEXF, the format Gephi reads.
-
-    Returns False and prints the error rather than raising.
-    """
     try:
         gexf = ET.Element('gexf')
         gexf.set('xmlns', 'http://www.gexf.net/1.2draft')
@@ -106,7 +101,6 @@ def export_to_gexf(graph_data, filepath, node_attributes=None):
 
 
 def export_to_json(graph_data, filepath, node_attributes=None):
-    """Write a graph as JSON. Returns False on error."""
     try:
         data = {
             'nodes': [],
@@ -140,7 +134,6 @@ def export_to_json(graph_data, filepath, node_attributes=None):
 
 
 def export_to_csv_edges(graph_data, filepath):
-    """Write the edge list as a source,target CSV. Returns False on error."""
     try:
         with open(filepath, 'w') as f:
             f.write("source,target\n")
@@ -155,10 +148,7 @@ def export_to_csv_edges(graph_data, filepath):
 
 
 def export_to_pajek(graph_data, filepath):
-    """Write a graph as Pajek NET. Returns False on error.
-
-    Pajek numbers vertices from 1, so the node index map is offset by one.
-    """
+    """Write a graph as Pajek NET, which numbers vertices from 1, so indices shift."""
     try:
         with open(filepath, 'w') as f:
             f.write(f"*Vertices {len(graph_data.nodes)}\n")
@@ -185,10 +175,7 @@ def export_to_pajek(graph_data, filepath):
 
 
 def export_positions(obj, filepath):
-    """Write node positions from a Blender object as node_id,x,y,z CSV.
-
-    Returns False if the object carries no "node_positions".
-    """
+    """Node positions from a Blender object as node_id,x,y,z CSV."""
     try:
         if "node_positions" not in obj:
             return False
@@ -212,7 +199,6 @@ def export_positions(obj, filepath):
 
 
 def export_statistics_report(stats, filepath):
-    """Write a statistics dictionary as a plain text report."""
     try:
         with open(filepath, 'w') as f:
             f.write("=" * 60 + "\n")

@@ -1,4 +1,5 @@
-# Pathfinding algorithms for graphs
+# Pathfinding algorithms. Without networkx each logs the missing extra and
+# returns None, or `[]` where the caller iterates the result.
 
 import numpy as np
 
@@ -17,22 +18,15 @@ except ImportError:
 
 
 def _networkx_missing(feature, empty=None):
-    """Log why `feature` did not run and return its no-result value.
-
-    `empty` exists for k_shortest_paths, which returns a list and already uses
-    `[]` for "no path found". Handing its caller a None it never handles
-    elsewhere would trade an import error for an iteration error.
-    """
+    """Log why `feature` did not run and return `empty`. k_shortest_paths needs
+    `[]`, which is already its "no path found", not a None nobody handles."""
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return empty
 
 
 def dijkstra_shortest_path(graph_data, source, target=None):
-    """Shortest path from ``source`` by Dijkstra; None without networkx.
-
-    With a ``target``, returns 'path', 'distance' and 'exists'. Without one,
-    returns 'distances' and 'paths' keyed by every reachable node.
-    """
+    """Shortest path from ``source`` by Dijkstra. With a ``target``: 'path',
+    'distance', 'exists'. Without: 'distances' and 'paths' per reachable node."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Dijkstra shortest path")
 
@@ -75,13 +69,10 @@ def dijkstra_shortest_path(graph_data, source, target=None):
 
 
 def a_star_path(graph_data, source, target, positions):
-    """Shortest path by A*, using Euclidean distance over ``positions`` as heuristic.
-
-    ``positions`` is an (N, 3) array indexed by node. Returns 'path',
-    'distance' and 'exists'; None without networkx. The heuristic only stays
-    admissible while edge weights are no smaller than the straight-line
-    distance between their endpoints.
-    """
+    """Shortest path by A*, with Euclidean distance over ``positions``, an
+    (N, 3) array indexed by node, as heuristic. Returns 'path', 'distance' and
+    'exists'. The heuristic stays admissible only while edge weights are no
+    smaller than the straight-line distance between their endpoints."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("A* shortest path")
 
@@ -121,11 +112,9 @@ def a_star_path(graph_data, source, target, positions):
 
 
 def bellman_ford_path(graph_data, source):
-    """Shortest paths from ``source`` by Bellman-Ford, which allows negative weights.
-
-    Returns 'distances', 'paths' and 'has_negative_cycle'; None without
-    networkx. A negative cycle empties the first two rather than raising.
-    """
+    """Shortest paths from ``source`` by Bellman-Ford, negative weights allowed:
+    'distances', 'paths' and 'has_negative_cycle'. A negative cycle empties the
+    first two rather than raising."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("Bellman-Ford shortest paths")
 
@@ -159,11 +148,8 @@ def bellman_ford_path(graph_data, source):
 
 
 def all_pairs_shortest_path(graph_data):
-    """Return an (N, N) 'distance_matrix' of shortest paths; None without networkx.
-
-    Unreachable pairs stay inf. One Dijkstra run per node, so cost grows with
-    nodes times edges.
-    """
+    """An (N, N) 'distance_matrix' of shortest paths, unreachable pairs left at
+    inf. One Dijkstra run per node, so cost grows with nodes times edges."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("All-pairs shortest paths")
 
@@ -195,11 +181,8 @@ def all_pairs_shortest_path(graph_data):
 
 
 def k_shortest_paths(graph_data, source, target, k=3):
-    """Find up to ``k`` shortest simple paths, shortest first.
-
-    Returns a list of dicts with 'path' and 'length', empty without networkx,
-    when no path exists, or when ``k`` is not positive.
-    """
+    """Up to ``k`` shortest simple paths, shortest first, as dicts of 'path' and
+    'length'. Empty when no path exists or ``k`` is not positive."""
     if not NETWORKX_AVAILABLE:
         return _networkx_missing("k shortest paths", empty=[])
 

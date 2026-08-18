@@ -1,7 +1,4 @@
-"""Coloring core: colormap definitions and attribute helpers.
-
-Plain functions, reusable outside Blender, so the coloring UI only orchestrates.
-"""
+"""Coloring core: colormaps and attribute helpers, all reusable outside Blender."""
 
 
 _LAZY = {

@@ -1,14 +1,9 @@
 # Geospatial: DEM download and processing, rasters, terrain, imagery textures.
-#
-
-#
-# Keep `imagery` out of the table. Callers reach it as
-# `from ..core.geo import imagery`, which resolves as a submodule either way,
-# and listing it would grow an attribute surface this table exists to preserve.
+# `imagery` stays out of the table: `from ..core.geo import imagery` resolves as a
+# submodule either way, and listing it would grow the attribute surface.
 
 _LAZY = {
-    # Blender-bound modules stayed with the add-on; reach them from that side
-    # as SciGraphs.core.<name>.
+    # Blender-bound modules stayed with the add-on, as SciGraphs.core.<name>.
     "dem_download": ".dem_download",
     "georaster": ".georaster",
 }

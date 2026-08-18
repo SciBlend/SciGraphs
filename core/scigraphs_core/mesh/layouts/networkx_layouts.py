@@ -4,7 +4,6 @@ from .common import *
 from .basic import _random_layout
 
 def _spring_layout_2d(G, iterations, scale):
-    """Force-directed layout in 2D using NetworkX."""
     pos_dict = nx.spring_layout(G, iterations=iterations, dim=2, scale=scale)
 
     positions = np.zeros((len(G.nodes()), 3))
@@ -14,7 +13,6 @@ def _spring_layout_2d(G, iterations, scale):
     return positions
 
 def _spring_layout_3d(G, iterations, scale):
-    """Force-directed layout in 3D using NetworkX."""
     pos_dict = nx.spring_layout(G, iterations=iterations, dim=3, scale=scale)
 
     positions = np.zeros((len(G.nodes()), 3))
@@ -24,7 +22,6 @@ def _spring_layout_3d(G, iterations, scale):
     return positions
 
 def _spectral_layout_3d(G, scale):
-    """Position nodes from the graph Laplacian's eigenvectors."""
     import time
     start = time.time()
     print(f"Computing Spectral 3D layout for {len(G.nodes())} nodes...")
@@ -66,11 +63,9 @@ def _mds_layout_3d(G, scale):
             if i in path_lengths and j in path_lengths[i]:
                 dist_matrix[i, j] = path_lengths[i][j]
             else:
-                # No path between them, so stand in a distance larger than any
-                # real one can be.
+                # No path: stand in a distance larger than any real one.
                 dist_matrix[i, j] = num_nodes * 2
 
-    # Double-center the squared distances, then take the top eigenvectors.
     n = dist_matrix.shape[0]
     H = np.eye(n) - np.ones((n, n)) / n
 
@@ -82,8 +77,7 @@ def _mds_layout_3d(G, scale):
     eigenvalues = eigenvalues[idx]
     eigenvectors = eigenvectors[:, idx]
 
-    # Clamped at zero because B is only positive semi-definite when the
-    # distances are Euclidean, and shortest-path distances are not.
+    # Clamp: B is only PSD for Euclidean distances, and hop counts are not.
     eigenvalues = np.maximum(eigenvalues[:3], 0)
     positions = eigenvectors[:, :3] @ np.diag(np.sqrt(eigenvalues))
 
@@ -98,12 +92,9 @@ def _mds_layout_3d(G, scale):
     return positions
 
 def _generate_z_component(G, num_nodes, method='SPECTRAL'):
-    """Derive a Z coordinate per node from graph structure, giving a 2D layout a
-    meaningful third axis.
-
-    *method* is 'DEGREE', 'BETWEENNESS', 'SPECTRAL' or 'RANDOM', the last two
-    falling back to DEGREE on failure. Output is centered and spans -0.5 to 0.5.
-    """
+    """Derive a Z coordinate per node from graph structure, so a 2D layout gets
+    a third axis. *method* is DEGREE, BETWEENNESS, SPECTRAL or RANDOM, the last
+    two falling back to DEGREE; output is centered and spans -0.5 to 0.5."""
     if method == 'DEGREE':
         degrees = np.array([G.degree(n) for n in G.nodes()])
         z = degrees.astype(float)

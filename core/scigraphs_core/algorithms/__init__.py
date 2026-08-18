@@ -1,5 +1,4 @@
-# Graph algorithms: analysis, construction, flow, paths, spanning trees, stats,
-# topology. Imported lazily, so a missing optional backend costs nothing here.
+# Graph algorithms, imported lazily so a missing optional backend costs nothing.
 
 _LAZY = {
     "analysis": ".analysis",
