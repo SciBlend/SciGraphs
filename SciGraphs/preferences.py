@@ -523,7 +523,7 @@ class SCIGRAPHS_OT_ValidateAPIKey(bpy.types.Operator):
             self.report({'WARNING'}, "No API key entered")
             return {'CANCELLED'}
         
-        from .core.geo.dem_download import validate_api_key
+        from scigraphs_core.geo.dem_download import validate_api_key
         
         self.report({'INFO'}, "Validating API key...")
         
@@ -601,7 +601,7 @@ class SCIGRAPHS_OT_TestDBConnection(bpy.types.Operator):
         
         # Import the db_connector module to test connection
         try:
-            from .core import db_connector
+            from scigraphs_core import db_connector
             success, message = db_connector.test_connection(profile)
             
             if success:

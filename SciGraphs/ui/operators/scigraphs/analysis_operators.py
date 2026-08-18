@@ -1,9 +1,10 @@
 # Analysis operators (centrality, clustering, community detection, directed analysis)
 
 import bpy
-from ....core import analysis, geometry
-from ....core.mesh.mesh_utils import parse_graph_data_filtered, expand_node_values_to_mesh
-from ....core.visualization.animation import update_flow_activation
+from scigraphs_core import analysis
+from ....core import geometry
+from scigraphs_core.mesh.mesh_utils import parse_graph_data_filtered, expand_node_values_to_mesh
+from scigraphs_core.visualization.animation import update_flow_activation
 
 
 def _fit_attribute_values(values, target_length, default=0.0):
@@ -118,7 +119,7 @@ class SCIGRAPHS_OT_ApplyClustering(bpy.types.Operator):
             ('infomap', "Infomap", "Map equation"),
             ('rb', "RB", "Reichardt-Bornholdt"),
             ('rn', "RN", "Ronhovde-Nussinov"),
-            ('rnsc', "RNSC", "Restricted Neighbourhood Search"),
+            ('rnsc', "RNSC", "Restricted Neighborhood Search"),
             ('scluster', "SCluster", "Hierarchical clustering"),
             ('uvcluster', "UVCluster", "Iterative cluster"),
         ],
@@ -162,7 +163,7 @@ class SCIGRAPHS_OT_ApplyClustering(bpy.types.Operator):
             self.report({'ERROR'}, f"{self.algorithm} clustering failed")
             return {'CANCELLED'}
         
-        from ....core.mesh.mesh_utils import create_or_update_attribute
+        from scigraphs_core.mesh.mesh_utils import create_or_update_attribute
 
         nodes_list = graph_data.nodes
         create_or_update_attribute(mesh, 'cluster_id', 'INT', result['cluster_ids'], obj)

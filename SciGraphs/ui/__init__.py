@@ -1,5 +1,4 @@
 import bpy
-# UI module for SciGraphs addon
 
 from . import operators
 from . import panels
@@ -21,11 +20,10 @@ except ImportError:
 
 
 class SCIGRAPHS_PT_engine_missing(bpy.types.Panel):
-    """Shown in place of the GPU preview when the render engine is absent.
+    """Stands in for the GPU preview when the render engine is not installed.
 
-    Deliberately not an error dialog. The add-on works; one feature is not
-    installed, and the panel that would have driven it says so, where the user
-    was already looking for it.
+    Not an error dialog: everything else still works, and the message belongs
+    in the panel the user came looking for.
     """
 
     bl_label = "GPU Render Engine"
@@ -48,7 +46,7 @@ class SCIGRAPHS_PT_engine_missing(bpy.types.Panel):
         col.scale_y = 0.8
         col.label(text="Everything else works:", icon='CHECKMARK')
         for line in ("import and layouts",
-                     "analysis and colouring",
+                     "analysis and coloring",
                      "the Geometry Nodes path"):
             col.label(text="    " + line)
 

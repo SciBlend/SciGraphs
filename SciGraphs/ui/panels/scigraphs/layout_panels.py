@@ -15,7 +15,6 @@ class SCIGRAPHS_PT_layout(bpy.types.Panel):
         props = context.scene.scigraphs
         obj = context.active_object
         
-        # Quick info and status
         if obj and "num_nodes" in obj:
             num_nodes = obj["num_nodes"]
             # Both storage formats record num_edges, and for the legacy one it
@@ -30,7 +29,6 @@ class SCIGRAPHS_PT_layout(bpy.types.Panel):
             row.label(text=f"{num_nodes:,} nodes", icon='MESH_CIRCLE')
             row.label(text=f"{num_edges:,} edges", icon='CURVE_PATH')
             
-            # Smart recommendations based on graph size
             if num_nodes > 10000:
                 split = box.split(factor=0.7)
                 split.label(text="Large Graph Detected", icon='INFO')
@@ -60,16 +58,13 @@ class SCIGRAPHS_PT_layout_algorithm(bpy.types.Panel):
         layout = self.layout
         props = context.scene.scigraphs
         
-        # Algorithm selector with icon
         layout.label(text="Choose Layout Algorithm:", icon='SORTSIZE')
         layout.prop(props, "layout_algorithm", text="")
         
-        # Algorithm info card
         algo = props.layout_algorithm
         box = layout.box()
         box.label(text="Algorithm Info:", icon='INFO')
         
-        # Dimension indicator
         dimensions = {
             'GRID': '2D', 'SPRING': '2D', 'FORCEATLAS2': '2D',
             'IGRAPH_DH': '2D', 'IGRAPH_GRAPHOPT': '2D',
@@ -85,7 +80,6 @@ class SCIGRAPHS_PT_layout_algorithm(bpy.types.Panel):
             'GRAPHVIZ_OSAGE': '2D', 'GRAPHVIZ_PATCHWORK': '2D',
         }
         
-        # Speed indicator
         speed_icons = {
             'RANDOM': ('CHECKMARK', 'Instant'),
             'GRID': ('CHECKMARK', 'Instant'),
@@ -126,7 +120,6 @@ class SCIGRAPHS_PT_layout_algorithm(bpy.types.Panel):
         row.label(text=f"{dimension}", icon='EMPTY_AXIS')
         row.label(text=f"Speed: {speed_text}", icon=icon)
         
-        # Use case
         use_cases = {
             'RANDOM': 'Quick test, initial positions',
             'GRID': '2D regular arrangement',
@@ -176,11 +169,9 @@ class SCIGRAPHS_PT_layout_settings(bpy.types.Panel):
         layout = self.layout
         props = context.scene.scigraphs
         
-        # Only global scale setting
         layout.use_property_split = True
         layout.prop(props, "layout_scale", text="Scale")
         
-        # Apply layout button - one-click execution
         layout.separator()
         box = layout.box()
         box.label(text="Calculate layout once:", icon='INFO')
@@ -206,20 +197,17 @@ class SCIGRAPHS_PT_layout_interactive(bpy.types.Panel):
         obj = context.active_object
         scene = context.scene
         
-        # Info card
         box = layout.box()
         box.label(text="Real-time layout calculation (Gephi-style)", icon='INFO')
         box.label(text="Computes layout iteratively over frames.")
         box.label(text="You can stop anytime to inspect results.")
         
-        # Timeline configuration
         layout.separator()
         box = layout.box()
         box.label(text="Timeline", icon='TIME')
         num_frames = scene.frame_end - scene.frame_start + 1
         box.label(text=f"Frames: {scene.frame_start} to {scene.frame_end} ({num_frames} total)")
         
-        # Execution settings
         layout.separator()
         layout.use_property_split = True
         layout.use_property_decorate = False
@@ -231,12 +219,10 @@ class SCIGRAPHS_PT_layout_interactive(bpy.types.Panel):
         
         layout.separator()
         
-        # Display options
         row = layout.row(align=True)
         row.prop(props, "update_viewport", text="Live Update", toggle=True, icon='RESTRICT_VIEW_OFF')
         row.prop(props, "show_forces", text="Show Forces", toggle=True, icon='FORCE_FORCE')
         
-        # Main controls
         layout.separator()
         row = layout.row(align=True)
         row.scale_y = 1.5
@@ -246,7 +232,6 @@ class SCIGRAPHS_PT_layout_interactive(bpy.types.Panel):
         row = layout.row()
         row.operator("scigraphs.bake_animation", text="Bake to Animation", icon='REC')
         
-        # Current status
         if obj and "layout_iteration" in obj:
             box = layout.box()
             box.label(text="Current Status", icon='INFO')
@@ -259,7 +244,6 @@ class SCIGRAPHS_PT_layout_interactive(bpy.types.Panel):
                 energy = obj["layout_energy"]
                 col.label(text=f"Energy: {energy:.4f}")
                 
-                # Energy visualization (pseudo progress bar)
                 if iteration > 1:
                     prev_energy = obj.get("prev_energy", energy)
                     if prev_energy > 0:
@@ -325,13 +309,11 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         box = layout.box()
         box.label(text=f"Spring Layout {dimension} Settings", icon='FORCE_LENNARDJONES')
         
-        # Iterations
         col = box.column(align=True)
         col.prop(props, "iterations", text="Iterations")
         
         box.separator()
         
-        # Force parameters
         col = box.column(align=True)
         col.label(text="Force Dynamics:")
         col.prop(props, "repulsion_strength", text="Repulsion")
@@ -341,7 +323,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         
         box.separator()
         
-        # Cooling parameters
         col = box.column(align=True)
         col.label(text="Convergence Control:")
         col.prop(props, "initial_temperature", text="Initial Temp")
@@ -371,7 +352,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         box = layout.box()
         box.label(text="Fruchterman-Reingold Settings", icon='FORCE_LENNARDJONES')
         
-        # Info about parameter usage
         info_box = box.box()
         info_box.label(text="Note: These parameters only work in", icon='INFO')
         info_box.label(text="Interactive Mode (Gephi-style)")
@@ -397,17 +377,15 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         col.prop(props, "igraph_kk_kkconst")
     
     def _draw_igraph_drl(self, layout, props):
-        """DrL parameters — all 6 phases exposed."""
+        """DrL parameters, all six phases exposed."""
         box = layout.box()
         box.label(text="DrL Settings", icon='MOD_PARTICLES')
         
-        # Global parameter
         col = box.column(align=True)
         col.prop(props, "igraph_drl_edge_cut")
         
         box.separator()
         
-        # Per-phase parameters
         phases = [
             ("Init", "init", "PLAY"),
             ("Liquid", "liquid", "MOD_FLUIDSIM"),
@@ -476,12 +454,10 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         box = layout.box()
         box.label(text="Yifan Hu (sfdp) Settings", icon='FORCE_VORTEX')
         
-        # Dimension mode
         col = box.column(align=True)
         col.prop(props, "sfdp_dim")
         col.prop(props, "graphviz_quiet")
         
-        # Z generation (only for 2D+Z mode)
         if props.sfdp_dim == '2Z':
             z_box = box.box()
             z_box.label(text="Z Depth Generation", icon='ORIENTATION_LOCAL')
@@ -491,7 +467,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         
         box.separator()
         
-        # Core params
         core_box = box.box()
         core_box.label(text="Force Parameters", icon='FORCE_CHARGE')
         col = core_box.column(align=True)
@@ -501,7 +476,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         
         box.separator()
         
-        # Multilevel & quality
         qual_box = box.box()
         qual_box.label(text="Quality", icon='MODIFIER')
         col = qual_box.column(align=True)
@@ -512,7 +486,6 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         
         box.separator()
         
-        # Overlap
         ov_box = box.box()
         ov_box.label(text="Overlap", icon='SELECT_SUBTRACT')
         col = ov_box.column(align=True)
@@ -628,18 +601,15 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Info box
         box = layout.box()
         box.label(text="Split layout into distinct Z-layers", icon='INFO')
         box.label(text="Apply after any 2D/3D layout algorithm")
         
-        # Current status
         if obj and "splitter_num_layers" in obj:
             row = box.row()
             row.alert = False
             row.label(text=f"Current: {obj['splitter_num_layers']} layers ({obj.get('splitter_criterion', 'N/A')})", icon='CHECKMARK')
         
-        # Split Criterion
         layout.separator()
         box = layout.box()
         box.label(text="Split Criterion", icon='FILTER')
@@ -647,7 +617,6 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
         col = box.column(align=True)
         col.prop(props, "splitter_criterion", text="")
         
-        # Criterion-specific settings
         if props.splitter_criterion == 'COMMUNITY':
             col.separator()
             col.prop(props, "splitter_community_algorithm", text="Algorithm")
@@ -665,7 +634,6 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
             col.separator()
             col.prop(props, "splitter_centrality_bins", text="Bins")
         
-        # Layer Settings
         layout.separator()
         box = layout.box()
         box.label(text="Layer Settings", icon='OUTLINER_OB_EMPTY')
@@ -675,7 +643,6 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
         col.prop(props, "splitter_base_z", text="Base Z")
         col.prop(props, "splitter_layer_order", text="Order")
         
-        # Options
         layout.separator()
         box = layout.box()
         box.label(text="Options", icon='OPTIONS')
@@ -685,18 +652,15 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
         col.prop(props, "splitter_center_layers", text="Center Each Layer")
         col.prop(props, "splitter_scale_by_size", text="Scale by Layer Size")
         
-        # Edge handling
         col.separator()
         col.prop(props, "splitter_inter_layer_edges", text="Inter-Layer Edges")
         
-        # Action buttons
         layout.separator()
         row = layout.row(align=True)
         row.scale_y = 1.5
         row.operator("scigraphs.network_splitter_3d", text="Split Network", icon='SNAP_VERTEX')
         row.operator("scigraphs.reset_splitter", text="", icon='LOOP_BACK')
         
-        # Layer info
         if obj and "splitter_num_layers" in obj:
             layout.separator()
             info_box = layout.box()

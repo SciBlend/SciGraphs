@@ -1,13 +1,11 @@
 import bpy
-from ...utils.logger import log
-from .get_c2g import get_city2graph
+from scigraphs_core.logger import log
+from scigraphs_core.city2graph.get_c2g import get_city2graph
 from . import utils
 
 
-# Module-level cache for the active GTFS connection.
-# Blender id-properties only accept primitive types, so the actual
-# DuckDBPyConnection cannot live on the scene. We keep it here and
-# expose only serialisable metadata via ``set_active_gtfs``.
+# Blender id-properties only accept primitive types, so a DuckDBPyConnection
+# cannot live on the scene. It lives here instead.
 _GTFS_CACHE = {"connection": None, "filepath": None}
 
 
@@ -35,16 +33,12 @@ def clear_active_gtfs():
 
 
 def load_gtfs(filepath):
-    """
-    Load GTFS (General Transit Feed Specification) data from zip file.
-    
-    In city2graph 0.3.1+, this returns a DuckDB connection with GTFS tables loaded.
-    
-    Args:
-        filepath: Path to GTFS .zip file
-    
-    Returns:
-        duckdb.DuckDBPyConnection: DuckDB connection with GTFS tables
+    """Load a GTFS feed and return the DuckDB connection city2graph builds.
+
+    ``filepath`` may be a .zip or a folder of extracted .txt files, which is
+    zipped to a temp file first because city2graph's loader only takes a zip.
+    Missing stops, trips or stop_times gives None: that is what an unparsable
+    feed looks like from here.
     """
     c2g = get_city2graph()
     if c2g is None:
@@ -63,10 +57,6 @@ def load_gtfs(filepath):
         path = filepath
         cleanup_path = None
 
-        # city2graph.load_gtfs only accepts a .zip path. If the user
-        # picked an extracted GTFS folder, zip it on the fly into a
-        # temp file (lighter than re-implementing the loader). Plain
-        # .txt files are detected by GTFS spec table names.
         if os.path.isdir(filepath):
             txt_files = sorted(glob.glob(os.path.join(filepath, "*.txt")))
             if not txt_files:
@@ -88,8 +78,7 @@ def load_gtfs(filepath):
 
         gtfs_con = c2g_load_gtfs(path)
 
-        # Best-effort cleanup of the temporary zip — DuckDB has already
-        # loaded the data into memory by this point.
+        # Safe to unlink: DuckDB has the data in memory by now.
         if cleanup_path is not None:
             try:
                 os.unlink(cleanup_path)
@@ -103,10 +92,6 @@ def load_gtfs(filepath):
         tables = {row[0] for row in gtfs_con.execute("SHOW TABLES").fetchall()}
         log(f"GTFS loaded with tables: {', '.join(sorted(tables))}")
 
-        # Sanity check: an empty GTFS connection is almost certainly
-        # an upstream silent failure (bad zip, wrong path, etc.). Bail
-        # out cleanly so the caller doesn't end up with a useless
-        # connection.
         required = {"stops", "trips", "stop_times"}
         if not required.issubset(tables):
             missing = sorted(required - tables)
@@ -143,27 +128,15 @@ def build_gtfs_graph(
     name="GTFS_Network",
     collection_name="C2G_Transportation",
 ):
-    """Build a SciGraphs-canonical Blender object from a GTFS feed.
+    """Build one SciGraphs-canonical Blender object from a GTFS feed.
 
-    This produces ONE mesh object with:
-      * one vertex per GTFS stop (mesh attribute ``node_id`` for SciGraphs lookup);
-      * one edge per directly-connected pair of stops in the
-        ``travel_summary_graph`` (i.e. consecutive stops served by the
-        same trip);
-      * ``edge_*`` mesh attributes for every numeric column the
-        travel-summary graph exposes (``trip_count``, ``mean_duration``,
-        ``frequency``, etc.) — applied via SciGraphs' standard
-        ``import_attributes_from_dataframe`` so all downstream
-        analysis tools (Coloring Gizmo, Setup Visualization, GNN
-        export…) recognise them automatically;
-      * the SciGraphs marker custom properties (``is_scigraphs_graph``,
-        ``num_nodes``, ``num_edges``, ``nodes_data``, ``edges_data``,
-        ``is_directed``, ``node_positions``);
-      * geographic alignment (``c2g_center_lat/lon/scale`` or, when
-        ``osmnx_obj`` is provided, the matching ``osmnx_*`` values) so
-        the stops land on top of the road network.
-
-    Returns the created object, or ``None`` on failure.
+    Vertices are stops, edges the consecutive stop pairs ``travel_summary_graph``
+    reports. Every numeric column of that graph becomes an ``edge_*`` mesh
+    attribute through the standard attribute importer, so the coloring,
+    visualization and GNN export tools pick them up with no special casing. The
+    object carries the SciGraphs graph markers and the projection metadata
+    (``c2g_center_lat/lon/scale``, plus the matching ``osmnx_*`` when
+    ``osmnx_obj`` is given) so the stops land on top of the road network.
     """
     if gtfs_con is None:
         log("No GTFS connection available")
@@ -171,7 +144,7 @@ def build_gtfs_graph(
 
     try:
         from city2graph.transportation import travel_summary_graph
-        from ..algorithms.graph import GraphData
+        from scigraphs_core.algorithms.graph import GraphData
         from ..mesh.geometry import create_graph_object
         import math
         import numpy as np
@@ -195,7 +168,6 @@ def build_gtfs_graph(
             return None
         stops_df['stop_id'] = stops_df['stop_id'].astype(str)
 
-        # Travel summary graph — gives us the edges between stops.
         log("Computing travel summary graph for GTFS edges (this may take a few seconds)...")
         try:
             nodes_gdf, edges_gdf = travel_summary_graph(gtfs_con, as_nx=False)
@@ -204,9 +176,8 @@ def build_gtfs_graph(
             edges_gdf = None
             nodes_gdf = None
 
-        # Some feeds expose stop_lat/stop_lon already in the summary
-        # node table — prefer those when present, they match the IDs
-        # used by the edges' MultiIndex.
+        # Some feeds carry stop_lat/stop_lon in the summary node table. Prefer
+        # those: they match the IDs in the edges' MultiIndex.
         if nodes_gdf is not None and len(nodes_gdf) > 0:
             try:
                 ng = nodes_gdf.reset_index()
@@ -219,8 +190,6 @@ def build_gtfs_graph(
                     ng['stop_id'] = ng['stop_id'].astype(str)
                     extra = ng[['stop_id', 'stop_lat', 'stop_lon']].dropna()
                     if not extra.empty:
-                        # Replace stops_df with the canonical list used
-                        # by the edges so indices line up.
                         stops_df = extra.merge(
                             stops_df[['stop_id', 'stop_name']],
                             on='stop_id',
@@ -229,8 +198,7 @@ def build_gtfs_graph(
             except Exception:  # noqa: BLE001
                 pass
 
-        # Resolve projection (matches the convention used elsewhere
-        # in the addon: equirectangular around a chosen centre).
+        # Equirectangular around a chosen center, as everywhere else here.
         center_lat = None
         center_lon = None
         scale = 0.001
@@ -249,18 +217,17 @@ def build_gtfs_graph(
             center_lat = float((lats.min() + lats.max()) / 2)
             center_lon = float((lons.min() + lons.max()) / 2)
             log(
-                f"GTFS using own bbox centre: "
+                f"GTFS using own bbox center: "
                 f"({center_lat:.6f}, {center_lon:.6f})"
             )
 
         cos_lat = math.cos(math.radians(center_lat))
 
-        # Build node ordering that matches the SciGraphs convention.
         nodes = stops_df['stop_id'].tolist()
         node_to_idx = {n: i for i, n in enumerate(nodes)}
 
-        # Per-node coordinates: SciGraphs stores them so the geometry
-        # nodes setup can read them back without re-projecting.
+        # Stored per node so the geometry nodes setup can read the positions
+        # back without reprojecting.
         lats = stops_df['stop_lat'].to_numpy(dtype=float)
         lons = stops_df['stop_lon'].to_numpy(dtype=float)
         xs = (lons - center_lon) * cos_lat / scale
@@ -271,8 +238,6 @@ def build_gtfs_graph(
             for nid, x, y, z in zip(nodes, xs, ys, zs)
         }
 
-        # Build edges + per-edge dataframe so SciGraphs' standard
-        # attribute importer can ingest the GTFS-specific weights.
         edges = []
         if edges_gdf is not None and len(edges_gdf) > 0:
             log(f"Building {len(edges_gdf)} GTFS edges from travel summary")
@@ -288,16 +253,14 @@ def build_gtfs_graph(
             )
             ed[src_col] = ed[src_col].astype(str)
             ed[tgt_col] = ed[tgt_col].astype(str)
-            # Keep only edges whose endpoints exist in the stops table
-            # (defensive: some GTFS feeds reference dropped stop_ids).
+            # Some feeds reference stop_ids that are not in the stops table.
             mask = ed[src_col].isin(node_to_idx) & ed[tgt_col].isin(node_to_idx)
             ed = ed.loc[mask].reset_index(drop=True)
 
-            # Rename src/tgt to the SciGraphs convention so the
-            # attribute importer skips them automatically.
+            # 'source'/'target' is the SciGraphs convention, and the attribute
+            # importer skips those two columns by name.
             ed = ed.rename(columns={src_col: 'source', tgt_col: 'target'})
-            # Drop the geometry column (objects with non-scalar values
-            # break attribute import).
+            # Non-scalar values break attribute import.
             if 'geometry' in ed.columns:
                 ed = ed.drop(columns=['geometry'])
 
@@ -313,8 +276,7 @@ def build_gtfs_graph(
         graph_data.source_column_name = 'source'
         graph_data.target_column_name = 'target'
 
-        # Wipe any previous GTFS object with the same base name so
-        # repeated runs don't pile up duplicates.
+        # Wipe the previous object of this name so repeated runs do not pile up.
         for existing in list(bpy.data.objects):
             if existing.name == name or existing.get("is_gtfs_graph") and existing.name.startswith(name):
                 try:
@@ -332,8 +294,6 @@ def build_gtfs_graph(
             log("create_graph_object returned None")
             return None
 
-        # Move the object to the C2G collection so the user can find
-        # it next to the rest of the city2graph outputs.
         try:
             target_coll = utils.create_collection(collection_name)
             for c in list(obj.users_collection):
@@ -344,8 +304,8 @@ def build_gtfs_graph(
 
         obj.name = name
 
-        # Mark as a GTFS graph + propagate alignment so basemaps and
-        # spatial joins downstream snap to the same projection.
+        # Propagate the alignment so basemaps and spatial joins downstream snap
+        # to the same projection.
         obj["is_scigraphs_graph"] = True
         obj["is_gtfs_graph"] = True
         obj["c2g_center_lat"] = center_lat
@@ -384,12 +344,9 @@ def visualize_gtfs_routes(gtfs_con, osmnx_obj=None):
 def create_travel_summary_graph(gtfs_con, start_time=None, end_time=None,
                                 calendar_start=None, calendar_end=None,
                                 osmnx_obj=None):
-    """Build the SciGraphs canonical Blender graph for the travel summary.
-
-    Same engine as :func:`build_gtfs_graph` (so the result is a real
-    SciGraphs graph with proper attributes), but the underlying
-    travel_summary_graph call is parameterised by time / calendar
-    filters from the panel.
+    """Build the SciGraphs graph for the travel summary, on the same engine as
+    :func:`build_gtfs_graph` but with the ``travel_summary_graph`` call
+    parameterized by the panel's time and calendar filters.
     """
     c2g = get_city2graph()
     if c2g is None:
@@ -398,7 +355,7 @@ def create_travel_summary_graph(gtfs_con, start_time=None, end_time=None,
 
     try:
         from city2graph.transportation import travel_summary_graph
-        from ..algorithms.graph import GraphData
+        from scigraphs_core.algorithms.graph import GraphData
         from ..mesh.geometry import create_graph_object
         import math
         import numpy as np
@@ -421,9 +378,8 @@ def create_travel_summary_graph(gtfs_con, start_time=None, end_time=None,
             log("travel_summary_graph returned no nodes")
             return None
 
-        # Resolve projection.
-        # Anchor priority (same rule as build_gtfs_od_graph):
-        # OSMnx → existing GTFS object → own bbox.
+        # Anchor priority, same rule as build_gtfs_od_graph: the OSMnx graph,
+        # then any existing GTFS object, then this feed's own bbox.
         center_lat = None
         center_lon = None
         scale = 0.001
@@ -572,24 +528,19 @@ def build_gtfs_od_graph(
 ):
     """Build a SciGraphs graph from GTFS Origin-Destination pairs.
 
-    The raw output of ``c2g.get_od_pairs`` is a row per **trip leg**, which
-    for a metropolitan feed can easily reach millions of rows and OOM-kill
-    the Blender process when materialised. We aggregate the pairs into
-    one row per (orig, dest) — counting trips and averaging travel
-    time — and optionally truncate to the ``top_n`` heaviest pairs.
-
-    The result is a single SciGraphs canonical mesh object:
-      * vertices = stops referenced by any OD pair (positioned via
-        ``stop_lat``/``stop_lon`` from the GTFS ``stops`` table).
-      * edges = aggregated OD pairs, with ``edge_trip_count`` and
-        ``edge_travel_time_sec`` mesh attributes.
+    ``c2g.get_od_pairs`` returns one row per trip leg, which for a metropolitan
+    feed reaches millions of rows and OOM-kills Blender once materialized. This
+    aggregates to one row per (orig, dest), counting trips and averaging travel
+    time, and can keep only the ``top_n`` heaviest pairs. Vertices are the stops
+    any surviving pair references, positioned from ``stop_lat`` / ``stop_lon``;
+    edges carry ``edge_trip_count`` and ``edge_travel_time_sec``.
     """
     if gtfs_con is None:
         log("No GTFS connection available")
         return None
 
     try:
-        from ..algorithms.graph import GraphData
+        from scigraphs_core.algorithms.graph import GraphData
         from ..mesh.geometry import create_graph_object
         import math
         import pandas as pd  # noqa: F401  (used implicitly by DuckDB .df())
@@ -599,30 +550,23 @@ def build_gtfs_od_graph(
             f"(start_date={start_date}, end_date={end_date}, directed={directed})..."
         )
 
-        # We deliberately bypass city2graph.get_od_pairs because it
-        # materialises one row per active leg in pandas — for big
-        # feeds (Sao Paulo: 22k stops × 1.3k routes × N service days)
-        # that is tens of millions of rows and OOM-kills Blender. The
-        # query below performs the leg construction AND aggregation
-        # entirely inside DuckDB, so only the (orig, dest) summary
-        # crosses the Python boundary.
+        # Leg construction and aggregation both stay inside DuckDB, so only the
+        # (orig, dest) summary crosses into Python. city2graph.get_od_pairs
+        # materializes every leg in pandas instead: Sao Paulo's feed is 22k
+        # stops by 1.3k routes by N service days, tens of millions of rows.
 
         tables = {row[0] for row in gtfs_con.execute("SHOW TABLES").fetchall()}
         if not {'stop_times', 'trips', 'stops'}.issubset(tables):
             log("GTFS feed missing stop_times/trips/stops")
             return None
 
-        # Build a daily-active-trips CTE if calendar is available, so
-        # the trip_count weights actual service days instead of just
-        # the schedule pattern. Otherwise fall back to a single count
-        # per scheduled trip.
+        # With a calendar table, trip_count can weight actual service days
+        # rather than the bare schedule pattern.
         has_calendar = 'calendar' in tables
 
-        # Note: ``arrival_time`` / ``departure_time`` in GTFS may
-        # exceed 24:00:00 (overnight services). Splitting on ':' and
-        # using simple integer arithmetic keeps the aggregation
-        # SQL-only and avoids type errors with non-canonical times.
-        # NULLs are propagated and filtered later.
+        # GTFS ``arrival_time`` / ``departure_time`` may exceed 24:00:00 for
+        # overnight services, so the times are split on ':' and added up as
+        # integers. NULLs propagate and are filtered further down.
         select_legs = """
             WITH legs AS (
                 SELECT
@@ -655,10 +599,8 @@ def build_gtfs_od_graph(
         """
 
         if has_calendar:
-            # Service multiplier = number of active service days in
-            # the (optional) date range across all 7 weekday columns.
-            # If the user passed start/end_date we restrict the range;
-            # otherwise we use the calendar bounds.
+            # The multiplier is the count of active service days across the 7
+            # weekday columns, restricted to start_date/end_date when given.
             params = {}
             date_range_sql = ""
             if start_date or end_date:
@@ -697,7 +639,7 @@ def build_gtfs_od_graph(
         if directed:
             pair_select = "l.orig_stop_id AS source, l.dest_stop_id AS target"
         else:
-            # Canonicalise so (A,B) and (B,A) merge.
+            # Canonicalize the pair so (A,B) and (B,A) merge.
             pair_select = (
                 "LEAST(l.orig_stop_id, l.dest_stop_id) AS source, "
                 "GREATEST(l.orig_stop_id, l.dest_stop_id) AS target"
@@ -747,8 +689,6 @@ def build_gtfs_od_graph(
         agg['source'] = agg['source'].astype(str)
         agg['target'] = agg['target'].astype(str)
 
-        # Look up stop coordinates for every node referenced by the
-        # surviving OD pairs.
         used_ids = set(agg['source']).union(agg['target'])
         if not used_ids:
             log("No stops referenced after aggregation")
@@ -763,13 +703,9 @@ def build_gtfs_od_graph(
             log("None of the OD-pair stops have valid coordinates")
             return None
 
-        # Resolve projection.
-        # Priority of anchor:
-        #   1. Explicit OSMnx graph passed in.
-        #   2. Any existing GTFS graph in scene with matching feed
-        #      path — keeps the OD graph aligned with GTFS_Network /
-        #      Travel_Summary_Graph so they overlay perfectly.
-        #   3. Otherwise compute the bbox centre of the OD-pair stops.
+        # Anchor priority: the OSMnx graph passed in, then any existing GTFS
+        # graph in the scene, which keeps this overlaid on GTFS_Network and
+        # Travel_Summary_Graph, then the bbox center of the OD-pair stops.
         center_lat = None
         center_lon = None
         scale = 0.001
@@ -809,7 +745,7 @@ def build_gtfs_od_graph(
             center_lat = float((lats.min() + lats.max()) / 2)
             center_lon = float((lons.min() + lons.max()) / 2)
             log(
-                f"OD graph using own bbox centre: "
+                f"OD graph using own bbox center: "
                 f"({center_lat:.6f}, {center_lon:.6f})"
             )
 
@@ -825,11 +761,11 @@ def build_gtfs_od_graph(
             for nid, x, y in zip(nodes, xs, ys)
         }
 
-        # Drop OD edges whose endpoints fell out for lack of coords.
+        # Drop OD edges whose endpoints fell out for want of coordinates.
         mask = agg['source'].isin(node_to_idx) & agg['target'].isin(node_to_idx)
         agg = agg.loc[mask].reset_index(drop=True)
         if agg.empty:
-            log("All OD pairs lost their endpoints — nothing to build")
+            log("All OD pairs lost their endpoints, nothing to build")
             return None
 
         edges = list(zip(agg['source'].tolist(), agg['target'].tolist()))
@@ -894,19 +830,10 @@ def build_gtfs_od_graph(
 
 
 def get_gtfs_od_pairs(gtfs_con, start_date=None, end_date=None, directed=False):
-    """
-    Get Origin-Destination pairs from GTFS data.
-    
-    New in city2graph 0.3.1.
-    
-    Args:
-        gtfs_con: DuckDB connection with GTFS data
-        start_date: Optional start date (YYYYMMDD format)
-        end_date: Optional end date (YYYYMMDD format)
-        directed: Whether to preserve trip direction
-    
-    Returns:
-        GeoDataFrame with OD pairs
+    """Return the raw Origin-Destination pairs city2graph extracts from a feed.
+
+    Dates are YYYYMMDD strings. One unaggregated row per trip leg, so
+    :func:`build_gtfs_od_graph` is the memory-safe route on a large feed.
     """
     c2g = get_city2graph()
     if c2g is None:
@@ -945,19 +872,13 @@ def visualize_gtfs_network(
     osmnx_obj=None,
     create_stops=True,
     create_routes=True,
-    stop_size=0.05,  # noqa: ARG001 — kept for API compatibility
+    stop_size=0.05,  # noqa: ARG001 - kept for API compatibility
 ):
     """Create the canonical SciGraphs object for a GTFS feed.
 
-    The previous implementation produced two separate Blender objects
-    (one for stops, one for routes), which were not real graphs and
-    could not be analysed with the rest of SciGraphs. We now produce a
-    SINGLE graph object via :func:`build_gtfs_graph` and return both
-    keys pointing at it, so existing operators that read ``['stops']``
-    or ``['routes']`` keep working.
-
-    The ``create_stops`` / ``create_routes`` flags are honoured loosely:
-    if neither is True we skip the build entirely.
+    Both returned keys point at the one object :func:`build_gtfs_graph` makes,
+    so operators reading ``['stops']`` or ``['routes']`` keep working. The build
+    is skipped only when neither flag is True.
     """
     result = {'stops': [], 'routes': []}
     if not (create_stops or create_routes):

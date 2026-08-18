@@ -11,7 +11,8 @@ class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
     bl_description = "Download matrix from SuiteSparse Matrix Collection and create graph"
     
     def execute(self, context):
-        from ....core import suitesparse_importer, geometry
+        from scigraphs_core import suitesparse_importer
+        from ....core import geometry
         from .data_operators import SCIGRAPHS_AutoLayoutOnImport
         
         props = context.scene.scigraphs
@@ -21,7 +22,6 @@ class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
             self.report({'WARNING'}, "Please enter a matrix identifier (e.g. Grund/bayer09)")
             return {'CANCELLED'}
         
-        # Validate identifier format
         group, name = suitesparse_importer.parse_matrix_id(identifier)
         if not group or not name:
             self.report({'ERROR'}, f"Invalid identifier: '{identifier}'. Use 'Group/Name' format.")
@@ -29,7 +29,6 @@ class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
         
         props.suitesparse_status = f"Downloading {group}/{name}..."
         
-        # Download and build graph
         graph_data = suitesparse_importer.load_suitesparse_graph(
             identifier,
             mode=props.suitesparse_mode,
@@ -41,7 +40,6 @@ class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
             self.report({'ERROR'}, "Could not download or parse matrix. Check console for details.")
             return {'CANCELLED'}
         
-        # Create graph object using existing pipeline
         obj = geometry.create_graph_object(graph_data, is_directed=False)
         auto_layout_applied = SCIGRAPHS_AutoLayoutOnImport.apply(context, obj, self)
         focus_graph_in_top_view(context, obj)

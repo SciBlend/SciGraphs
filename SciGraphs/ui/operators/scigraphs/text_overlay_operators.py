@@ -1,7 +1,5 @@
-# Text overlay operators for graph node labels
-#
-# Provides operators to generate text overlay images with node labels
-# projected from 3D positions to screen coordinates.
+# Operators that render node labels to a PNG overlay, projecting each node from
+# its 3D position to screen coordinates.
 
 import bpy
 
@@ -10,7 +8,7 @@ from ....core.visualization.text_overlay import (
     get_font_path,
     get_settings_snapshot_with_object,
 )
-from ....utils.logger import log
+from scigraphs_core.logger import log
 
 
 class SCIGRAPHS_OT_GenerateTextOverlay(bpy.types.Operator):

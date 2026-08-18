@@ -64,7 +64,8 @@ class SCIGRAPHS_OT_CreateTemporalGraphs(bpy.types.Operator):
     
     def execute(self, context):
         import pandas as pd
-        from ....core import importer, geometry, graph as graph_module
+        from scigraphs_core import graph as graph_module
+        from ....core import importer, geometry
         from ....core import geospatial
         
         props = context.scene.scigraphs

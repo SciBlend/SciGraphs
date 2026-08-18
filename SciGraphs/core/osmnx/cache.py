@@ -1,34 +1,26 @@
-"""
-OSMnx Graph Cache Management
+"""On-disk GraphML cache for OSMnx graphs, so they survive a Blender restart.
 
-Persistent storage for OSMnx graphs to prevent memory loss when Blender restarts.
-Graphs are saved to a configurable cache directory with descriptive filenames.
+Filenames are derived from the query and network type, which means two objects
+built from the same query share one cache entry.
 """
 
 import os
 import re
 from pathlib import Path
-from ...utils.logger import log
-from .get_osmnx import get_osmnx
-from .io import save_graph_graphml, load_graph_graphml
+from scigraphs_core.logger import log
+from scigraphs_core.osmnx.get_osmnx import get_osmnx
+from scigraphs_core.osmnx.io import save_graph_graphml, load_graph_graphml
 
 
 def get_cache_directory():
-    """
-    Get the configured cache directory from addon preferences.
-    If not set, use default location in Blender's user scripts folder.
-    
-    Returns:
-        Path to cache directory (string)
-    """
+    """Cache directory from preferences, or one under Blender's user scripts."""
     import bpy
     from ...preferences import get_preferences
-    
+
     prefs = get_preferences()
     if prefs and prefs.osmnx_cache_directory:
         cache_dir = bpy.path.abspath(prefs.osmnx_cache_directory)
     else:
-        # Default to user scripts folder
         user_scripts = bpy.utils.resource_path('USER')
         cache_dir = os.path.join(user_scripts, "scripts", "addons", "scigraphs_osmnx_cache")
     
@@ -36,12 +28,7 @@ def get_cache_directory():
 
 
 def ensure_cache_directory():
-    """
-    Create cache directory if it doesn't exist.
-    
-    Returns:
-        True if directory exists or was created, False on error
-    """
+    """Create the cache directory if needed. False if that fails."""
     try:
         cache_dir = get_cache_directory()
         Path(cache_dir).mkdir(parents=True, exist_ok=True)
@@ -52,69 +39,43 @@ def ensure_cache_directory():
 
 
 def sanitize_filename(name):
+    """Make a string usable as a filename: reserved characters and whitespace
+    become underscores, and the result is cut to 100 characters.
     """
-    Sanitize a string to be safe for use as a filename.
-    
-    Args:
-        name: String to sanitize
-        
-    Returns:
-        Sanitized string safe for filenames
-    """
-    # Remove or replace invalid filename characters
     name = re.sub(r'[<>:"/\\|?*]', '_', name)
-    # Replace spaces and commas with underscores
     name = re.sub(r'[\s,]+', '_', name)
-    # Remove multiple consecutive underscores
     name = re.sub(r'_+', '_', name)
-    # Remove leading/trailing underscores
     name = name.strip('_')
-    # Limit length
     if len(name) > 100:
         name = name[:100]
     return name
 
 
 def generate_cache_filename(obj):
-    """
-    Generate descriptive filename from object metadata.
-    
-    Args:
-        obj: Blender object with OSMnx metadata
-        
-    Returns:
-        Filename (without path) for the cached graph, or None if metadata missing
+    """Cache filename for an object, from its query name and network type.
+
+    None for anything that is not an OSMnx object. Objects with no stored query
+    name fall back to the object name, so renaming one orphans its cache entry.
     """
     if not obj or not obj.get("is_osmnx", False):
         return None
-    
+
     query_name = obj.get("osmnx_query_name", "")
     network_type = obj.get("osmnx_network_type", "drive")
-    
+
     if not query_name:
-        # Fallback to object name if no query name
         query_name = obj.name
-    
-    # Sanitize the query name for use in filename
+
     safe_name = sanitize_filename(query_name)
     safe_network = sanitize_filename(network_type)
-    
-    # Generate descriptive filename
+
     filename = f"{safe_name}_{safe_network}.graphml"
-    
+
     return filename
 
 
 def get_cache_filepath(obj):
-    """
-    Get full path to cached graph file for an object.
-    
-    Args:
-        obj: Blender object with OSMnx metadata
-        
-    Returns:
-        Full filepath to cached graph, or None if cannot be determined
-    """
+    """Full path to an object's cache file, or None if it has no name."""
     filename = generate_cache_filename(obj)
     if not filename:
         return None
@@ -124,15 +85,10 @@ def get_cache_filepath(obj):
 
 
 def save_graph_to_cache(obj, G):
-    """
-    Save graph to cache with descriptive filename.
-    
-    Args:
-        obj: Blender object with OSMnx metadata
-        G: OSMnx MultiDiGraph to save
-        
-    Returns:
-        Tuple of (success: bool, filepath: str or None, message: str)
+    """Write a graph to the object's cache slot.
+
+    Returns (success, filepath or None, message); the message is meant for the
+    operator to report.
     """
     if not obj or not G:
         return False, None, "Invalid object or graph"
@@ -157,15 +113,7 @@ def save_graph_to_cache(obj, G):
 
 
 def load_graph_from_cache(obj):
-    """
-    Load graph from cache based on object metadata.
-    
-    Args:
-        obj: Blender object with OSMnx metadata
-        
-    Returns:
-        OSMnx MultiDiGraph or None if not found or error
-    """
+    """Read an object's cached graph, or None when there is no usable file."""
     if not obj:
         return None
     
@@ -188,12 +136,7 @@ def load_graph_from_cache(obj):
 
 
 def list_cached_graphs():
-    """
-    Return list of all cached graph files with metadata.
-    
-    Returns:
-        List of tuples: (filename, filepath, file_size_mb, modified_time)
-    """
+    """List cached graphs newest first, as (filename, filepath, size_mb, mtime)."""
     cache_dir = get_cache_directory()
     
     if not os.path.exists(cache_dir):
@@ -206,14 +149,12 @@ def list_cached_graphs():
             if filename.endswith('.graphml'):
                 filepath = os.path.join(cache_dir, filename)
                 
-                # Get file stats
                 stat = os.stat(filepath)
-                size_mb = stat.st_size / (1024 * 1024)  # Convert to MB
+                size_mb = stat.st_size / (1024 * 1024)
                 modified_time = stat.st_mtime
                 
                 cached_graphs.append((filename, filepath, size_mb, modified_time))
         
-        # Sort by modification time (newest first)
         cached_graphs.sort(key=lambda x: x[3], reverse=True)
         
     except Exception as e:
@@ -223,15 +164,7 @@ def list_cached_graphs():
 
 
 def delete_cached_graph(filepath):
-    """
-    Delete a specific cached graph file.
-    
-    Args:
-        filepath: Full path to the cached graph file
-        
-    Returns:
-        True on success, False on error
-    """
+    """Delete one cached graph file. False if it was missing or locked."""
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
@@ -246,12 +179,7 @@ def delete_cached_graph(filepath):
 
 
 def clear_all_cache():
-    """
-    Delete all cached graph files.
-    
-    Returns:
-        Tuple of (success_count, error_count)
-    """
+    """Delete every cached graph. Returns (deleted, failed)."""
     cached_graphs = list_cached_graphs()
     success_count = 0
     error_count = 0

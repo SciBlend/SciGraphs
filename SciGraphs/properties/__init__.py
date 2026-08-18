@@ -1,5 +1,3 @@
-# Properties module for SciGraphs addon
-
 from . import scene_properties
 from . import city2graph_properties
 from . import viz_properties

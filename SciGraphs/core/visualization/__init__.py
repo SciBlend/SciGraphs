@@ -1,2 +1,4 @@
-from . import animation
-from . import text_overlay
+"""Text overlay drawing, which needs the viewport.
+
+The Blender-free half lives in `scigraphs_core.visualization`.
+"""

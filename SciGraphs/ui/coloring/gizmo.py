@@ -1,9 +1,7 @@
 """Floating horizontal toolbar gizmo for the coloring system.
 
-The gizmo group renders a row of 2D buttons anchored at the top of the
-3D viewport. The row is drag-able (left handle), exposes 8 colormap chips
-in the middle, and packs the supporting actions (settings popup, refresh
-range, reverse, apply, cycle attribute, remove, close) on the right.
+A row of 2D buttons anchored at the top of the 3D viewport: a drag handle on
+the left, the colormap chips in the middle, and the actions on the right.
 """
 
 from __future__ import annotations
@@ -14,7 +12,7 @@ import gpu
 from gpu_extras.batch import batch_for_shader
 from mathutils import Matrix
 
-from ...core.coloring.colormaps import (
+from scigraphs_core.coloring.colormaps import (
     COLORMAP_ICONS,
     QUICK_COLORMAPS,
     sample_colormap,
@@ -22,9 +20,7 @@ from ...core.coloring.colormaps import (
 from . import functions as fn
 
 
-# ---------------------------------------------------------------------------
-# Tooltip overlay
-# ---------------------------------------------------------------------------
+# --- Tooltip overlay --------------------------------------------------------
 
 _TOOLTIP_HANDLE = None
 _TOOLTIP_STATE = None
@@ -127,7 +123,7 @@ def _draw_tooltip_callback():
 
 
 def _draw_preview_callback():
-    """Render a thin colormap preview strip + range labels under the toolbar."""
+    """Draw the colormap preview strip and range labels under the toolbar."""
     context = bpy.context
     if context.area is None or context.area.type != 'VIEW_3D':
         return
@@ -234,9 +230,7 @@ def disable_color_overlay():
     _clear_tooltip()
 
 
-# ---------------------------------------------------------------------------
-# Toolbar layout helpers
-# ---------------------------------------------------------------------------
+# --- Toolbar layout helpers -------------------------------------------------
 
 def _toolbar_origin(context, button_count: int):
     """Return ``(x, y, spacing)`` for the leftmost button of the toolbar."""
@@ -260,19 +254,17 @@ def _toolbar_origin(context, button_count: int):
     return x, y, spacing
 
 
-# ---------------------------------------------------------------------------
-# Action descriptors
-# ---------------------------------------------------------------------------
+# --- Action descriptors -----------------------------------------------------
 
 _CHIP_TOOLTIPS = {
-    "viridis": "Viridis – perceptually uniform sequential. Good default for densities.",
-    "plasma": "Plasma – sequential, vivid contrast for centrality / accessibility.",
-    "inferno": "Inferno – sequential dark-to-light, ideal on dark viewports.",
-    "magma": "Magma – sequential, smoother than Inferno for subtle gradients.",
-    "turbo": "Turbo – high-contrast rainbow, useful for spotting outliers.",
-    "cividis": "Cividis – colorblind-friendly sequential.",
-    "coolwarm": "Cool-Warm – diverging blue-red, perfect for signed metrics.",
-    "RdYlBu": "Red-Yellow-Blue – diverging, popular for elevation / temperature.",
+    "viridis": "Viridis, perceptually uniform sequential. Good default for densities.",
+    "plasma": "Plasma, sequential, vivid contrast for centrality / accessibility.",
+    "inferno": "Inferno, sequential dark-to-light, ideal on dark viewports.",
+    "magma": "Magma, sequential, smoother than Inferno for subtle gradients.",
+    "turbo": "Turbo, high-contrast rainbow, useful for spotting outliers.",
+    "cividis": "Cividis, colorblind-friendly sequential.",
+    "coolwarm": "Cool-Warm, diverging blue-red, perfect for signed metrics.",
+    "RdYlBu": "Red-Yellow-Blue, diverging, popular for elevation / temperature.",
 }
 
 
@@ -346,9 +338,7 @@ _AUX_BUTTONS = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Gizmo group
-# ---------------------------------------------------------------------------
+# --- Gizmo group ------------------------------------------------------------
 
 class SCIGRAPHS_GGT_color_toolbar(bpy.types.GizmoGroup):
     """Floating horizontal coloring toolbar."""
@@ -362,12 +352,11 @@ class SCIGRAPHS_GGT_color_toolbar(bpy.types.GizmoGroup):
     def poll(cls, context):
         if not getattr(context.window_manager, "scigraphs_show_color_toolbar", True):
             return False
-        # Only show the toolbar when an active mesh has scalar attributes the
-        # user could colorize. Otherwise it would just clutter the viewport.
+        # No scalar attributes means nothing to color, so stay out of the way.
         return fn.has_scalar_attributes(fn.active_mesh_object(context))
 
-    # Attributes initialised in setup() because Blender constructs the
-    # GizmoGroup itself; declaring them here keeps Pylint happy.
+    # Blender constructs the GizmoGroup itself, so these are filled in by
+    # setup(); the declarations are here only to keep Pylint quiet.
     _move_button = None
     _chip_buttons = ()
     _aux_buttons = ()
@@ -487,9 +476,7 @@ class SCIGRAPHS_GGT_color_toolbar(bpy.types.GizmoGroup):
         return None
 
 
-# ---------------------------------------------------------------------------
-# Registration
-# ---------------------------------------------------------------------------
+# --- Registration -----------------------------------------------------------
 
 _classes = (SCIGRAPHS_GGT_color_toolbar,)
 

@@ -1,9 +1,8 @@
-# SQL Import operators for SciGraphs
-#
-# Operators for loading graph data from SQL databases.
+# Operators for loading graph data out of SQL databases.
 
 import bpy
-from ....core import sql_importer, db_connector, geometry, graph
+from scigraphs_core import sql_importer, db_connector, graph
+from ....core import geometry
 from ....preferences import get_preferences
 from ...view_utils import focus_graph_in_top_view
 
@@ -17,26 +16,22 @@ class SCIGRAPHS_OT_LoadSQLColumns(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.scigraphs
         
-        # Get the selected database profile
         profile = self._get_profile(props)
         if profile is None:
             self.report({'WARNING'}, "No database profile selected. Configure in Preferences.")
             return {'CANCELLED'}
-        
-        # Check if query is provided
+
         if not props.sql_query or not props.sql_query.strip():
             self.report({'WARNING'}, "Please enter a SQL query")
             return {'CANCELLED'}
-        
-        # Get columns from query
+
         columns = sql_importer.get_columns_from_query(profile, props.sql_query)
-        
+
         if not columns:
             props.sql_query_status = "Query returned no columns or failed"
             self.report({'ERROR'}, "Could not load columns from query")
             return {'CANCELLED'}
-        
-        # Store columns in cache (pipe-separated)
+
         props.sql_columns_cache = "|".join(columns)
         props.sql_query_status = f"Loaded {len(columns)} columns"
         
@@ -44,7 +39,6 @@ class SCIGRAPHS_OT_LoadSQLColumns(bpy.types.Operator):
         return {'FINISHED'}
     
     def _get_profile(self, props):
-        """Get the selected database profile."""
         prefs = get_preferences()
         if not prefs or not prefs.db_profiles:
             return None
@@ -77,7 +71,6 @@ class SCIGRAPHS_OT_PreviewSQLQuery(bpy.types.Operator):
             self.report({'WARNING'}, "Please enter a SQL query")
             return {'CANCELLED'}
         
-        # Preview the query
         df, total_rows, error = sql_importer.preview_query(
             profile, props.sql_query, max_rows=10
         )
@@ -92,12 +85,10 @@ class SCIGRAPHS_OT_PreviewSQLQuery(bpy.types.Operator):
             self.report({'WARNING'}, "Query returned no results")
             return {'CANCELLED'}
         
-        # Update status and cache columns
         props.sql_columns_cache = "|".join(df.columns)
         props.sql_row_count = total_rows
         props.sql_query_status = f"Preview: {len(df)} of {total_rows} rows, {len(df.columns)} columns"
-        
-        # Print preview to console
+
         print("\n=== SQL Query Preview ===")
         print(f"Columns: {list(df.columns)}")
         print(f"Total rows: {total_rows}")
@@ -108,7 +99,6 @@ class SCIGRAPHS_OT_PreviewSQLQuery(bpy.types.Operator):
         return {'FINISHED'}
     
     def _get_profile(self, props):
-        """Get the selected database profile."""
         prefs = get_preferences()
         if not prefs or not prefs.db_profiles:
             return None
@@ -141,7 +131,6 @@ class SCIGRAPHS_OT_CreateGraphFromSQL(bpy.types.Operator):
             self.report({'WARNING'}, "Please enter a SQL query")
             return {'CANCELLED'}
         
-        # Get column indices
         try:
             source_col = int(props.source_column)
             target_col = int(props.target_column)
@@ -149,9 +138,7 @@ class SCIGRAPHS_OT_CreateGraphFromSQL(bpy.types.Operator):
             self.report({'ERROR'}, "Invalid column selection")
             return {'CANCELLED'}
         
-        # Load graph data from SQL
         if props.use_geospatial:
-            # Handle geospatial mode
             lat_col = None
             lon_col = None
             weight_col = None
@@ -185,7 +172,6 @@ class SCIGRAPHS_OT_CreateGraphFromSQL(bpy.types.Operator):
             self.report({'ERROR'}, "Could not create graph from SQL query")
             return {'CANCELLED'}
         
-        # Create the graph visualization
         graph_obj = geometry.create_graph_object(graph_data, is_directed=props.is_directed)
 
         if not props.use_geospatial:
@@ -199,7 +185,6 @@ class SCIGRAPHS_OT_CreateGraphFromSQL(bpy.types.Operator):
         return {'FINISHED'}
     
     def _get_profile(self, props):
-        """Get the selected database profile."""
         prefs = get_preferences()
         if not prefs or not prefs.db_profiles:
             return None
@@ -240,7 +225,6 @@ class SCIGRAPHS_OT_TestSQLConnection(bpy.types.Operator):
         return {'FINISHED'}
     
     def _get_profile(self, props):
-        """Get the selected database profile."""
         prefs = get_preferences()
         if not prefs or not prefs.db_profiles:
             return None

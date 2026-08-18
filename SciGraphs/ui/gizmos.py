@@ -1,5 +1,4 @@
-# SciGraphs viewport node handles
-# Draws safe, non-RNA gizmo-like handles for graph nodes.
+# Viewport node handles, drawn without RNA gizmos.
 
 import bpy
 import numpy as np
@@ -145,9 +144,8 @@ _TOOLBAR_LABELS = {
 def set_active_toolbar(context, toolbar):
     """Select the toolbar profile to show when the quick toolbar is visible.
 
-    Honors the manual override set by the navbar arrows: while the override is
-    active, contextual auto-switching from the side panels is ignored so the
-    user-selected profile stays put.
+    While the navbar arrows have set a manual override, contextual switching
+    from the side panels is ignored so the chosen profile stays put.
     """
     wm = context.window_manager
     if toolbar not in _TOOLBAR_PROFILES:
@@ -1080,11 +1078,9 @@ class SCIGRAPHS_OT_city2graph_quick_action_dialog(bpy.types.Operator):
 class _PanelDrawProxy:
     """Stand-in for a Panel instance during popup drawing.
 
-    Exposes a fixed ``layout`` and delegates any other attribute lookup
-    (e.g. helper methods like ``_draw_database_ui`` or class attributes such as
-    ``bl_label``) to the originating Panel class, binding instance methods to
-    this proxy so ``self._draw_*`` calls inside the panel's ``draw`` keep
-    working when rendered from a popup.
+    Holds a fixed ``layout`` and forwards every other lookup to the originating
+    Panel class, binding instance methods to the proxy so the panel's own
+    ``self._draw_*`` calls still work from inside a popup.
     """
 
     def __init__(self, layout, panel_cls=None):
@@ -1096,9 +1092,8 @@ class _PanelDrawProxy:
         if panel_cls is None:
             raise AttributeError(name)
 
-        # Inspect the raw descriptor across the MRO to tell instance methods
-        # (which must be bound to this proxy) from static/class methods and
-        # plain attributes (which are returned as-is).
+        # Walk the MRO for the raw descriptor: instance methods have to be
+        # bound to this proxy, everything else is returned as-is.
         raw = None
         for klass in getattr(panel_cls, "__mro__", [panel_cls]):
             if name in vars(klass):
@@ -1172,8 +1167,8 @@ class SCIGRAPHS_OT_open_subpanel(bpy.types.Operator):
             self.report({'WARNING'}, f"Unknown subpanel: {self.subpanel}")
             return {'CANCELLED'}
         # invoke_props_dialog re-runs draw() on every redraw, so conditional
-        # panel UI (e.g. the Data source switch) updates live. invoke_popup is
-        # static and would freeze the panel at its initial state.
+        # panel UI updates live. invoke_popup would freeze it at its initial
+        # state.
         return context.window_manager.invoke_props_dialog(self, width=560)
 
     def draw(self, context):

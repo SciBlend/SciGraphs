@@ -9,9 +9,7 @@ from bpy.props import (
 )
 
 SPLITTER_PROPERTIES = {
-    # ========================================
-    # NETWORK SPLITTER 3D
-    # ========================================
+    # --- NETWORK SPLITTER 3D ------------------------------------------------
 
     'splitter_criterion': EnumProperty(
         name="Split Criterion",
@@ -78,7 +76,7 @@ SPLITTER_PROPERTIES = {
             ('INFOMAP', "Infomap", "Map equation (Rosvall & Bergstrom 2008)"),
             ('RB', "RB", "Reichardt-Bornholdt Potts model (2006)"),
             ('RN', "RN", "Ronhovde-Nussinov resolution-free (2010)"),
-            ('RNSC', "RNSC", "Restricted Neighbourhood Search Clustering (King et al. 2004)"),
+            ('RNSC', "RNSC", "Restricted Neighborhood Search Clustering (King et al. 2004)"),
             ('SCLUSTER', "SCluster", "Hierarchical clustering (Aldecoa & Marín 2010)"),
             ('UVCLUSTER', "UVCluster", "Iterative cluster analysis (Arnau et al. 2005)"),
         ],
@@ -353,7 +351,7 @@ SPLITTER_PROPERTIES = {
             ('infomap', "Infomap", "Map equation (Rosvall & Bergstrom 2008)"),
             ('rb', "RB", "Reichardt-Bornholdt Potts model (2006)"),
             ('rn', "RN", "Ronhovde-Nussinov resolution-free (2010)"),
-            ('rnsc', "RNSC", "Restricted Neighbourhood Search Clustering (King et al. 2004)"),
+            ('rnsc', "RNSC", "Restricted Neighborhood Search Clustering (King et al. 2004)"),
             ('scluster', "SCluster", "Hierarchical clustering (Aldecoa & Marín 2010)"),
             ('uvcluster', "UVCluster", "Iterative cluster analysis (Arnau et al. 2005)"),
         ],

@@ -1,5 +1,4 @@
-# SciGraphs Pie Menus
-# Radial menus for quick access to common operations
+# Radial menus for quick access to common operations.
 
 import bpy
 
@@ -160,34 +159,28 @@ def register():
     for cls in _PIE_CLASSES:
         bpy.utils.register_class(cls)
     
-    # Register keymaps
     wm = bpy.context.window_manager
     if wm.keyconfigs.addon:
         km = wm.keyconfigs.addon.keymaps.new(name='3D View', space_type='VIEW_3D')
         
-        # Q = Main pie menu
         kmi = km.keymap_items.new("scigraphs.pie_main", 'Q', 'PRESS', shift=True)
         _KEYMAP_ITEMS.append((km, kmi))
         
-        # Shift+L = Layout pie
         kmi = km.keymap_items.new("scigraphs.pie_layout", 'L', 'PRESS', shift=True, ctrl=True)
         _KEYMAP_ITEMS.append((km, kmi))
         
-        # Shift+A already used, use Ctrl+Shift+A = Analysis pie
+        # Ctrl as well, because Blender already owns Shift+A.
         kmi = km.keymap_items.new("scigraphs.pie_analysis", 'A', 'PRESS', shift=True, ctrl=True)
         _KEYMAP_ITEMS.append((km, kmi))
         
-        # Ctrl+Shift+V = Visualization pie
         kmi = km.keymap_items.new("scigraphs.pie_visualization", 'V', 'PRESS', shift=True, ctrl=True)
         _KEYMAP_ITEMS.append((km, kmi))
         
-        # Ctrl+Shift+T = Topology pie
         kmi = km.keymap_items.new("scigraphs.pie_topology", 'T', 'PRESS', shift=True, ctrl=True)
         _KEYMAP_ITEMS.append((km, kmi))
 
 
 def unregister():
-    # Remove keymaps
     for km, kmi in _KEYMAP_ITEMS:
         km.keymap_items.remove(kmi)
     _KEYMAP_ITEMS.clear()

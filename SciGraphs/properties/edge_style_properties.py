@@ -10,9 +10,8 @@ from bpy.props import (
 def _gpu_style_refresh(self, context):
     """Repaint the GPU preview when a style parameter changes.
 
-    The GPU render path bakes these parameters into its batch-cache
-    signature, so a simple redraw is enough: the next draw notices the
-    signature change and re-tessellates the edges.
+    These parameters are baked into the batch-cache signature, so a redraw is
+    enough: the next draw sees the new signature and re-tessellates.
     """
     try:
         from ..ui.gpu_render.state import tag_redraw
@@ -22,9 +21,7 @@ def _gpu_style_refresh(self, context):
 
 
 EDGE_STYLE_PROPERTIES = {
-    # ========================================
-    # EDGE STYLE PROPERTIES
-    # ========================================
+    # --- EDGE STYLE PROPERTIES ----------------------------------------------
 
     'edge_style_type': EnumProperty(
         name="Edge Style",
@@ -36,7 +33,7 @@ EDGE_STYLE_PROPERTIES = {
             ('ARC', "Arc", "Circular arc segments"),
             ('BUNDLED', "Bundled (FDEB)", "Force-directed edge bundling: edges attract each other pairwise (Holten & van Wijk 2009)"),
             ('HIERARCHICAL', "Bundled (Hierarchical)", "Route edges along the cluster tree, from each endpoint up to the least common ancestor and back down (Holten 2006). Needs a clustering attribute; scales to any edge count"),
-            ('FDEB', "Bundled (Force-Directed, GPU)", "The same forces as FDEB, relaxed in compute shaders against a spatial neighbourhood instead of an all-pairs matrix. No clustering attribute needed, and no 4096-edge ceiling"),
+            ('FDEB', "Bundled (Force-Directed, GPU)", "The same forces as FDEB, relaxed in compute shaders against a spatial neighborhood instead of an all-pairs matrix. No clustering attribute needed, and no 4096-edge ceiling"),
             ('SBEB', "Bundled (Skeleton, image-based)", "Attract edges toward the skeleton of their own drawn density, computed in image space (Ersoy et al. 2011). Its cost follows the raster resolution rather than the edge count"),
             ('ROUTED', "Bundled (Routed roads)", "Route edges along a grid and make shared stretches cheaper each round, so they converge onto exactly coincident roads (Lambert et al. 2010). Can be told to steer clear of crowded regions"),
             ('MINGLE', "Bundled (Agglomerative, ink)", "Merge edges into a tree of shared trunks, choosing at each step the merge that saves the most drawn ink (Gansner et al. 2011). Meeting points are explicit and exactly shared, which reads differently from the soft merging of the force-directed families"),
@@ -160,7 +157,7 @@ EDGE_STYLE_PROPERTIES = {
         name="Skip Common Ancestor",
         description=(
             "Do not route through the meeting point of the two endpoints, so "
-            "links inside one cluster stop detouring via its centre. Ignored "
+            "links inside one cluster stop detouring via its center. Ignored "
             "for the shortest paths, where it would collapse every such link "
             "onto the same straight line"
         ),
@@ -185,15 +182,15 @@ EDGE_STYLE_PROPERTIES = {
     'edge_heb_gradient': EnumProperty(
         name="Gradient",
         description=(
-            "Colour along each curve. Curvature already carries the bundling "
-            "and cannot also show direction, so colour does it instead"
+            "Color along each curve. Curvature already carries the bundling "
+            "and cannot also show direction, so color does it instead"
         ),
         items=[
-            ('NONE', "None", "One flat edge colour"),
+            ('NONE', "None", "One flat edge color"),
             ('DIRECTION', "Direction",
              "Green at the source, red at the destination"),
             ('NODES', "Endpoint Nodes",
-             "Blend the colours of the two nodes, so a strand shows which "
+             "Blend the colors of the two nodes, so a strand shows which "
              "cluster it leaves and which it reaches"),
         ],
         default='NODES',
@@ -201,9 +198,8 @@ EDGE_STYLE_PROPERTIES = {
     ),
 
     # --- Shared by every bundling mode -------------------------------------
-    #
-    # These act on the control polygon, whichever family produced it, so they
-    # are deliberately not prefixed with one mode's name.
+    # These act on the control polygon whatever produced it, hence no mode
+    # prefix on the names.
 
     'edge_bundle_turn_limit': FloatProperty(
         name="Turning Limit",
@@ -212,9 +208,8 @@ EDGE_STYLE_PROPERTIES = {
             "distant links from doubling back to join a bundle they only just "
             "reach. 180 leaves the route exactly as the algorithm produced it"
         ),
-        # Plain degrees rather than subtype='ANGLE', which would make Blender
-        # store and show radians and put a unit on a control whose useful range
-        # the user reads in degrees.
+        # Plain degrees, not subtype='ANGLE': that would store and display
+        # radians on a control whose useful range the user reads in degrees.
         default=180.0,
         min=20.0,
         max=180.0,
@@ -225,7 +220,7 @@ EDGE_STYLE_PROPERTIES = {
         name="Strength Follows Length",
         description=(
             "Bundle long links harder than short ones. A link across the whole "
-            "graph is what bundling is for; a link between neighbours only "
+            "graph is what bundling is for; a link between neighbors only "
             "loses its direct reading by being routed. 0 gives every edge the "
             "same strength"
         ),
@@ -271,7 +266,7 @@ EDGE_STYLE_PROPERTIES = {
         description=(
             "Draw an edge more transparently the more of the graph shares its "
             "route, so a dense bundle stops reading as one opaque mass. 0 "
-            "keeps every edge at the opacity its colour asks for"
+            "keeps every edge at the opacity its color asks for"
         ),
         default=0.0,
         min=0.0,
@@ -319,7 +314,7 @@ EDGE_STYLE_PROPERTIES = {
             "a threshold chosen against three terms is strictly stricter once "
             "there are four, and the CPU default leaves almost nothing above it"
         ),
-        # Holten's own is 0.05. This sits above it because the neighbourhood
+        # Holten's own is 0.05. This sits above it because the neighborhood
         # radius already excludes the distant pairs a low threshold would
         # otherwise admit, and below the CPU default for the reason above.
         default=0.25,
@@ -341,7 +336,7 @@ EDGE_STYLE_PROPERTIES = {
         update=_gpu_style_refresh,
     ),
 
-    # --- Agglomerative bundling by ink minimisation (MINGLE) ----------------
+    # --- Agglomerative bundling by ink minimization (MINGLE) ----------------
 
     'edge_mingle_neighbours': IntProperty(
         name="Candidates",
@@ -560,9 +555,7 @@ EDGE_STYLE_PROPERTIES = {
         update=_gpu_style_refresh,
     ),
 
-    # ========================================
-    # NODE ATTRIBUTE IMPORT
-    # ========================================
+    # --- NODE ATTRIBUTE IMPORT ----------------------------------------------
 
     'node_attr_filepath': StringProperty(
         name="Node Attribute File",

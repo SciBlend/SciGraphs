@@ -1,7 +1,5 @@
-# Text overlay generation for graph node labels
-#
-# This module handles projection of 3D node positions to 2D screen coordinates,
-# depth occlusion testing, and PNG image generation with text labels.
+# Text overlay for graph node labels: projects 3D node positions to screen,
+# tests depth occlusion, and writes a PNG of the labels.
 
 import bpy
 import json
@@ -18,7 +16,7 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-from ...utils.logger import log
+from scigraphs_core.logger import log
 
 
 @dataclass
@@ -37,13 +35,11 @@ class TextOverlaySettings:
     filter_attribute: str
     filter_operator: str
     filter_value: float
-    # Number format settings
     format_type: str = 'AUTO'  # 'AUTO', 'INTEGER', 'FLOAT', 'SCIENTIFIC', 'PERCENTAGE'
     float_decimals: int = 2
     format_prefix: str = ""
     format_suffix: str = ""
     thousands_separator: bool = False
-    # Font settings
     font_path: str = ""
 
 
@@ -54,25 +50,17 @@ class ProjectedNode:
     x: float  # Pixel X coordinate
     y: float  # Pixel Y coordinate
     distance: float  # Distance from camera
-    visible: bool  # Whether node is within camera view
-    occluded: bool  # Whether node is hidden by geometry
-    attribute_value: Optional[float]  # Value of filter attribute if applicable
+    visible: bool
+    occluded: bool
+    attribute_value: Optional[float]
 
 
 def resolve_node_names(obj) -> Optional[List[str]]:
-    """
-    Resolve node names for a graph object from its stored metadata.
+    """Resolve the node names of a graph object from its stored metadata.
 
-    Tries ``obj["node_names"]`` (JSON list) first, then falls back to
-    ``obj["nodes_data"]`` (comma-separated string used by geospatial graphs),
-    and finally to generated names based on vertex indices.
-
-    Args:
-        obj: Graph object
-
-    Returns:
-        List of node names aligned with mesh vertex order, or None if the
-        object is not a valid mesh.
+    ``obj["node_names"]`` (a JSON list) first, then ``obj["nodes_data"]`` (the
+    comma-separated form geospatial graphs use), then names built from vertex
+    indices. Aligned with mesh vertex order; None if the object is not a mesh.
     """
     if obj is None or obj.type != 'MESH':
         return None
@@ -100,15 +88,7 @@ def resolve_node_names(obj) -> Optional[List[str]]:
 
 
 def get_node_positions_from_object(obj) -> Dict[str, Vector]:
-    """
-    Extract node positions from a graph object.
-    
-    Reads vertex positions from mesh and maps them to node names
-    stored in obj["node_names"] or obj["nodes_data"].
-    
-    Returns:
-        Dictionary mapping node name to world position Vector
-    """
+    """Map node name to world position, reading vertex positions off the mesh."""
     if obj is None or obj.type != 'MESH':
         return {}
     
@@ -120,7 +100,6 @@ def get_node_positions_from_object(obj) -> Dict[str, Vector]:
     positions = {}
     world_matrix = obj.matrix_world
     
-    # Match vertices to node names by index
     for i, vert in enumerate(mesh.vertices):
         if i < len(node_names):
             world_pos = world_matrix @ vert.co
@@ -130,16 +109,7 @@ def get_node_positions_from_object(obj) -> Dict[str, Vector]:
 
 
 def get_node_attribute_values(obj, attribute_name: str) -> Dict[str, float]:
-    """
-    Get attribute values for each node from mesh attributes or object properties.
-    
-    Args:
-        obj: Graph object
-        attribute_name: Name of the attribute to retrieve
-        
-    Returns:
-        Dictionary mapping node name to attribute value
-    """
+    """Map node name to attribute value, from mesh attributes or object properties."""
     if obj is None or not attribute_name:
         return {}
     
@@ -151,19 +121,16 @@ def get_node_attribute_values(obj, attribute_name: str) -> Dict[str, float]:
     
     values = {}
     
-    # Check mesh attributes first
     if attribute_name in mesh.attributes:
         attr = mesh.attributes[attribute_name]
         if attr.domain == 'POINT':
             for i, data in enumerate(attr.data):
                 if i < len(node_names):
-                    # Handle different attribute types
                     if hasattr(data, 'value'):
                         values[node_names[i]] = float(data.value)
                     elif hasattr(data, 'vector'):
                         values[node_names[i]] = data.vector.length
     
-    # Check object custom properties as fallback
     elif f"attr_{attribute_name}" in obj:
         attr_data = obj[f"attr_{attribute_name}"]
         if isinstance(attr_data, (list, tuple)):
@@ -180,20 +147,11 @@ def project_nodes_to_screen(
     scene: bpy.types.Scene,
     render_resolution: Tuple[int, int]
 ) -> List[ProjectedNode]:
-    """
-    Project 3D node positions to 2D screen coordinates.
-    
-    Uses Blender's camera projection matrix to correctly handle
-    focal length, sensor size, shift, and camera transformation.
-    
-    Args:
-        obj: Graph object containing nodes
-        camera: Camera object to project from
-        scene: Current scene
-        render_resolution: (width, height) in pixels
-        
-    Returns:
-        List of ProjectedNode with screen coordinates
+    """Project 3D node positions onto 2D screen pixels.
+
+    Reproduces Blender's own camera projection: focal length, sensor size and
+    fit, lens shift, and the camera transform. ``render_resolution`` is
+    (width, height) in pixels.
     """
     import mathutils
     
@@ -208,15 +166,13 @@ def project_nodes_to_screen(
     width, height = render_resolution
     camera_pos = camera.matrix_world.translation
     
-    # Get camera data
     cam_data = camera.data
     focal_length = cam_data.lens  # in mm
     sensor_width = cam_data.sensor_width  # in mm
     sensor_height = cam_data.sensor_height  # in mm
-    shift_x = cam_data.shift_x  # Lens shift X
-    shift_y = cam_data.shift_y  # Lens shift Y
+    shift_x = cam_data.shift_x
+    shift_y = cam_data.shift_y
     
-    # Determine sensor fit and calculate effective sensor dimensions
     aspect_ratio = width / height
     sensor_aspect = sensor_width / sensor_height
     
@@ -228,8 +184,7 @@ def project_nodes_to_screen(
     else:
         sensor_fit = cam_data.sensor_fit
     
-    # Calculate the view dimensions based on sensor fit
-    # This matches Blender's internal calculation
+    # View dimensions per sensor fit, matching Blender's internal calculation.
     if sensor_fit == 'HORIZONTAL':
         view_fac = width / sensor_width
         sensor_size = sensor_width
@@ -245,30 +200,25 @@ def project_nodes_to_screen(
     log(f"Camera shift: x={shift_x}, y={shift_y}")
     log(f"Render resolution: {width}x{height}, aspect={aspect_ratio:.3f}")
     
-    # Get camera view matrix (world to camera space)
     modelview_matrix = camera.matrix_world.inverted()
     
     projected = []
     
     for name, world_pos in positions.items():
-        # Transform to camera space
         cam_co = modelview_matrix @ world_pos
         
-        # cam_co.z is negative when in front of camera
+        # cam_co.z is negative in front of the camera.
         if cam_co.z >= 0:
-            # Behind camera
             projected.append(ProjectedNode(
                 name=name, x=0, y=0, distance=0,
                 visible=False, occluded=True, attribute_value=None
             ))
             continue
         
-        # Perspective projection matching Blender's camera
         depth = -cam_co.z  # Make positive (distance along view axis)
         
-        # Project to sensor plane
-        # The projection formula: screen_coord = (cam_coord * focal_length) / depth
-        # Then normalize to sensor size
+        # Sensor-plane projection: (cam_coord * focal_length) / depth, then
+        # normalized to sensor size.
         
         if sensor_fit == 'HORIZONTAL':
             # Horizontal fit: sensor_width matches image width
@@ -279,8 +229,7 @@ def project_nodes_to_screen(
             proj_x = (cam_co.x * focal_length) / (depth * sensor_height / 2.0) / aspect_ratio
             proj_y = (cam_co.y * focal_length) / (depth * sensor_height / 2.0)
         
-        # Apply lens shift (shift is in sensor units, typically -0.5 to 0.5)
-        # Shift affects the projection center
+        # Lens shift is in sensor units, about -0.5 to 0.5, and moves the center.
         proj_x += shift_x * 2.0
         proj_y += shift_y * 2.0
         
@@ -288,7 +237,6 @@ def project_nodes_to_screen(
         norm_x = (proj_x + 1.0) / 2.0
         norm_y = (proj_y + 1.0) / 2.0
         
-        # Check if node is within frame
         visible = (
             0.0 <= norm_x <= 1.0 and
             0.0 <= norm_y <= 1.0
@@ -298,7 +246,6 @@ def project_nodes_to_screen(
         x_px = norm_x * width
         y_px = (1.0 - norm_y) * height
         
-        # Calculate actual distance from camera
         distance = (world_pos - camera_pos).length
         
         projected.append(ProjectedNode(
@@ -320,20 +267,9 @@ def test_depth_occlusion(
     projected_nodes: List[ProjectedNode],
     camera: bpy.types.Object
 ) -> List[ProjectedNode]:
-    """
-    Test which nodes are occluded by geometry using raycasting.
-    
-    Casts a ray from camera to each node and checks if it hits
-    geometry before reaching the node.
-    
-    Args:
-        context: Blender context
-        obj: Graph object (excluded from raycast)
-        projected_nodes: List of projected nodes to test
-        camera: Camera to cast rays from
-        
-    Returns:
-        Updated list with occluded flag set
+    """Flag the nodes hidden by geometry, raycasting from the camera to each one.
+
+    Returns the same list with ``occluded`` set.
     """
     if camera is None:
         return projected_nodes
@@ -362,14 +298,12 @@ def test_depth_occlusion(
             node.occluded = True
             continue
         
-        # Ray direction from camera to node
         direction = (node_pos - camera_pos).normalized()
         node_distance = (node_pos - camera_pos).length
         
         # Small offset to avoid self-intersection
         ray_origin = camera_pos + direction * 0.01
         
-        # Cast ray
         hit, location, normal, index, hit_obj, matrix = context.scene.ray_cast(
             depsgraph, ray_origin, direction
         )
@@ -390,15 +324,13 @@ def declutter_labels(
 ) -> List[ProjectedNode]:
     """Drop labels whose box would overlap one already accepted.
 
-    The renderer has no collision pass and simply overdraws, so on a clustered
-    layout the densest region becomes stacked, unreadable text. Greedy in the
-    order it is given, so callers should sort by importance first: the first
-    label to claim a region of screen keeps it.
+    The renderer has no collision pass and simply overdraws, so a clustered
+    layout turns into stacked, unreadable text. Greedy in the order it is given,
+    so sort by importance first: the first label to claim a region keeps it.
 
-    The box is estimated rather than measured. Asking Pillow for metrics here
-    would mean loading the font a second time and duplicating the per-node
-    logic in `calculate_text_size`; the estimate only has to be good enough to
-    keep neighbours apart, and it errs wide.
+    The box is estimated, not measured. Asking Pillow for metrics would mean
+    loading the font a second time and duplicating `calculate_text_size`; the
+    estimate only has to keep neighbors apart, and it errs wide.
     """
     accepted: List[ProjectedNode] = []
     boxes: List[Tuple[float, float, float, float]] = []
@@ -421,16 +353,7 @@ def apply_distance_filter(
     projected_nodes: List[ProjectedNode],
     max_distance: float
 ) -> List[ProjectedNode]:
-    """
-    Filter out nodes beyond maximum distance.
-    
-    Args:
-        projected_nodes: List of projected nodes
-        max_distance: Maximum distance (0 = no limit)
-        
-    Returns:
-        Filtered list of nodes
-    """
+    """Drop nodes beyond ``max_distance``. 0 means no limit."""
     if max_distance <= 0:
         return projected_nodes
     
@@ -442,17 +365,7 @@ def apply_attribute_filter(
     obj: bpy.types.Object,
     settings: TextOverlaySettings
 ) -> List[ProjectedNode]:
-    """
-    Filter nodes based on attribute value comparison.
-    
-    Args:
-        projected_nodes: List of projected nodes
-        obj: Graph object to get attributes from
-        settings: Filter settings
-        
-    Returns:
-        Filtered list of nodes
-    """
+    """Keep the nodes whose filter attribute passes the comparison in ``settings``."""
     if not settings.filter_enabled or not settings.filter_attribute:
         return projected_nodes
     
@@ -462,11 +375,9 @@ def apply_attribute_filter(
         log(f"Warning: Attribute '{settings.filter_attribute}' not found")
         return projected_nodes
     
-    # Update nodes with attribute values
     for node in projected_nodes:
         node.attribute_value = attr_values.get(node.name)
     
-    # Apply filter
     filtered = []
     for node in projected_nodes:
         if node.attribute_value is None:
@@ -500,17 +411,7 @@ def calculate_text_size(
     settings: TextOverlaySettings,
     camera: bpy.types.Object
 ) -> int:
-    """
-    Calculate text size for a node based on settings and distance.
-    
-    Args:
-        node: Projected node
-        settings: Text overlay settings
-        camera: Camera for reference
-        
-    Returns:
-        Text size in pixels
-    """
+    """Text size in pixels for one node, from the size mode and its distance."""
     if settings.size_mode == 'FIXED':
         return settings.fixed_size
     
@@ -518,7 +419,6 @@ def calculate_text_size(
     base_size = settings.fixed_size * settings.size_scale
     
     if settings.size_mode == 'PROPORTIONAL':
-        # Size inversely proportional to distance
         if node.distance > 0:
             size = int(base_size * 10.0 / node.distance)
         else:
@@ -531,27 +431,18 @@ def calculate_text_size(
             scaled_size = int(base_size * 5.0 / node.distance)
         else:
             scaled_size = int(base_size)
-        # Ensure minimum readable size
         return max(settings.fixed_size, min(scaled_size, 200))
     
     return settings.fixed_size
 
 
 def format_value(value: Any, settings: TextOverlaySettings) -> str:
+    """Format a value for display, following the overlay's format settings.
+
+    Covers integer/float detection, decimal places, scientific notation,
+    percentages, thousands separators and prefix/suffix.
     """
-    Format a value according to the text overlay settings.
-    
-    Handles integer/float detection, decimal places, scientific notation,
-    percentages, thousand separators, and prefix/suffix.
-    
-    Args:
-        value: The value to format (can be string, int, or float)
-        settings: Text overlay settings containing format options
-        
-    Returns:
-        Formatted string representation
-    """
-    # If value is already a string that cannot be parsed as number, return as-is
+    # A string that will not parse as a number passes through untouched.
     if isinstance(value, str):
         try:
             value = float(value)
@@ -585,9 +476,7 @@ def format_value(value: Any, settings: TextOverlaySettings) -> str:
         percentage = value * 100
         result = f"{percentage:.{settings.float_decimals}f}%"
     
-    # Apply thousands separator
     if settings.thousands_separator and settings.format_type != 'SCIENTIFIC':
-        # Split integer and decimal parts
         if '.' in result:
             int_part, dec_part = result.split('.')
             int_part = f"{int(int_part.replace(',', '')):,}"
@@ -606,32 +495,20 @@ def format_value(value: Any, settings: TextOverlaySettings) -> str:
             except ValueError:
                 pass
     
-    # Apply prefix and suffix
     return f"{settings.format_prefix}{result}{settings.format_suffix}"
 
 
 def load_font(font_path: str, size: int):
-    """
-    Load a font from path, with fallback options.
-    
-    Args:
-        font_path: Path to font file (can be empty)
-        size: Font size in pixels
-        
-    Returns:
-        PIL ImageFont object
-    """
+    """Load a TrueType font, falling back through the common system font paths."""
     if not PIL_AVAILABLE:
         return None
     
-    # Try custom font path first
     if font_path and os.path.exists(font_path):
         try:
             return ImageFont.truetype(font_path, size)
         except (IOError, OSError) as e:
             log(f"Could not load custom font {font_path}: {e}")
     
-    # Fallback font paths
     fallback_fonts = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Linux
@@ -649,7 +526,6 @@ def load_font(font_path: str, size: int):
             except (IOError, OSError):
                 continue
     
-    # Last resort: default bitmap font
     log("Warning: Using default bitmap font, text may look pixelated")
     return ImageFont.load_default()
 
@@ -661,34 +537,19 @@ def generate_text_image(
     camera: bpy.types.Object,
     output_path: Optional[str] = None
 ) -> Optional[str]:
-    """
-    Generate PNG image with text labels using Pillow.
-    
-    Args:
-        projected_nodes: List of nodes with screen coordinates
-        resolution: (width, height) in pixels
-        settings: Text overlay configuration
-        camera: Camera for size calculations
-        output_path: Path to save image (auto-generated if None)
-        
-    Returns:
-        Path to generated image, or None on failure
-    """
+    """Draw the labels into a PNG with Pillow. Returns its path, or None."""
     if not PIL_AVAILABLE:
         log("Error: Pillow (PIL) is required for text overlay generation")
         return None
     
     width, height = resolution
     
-    # Create transparent RGBA image
     image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     
-    # Convert colors to 0-255 range
     text_color = tuple(int(c * 255) for c in settings.text_color) + (255,)
     bg_color = tuple(int(c * 255) for c in settings.background_color) + (int(settings.background_alpha * 255),)
     
-    # Filter to visible, non-occluded nodes
     visible_nodes = [n for n in projected_nodes if n.visible and not n.occluded]
     
     # Sort by distance (furthest first, so closer nodes draw on top)
@@ -698,16 +559,13 @@ def generate_text_image(
     font_cache = {}
     
     for node in visible_nodes:
-        # Format the text value
         text = format_value(node.name, settings)
         font_size = calculate_text_size(node, settings, camera)
         
-        # Get or load font for this size
         if font_size not in font_cache:
             font_cache[font_size] = load_font(settings.font_path, font_size)
         font = font_cache[font_size]
         
-        # Get text bounding box
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
@@ -716,7 +574,6 @@ def generate_text_image(
         x = node.x - text_width / 2
         y = node.y - text_height / 2
         
-        # Draw background rectangle if enabled
         if settings.background_enabled:
             padding = 3
             draw.rectangle(
@@ -724,15 +581,12 @@ def generate_text_image(
                 fill=bg_color
             )
         
-        # Draw text
         draw.text((x, y), text, font=font, fill=text_color)
     
-    # Generate output path if not provided
     if output_path is None:
         temp_dir = tempfile.gettempdir()
         output_path = os.path.join(temp_dir, "scigraphs_text_overlay.png")
     
-    # Save image
     image.save(output_path, 'PNG')
     log(f"Text overlay saved to: {output_path}")
     
@@ -740,20 +594,11 @@ def generate_text_image(
 
 
 def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
-    """
-    Configure compositor to overlay text image on render.
-    
-    Creates or updates compositor node setup:
-    Render Layers -> Alpha Over <- Image (text overlay) -> Output
-    
-    Compatible with Blender 5.0+ which uses compositing_node_group instead of node_tree.
-    
-    Args:
-        scene: Scene to configure compositor for
-        image_path: Path to text overlay image
-        
-    Returns:
-        True on success, False on failure
+    """Wire the compositor to lay the text image over the render.
+
+    Render Layers -> Alpha Over <- Image, scaled to render size. Works on
+    Blender 5.0+, which uses ``compositing_node_group``, and on 4.x, which uses
+    ``scene.node_tree``.
     """
     log(f"Setting up compositor overlay with image: {image_path}")
     
@@ -764,12 +609,10 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         # Blender 5.0+ API: use compositing_node_group
         log("Using Blender 5.0+ compositor API")
         
-        # Check if there's an existing node group
         if scene.compositing_node_group is not None:
             tree = scene.compositing_node_group
             log(f"Using existing compositor node group: {tree.name}")
         else:
-            # Create new compositor node tree
             tree = bpy.data.node_groups.new("SciGraphs_Compositor", "CompositorNodeTree")
             scene.compositing_node_group = tree
             log("Created new compositor node group")
@@ -783,7 +626,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         log("Error: Could not access or create compositor node tree")
         return False
     
-    # Load or update image
     image_name = "SciGraphs_TextOverlay"
     
     if image_name in bpy.data.images:
@@ -794,7 +636,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         img = bpy.data.images.load(image_path, check_existing=False)
         img.name = image_name
     
-    # Find or create nodes
     render_layers = None
     output_node = None
     alpha_over = None
@@ -810,18 +651,15 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         elif node.type == 'IMAGE' and node.name == 'SciGraphs_TextImage':
             image_node = node
     
-    # Create render layers if missing
     if render_layers is None:
         render_layers = tree.nodes.new(type='CompositorNodeRLayers')
         render_layers.location = (0, 300)
     
-    # Create output node if missing
     if output_node is None:
         if is_blender_5:
             # Blender 5.0 uses NodeGroupOutput
             output_node = tree.nodes.new(type='NodeGroupOutput')
             output_node.location = (600, 300)
-            # Create output socket for the node group
             if not any(s.name == 'Image' for s in tree.interface.items_tree if hasattr(s, 'in_out') and s.in_out == 'OUTPUT'):
                 tree.interface.new_socket(name='Image', in_out='OUTPUT', socket_type='NodeSocketColor')
         else:
@@ -829,21 +667,18 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
             output_node = tree.nodes.new(type='CompositorNodeComposite')
             output_node.location = (600, 300)
     
-    # Create alpha over node
     if alpha_over is None:
         alpha_over = tree.nodes.new(type='CompositorNodeAlphaOver')
         alpha_over.name = 'SciGraphs_TextAlphaOver'
         alpha_over.label = 'Text Overlay'
         alpha_over.location = (400, 300)
     
-    # Create image node
     if image_node is None:
         image_node = tree.nodes.new(type='CompositorNodeImage')
         image_node.name = 'SciGraphs_TextImage'
         image_node.label = 'Text Labels'
         image_node.location = (100, 100)
     
-    # Set image
     image_node.image = img
     
     # Create or find Scale node to ensure text image matches render size
@@ -863,7 +698,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
     # Blender 4.x uses 'space' property, Blender 5.0+ uses inputs[1]
     scale_set = False
     
-    # Try Blender 4.x method first (space property)
     if hasattr(scale_node, 'space'):
         try:
             scale_node.space = 'RENDER_SIZE'
@@ -885,7 +719,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
     if not scale_set:
         log("Warning: Could not set Scale node to Render Size mode")
     
-    # Clear existing links to alpha over inputs and scale node
     for link in list(tree.links):
         if link.to_node == alpha_over:
             tree.links.remove(link)
@@ -896,40 +729,28 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         elif link.from_node == scale_node:
             tree.links.remove(link)
     
-    # Alpha Over node inputs in Blender 5.0:
-    # - "Background" : bottom layer (the rendered scene)
-    # - "Foreground" : top layer (text labels, drawn over using alpha)
-    # - "Factor" : blend factor
-    
-    # Connect nodes using input names for Blender 5.0 compatibility:
-    # Render Layers -> Alpha Over Background (the rendered scene as base)
+    # Blender 5.0 names the Alpha Over inputs "Background" (the rendered scene),
+    # "Foreground" (the labels) and "Factor". Connect by name where the name
+    # exists, by index otherwise.
     if 'Background' in alpha_over.inputs:
         tree.links.new(render_layers.outputs['Image'], alpha_over.inputs['Background'])
     else:
-        # Fallback for older Blender versions
         tree.links.new(render_layers.outputs['Image'], alpha_over.inputs[1])
     
-    # Text Image -> Scale -> Alpha Over Foreground
-    # First connect image to scale node
+    # Text Image -> Scale -> Alpha Over Foreground.
     tree.links.new(image_node.outputs['Image'], scale_node.inputs['Image'])
     
-    # Then connect scale to Alpha Over Foreground
     if 'Foreground' in alpha_over.inputs:
         tree.links.new(scale_node.outputs['Image'], alpha_over.inputs['Foreground'])
     else:
-        # Fallback for older Blender versions
         tree.links.new(scale_node.outputs['Image'], alpha_over.inputs[2])
     
-    # Alpha Over -> Output
     if output_node.type == 'GROUP_OUTPUT':
-        # For Blender 5.0, connect to the Image input of GroupOutput
         if 'Image' in output_node.inputs:
             tree.links.new(alpha_over.outputs['Image'], output_node.inputs['Image'])
     else:
-        # For Blender 4.x, connect to Composite node
         tree.links.new(alpha_over.outputs['Image'], output_node.inputs['Image'])
     
-    # Find or create Viewer node and connect Alpha Over to it
     viewer_node = None
     for node in tree.nodes:
         if node.type == 'VIEWER':
@@ -940,7 +761,6 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
         viewer_node = tree.nodes.new(type='CompositorNodeViewer')
         viewer_node.location = (600, 100)
     
-    # Connect Alpha Over output to Viewer
     tree.links.new(alpha_over.outputs['Image'], viewer_node.inputs['Image'])
     
     log("Compositor configured for text overlay")
@@ -948,17 +768,7 @@ def setup_compositor_overlay(scene: bpy.types.Scene, image_path: str) -> bool:
 
 
 def remove_compositor_overlay(scene: bpy.types.Scene) -> bool:
-    """
-    Remove text overlay nodes from compositor.
-    
-    Compatible with Blender 5.0+ and 4.x.
-    
-    Args:
-        scene: Scene to modify
-        
-    Returns:
-        True on success
-    """
+    """Remove the text overlay nodes from the compositor. Blender 4.x and 5.0+."""
     tree = None
     is_blender_5 = hasattr(scene, 'compositing_node_group')
     
@@ -996,7 +806,6 @@ def remove_compositor_overlay(scene: bpy.types.Scene) -> bool:
         if 'Image' in output_node.inputs:
             tree.links.new(render_layers.outputs['Image'], output_node.inputs['Image'])
     
-    # Remove image from data
     if "SciGraphs_TextOverlay" in bpy.data.images:
         bpy.data.images.remove(bpy.data.images["SciGraphs_TextOverlay"])
     
@@ -1005,27 +814,17 @@ def remove_compositor_overlay(scene: bpy.types.Scene) -> bool:
 
 
 def get_available_attributes(obj) -> List[str]:
-    """
-    Get list of available attributes from a graph object.
-    
-    Args:
-        obj: Graph object
-        
-    Returns:
-        List of attribute names
-    """
+    """List a graph's POINT attribute names plus its ``attr_``-prefixed properties."""
     if obj is None or obj.type != 'MESH':
         return []
     
     attributes = []
     mesh = obj.data
     
-    # Mesh attributes
     for attr in mesh.attributes:
         if attr.domain == 'POINT':
             attributes.append(attr.name)
     
-    # Object custom properties that look like attributes
     for key in obj.keys():
         if key.startswith("attr_") and key not in attributes:
             attr_name = key[5:]  # Remove "attr_" prefix
@@ -1034,9 +833,7 @@ def get_available_attributes(obj) -> List[str]:
     return sorted(set(attributes))
 
 
-# ---------------------------------------------------------------------------
-# Settings snapshot helpers (moved from text_overlay_operators.py)
-# ---------------------------------------------------------------------------
+# ---- Settings snapshot helpers ----
 
 def get_font_path(props) -> str:
     """Resolve the font path from the addon property group."""

@@ -1,29 +1,19 @@
-# Terrain visualization module for DEM (Digital Elevation Model) import
-#
-# This module handles:
-# - Loading DEM raster files (GeoTIFF, etc.)
-# - Fetching DEM data from elevation APIs (Open-Elevation, etc.)
-# - Creating terrain mesh in Blender
-# - Aligning terrain with OSMnx street network
-# - Applying materials and textures
+# Terrain meshes from DEM rasters and elevation APIs, aligned to OSMnx
+# street networks.
 
 import bpy
 import bmesh
 import numpy as np
 import time
-from ...utils.logger import log
+from scigraphs_core.logger import log
 
 
 def load_dem_data(filepath, bounds=None):
-    """
-    Load elevation data from a DEM raster file.
-    
-    Args:
-        filepath: Path to DEM file (GeoTIFF, etc.)
-        bounds: Optional dict with 'north', 'south', 'east', 'west' to crop
-    
-    Returns:
-        Dict with elevation data, extent, and metadata, or None on error
+    """Read a DEM raster into an elevation dict, cropped to bounds if given.
+
+    Requires rasterio. The returned bounds are the ones actually read, which
+    for a cropped window are snapped to pixel edges and so differ slightly
+    from the bounds requested. Nodata pixels come back as NaN.
     """
     try:
         import rasterio
@@ -34,14 +24,11 @@ def load_dem_data(filepath, bounds=None):
     
     try:
         with rasterio.open(filepath) as src:
-            # Get raster metadata
             transform = src.transform
             crs = src.crs
             nodata = src.nodata
             
-            # Read full raster or cropped window
             if bounds:
-                # Calculate window from bounds
                 window = from_bounds(
                     bounds['west'], bounds['south'],
                     bounds['east'], bounds['north'],
@@ -49,10 +36,8 @@ def load_dem_data(filepath, bounds=None):
                 )
                 elevation = src.read(1, window=window)
                 
-                # Recalculate transform for the window
                 window_transform = src.window_transform(window)
                 
-                # Calculate actual bounds of the window
                 height, width = elevation.shape
                 actual_bounds = {
                     'west': window_transform.c,
@@ -70,11 +55,9 @@ def load_dem_data(filepath, bounds=None):
                 }
                 window_transform = transform
             
-            # Handle nodata values
             if nodata is not None:
                 elevation = np.where(elevation == nodata, np.nan, elevation)
             
-            # Get resolution
             res_x = abs(window_transform.a) if bounds else abs(transform.a)
             res_y = abs(window_transform.e) if bounds else abs(transform.e)
             
@@ -97,17 +80,11 @@ def load_dem_data(filepath, bounds=None):
 
 
 def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=5):
-    """
-    Fetch elevation data from an online API for a given bounding box.
-    
-    Args:
-        bounds: Dict with 'north', 'south', 'east', 'west' coordinates
-        resolution: Number of points per side (total points = resolution^2)
-        api: API to use ('open-elevation' or 'opentopodata')
-        max_workers: Number of parallel requests to make
-    
-    Returns:
-        Dict with elevation data similar to load_dem_data(), or None on error
+    """Sample elevations over a bounding box from an online API.
+
+    Returns the same dict shape as load_dem_data(). resolution is points per
+    side, so the request costs resolution squared points; api is
+    'open-elevation' or 'opentopodata'.
     """
     import requests
     
@@ -116,11 +93,9 @@ def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=
     east = bounds['east']
     west = bounds['west']
     
-    # Generate grid of lat/lon points
     lats = np.linspace(north, south, resolution)
     lons = np.linspace(west, east, resolution)
     
-    # Create list of all coordinates
     coords = []
     for lat in lats:
         for lon in lons:
@@ -129,7 +104,6 @@ def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=
     total_points = len(coords)
     log(f"Fetching elevation for {total_points} points ({resolution}x{resolution} grid) with {max_workers} workers...")
     
-    # Query API in batches
     if api == 'open-elevation':
         elevations = _fetch_open_elevation(coords, max_workers=max_workers)
     elif api == 'opentopodata':
@@ -142,10 +116,8 @@ def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=
         log("Failed to fetch all elevation data")
         return None
     
-    # Reshape to 2D grid
     elevation_grid = np.array(elevations).reshape(resolution, resolution)
     
-    # Interpolate NaN values from failed batches
     nan_count = np.sum(np.isnan(elevation_grid))
     if nan_count > 0:
         log(f"Interpolating {nan_count} missing elevation values...")
@@ -166,17 +138,11 @@ def fetch_dem_from_api(bounds, resolution=50, api='open-elevation', max_workers=
 
 
 def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max_workers=5):
-    """
-    Fetch elevations from Open-Elevation API using parallel requests.
-    Free API, no key required.
-    Failed batches are marked with NaN and interpolated afterwards.
-    
-    Args:
-        coords: List of coordinate dicts with 'latitude' and 'longitude'
-        batch_size: Number of points per API request
-        pause: Pause between batch completions (seconds)
-        max_retries: Number of retries for failed requests
-        max_workers: Number of parallel requests (higher = faster, but may cause rate limiting)
+    """Fetch elevations from Open-Elevation in parallel batches. No key needed.
+
+    Batches that fail every retry come back as NaN for the caller to
+    interpolate. Raising max_workers speeds things up until the API starts
+    rate limiting.
     """
     import requests
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -185,13 +151,11 @@ def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max
     total = len(coords)
     num_batches = (total + batch_size - 1) // batch_size
     
-    # Prepare all batches
     batches = []
     for i in range(0, total, batch_size):
         batch = coords[i:i + batch_size]
         batches.append((i // batch_size, batch))
     
-    # Results storage (indexed by batch number)
     results_map = {}
     failed_batches = []
     
@@ -223,7 +187,6 @@ def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max
                 if retry < max_retries:
                     time.sleep(0.3)
         
-        # All retries failed
         return batch_idx, [np.nan] * len(batch), False
     
     completed = 0
@@ -250,17 +213,17 @@ def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max
             time.sleep(pause)
     except KeyboardInterrupt:
         interrupted = True
-        log("Open-Elevation fetch interrupted by user — cancelling pending requests")
+        log("Open-Elevation fetch interrupted by user, canceling pending requests")
         for fut in futures:
             fut.cancel()
     finally:
-        # Don't wait for in-flight HTTP requests when the user aborted: that
-        # is what made Ctrl+C hang Blender for ~30s in the previous version.
+        # Waiting on in-flight HTTP requests after an abort hangs Blender for
+        # about 30 seconds, so do not wait when interrupted.
         executor.shutdown(wait=not interrupted, cancel_futures=True)
 
     if interrupted:
-        # Bubble up so the operator can report a clean cancellation.
-        raise KeyboardInterrupt("Open-Elevation fetch cancelled")
+        # The operator catches this and reports a clean cancellation.
+        raise KeyboardInterrupt("Open-Elevation fetch canceled")
 
     all_elevations = []
     for i in range(num_batches):
@@ -275,30 +238,20 @@ def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max
 
 
 def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_workers=2):
-    """
-    Fetch elevations from OpenTopoData API using parallel requests.
-    Free API with multiple datasets (SRTM, ASTER, etc.)
-    Failed batches are marked with NaN for later interpolation.
-    
-    Note: OpenTopoData has stricter rate limits, so fewer workers recommended.
-    
-    Args:
-        coords: List of coordinate dicts with 'latitude' and 'longitude'
-        batch_size: Number of points per API request
-        pause: Pause between batch completions (seconds)
-        max_retries: Number of retries for failed requests
-        max_workers: Number of parallel requests (2-3 recommended for this API)
+    """Fetch elevations from OpenTopoData in parallel batches.
+
+    Rate limits here are stricter than Open-Elevation, so max_workers is capped
+    at 3 below and 2 is the sane default. Failed batches come back as NaN.
     """
     import requests
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    
-    # Using SRTM 30m dataset (global coverage)
+
+    # SRTM 30 m, the one dataset with global coverage.
     url = "https://api.opentopodata.org/v1/srtm30m"
     
     total = len(coords)
     num_batches = (total + batch_size - 1) // batch_size
     
-    # Prepare batches
     batches = []
     for i in range(0, total, batch_size):
         batch = coords[i:i + batch_size]
@@ -327,16 +280,15 @@ def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_wo
                     return batch_idx, elevations, True
                 else:
                     if retry < max_retries:
-                        time.sleep(1.0)  # OpenTopoData has stricter rate limit
-            
+                        time.sleep(1.0)
+
             except Exception:
                 if retry < max_retries:
                     time.sleep(1.0)
         
         return batch_idx, [np.nan] * len(batch), False
     
-    # Limit workers for OpenTopoData (stricter rate limit)
-    effective_workers = min(max_workers, 3)  # Cap at 3 for this API
+    effective_workers = min(max_workers, 3)
     completed = 0
     
     log(f"Fetching {total} points in {num_batches} batches ({effective_workers} workers)...")
@@ -361,14 +313,14 @@ def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_wo
             time.sleep(pause)
     except KeyboardInterrupt:
         interrupted = True
-        log("OpenTopoData fetch interrupted by user — cancelling pending requests")
+        log("OpenTopoData fetch interrupted by user, canceling pending requests")
         for fut in futures:
             fut.cancel()
     finally:
         executor.shutdown(wait=not interrupted, cancel_futures=True)
 
     if interrupted:
-        raise KeyboardInterrupt("OpenTopoData fetch cancelled")
+        raise KeyboardInterrupt("OpenTopoData fetch canceled")
 
     all_elevations = []
     for i in range(num_batches):
@@ -383,35 +335,41 @@ def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_wo
 
 
 def _interpolate_nan_values(grid):
+    """Fill NaN gaps left by failed API batches, by nearest neighbor.
+
+    scipy is an optional extra, and the import is guarded because it sits
+    downstream of the network fetch: an unguarded ImportError here would throw
+    away an elevation download that already succeeded. Without scipy the gaps
+    get the mean of the valid samples instead, which patches visibly flatter.
     """
-    Interpolate NaN values in a 2D grid using nearest neighbor approach.
-    This handles gaps from failed API batches.
-    """
-    from scipy import ndimage
-    
-    # If no valid data at all, return zeros
+    try:
+        from scipy import ndimage
+    except ImportError:
+        ndimage = None
+
     valid_mask = ~np.isnan(grid)
     if not np.any(valid_mask):
         log("Warning: No valid elevation data, using zeros")
         return np.zeros_like(grid)
-    
-    # Get mean of valid values as fallback
+
     mean_value = np.nanmean(grid)
-    
-    # Use distance transform to find nearest valid value indices
+
+    if ndimage is None:
+        log("Warning: scipy is not installed, so elevation gaps are filled with "
+            "the mean of the valid samples rather than by nearest neighbor; "
+            "install the 'scipy' extra for nearest-neighbor interpolation")
+        return np.where(np.isnan(grid), mean_value, grid)
+
     invalid_mask = np.isnan(grid)
-    
-    # scipy ndimage can fill with nearest neighbor
+
     indices = ndimage.distance_transform_edt(
-        invalid_mask, 
-        return_distances=False, 
+        invalid_mask,
+        return_distances=False,
         return_indices=True
     )
-    
-    # Create interpolated grid
+
     result = grid[indices[0], indices[1]]
-    
-    # Any remaining NaN (shouldn't happen) gets mean value
+
     result = np.where(np.isnan(result), mean_value, result)
     
     return result
@@ -419,34 +377,18 @@ def _interpolate_nan_values(grid):
 
 def create_terrain_from_api(bounds, resolution=50, scale=0.001, vertical_scale=1.0,
                             vertical_offset=0.0, api='open-elevation', name="API_Terrain"):
-    """
-    Create terrain mesh by fetching elevation data from an API.
-    
-    Args:
-        bounds: Dict with 'north', 'south', 'east', 'west'
-        resolution: Grid resolution (points per side)
-        scale: Scale factor for coordinates
-        vertical_scale: Vertical exaggeration
-        vertical_offset: Base elevation offset
-        api: API to use ('open-elevation' or 'opentopodata')
-        name: Name for the Blender object
-    
-    Returns:
-        Created Blender terrain object, or None on error
-    """
-    # Fetch elevation data
+    """Fetch elevations for a bounding box and build the terrain mesh."""
     dem_data = fetch_dem_from_api(bounds, resolution=resolution, api=api)
     
     if dem_data is None:
         return None
     
-    # Create mesh from the data
     terrain_obj = create_terrain_mesh(
         dem_data,
         scale=scale,
         vertical_scale=vertical_scale,
         vertical_offset=vertical_offset,
-        subsample=1,  # Already at desired resolution
+        subsample=1,  # The API grid is already the resolution asked for.
         name=name
     )
     
@@ -459,26 +401,16 @@ def create_terrain_from_api(bounds, resolution=50, scale=0.001, vertical_scale=1
 
 def create_terrain_from_osmnx_api(osmnx_obj, resolution=50, vertical_scale=1.0,
                                    vertical_offset=0.0, api='open-elevation', padding=0.1):
-    """
-    Create terrain mesh aligned with OSMnx network using elevation API.
-    
-    Args:
-        osmnx_obj: OSMnx graph Blender object
-        resolution: Grid resolution (points per side)
-        vertical_scale: Vertical exaggeration
-        vertical_offset: Base elevation offset
-        api: API to use
-        padding: Extra padding around network bounds (fraction)
-    
-    Returns:
-        Created terrain object, or None on error
+    """Build API terrain under an OSMnx network, sharing its scale and extent.
+
+    padding is a fraction of the network extent added on each side, so 0.1
+    widens the DEM request by 10 percent.
     """
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         log("Invalid OSMnx object")
         return None
     
-    # Get network extent
-    from ..osmnx import analysis as osmnx_analysis
+    from scigraphs_core.osmnx import analysis as osmnx_analysis
     from ..data_io.importer import _osmnx_graph_cache
     
     G = None
@@ -496,7 +428,6 @@ def create_terrain_from_osmnx_api(osmnx_obj, resolution=50, vertical_scale=1.0,
         log("Could not get network extent")
         return None
     
-    # Add padding
     lat_range = extent['north'] - extent['south']
     lon_range = extent['east'] - extent['west']
     
@@ -509,7 +440,6 @@ def create_terrain_from_osmnx_api(osmnx_obj, resolution=50, vertical_scale=1.0,
     
     scale = osmnx_obj.get("osmnx_scale", 0.001)
     
-    # Create terrain from API
     terrain_obj = create_terrain_from_api(
         bounds,
         resolution=resolution,
@@ -523,16 +453,14 @@ def create_terrain_from_osmnx_api(osmnx_obj, resolution=50, vertical_scale=1.0,
     if terrain_obj is None:
         return None
     
-    # Apply material
     apply_terrain_material(terrain_obj, style='ELEVATION')
     
-    # Link to OSMnx object
     terrain_obj["osmnx_parent"] = osmnx_obj.name
     osmnx_obj["terrain_child"] = terrain_obj.name
     
-    # Small z offset to avoid z-fighting
+    # Drop the terrain a hair so it does not z-fight with the network.
     terrain_obj.location.z = -0.001
-    
+
     log(f"Terrain from API created and aligned with {osmnx_obj.name}")
     
     return terrain_obj
@@ -541,21 +469,12 @@ def create_terrain_from_osmnx_api(osmnx_obj, resolution=50, vertical_scale=1.0,
 def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0, 
                         vertical_offset=0.0, subsample=1, name="Terrain", 
                         center_lat=None, center_lon=None):
-    """
-    Create a Blender mesh from DEM elevation data.
-    
-    Args:
-        dem_data: Dict returned by load_dem_data()
-        scale: Scale factor to match OSMnx network (meters to Blender units)
-        vertical_scale: Vertical exaggeration factor
-        vertical_offset: Base elevation offset in meters
-        subsample: Subsample factor (1=full resolution, 2=half, etc.)
-        name: Name for the Blender object
-        center_lat: Latitude of coordinate system center (for alignment with OSMnx)
-        center_lon: Longitude of coordinate system center (for alignment with OSMnx)
-    
-    Returns:
-        Created Blender object, or None on error
+    """Build a Blender mesh from a DEM dict.
+
+    Pass the network's center_lat and center_lon to share its projection
+    origin; left None they default to the DEM bbox center, which puts the
+    terrain somewhere else entirely if the network was fetched with padding.
+    scale converts meters to Blender units and must match the network's.
     """
     if dem_data is None:
         return None
@@ -563,52 +482,42 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
     elevation = dem_data['elevation']
     bounds = dem_data['bounds']
     
-    # Subsample if requested (for performance with large DEMs)
     if subsample > 1:
         elevation = elevation[::subsample, ::subsample]
     
     height, width = elevation.shape
     log(f"Creating terrain mesh: {width}x{height} vertices")
     
-    # Use provided center or calculate from DEM bounds
     if center_lat is None or center_lon is None:
         center_lat = (bounds['north'] + bounds['south']) / 2
         center_lon = (bounds['east'] + bounds['west']) / 2
     
-    # Earth parameters for coordinate conversion
     EARTH_RADIUS = 6371000.0
     cos_lat = np.cos(np.radians(center_lat))
     meters_per_deg = np.pi / 180.0 * EARTH_RADIUS
     
-    # Calculate vertex positions
     lats = np.linspace(bounds['north'], bounds['south'], height)
     lons = np.linspace(bounds['west'], bounds['east'], width)
     
-    # Get min elevation for offset reference
     min_elev = np.nanmin(elevation)
     if np.isnan(min_elev):
         min_elev = 0
     
-    # Create mesh
     mesh = bpy.data.meshes.new(name=f"{name}_Mesh")
     bm = bmesh.new()
     
-    # Create vertices
     vert_grid = []
     
     for i, lat in enumerate(lats):
         row = []
         for j, lon in enumerate(lons):
-            # Convert lat/lon to local meters
             y_m = (lat - center_lat) * meters_per_deg
             x_m = (lon - center_lon) * meters_per_deg * cos_lat
             
-            # Get elevation
             elev = elevation[i, j]
             if np.isnan(elev):
                 elev = min_elev
             
-            # Apply scale and offset
             x = x_m * scale
             y = y_m * scale
             z = ((elev - min_elev) + vertical_offset) * scale * vertical_scale
@@ -620,7 +529,6 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
     
     bm.verts.ensure_lookup_table()
     
-    # Create faces (quads)
     for i in range(height - 1):
         for j in range(width - 1):
             v1 = vert_grid[i][j]
@@ -631,17 +539,14 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
             try:
                 bm.faces.new([v1, v2, v3, v4])
             except ValueError:
-                pass  # Skip degenerate faces
+                pass  # Degenerate quad, usually a flat nodata patch.
     
-    # Convert to mesh
     bm.to_mesh(mesh)
     bm.free()
     
-    # Create object
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
     
-    # Store metadata
     obj["is_terrain"] = True
     obj["dem_bounds_north"] = bounds['north']
     obj["dem_bounds_south"] = bounds['south']
@@ -654,7 +559,6 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
     obj["dem_min_elevation"] = float(min_elev)
     obj["dem_max_elevation"] = float(np.nanmax(elevation))
     
-    # Add elevation attribute to vertices
     _add_elevation_attribute(obj, elevation, subsample)
     
     log(f"Terrain mesh created: {len(mesh.vertices)} vertices, {len(mesh.polygons)} faces")
@@ -663,17 +567,15 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
 
 
 def _add_elevation_attribute(obj, elevation, subsample):
-    """Add elevation as vertex attribute for material use."""
+    """Store raw meters per vertex in an "elevation" attribute for materials."""
     mesh = obj.data
     height, width = elevation.shape
     
-    # Create attribute
     if "elevation" in mesh.attributes:
         mesh.attributes.remove(mesh.attributes["elevation"])
     
     attr = mesh.attributes.new(name="elevation", type='FLOAT', domain='POINT')
     
-    # Flatten elevation data to match vertex order
     values = []
     for i in range(height):
         for j in range(width):
@@ -685,22 +587,16 @@ def _add_elevation_attribute(obj, elevation, subsample):
 
 
 def apply_terrain_material(obj, style='ELEVATION'):
-    """
-    Apply a material to the terrain mesh.
-    
-    Args:
-        obj: Terrain Blender object
-        style: Material style ('ELEVATION', 'SIMPLE', 'SATELLITE')
-    
-    Returns:
-        Created material
+    """Assign the terrain material for a style, reusing it across objects.
+
+    The material is shared by name, so its elevation range comes from whichever
+    object created it first.
     """
     if obj is None or not obj.get("is_terrain", False):
         return None
     
     mat_name = f"Terrain_{style}"
     
-    # Check if material exists
     mat = bpy.data.materials.get(mat_name)
     if mat is None:
         mat = bpy.data.materials.new(name=mat_name)
@@ -709,7 +605,6 @@ def apply_terrain_material(obj, style='ELEVATION'):
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
         
-        # Clear default nodes
         nodes.clear()
         
         if style == 'ELEVATION':
@@ -719,7 +614,6 @@ def apply_terrain_material(obj, style='ELEVATION'):
         else:
             _create_simple_material(nodes, links)
     
-    # Assign material to object
     if obj.data.materials:
         obj.data.materials[0] = mat
     else:
@@ -730,31 +624,25 @@ def apply_terrain_material(obj, style='ELEVATION'):
 
 def _create_elevation_material(nodes, links, obj):
     """Create a color-ramp material based on elevation."""
-    # Output node
     output = nodes.new(type='ShaderNodeOutputMaterial')
     output.location = (400, 0)
     
-    # Principled BSDF
     bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
     bsdf.location = (100, 0)
     bsdf.inputs['Roughness'].default_value = 0.8
     
-    # Color ramp for elevation
     ramp = nodes.new(type='ShaderNodeValToRGB')
     ramp.location = (-200, 0)
     
-    # Set color ramp colors (terrain-like)
     ramp.color_ramp.elements[0].position = 0.0
-    ramp.color_ramp.elements[0].color = (0.2, 0.4, 0.1, 1.0)  # Green (low)
-    
+    ramp.color_ramp.elements[0].color = (0.2, 0.4, 0.1, 1.0)  # Green, low
+
     ramp.color_ramp.elements[1].position = 1.0
-    ramp.color_ramp.elements[1].color = (0.6, 0.5, 0.4, 1.0)  # Brown (high)
-    
-    # Add intermediate color
+    ramp.color_ramp.elements[1].color = (0.6, 0.5, 0.4, 1.0)  # Brown, high
+
     elem = ramp.color_ramp.elements.new(0.5)
-    elem.color = (0.5, 0.45, 0.3, 1.0)  # Tan (middle)
+    elem.color = (0.5, 0.45, 0.3, 1.0)  # Tan, middle
     
-    # Map range to normalize elevation
     map_range = nodes.new(type='ShaderNodeMapRange')
     map_range.location = (-400, 0)
     
@@ -766,12 +654,10 @@ def _create_elevation_material(nodes, links, obj):
     map_range.inputs['To Min'].default_value = 0.0
     map_range.inputs['To Max'].default_value = 1.0
     
-    # Attribute node to read elevation
     attr_node = nodes.new(type='ShaderNodeAttribute')
     attr_node.location = (-600, 0)
     attr_node.attribute_name = "elevation"
     
-    # Link nodes
     links.new(attr_node.outputs['Fac'], map_range.inputs['Value'])
     links.new(map_range.outputs['Result'], ramp.inputs['Fac'])
     links.new(ramp.outputs['Color'], bsdf.inputs['Base Color'])
@@ -793,25 +679,14 @@ def _create_simple_material(nodes, links):
 
 def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0, 
                                vertical_offset=0.0, subsample=1, padding=0.1):
-    """
-    Create terrain mesh aligned with an OSMnx street network.
-    
-    Args:
-        osmnx_obj: OSMnx graph Blender object
-        dem_filepath: Path to DEM file
-        vertical_scale: Vertical exaggeration
-        vertical_offset: Base elevation offset
-        subsample: Subsample factor for large DEMs
-        padding: Extra padding around network bounds (fraction)
-    
-    Returns:
-        Created terrain object, or None on error
+    """Build terrain from a DEM file, cropped and aligned to an OSMnx network.
+
+    Falls back to loading the whole DEM if the network extent cannot be found.
     """
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         log("Invalid OSMnx object")
         return None
     
-    # Get network extent from mesh vertices
     mesh = osmnx_obj.data
     scale = osmnx_obj.get("osmnx_scale", 0.001)
     
@@ -819,24 +694,18 @@ def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0,
         log("OSMnx mesh has no vertices")
         return None
     
-    # Calculate bounds from vertices
     xs = [v.co.x for v in mesh.vertices]
     ys = [v.co.y for v in mesh.vertices]
     
     min_x, max_x = min(xs), max(xs)
     min_y, max_y = min(ys), max(ys)
     
-    # Convert back to lat/lon (reverse the OSMnx coordinate transformation)
-    # This is approximate but should work for the DEM cropping
-    
-    # Get stored center if available, otherwise estimate
-    from ..osmnx import analysis as osmnx_analysis
+    from scigraphs_core.osmnx import analysis as osmnx_analysis
     from ..data_io.importer import _osmnx_graph_cache
     
     G = None
     graph_id = osmnx_obj.get("osmnx_graph_id", "")
     if graph_id and hasattr(osmnx_analysis, 'get_graph_extent'):
-        # Try to get graph from cache
         if graph_id in _osmnx_graph_cache:
             G = _osmnx_graph_cache[graph_id]
     
@@ -850,7 +719,6 @@ def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0,
                 'west': extent['west'],
             }
             
-            # Add padding
             lat_range = bounds['north'] - bounds['south']
             lon_range = bounds['east'] - bounds['west']
             
@@ -864,17 +732,14 @@ def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0,
         bounds = None
         log("Could not get network extent, loading full DEM")
     
-    # Load DEM data
     dem_data = load_dem_data(dem_filepath, bounds=bounds)
     
     if dem_data is None:
         return None
     
-    # Get center coordinates from OSMnx object for alignment
     center_lat = osmnx_obj.get("osmnx_center_lat")
     center_lon = osmnx_obj.get("osmnx_center_lon")
     
-    # Create terrain mesh with same scale and center as OSMnx network
     terrain_obj = create_terrain_mesh(
         dem_data,
         scale=scale,
@@ -889,28 +754,24 @@ def create_terrain_from_osmnx(osmnx_obj, dem_filepath, vertical_scale=1.0,
     if terrain_obj is None:
         return None
     
-    # Apply elevation material
     apply_terrain_material(terrain_obj, style='ELEVATION')
     
-    # Link terrain to OSMnx object
     terrain_obj["osmnx_parent"] = osmnx_obj.name
     osmnx_obj["terrain_child"] = terrain_obj.name
     
-    # Position terrain slightly below the network
-    terrain_obj.location.z = -0.001  # Small offset to avoid z-fighting
-    
+    terrain_obj.location.z = -0.001  # Just below the network, against z-fighting.
+
+
     log(f"Terrain created and aligned with {osmnx_obj.name}")
     
     return terrain_obj
 
 
 def update_terrain_vertical_scale(terrain_obj, vertical_scale):
-    """
-    Update the vertical scale of an existing terrain mesh.
-    
-    Args:
-        terrain_obj: Terrain Blender object
-        vertical_scale: New vertical scale factor
+    """Re-exaggerate an existing terrain by rescaling Z in place.
+
+    Works from the ratio against the stored scale, so repeated calls do not
+    compound.
     """
     if terrain_obj is None or not terrain_obj.get("is_terrain", False):
         return
@@ -920,46 +781,34 @@ def update_terrain_vertical_scale(terrain_obj, vertical_scale):
     if old_scale == vertical_scale:
         return
     
-    # Calculate scale factor
     factor = vertical_scale / old_scale
     
-    # Scale Z coordinates of all vertices
     mesh = terrain_obj.data
     for v in mesh.vertices:
         v.co.z *= factor
     
     mesh.update()
     
-    # Update stored scale
     terrain_obj["dem_vertical_scale"] = vertical_scale
     
     log(f"Terrain vertical scale updated to {vertical_scale}")
 
 
 def remove_terrain(terrain_obj):
-    """
-    Remove a terrain object and clean up references.
-    
-    Args:
-        terrain_obj: Terrain Blender object to remove
-    """
+    """Delete a terrain object, its orphaned mesh and the parent's back link."""
     if terrain_obj is None:
         return
     
-    # Remove reference from parent OSMnx object
     parent_name = terrain_obj.get("osmnx_parent", "")
     if parent_name and parent_name in bpy.data.objects:
         parent = bpy.data.objects[parent_name]
         if "terrain_child" in parent:
             del parent["terrain_child"]
     
-    # Remove mesh data
     mesh = terrain_obj.data
     
-    # Remove object
     bpy.data.objects.remove(terrain_obj, do_unlink=True)
     
-    # Remove mesh if orphaned
     if mesh.users == 0:
         bpy.data.meshes.remove(mesh)
     
@@ -967,28 +816,17 @@ def remove_terrain(terrain_obj):
 
 
 def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, vertical_offset=0.0):
-    """
-    Apply elevation data from DEM to the OSMnx graph vertices.
-    This ensures the graph and terrain use the same elevation source.
-    
-    Args:
-        osmnx_obj: OSMnx Blender object
-        dem_data: Dict with elevation data from load_dem_data() or fetch_dem_from_api()
-        vertical_scale: Vertical exaggeration factor
-        vertical_offset: Base elevation offset in meters
-    
-    Returns:
-        True on success, False on error
+    """Lift an OSMnx network's vertices onto a DEM grid.
+
+    Terrain built from the same dem_data then shares the elevation source, so
+    the network sits on the surface rather than through it.
     """
     if osmnx_obj is None or dem_data is None:
         return False
 
     mesh = osmnx_obj.data
-    # SciGraphs has historically stored the network scale under two custom
-    # property names depending on which import path created the object
-    # (``"scale"`` for the main downloader, ``"osmnx_scale"`` for the
-    # cache/IO/data operators). Read both so elevations map correctly
-    # regardless of which path was used.
+    # The main downloader writes "scale"; the cache, IO and data operators write
+    # "osmnx_scale". Read both, or elevations map wrong on one of them.
     scale = osmnx_obj.get("osmnx_scale")
     if scale is None:
         scale = osmnx_obj.get("scale", 0.001)
@@ -1003,37 +841,29 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
     if np.isnan(max_elev):
         max_elev = min_elev
 
-    # Single source of truth for the projection: the addon stores the
-    # equirectangular-local origin used to build the mesh on the object
-    # itself. Sampling the DEM through the *mesh* coordinates (instead of
-    # the cached MultiDiGraph node coordinates) avoids the entire family
-    # of bugs that arise when the cached graph and the visible mesh
-    # diverge — e.g. simplified / projected / converted graphs whose
-    # node IDs no longer match ``nodes_data`` 1:1, or projected graphs
-    # where ``G.nodes[n]['x','y']`` are UTM metres instead of degrees.
+    # Sample through the mesh coordinates, not the cached MultiDiGraph node
+    # coordinates. The two diverge for simplified or converted graphs, whose
+    # node IDs no longer match nodes_data one for one, and for projected
+    # graphs, where G.nodes[n]['x','y'] hold UTM meters rather than degrees.
     EARTH_RADIUS = 6_371_000.0
     center_lat = osmnx_obj.get("osmnx_center_lat")
     center_lon = osmnx_obj.get("osmnx_center_lon")
     if center_lat is None or center_lon is None:
-        # Legacy objects: fall back to the DEM bbox centre. Less accurate
-        # if the graph was downloaded with a different padding, but
-        # better than refusing to apply elevations.
+        # The DEM bbox center is off when the graph was fetched with different
+        # padding, but that beats refusing to apply elevations at all.
         center_lat = (bounds['north'] + bounds['south']) / 2
         center_lon = (bounds['east'] + bounds['west']) / 2
-        log("Network has no osmnx_center_lat/lon; using DEM bbox centre as fallback")
+        log("Network has no osmnx_center_lat/lon; using DEM bbox center as fallback")
     center_lat = float(center_lat)
     center_lon = float(center_lon)
 
     cos_lat = np.cos(np.radians(center_lat))
     if abs(cos_lat) < 1e-9:
-        cos_lat = 1.0  # safety at the poles
+        cos_lat = 1.0  # At the poles the longitude scale would divide by zero.
     inv_scale = 1.0 / float(scale) if scale else 1.0
 
-    # Sample elevation per mesh vertex by inverting the equirectangular
-    # projection that originally placed the vertex. This makes the
-    # function robust to any mismatch between the cached graph and the
-    # mesh (simplification, conversion, projection) because the mesh is
-    # the only thing being rendered anyway.
+    # Recover each vertex's (lat, lon) by inverting the equirectangular
+    # projection that placed it.
     vertex_elevations = [0.0] * len(mesh.vertices)
     out_of_bounds = 0
     for vert_idx, vert in enumerate(mesh.vertices):
@@ -1042,11 +872,8 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
         lat = center_lat + (y_m / (np.pi / 180.0 * EARTH_RADIUS))
         lon = center_lon + (x_m / (np.pi / 180.0 * EARTH_RADIUS * cos_lat))
 
-        # Track vertices whose true geographic position is outside the
-        # DEM tile. ``_sample_elevation_from_grid`` clamps to the border
-        # so we still get a sane value, but having lots of these usually
-        # means the user fetched a too-small DEM and should re-run with
-        # more padding.
+        # _sample_elevation_from_grid clamps these to the border, so the value
+        # stays sane. A large count means the DEM tile was fetched too small.
         if not (bounds['south'] <= lat <= bounds['north']
                 and bounds['west'] <= lon <= bounds['east']):
             out_of_bounds += 1
@@ -1067,9 +894,8 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
             "Increase 'Padding' before fetching the DEM if this is large."
         )
 
-    # Mirror the per-vertex elevations back into the cached graph so
-    # downstream code (grade calculations, GraphML export, etc.) can
-    # still use ``G.nodes[n]['elevation']`` as before.
+    # Mirror the elevations back into the cached graph, where grade
+    # calculations and GraphML export read G.nodes[n]['elevation'].
     nodes_str = osmnx_obj.get("nodes_data", "")
     node_ids = nodes_str.split(",") if nodes_str else []
     from ..data_io.importer import _osmnx_graph_cache
@@ -1088,7 +914,6 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
 
     mesh.update()
     
-    # Create elevation attribute
     attr_name = "elevation"
     if attr_name in mesh.attributes:
         mesh.attributes.remove(mesh.attributes[attr_name])
@@ -1096,7 +921,6 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
     elev_attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
     elev_attr.data.foreach_set("value", vertex_elevations)
     
-    # Update object properties
     osmnx_obj["osmnx_has_elevation"] = True
     osmnx_obj["osmnx_3d_applied"] = True
     osmnx_obj["osmnx_elev_scale_used"] = vertical_scale
@@ -1110,25 +934,22 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
 
 
 def _sample_elevation_from_grid(lat, lon, elevation_grid, bounds):
-    """
-    Sample elevation value from grid at a given lat/lon coordinate.
-    Uses bilinear interpolation.
+    """Bilinearly sample the elevation grid at one (lat, lon).
+
+    Coordinates outside the grid are clamped to the edge. NaN corners are
+    replaced with the mean of the valid corners, and an all-NaN cell reads 0.
     """
     height, width = elevation_grid.shape
     
-    # Calculate pixel coordinates
     x_frac = (lon - bounds['west']) / (bounds['east'] - bounds['west'])
     y_frac = (bounds['north'] - lat) / (bounds['north'] - bounds['south'])
     
-    # Clamp to valid range
     x_frac = max(0, min(1, x_frac))
     y_frac = max(0, min(1, y_frac))
     
-    # Convert to pixel indices
     x = x_frac * (width - 1)
     y = y_frac * (height - 1)
     
-    # Bilinear interpolation
     x0 = int(x)
     y0 = int(y)
     x1 = min(x0 + 1, width - 1)
@@ -1137,27 +958,23 @@ def _sample_elevation_from_grid(lat, lon, elevation_grid, bounds):
     dx = x - x0
     dy = y - y0
     
-    # Get four corner values
     v00 = elevation_grid[y0, x0]
     v10 = elevation_grid[y0, x1]
     v01 = elevation_grid[y1, x0]
     v11 = elevation_grid[y1, x1]
     
-    # Handle NaN values
     values = [v00, v10, v01, v11]
     valid_values = [v for v in values if not np.isnan(v)]
     
     if not valid_values:
         return 0.0
     
-    # Replace NaN with mean of valid values
     mean_val = np.mean(valid_values)
     v00 = v00 if not np.isnan(v00) else mean_val
     v10 = v10 if not np.isnan(v10) else mean_val
     v01 = v01 if not np.isnan(v01) else mean_val
     v11 = v11 if not np.isnan(v11) else mean_val
     
-    # Interpolate
     elev = (v00 * (1 - dx) * (1 - dy) +
             v10 * dx * (1 - dy) +
             v01 * (1 - dx) * dy +
@@ -1169,23 +986,11 @@ def _sample_elevation_from_grid(lat, lon, elevation_grid, bounds):
 def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
                        vertical_scale=1.0, vertical_offset=0.0, show_terrain=True,
                        api='open-elevation', subsample=1, padding=0.1, max_workers=5):
-    """
-    Unified DEM import that creates terrain AND applies elevations to graph.
-    
-    Args:
-        osmnx_obj: OSMnx Blender object
-        dem_source: File path (if source_type='file') or ignored (if 'api')
-        source_type: 'file' or 'api'
-        resolution: Grid resolution for API (points per side)
-        vertical_scale: Vertical exaggeration
-        vertical_offset: Base elevation offset
-        show_terrain: Whether to create visible terrain mesh
-        api: API to use if source_type='api'
-        subsample: Subsample factor for file source
-        padding: Padding around network bounds
-    
-    Returns:
-        Tuple (terrain_obj or None, success_bool)
+    """Import a DEM, lift the network onto it, and optionally build terrain.
+
+    One DEM fetch feeds both steps, which is what keeps network and terrain on
+    the same surface. dem_source is a file path when source_type is 'file' and
+    ignored when it is 'api'. Returns (terrain_obj or None, success).
     """
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         log("Invalid OSMnx object")
@@ -1193,8 +998,7 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
     
     scale = osmnx_obj.get("osmnx_scale", 0.001)
     
-    # Get network bounds
-    from ..osmnx import analysis as osmnx_analysis
+    from scigraphs_core.osmnx import analysis as osmnx_analysis
     from ..data_io.importer import _osmnx_graph_cache
     
     G = None
@@ -1211,7 +1015,6 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
         log("Could not get network extent")
         return None, False
     
-    # Add padding to bounds
     lat_range = extent['north'] - extent['south']
     lon_range = extent['east'] - extent['west']
     
@@ -1222,7 +1025,6 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
         'west': extent['west'] - lon_range * padding,
     }
     
-    # Get DEM data
     if source_type == 'api':
         dem_data = fetch_dem_from_api(bounds, resolution=resolution, api=api, max_workers=max_workers)
     else:
@@ -1232,7 +1034,6 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
         log("Failed to get DEM data")
         return None, False
     
-    # Apply elevations to graph
     success = apply_dem_elevations_to_graph(
         osmnx_obj, dem_data,
         vertical_scale=vertical_scale,
@@ -1245,7 +1046,6 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
     
     terrain_obj = None
     
-    # Create terrain mesh if requested
     if show_terrain:
         terrain_obj = create_terrain_mesh(
             dem_data,
@@ -1263,8 +1063,7 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
             terrain_obj["dem_source"] = api if source_type == 'api' else 'file'
             osmnx_obj["terrain_child"] = terrain_obj.name
             
-            # Position slightly below to avoid z-fighting
-            terrain_obj.location.z = -0.001
+            terrain_obj.location.z = -0.001  # Avoids z-fighting.
     
     log(f"DEM import complete. Terrain: {'created' if terrain_obj else 'hidden'}")
     
@@ -1272,13 +1071,7 @@ def import_dem_unified(osmnx_obj, dem_source, source_type='api', resolution=50,
 
 
 def toggle_terrain_visibility(osmnx_obj, visible):
-    """
-    Toggle visibility of terrain associated with an OSMnx graph.
-    
-    Args:
-        osmnx_obj: OSMnx Blender object
-        visible: True to show, False to hide
-    """
+    """Show or hide the terrain attached to an OSMnx network."""
     if osmnx_obj is None:
         return
     
@@ -1290,15 +1083,10 @@ def toggle_terrain_visibility(osmnx_obj, visible):
 
 
 def get_osmnx_bounds(osmnx_obj, padding=0.1):
-    """
-    Get the geographic bounds of an OSMnx object in WGS84 (EPSG:4326).
-    
-    Args:
-        osmnx_obj: OSMnx Blender object
-        padding: Extra padding as fraction of extent (0.1 = 10%)
-    
-    Returns:
-        Dict with 'north', 'south', 'east', 'west' in degrees (WGS84) or None
+    """Return a network's bounds in WGS84 degrees, padded by a fraction.
+
+    Always WGS84 even when the cached graph is projected, since the DEM
+    services and the export formats below all expect EPSG:4326.
     """
     if osmnx_obj is None or not osmnx_obj.get("is_osmnx", False):
         return None
@@ -1312,12 +1100,10 @@ def get_osmnx_bounds(osmnx_obj, padding=0.1):
         log("Could not find OSMnx graph in cache")
         return None
     
-    # Get coordinates from graph, handling projected CRS
     extent = _get_wgs84_extent(G)
     if extent is None:
         return None
     
-    # Add padding
     lat_range = extent['north'] - extent['south']
     lon_range = extent['east'] - extent['west']
     
@@ -1332,14 +1118,11 @@ def get_osmnx_bounds(osmnx_obj, padding=0.1):
 
 
 def _get_wgs84_extent(G):
-    """
-    Get graph extent in WGS84 coordinates, reprojecting if necessary.
-    
-    Args:
-        G: OSMnx graph (may be projected or unprojected)
-    
-    Returns:
-        Dict with 'north', 'south', 'east', 'west' in WGS84 degrees
+    """Graph extent in WGS84 degrees, reprojecting a projected graph first.
+
+    Nodes outside the valid lat/lon ranges are dropped: on a projected graph
+    that was missed, UTM meters would otherwise pass as degrees and blow the
+    extent up to the whole planet.
     """
     if G is None:
         return None
@@ -1347,33 +1130,28 @@ def _get_wgs84_extent(G):
     try:
         import osmnx as ox
         
-        # Check if graph is projected (not in lat/lon)
         crs = G.graph.get('crs', None)
         is_projected = False
         
         if crs is not None:
-            # CRS can be a string like 'EPSG:4326' or a pyproj CRS object
+            # crs may be a string or a pyproj CRS object, hence str().
             crs_str = str(crs).upper()
-            # EPSG:4326 is WGS84 (unprojected)
             if 'EPSG:4326' not in crs_str and 'WGS 84' not in crs_str:
                 is_projected = True
         
-        # If projected, we need to reproject to WGS84
         if is_projected:
             log(f"Graph is projected ({crs}), reprojecting to WGS84...")
             G_wgs84 = ox.project_graph(G, to_crs='EPSG:4326')
         else:
             G_wgs84 = G
         
-        # Extract coordinates
         lats = []
         lons = []
         for node, data in G_wgs84.nodes(data=True):
             if 'y' in data and 'x' in data:
                 lat = data['y']
                 lon = data['x']
-                
-                # Sanity check: valid lat/lon ranges
+
                 if -90 <= lat <= 90 and -180 <= lon <= 180:
                     lats.append(lat)
                     lons.append(lon)
@@ -1395,23 +1173,16 @@ def _get_wgs84_extent(G):
 
 
 def export_bounds_geojson(bounds, filepath):
-    """
-    Export bounds as GeoJSON polygon file.
-    Compatible with Copernicus Data Space (EPSG:4326 required).
-    
-    Args:
-        bounds: Dict with 'north', 'south', 'east', 'west' in WGS84 degrees
-        filepath: Output file path (.geojson)
-    
-    Returns:
-        True on success, False on error
+    """Write bounds as a GeoJSON polygon for Copernicus Data Space.
+
+    Copernicus requires EPSG:4326, so out-of-range degrees are rejected here
+    rather than uploaded and silently misinterpreted.
     """
     import json
     
     if bounds is None:
         return False
     
-    # Validate that coordinates are in valid WGS84 range
     if not (-90 <= bounds['south'] <= 90 and -90 <= bounds['north'] <= 90):
         log(f"Invalid latitude values: {bounds['south']}, {bounds['north']}")
         log("Coordinates must be in WGS84 (EPSG:4326)")
@@ -1422,17 +1193,15 @@ def export_bounds_geojson(bounds, filepath):
         log("Coordinates must be in WGS84 (EPSG:4326)")
         return False
     
-    # Create polygon coordinates (closed ring)
-    # Format: [longitude, latitude] as per GeoJSON spec
+    # GeoJSON rings are [longitude, latitude] and must close on themselves.
     coordinates = [[
         [bounds['west'], bounds['south']],
         [bounds['east'], bounds['south']],
         [bounds['east'], bounds['north']],
         [bounds['west'], bounds['north']],
-        [bounds['west'], bounds['south']],  # Close the ring
+        [bounds['west'], bounds['south']],
     ]]
-    
-    # Simple GeoJSON that Copernicus accepts (minimal properties)
+
     geojson = {
         "type": "FeatureCollection",
         "features": [{
@@ -1456,21 +1225,11 @@ def export_bounds_geojson(bounds, filepath):
 
 
 def export_bounds_kml(bounds, filepath):
-    """
-    Export bounds as KML file.
-    Compatible with Copernicus Data Space and Google Earth.
-    
-    Args:
-        bounds: Dict with 'north', 'south', 'east', 'west'
-        filepath: Output file path (.kml)
-    
-    Returns:
-        True on success, False on error
-    """
+    """Write bounds as KML, for Copernicus Data Space and Google Earth."""
     if bounds is None:
         return False
-    
-    # KML coordinates are lon,lat,alt (space separated, comma between points)
+
+    # KML coordinates are lon,lat,alt: commas inside a point, spaces between.
     coords = (
         f"{bounds['west']},{bounds['south']},0 "
         f"{bounds['east']},{bounds['south']},0 "
@@ -1524,21 +1283,10 @@ def export_bounds_kml(bounds, filepath):
 
 
 def export_bounds_wkt(bounds, filepath):
-    """
-    Export bounds as WKT (Well-Known Text) file.
-    Compatible with Copernicus Data Space.
-    
-    Args:
-        bounds: Dict with 'north', 'south', 'east', 'west'
-        filepath: Output file path (.wkt)
-    
-    Returns:
-        True on success, False on error
-    """
+    """Write bounds as a WKT polygon, for Copernicus Data Space."""
     if bounds is None:
         return False
-    
-    # WKT polygon format
+
     wkt = (
         f"POLYGON(("
         f"{bounds['west']} {bounds['south']}, "
@@ -1560,24 +1308,17 @@ def export_bounds_wkt(bounds, filepath):
 
 
 def export_aoi_for_copernicus(osmnx_obj, filepath, format='geojson', padding=0.1):
-    """
-    Export the area of interest for use with Copernicus Data Space.
-    
-    Args:
-        osmnx_obj: OSMnx Blender object
-        filepath: Output file path
-        format: Export format ('geojson', 'kml', or 'wkt')
-        padding: Extra padding as fraction of extent
-    
-    Returns:
-        Tuple (success, bounds_info_dict)
+    """Export a network's area of interest for Copernicus Data Space.
+
+    format is 'geojson', 'kml' or 'wkt'. Returns (success, bounds_info); the
+    second element carries the bounds plus the extent in km and its area, and
+    is filled in even when the write fails.
     """
     bounds = get_osmnx_bounds(osmnx_obj, padding=padding)
     
     if bounds is None:
         return False, None
     
-    # Calculate area info
     lat_mid = (bounds['north'] + bounds['south']) / 2
     lat_km = 111.0
     lon_km = 111.0 * np.cos(np.radians(lat_mid))
@@ -1596,7 +1337,6 @@ def export_aoi_for_copernicus(osmnx_obj, filepath, format='geojson', padding=0.1
         'area_km2': area_km2,
     }
     
-    # Export in requested format
     if format == 'geojson':
         success = export_bounds_geojson(bounds, filepath)
     elif format == 'kml':
@@ -1614,7 +1354,6 @@ def export_aoi_for_copernicus(osmnx_obj, filepath, format='geojson', padding=0.1
 # TERRAIN PLANE IMPORT (Textured plane from raster/KMZ)
 # =============================================================================
 
-# Supported CRS definitions
 SUPPORTED_CRS = {
     'EPSG:4326': {
         'name': 'WGS 84',
@@ -1636,26 +1375,16 @@ SUPPORTED_CRS = {
 
 def import_terrain_plane(filepath, source_crs='EPSG:4326', target_crs='EPSG:4326',
                          osmnx_obj=None, name="Terrain_Plane"):
-    """
-    Import a raster file as a textured terrain plane.
-    
-    Supports: GeoTIFF (8/16/32 bit), KMZ with embedded images, PNG, JPG
-    
-    Args:
-        filepath: Path to raster file
-        source_crs: CRS of the input file
-        target_crs: Target CRS for the mesh
-        osmnx_obj: Optional OSMnx object to align with
-        name: Name for the Blender object
-    
-    Returns:
-        Tuple (terrain_object, metadata_dict) or (None, None) on error
+    """Import a raster as a flat textured plane, picked by file extension.
+
+    Handles GeoTIFF at 8, 16 or 32 bit, KMZ with an embedded ground overlay,
+    and plain PNG or JPG, which has no georeferencing of its own and so needs
+    osmnx_obj. Returns (object, metadata) or (None, None).
     """
     import os
     
     ext = os.path.splitext(filepath)[1].lower()
     
-    # Route to appropriate importer
     if ext == '.kmz':
         return _import_kmz_terrain(filepath, source_crs, target_crs, osmnx_obj, name)
     elif ext in ['.tif', '.tiff', '.geotiff']:
@@ -1676,11 +1405,9 @@ def _import_kmz_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
     
     try:
         with zipfile.ZipFile(filepath, 'r') as kmz:
-            # List contents
             contents = kmz.namelist()
             log(f"KMZ contents: {contents}")
             
-            # Find KML file
             kml_file = None
             for f in contents:
                 if f.lower().endswith('.kml'):
@@ -1691,11 +1418,9 @@ def _import_kmz_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
                 log("No KML file found in KMZ")
                 return None, None
             
-            # Extract to temp dir
             temp_dir = tempfile.mkdtemp()
             kmz.extractall(temp_dir)
             
-            # Parse KML for bounds and image reference
             kml_path = os.path.join(temp_dir, kml_file)
             bounds, image_path = _parse_kml_ground_overlay(kml_path, temp_dir)
             
@@ -1707,7 +1432,6 @@ def _import_kmz_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
                 f"E={bounds['east']:.5f}, W={bounds['west']:.5f}")
             log(f"Image: {image_path}")
             
-            # Create terrain plane with the image
             return _create_textured_terrain_plane(
                 image_path, bounds, source_crs, target_crs, osmnx_obj, name
             )
@@ -1718,24 +1442,25 @@ def _import_kmz_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
 
 
 def _parse_kml_ground_overlay(kml_path, base_dir):
-    """Parse KML file to extract GroundOverlay bounds and image path."""
+    """Pull the GroundOverlay bounds and image path out of a KML.
+
+    Every lookup is tried with the KML namespace and then without it, since
+    exporters disagree about declaring it.
+    """
     import xml.etree.ElementTree as ET
     import os
-    
+
     try:
         tree = ET.parse(kml_path)
         root = tree.getroot()
-        
-        # Handle KML namespace
+
         ns = {'kml': 'http://www.opengis.net/kml/2.2'}
-        
-        # Try with namespace first, then without
+
         ground_overlay = root.find('.//kml:GroundOverlay', ns)
         if ground_overlay is None:
             ground_overlay = root.find('.//GroundOverlay')
         
         if ground_overlay is None:
-            # Try finding any element with LatLonBox
             for elem in root.iter():
                 if 'LatLonBox' in elem.tag or elem.find('.//LatLonBox') is not None:
                     ground_overlay = elem
@@ -1745,7 +1470,6 @@ def _parse_kml_ground_overlay(kml_path, base_dir):
             log("No GroundOverlay found in KML")
             return None, None
         
-        # Get bounds from LatLonBox
         lat_lon_box = ground_overlay.find('.//kml:LatLonBox', ns)
         if lat_lon_box is None:
             lat_lon_box = ground_overlay.find('.//LatLonBox')
@@ -1771,7 +1495,6 @@ def _parse_kml_ground_overlay(kml_path, base_dir):
             log(f"Incomplete bounds: {bounds}")
             return None, None
         
-        # Get image path from Icon/href
         icon = ground_overlay.find('.//kml:Icon', ns)
         if icon is None:
             icon = ground_overlay.find('.//Icon')
@@ -1786,7 +1509,7 @@ def _parse_kml_ground_overlay(kml_path, base_dir):
                 if os.path.exists(image_path):
                     return bounds, image_path
         
-        # Try to find any image file in the directory
+        # No usable Icon href: take whatever image the archive contains.
         for f in os.listdir(base_dir):
             if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff')):
                 return bounds, os.path.join(base_dir, f)
@@ -1809,11 +1532,9 @@ def _import_geotiff_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
     
     try:
         with rasterio.open(filepath) as src:
-            # Get file info
             bit_depth = src.dtypes[0]
             log(f"GeoTIFF: {src.width}x{src.height}, {bit_depth}, {len(src.indexes)} band(s)")
             
-            # Get bounds
             bounds = {
                 'west': src.bounds.left,
                 'south': src.bounds.bottom,
@@ -1824,30 +1545,23 @@ def _import_geotiff_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
             file_crs = str(src.crs) if src.crs else source_crs
             log(f"File CRS: {file_crs}")
             
-            # Reproject bounds if needed
             if file_crs != 'EPSG:4326' and source_crs != file_crs:
                 log(f"Using specified CRS: {source_crs}")
                 file_crs = source_crs
             
-            # Convert bounds to WGS84 for alignment
             bounds_wgs84 = _reproject_bounds(bounds, file_crs, 'EPSG:4326')
             if bounds_wgs84 is None:
                 bounds_wgs84 = bounds
             
             log(f"Bounds (WGS84): N={bounds_wgs84['north']:.5f}, S={bounds_wgs84['south']:.5f}")
             
-            # Read image data
             if src.count >= 3:
-                # RGB image
                 img_data = src.read([1, 2, 3])
             else:
-                # Single band (grayscale or DEM)
                 img_data = src.read(1)
-            
-            # Normalize to 0-255 for texture
+
             img_normalized = _normalize_raster_data(img_data, bit_depth)
             
-            # Save as temp PNG for Blender
             import tempfile
             import os
             from PIL import Image
@@ -1856,10 +1570,8 @@ def _import_geotiff_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
             temp_image = os.path.join(temp_dir, "terrain_texture.png")
             
             if len(img_normalized.shape) == 3:
-                # RGB
                 img_pil = Image.fromarray(np.transpose(img_normalized, (1, 2, 0)).astype(np.uint8))
             else:
-                # Grayscale
                 img_pil = Image.fromarray(img_normalized.astype(np.uint8))
             
             img_pil.save(temp_image)
@@ -1882,7 +1594,6 @@ def _import_image_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
         log("Image import requires an OSMnx object for georeferencing")
         return None, None
     
-    # Get bounds from OSMnx object
     bounds = get_osmnx_bounds(osmnx_obj, padding=0.1)
     if bounds is None:
         log("Could not get bounds from OSMnx object")
@@ -1894,15 +1605,18 @@ def _import_image_terrain(filepath, source_crs, target_crs, osmnx_obj, name):
 
 
 def _normalize_raster_data(data, dtype):
-    """Normalize raster data to 0-255 range based on bit depth."""
-    
-    # Handle different data types
+    """Rescale raster bands to 0-255 for use as a texture.
+
+    uint16 is shifted down by 256, which assumes the data really uses the full
+    16-bit range. Signed and float data are stretched between their own min and
+    max, so the result shows relative values, not absolute ones.
+    """
+
     if 'uint8' in dtype:
         return data.astype(np.float32)
     elif 'uint16' in dtype:
         return (data.astype(np.float32) / 256).clip(0, 255)
     elif 'int16' in dtype:
-        # Often used for DEMs, may have negative values
         data_f = data.astype(np.float32)
         data_min = np.nanmin(data_f)
         data_max = np.nanmax(data_f)
@@ -1917,12 +1631,16 @@ def _normalize_raster_data(data, dtype):
             return ((data_f - data_min) / (data_max - data_min) * 255).clip(0, 255)
         return np.zeros_like(data_f)
     else:
-        # Default: assume 8-bit
         return data.astype(np.float32).clip(0, 255)
 
 
 def _reproject_bounds(bounds, from_crs, to_crs):
-    """Reproject bounds from one CRS to another."""
+    """Reproject a bounds dict between CRS with pyproj. None if pyproj is absent.
+
+    Only the two opposite corners are transformed, so for a rotated or strongly
+    curved projection the result is the corners' new positions, not the true
+    bounding box of the reprojected area.
+    """
     if from_crs == to_crs:
         return bounds
     
@@ -1931,7 +1649,6 @@ def _reproject_bounds(bounds, from_crs, to_crs):
         
         transformer = Transformer.from_crs(from_crs, to_crs, always_xy=True)
         
-        # Transform corners
         west, south = transformer.transform(bounds['west'], bounds['south'])
         east, north = transformer.transform(bounds['east'], bounds['north'])
         
@@ -1951,35 +1668,22 @@ def _reproject_bounds(bounds, from_crs, to_crs):
 
 def _create_textured_terrain_plane(image_path, bounds, source_crs, target_crs, 
                                    osmnx_obj, name):
+    """Build the quad, size it to the bounds, and texture it.
+
+    Unknown CRS are assumed geographic, so their bounds are read as degrees.
     """
-    Create a textured plane mesh for terrain visualization.
-    
-    Args:
-        image_path: Path to texture image
-        bounds: Dict with north, south, east, west
-        source_crs: CRS of the bounds
-        target_crs: Target CRS for positioning
-        osmnx_obj: Optional OSMnx object to align with
-        name: Object name
-    
-    Returns:
-        Tuple (blender_object, metadata)
-    """
-    # Calculate dimensions
     lat_mid = (bounds['north'] + bounds['south']) / 2
-    
-    # For geographic CRS, convert to approximate meters
+
     if SUPPORTED_CRS.get(source_crs, {}).get('is_geographic', True):
+        # 111 km per degree of latitude, shrinking with cos(lat) for longitude.
         lat_km = 111.0
         lon_km = 111.0 * np.cos(np.radians(lat_mid))
         width_m = (bounds['east'] - bounds['west']) * lon_km * 1000
         height_m = (bounds['north'] - bounds['south']) * lat_km * 1000
     else:
-        # Already in meters
         width_m = bounds['east'] - bounds['west']
         height_m = bounds['north'] - bounds['south']
     
-    # Get scale from OSMnx object if available
     if osmnx_obj is not None:
         scale = osmnx_obj.get("osmnx_scale", 0.001)
     else:
@@ -1990,10 +1694,8 @@ def _create_textured_terrain_plane(image_path, bounds, source_crs, target_crs,
     
     log(f"Terrain plane: {width_m:.0f}m x {height_m:.0f}m -> {width_bu:.2f} x {height_bu:.2f} BU")
     
-    # Create plane mesh
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
-    
-    # Simple quad with correct aspect ratio
+
     half_w = width_bu / 2
     half_h = height_bu / 2
     
@@ -2008,34 +1710,28 @@ def _create_textured_terrain_plane(image_path, bounds, source_crs, target_crs,
     mesh.from_pydata(verts, [], faces)
     mesh.update()
     
-    # Add UV coordinates
     mesh.uv_layers.new(name="UVMap")
     uv_layer = mesh.uv_layers.active.data
     
-    # UV coordinates for the quad
     uv_coords = [(0, 0), (1, 0), (1, 1), (0, 1)]
     for i, uv in enumerate(uv_coords):
         uv_layer[i].uv = uv
     
-    # Create object
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
     
-    # Load texture and create material
     mat = _create_terrain_texture_material(image_path, name)
     if mat:
         obj.data.materials.append(mat)
     
-    # Position relative to OSMnx object
     if osmnx_obj is not None:
         obj.location = osmnx_obj.location.copy()
-        obj.location.z -= 0.01  # Slightly below
-        
-        # Store alignment info
+        obj.location.z -= 0.01  # Sit under the network.
+
+
         obj["osmnx_parent"] = osmnx_obj.name
         osmnx_obj["terrain_plane_child"] = obj.name
     
-    # Store metadata
     obj["is_terrain_plane"] = True
     obj["terrain_bounds_north"] = bounds['north']
     obj["terrain_bounds_south"] = bounds['south']
@@ -2058,7 +1754,7 @@ def _create_textured_terrain_plane(image_path, bounds, source_crs, target_crs,
 
 
 def _create_terrain_texture_material(image_path, name):
-    """Create a material with the terrain texture."""
+    """Build the terrain plane's material: the image, fully rough, no specular."""
     import os
     
     if not os.path.exists(image_path):
@@ -2073,21 +1769,17 @@ def _create_terrain_texture_material(image_path, name):
     links = mat.node_tree.links
     nodes.clear()
     
-    # Output
     output = nodes.new(type='ShaderNodeOutputMaterial')
     output.location = (400, 0)
     
-    # Principled BSDF
     bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
     bsdf.location = (100, 0)
     bsdf.inputs['Roughness'].default_value = 1.0
     bsdf.inputs['Specular IOR Level'].default_value = 0.0
     
-    # Image texture
     tex_node = nodes.new(type='ShaderNodeTexImage')
     tex_node.location = (-300, 0)
     
-    # Load image
     try:
         img = bpy.data.images.load(image_path)
         tex_node.image = img
@@ -2096,12 +1788,10 @@ def _create_terrain_texture_material(image_path, name):
         log(f"Error loading texture: {e}")
         return None
     
-    # UV Map
     uv_node = nodes.new(type='ShaderNodeUVMap')
     uv_node.location = (-500, 0)
     uv_node.uv_map = "UVMap"
     
-    # Links
     links.new(uv_node.outputs['UV'], tex_node.inputs['Vector'])
     links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
     links.new(bsdf.outputs['BSDF'], output.inputs['Surface'])
@@ -2110,20 +1800,14 @@ def _create_terrain_texture_material(image_path, name):
 
 
 def update_terrain_plane_offset(terrain_obj, offset_x=0, offset_y=0, offset_z=0, scale_xy=1.0):
-    """
-    Update the position and scale of a terrain plane.
-    
-    Args:
-        terrain_obj: Terrain plane Blender object
-        offset_x: X offset in Blender units
-        offset_y: Y offset in Blender units
-        offset_z: Z offset in Blender units
-        scale_xy: Horizontal scale factor
+    """Nudge a terrain plane relative to its parent network.
+
+    Offsets are in Blender units and measured from the parent's location, so
+    they are absolute, not cumulative between calls.
     """
     if terrain_obj is None or not terrain_obj.get("is_terrain_plane", False):
         return
     
-    # Get parent OSMnx object if exists
     parent_name = terrain_obj.get("osmnx_parent", "")
     if parent_name and parent_name in bpy.data.objects:
         parent = bpy.data.objects[parent_name]
@@ -2131,18 +1815,16 @@ def update_terrain_plane_offset(terrain_obj, offset_x=0, offset_y=0, offset_z=0,
     else:
         base_location = terrain_obj.location.copy()
     
-    # Apply offset
     terrain_obj.location.x = base_location.x + offset_x
     terrain_obj.location.y = base_location.y + offset_y
     terrain_obj.location.z = base_location.z + offset_z - 0.01
     
-    # Apply scale
     terrain_obj.scale.x = scale_xy
     terrain_obj.scale.y = scale_xy
 
 
 def update_terrain_plane_opacity(terrain_obj, opacity):
-    """Update terrain plane texture opacity."""
+    """Set the terrain plane's alpha, switching blend mode to match."""
     if terrain_obj is None or not terrain_obj.get("is_terrain_plane", False):
         return
     
@@ -2153,7 +1835,6 @@ def update_terrain_plane_opacity(terrain_obj, opacity):
     if not mat.use_nodes:
         return
     
-    # Find BSDF node and adjust alpha
     for node in mat.node_tree.nodes:
         if node.type == 'BSDF_PRINCIPLED':
             node.inputs['Alpha'].default_value = opacity

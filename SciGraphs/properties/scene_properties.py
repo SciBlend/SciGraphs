@@ -11,7 +11,7 @@ from bpy.props import (
 )
 
 from .callbacks import get_column_items, get_db_profile_items, get_attribute_items, get_system_fonts
-from ..core.feature_tags import FEATURE_SOURCE_ITEMS, feature_type_items_for_source
+from scigraphs_core.feature_tags import FEATURE_SOURCE_ITEMS, feature_type_items_for_source
 
 _FEAT_TYPE_ITEMS_CACHE = {}
 
@@ -19,8 +19,8 @@ _FEAT_TYPE_ITEMS_CACHE = {}
 def _feat_type_items(self, context):
     """Enum items for ``feat_type``, filtered by the selected feature source.
 
-    The returned list is cached per source to keep the string references alive,
-    which avoids Blender's dynamic-EnumProperty memory corruption.
+    Cached per source so the string references stay alive; without that,
+    Blender's dynamic EnumProperty corrupts memory.
     """
     source = getattr(self, "feat_source", "OVERTURE")
     items = _FEAT_TYPE_ITEMS_CACHE.get(source)
@@ -422,9 +422,8 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('BIPARTITE_3D', "Bipartite (3D)", "Two parallel planes for bipartite graphs (fast)"),
             
             # === 3D FORCE-DIRECTED LAYOUTS ===
-            # Dimensionality here is measured, not assumed: scripts/visibility/
-            # audit_layouts.sh runs each entry and reports the flatness of what
-            # comes back. Several of these labels used to disagree with it.
+            # The 2D/3D in each label was measured against what the layout
+            # actually returns, not taken from its documentation.
             ('FORCEATLAS2', "ForceAtlas2 (3D)", "Gephi's algorithm (Jacomy et al. 2014), via networkx (medium)"),
             ('YIFAN_HU', "Yifan Hu (2D + Z)", "Planar force-directed placement with a synthesized Z axis, via scigraphs-utils"),
             ('IGRAPH_DRL', "DrL (3D - igraph)", "Distributed Recursive Layout for huge graphs 100k+ (very fast)"),
@@ -447,11 +446,9 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Hierarchical DAG layout, minimizes crossings (fast)"),
             ('CIRCULAR_HIERARCHY', "Circular Hierarchy (2D - Directed)", "Concentric circles from roots (fast)"),
         ],
-        # ForceAtlas2 rather than Yifan Hu, which was the default until it was
-        # found to abort Blender outright on a graph of a few hundred nodes
-        # (see the standalone repro in the tracker). A default that crashes is
-        # the worst possible default; this one is real 3D ForceAtlas2 and takes
-        # 111 ms where Yifan Hu took 992.
+        # Not Yifan Hu: it aborts Blender outright on a graph of a few hundred
+        # nodes. ForceAtlas2 is real 3D and took 111 ms on the same graph where
+        # Yifan Hu took 992.
         default='FORCEATLAS2',
     )
 
@@ -556,9 +553,7 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         max=10.0,
     )
     
-    # ========================================
-    # TOPOLOGICAL ANALYSIS PROPERTIES
-    # ========================================
+    # --- TOPOLOGICAL ANALYSIS PROPERTIES ------------------------------------
     
     topology_analysis_mode: EnumProperty(
         name="Analysis Mode",
@@ -590,9 +585,9 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=True,
     )
 
-# Inject properties defined in domain-specific modules.
-# This keeps all property names on the same SciGraphsProperties class
-# so existing code (`context.scene.scigraphs.osmnx_place_name`) works unchanged.
+# Domain modules define their properties separately but they all land on
+# SciGraphsProperties, so every name stays reachable as
+# `context.scene.scigraphs.<name>`.
 
 from .osmnx_scene_properties import OSMNX_SCENE_PROPERTIES
 from .layout_properties import LAYOUT_PROPERTIES

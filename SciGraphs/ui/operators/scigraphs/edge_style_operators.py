@@ -1,18 +1,14 @@
-"""
-Edge Style Operators for SciGraphs
-
-Operators for applying and managing edge styles in graph visualizations.
-"""
+"""Operators for applying, resetting and presetting graph edge styles."""
 
 import bpy
 from bpy.props import EnumProperty, BoolProperty
 
 from ....core import geometry
-from ....core import edge_styles
-from ....utils.logger import log
+from scigraphs_core import edge_styles
+from scigraphs_core.logger import log
 
 
-# Edge-style preset identifiers, shared by the operator enum and its invoke().
+# Shared by the operator's enum and by its invoke(), which validates against it.
 _PRESET_ITEMS = [
     ('GEPHI_DEFAULT', "Gephi Default", ""),
     ('CYTOSCAPE_BEZIER', "Cytoscape Bezier", ""),
@@ -40,19 +36,14 @@ class SCIGRAPHS_OT_ApplyEdgeStyle(bpy.types.Operator):
         obj = context.active_object
         props = context.scene.scigraphs
         
-        # Get style parameters from properties
         style_params = edge_styles.get_style_params_from_props(props)
-        
-        # Apply the style
         success = geometry.apply_edge_style_to_graph(obj, style_params)
-        
+
         if success:
             self.report({'INFO'}, f"Applied '{props.edge_style_type}' edge style")
-            
-            # Refresh visualization if active
+
             mod = obj.modifiers.get("SciGraphs_Viz")
             if mod:
-                # Force viewport update
                 obj.data.update()
                 for area in context.screen.areas:
                     if area.type == 'VIEW_3D':
@@ -84,12 +75,10 @@ class SCIGRAPHS_OT_ResetEdgeStyle(bpy.types.Operator):
         if success:
             self.report({'INFO'}, "Edges reset to straight lines")
             
-            # Update properties to match
             props = context.scene.scigraphs
             props.edge_style_type = 'STRAIGHT'
             props.edge_style_preset = 'MINIMAL'
-            
-            # Refresh viewport
+
             obj.data.update()
             for area in context.screen.areas:
                 if area.type == 'VIEW_3D':
@@ -127,13 +116,9 @@ class SCIGRAPHS_OT_ApplyEdgeStylePreset(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.scigraphs
         
-        # Apply preset to properties
         edge_styles.apply_preset(props, self.preset)
-        
-        # Update the preset selector
         props.edge_style_preset = self.preset
-        
-        # Apply to graph
+
         obj = context.active_object
         style_params = edge_styles.get_style_params_from_props(props)
         success = geometry.apply_edge_style_to_graph(obj, style_params)
@@ -164,8 +149,7 @@ class SCIGRAPHS_OT_PreviewEdgeStyle(bpy.types.Operator):
         return obj is not None and obj.type == 'MESH' and "num_nodes" in obj
     
     def execute(self, context):
-        # For now, preview is the same as apply
-        # In future could implement partial/preview mode
+        # No partial preview yet, so this just applies the style outright.
         return bpy.ops.scigraphs.apply_edge_style()
 
 

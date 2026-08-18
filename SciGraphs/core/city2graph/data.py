@@ -1,15 +1,17 @@
-from ...utils.logger import log
-from ..feature_tags import resolve_feature_tags, overture_type_from_preset, overture_place_keywords
-from .get_c2g import get_city2graph
+"""Download urban features from Overture Maps or OSMnx and build Blender objects.
+
+The functions that call into city2graph need version 0.3.1 or newer, and each
+returns None when the library is missing.
+"""
+from scigraphs_core.logger import log
+from scigraphs_core.feature_tags import resolve_feature_tags, overture_type_from_preset, overture_place_keywords
+from scigraphs_core.city2graph.get_c2g import get_city2graph
 from . import utils
-from . import overture_api
+from scigraphs_core.city2graph import overture_api
 
 
-# OSMnx fallback tag dictionaries for feature types that the Overture
-# REST API does not (yet) serve. Lifted from the recommendations of
-# the city2graph notebooks (proximity.txt, examples.txt) where the
-# authors switch to OSMnx for segments / land / water rather than
-# fighting the partial REST coverage.
+# OSMnx tag sets for the feature types Overture REST does not serve. The
+# city2graph notebooks make the same switch for segments, land and water.
 _OSMNX_FALLBACK_TAGS = {
     'building': {"building": True},
     'water': {
@@ -25,13 +27,9 @@ _OSMNX_FALLBACK_TAGS = {
 
 
 def _configure_osmnx_for_features(ox):
-    """Tune ``ox.settings`` so feature/area queries behave reasonably.
-
-    The default ``max_query_area_size`` is too restrictive for the
-    bbox sizes a typical urban analysis uses (40 km² triggers
-    thousands of Overpass sub-queries which can take minutes to
-    complete). We raise it unconditionally to a generous value that
-    still keeps accidental country-wide queries safe.
+    """Raise ``ox.settings.max_query_area_size`` and the timeout for feature
+    queries. The default is too small for a typical urban bbox: at 40 km² it
+    splits into thousands of Overpass sub-queries that take minutes.
     """
     if ox is None:
         log("[c2g osmnx-config] OSMnx unavailable; cannot tune settings")
@@ -39,9 +37,8 @@ def _configure_osmnx_for_features(ox):
     try:
         prev_mqas = getattr(ox.settings, "max_query_area_size", None)
         prev_timeout = getattr(ox.settings, "timeout", None)
-        # 200 km × 200 km — comfortably covers every city scale we
-        # support. Beyond this the user almost certainly meant to set
-        # a smaller bbox.
+        # 200 km x 200 km covers every city scale; past that the user almost
+        # certainly meant a smaller bbox.
         new_mqas = 200 * 1000 * 200 * 1000  # 4e10 m²
         ox.settings.max_query_area_size = new_mqas
         ox.settings.use_cache = True
@@ -58,15 +55,13 @@ def _configure_osmnx_for_features(ox):
 
 
 def _fetch_features_via_osmnx(bbox, feature_type):
-    """Fallback path for feature types Overture REST cannot serve.
+    """Fetch a feature type from OSMnx when Overture REST cannot serve it.
 
-    Uses OSMnx ``features_from_bbox`` for polygons/lines (buildings,
-    water, land) and ``graph_from_bbox`` + ``c2g.nx_to_gdf`` for
-    segments — the same combos used in the c2g notebooks. Returns a
-    GeoDataFrame or ``None`` if OSMnx itself cannot be imported.
+    Buildings, water and land come from ``features_from_bbox``, segments from a
+    bbox graph. None means OSMnx is missing or the area holds nothing.
     """
-    from ..osmnx import features as ox_features
-    from ..osmnx.get_osmnx import get_osmnx
+    from scigraphs_core.osmnx import features as ox_features
+    from scigraphs_core.osmnx.get_osmnx import get_osmnx
 
     log(f"[c2g fallback] entering OSMnx path for type='{feature_type}', bbox={bbox}")
     _configure_osmnx_for_features(get_osmnx())
@@ -79,25 +74,20 @@ def _fetch_features_via_osmnx(bbox, feature_type):
                 log("[c2g fallback] OSMnx not available; cannot fetch segments")
                 return None
             n, s, e, w = bbox
-            # NOTE: do not simplify here. Simplification collapses
-            # consecutive intersections into a single edge whose
-            # geometry attribute may then be missing or reduced to a
-            # Point representative — which is what made the rendered
-            # segments look like points instead of street lines.
+            # Do not simplify. Simplification collapses consecutive
+            # intersections into one edge whose geometry may go missing or
+            # shrink to a Point representative, and the segments then render as
+            # points instead of street lines.
             graph = _osmnx_graph_from_bbox(
                 ox, n, s, e, w, network_type='all', simplify=False, retain_all=True,
             )
             if graph is None or len(graph.edges) == 0:
                 log("[c2g fallback] No segments returned by OSMnx for this bbox")
                 return None
-            # Prefer OSMnx itself: ``graph_to_gdfs(edges=True)`` is
-            # guaranteed to return a GeoDataFrame whose geometry
-            # column holds LineStrings (with the real polyline of
-            # each street, not just the (u, v) endpoints). The
-            # equivalent ``c2g.nx_to_gdf`` route can drop the
-            # geometry to a centroid for some edge types, which then
-            # materialised as one isolated vertex per edge in
-            # Blender (the symptom you saw).
+            # ``graph_to_gdfs(edges=True)`` gives LineStrings holding the real
+            # polyline of each street. The equivalent ``c2g.nx_to_gdf`` route
+            # drops the geometry to a centroid for some edge types, which
+            # materializes as one isolated vertex per edge in Blender.
             edges_gdf = ox.graph_to_gdfs(graph, nodes=False, edges=True)
             try:
                 geom_types = edges_gdf.geometry.geom_type.value_counts().to_dict()
@@ -118,32 +108,21 @@ def _fetch_features_via_osmnx(bbox, feature_type):
     gdf = ox_features.features_from_bbox(bbox, tags)
     if gdf is None:
         return None
-    # OSMnx returns mixed (Point/LineString/Polygon) for some categories.
-    # For Buildings/Land/Water we want polygons (and their multi-variants).
+    # OSMnx mixes Point, LineString and Polygon in some categories; buildings,
+    # land and water want the polygons.
     try:
         if feature_type in ('building', 'land', 'water'):
             polygonal = gdf[gdf.geometry.geom_type.isin(['Polygon', 'MultiPolygon'])].copy()
             if len(polygonal) > 0:
                 gdf = polygonal
-    except Exception:  # noqa: BLE001 — defensive: keep raw if filter explodes
+    except Exception:  # noqa: BLE001 - defensive: keep raw if filter explodes
         pass
     log(f"[c2g fallback] OSMnx returned {len(gdf)} {feature_type} features")
     return gdf
 
 
 def get_boundaries(place_name, user_agent="scigraphs"):
-    """
-    Retrieve polygon boundary for a place using Nominatim geocoding.
-    
-    New in city2graph 0.3.1.
-    
-    Args:
-        place_name: Name of the place to geocode (e.g., "Liverpool, UK")
-        user_agent: User agent string for Nominatim API
-    
-    Returns:
-        GeoDataFrame with polygon geometry and place_name property
-    """
+    """Geocode ``place_name`` with Nominatim and return its boundary polygon."""
     c2g = get_city2graph()
     if c2g is None:
         log("city2graph is not available")
@@ -170,19 +149,11 @@ def get_boundaries(place_name, user_agent="scigraphs"):
 
 
 def load_overture_data_c2g(place_name=None, bbox=None, types=None, osmnx_obj=None):
-    """
-    Download Overture Maps data using city2graph's native API.
-    
-    This uses city2graph 0.3.1+ which calls the overturemaps CLI directly.
-    
-    Args:
-        place_name: Name of place to geocode (e.g., "Liverpool, UK")
-        bbox: Alternative - bounding box as [min_lon, min_lat, max_lon, max_lat]
-        types: List of feature types to download
-        osmnx_obj: Optional OSMnx object to align coordinates
-    
-    Returns:
-        dict: Dictionary mapping feature type to GeoDataFrame
+    """Download Overture Maps data through city2graph's own API, which calls the
+    overturemaps CLI and so needs it installed.
+
+    Pass either ``place_name`` or ``bbox`` as [min_lon, min_lat, max_lon,
+    max_lat]. Returns a dict of feature type to GeoDataFrame.
     """
     c2g = get_city2graph()
     if c2g is None:
@@ -229,19 +200,10 @@ def load_overture_data_c2g(place_name=None, bbox=None, types=None, osmnx_obj=Non
 
 
 def process_overture_segments(segments_gdf, connectors_gdf=None, get_barriers=True, threshold=1.0):
-    """
-    Process segments from Overture Maps to be split by connectors and extract barriers.
-    
-    New in city2graph 0.3.1.
-    
-    Args:
-        segments_gdf: GeoDataFrame containing road segments
-        connectors_gdf: Optional GeoDataFrame with connector points
-        get_barriers: Whether to generate barrier geometries from level rules
-        threshold: Distance threshold for endpoint clustering
-    
-    Returns:
-        GeoDataFrame: Processed segments with additional columns
+    """Split Overture segments at their connectors and extract barrier geometries.
+
+    ``get_barriers`` builds the barriers out of the segments' level rules, and
+    ``threshold`` is the endpoint clustering distance.
     """
     c2g = get_city2graph()
     if c2g is None:
@@ -273,19 +235,18 @@ def process_overture_segments(segments_gdf, connectors_gdf=None, get_barriers=Tr
         return None
 
 
-def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api=False, place_name=None, limit=10000, place_categories=None):
-    """
-    Download Overture Maps data within bounding box.
-    
-    Args:
-        bbox: Tuple of (north, south, east, west) coordinates
-        types: List of feature types to download (building, segment, place, water, land)
-        osmnx_obj: Optional OSMnx object to align coordinates
-        use_city2graph_api: If True, use city2graph's native API (requires CLI)
-        place_name: Place name to geocode (alternative to bbox, new in 0.3.1)
-    
-    Returns:
-        dict: Dictionary mapping feature type to created objects
+def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api=False, place_name=None, limit=10000, place_categories=None, overture_api_key=None):
+    """Download Overture Maps features and build Blender objects from them.
+
+    ``bbox`` is (north, south, east, west). Of the ``types``, building and place
+    come from the Overture REST API, while segment, water and land fall through
+    to OSMnx, which Overture REST does not serve. Setting ``use_city2graph_api``
+    or a ``place_name`` switches to the CLI-backed downloader instead.
+
+    ``overture_api_key`` is forwarded to the REST client, which cannot read a
+    Blender preference itself; None falls back to the OVERTURE_API_KEY
+    environment variable, then the demo key. Returns a dict of feature type to
+    created objects.
     """
     if use_city2graph_api or place_name:
         if place_name:
@@ -333,19 +294,16 @@ def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api
             log(f"Downloading {feature_type} features...")
             
             gdf = None
-            # Overture REST is the preferred source where available
-            # (richest schema, best for buildings/places). For
-            # everything else — and as a graceful fallback when
-            # Overture returns nothing — use OSMnx, which is what the
-            # city2graph notebooks themselves do (see proximity.txt
-            # and examples.txt).
+            # Overture REST has the richest schema for buildings and places.
+            # Everything else, and anything Overture returns empty, goes to
+            # OSMnx.
             if feature_type == 'building':
-                gdf = overture_api.query_overture_buildings(bbox, limit=limit)
+                gdf = overture_api.query_overture_buildings(bbox, limit=limit, api_key=overture_api_key)
                 if gdf is None or len(gdf) == 0:
                     log("Buildings not returned by Overture; falling back to OSMnx")
                     gdf = _fetch_features_via_osmnx(bbox, 'building')
             elif feature_type == 'place':
-                gdf = overture_api.query_overture_places(bbox, categories=place_categories, limit=limit)
+                gdf = overture_api.query_overture_places(bbox, categories=place_categories, limit=limit, api_key=overture_api_key)
             elif feature_type in ('segment', 'water', 'land'):
                 log(
                     f"'{feature_type}' is not served by Overture REST; "
@@ -397,10 +355,8 @@ def load_overture_data(bbox=None, types=None, osmnx_obj=None, use_city2graph_api
 
 
 def _filter_gdf_to_nodes(gdf):
-    """Keep only OSM node elements from a features GeoDataFrame.
-
-    Mirrors the notebook workflow (``element == "node"``) so point-feature
-    counts match. Returns the gdf unchanged when no element index is present.
+    """Keep only OSM node elements, or the whole frame if its index has no
+    element level.
     """
     if gdf is None or not hasattr(gdf.index, "names"):
         return gdf
@@ -411,13 +367,12 @@ def _filter_gdf_to_nodes(gdf):
 
 
 def download_features(bbox, source, feature_type, custom_tags="", osmnx_obj=None,
-                      limit=10000, nodes_only=False, place_name=None):
-    """Download and materialise features using the shared import selector.
+                      limit=10000, nodes_only=False, place_name=None,
+                      overture_api_key=None):
+    """Download features through the shared import selector and build objects.
 
-    When ``source`` is OSMnx and ``place_name`` is provided, the features are
-    queried within the place's administrative polygon (``features_from_place``)
-    instead of the bounding box, matching the notebook workflow. Otherwise the
-    bounding box is used.
+    With ``source`` set to OSMnx and a ``place_name`` given, the query runs
+    inside that place's administrative polygon rather than the bounding box.
     """
     source = source or 'OVERTURE'
     feature_type = feature_type or 'BUILDING'
@@ -435,6 +390,7 @@ def download_features(bbox, source, feature_type, custom_tags="", osmnx_obj=None
                 osmnx_obj=osmnx_obj,
                 limit=limit,
                 place_categories=place_categories,
+                overture_api_key=overture_api_key,
             )
             if result:
                 for objects in result.values():
@@ -444,7 +400,7 @@ def download_features(bbox, source, feature_type, custom_tags="", osmnx_obj=None
             return result
         log("Custom tags are not available in Overture mode; using OSMnx")
 
-    from ..osmnx import features as ox_features
+    from scigraphs_core.osmnx import features as ox_features
     from types import SimpleNamespace
 
     tags = resolve_feature_tags(SimpleNamespace(
@@ -487,16 +443,7 @@ def download_features(bbox, source, feature_type, custom_tags="", osmnx_obj=None
 
 
 def load_overture_buildings(bbox, osmnx_obj=None):
-    """
-    Download building footprints from Overture Maps.
-    
-    Args:
-        bbox: Tuple of (north, south, east, west) coordinates
-        osmnx_obj: Optional OSMnx object to align coordinates
-    
-    Returns:
-        list: Created Blender objects
-    """
+    """Download building footprints from Overture Maps into Blender objects."""
     result = load_overture_data(bbox, types=['building'], osmnx_obj=osmnx_obj)
     if result and 'building' in result:
         return result['building']
@@ -504,16 +451,7 @@ def load_overture_buildings(bbox, osmnx_obj=None):
 
 
 def load_overture_roads(bbox, osmnx_obj=None):
-    """
-    Download road segments from Overture Maps.
-    
-    Args:
-        bbox: Tuple of (north, south, east, west) coordinates
-        osmnx_obj: Optional OSMnx object to align coordinates
-    
-    Returns:
-        list: Created Blender objects
-    """
+    """Download road segments from Overture Maps into Blender objects."""
     result = load_overture_data(bbox, types=['segment'], osmnx_obj=osmnx_obj)
     if result and 'segment' in result:
         return result['segment']
@@ -521,16 +459,7 @@ def load_overture_roads(bbox, osmnx_obj=None):
 
 
 def load_overture_places(bbox, osmnx_obj=None):
-    """
-    Download places (POIs) from Overture Maps.
-    
-    Args:
-        bbox: Tuple of (north, south, east, west) coordinates
-        osmnx_obj: Optional OSMnx object to align coordinates
-    
-    Returns:
-        list: Created Blender objects
-    """
+    """Download places (POIs) from Overture Maps into Blender objects."""
     result = load_overture_data(bbox, types=['place'], osmnx_obj=osmnx_obj)
     if result and 'place' in result:
         return result['place']
@@ -538,16 +467,7 @@ def load_overture_places(bbox, osmnx_obj=None):
 
 
 def load_data_from_file(filepath, osmnx_obj=None):
-    """
-    Load urban data from file (GeoJSON, Shapefile, etc.).
-    
-    Args:
-        filepath: Path to file
-        osmnx_obj: Optional OSMnx object to align coordinates
-    
-    Returns:
-        list: Created Blender objects
-    """
+    """Load a geospatial file (GeoJSON, Shapefile, and the rest) into Blender objects."""
     try:
         import geopandas as gpd
         

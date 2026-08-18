@@ -1,8 +1,4 @@
-"""
-OSMnx Cache Management Operators
-
-Operators for viewing and managing cached OSMnx graphs.
-"""
+"""Operators for listing, loading and deleting cached OSMnx graphs."""
 
 import bpy
 import os
@@ -47,21 +43,17 @@ class SCIGRAPHS_OT_ViewCachedGraphs(bpy.types.Operator):
         
         layout.separator()
         
-        # List all cached graphs
         for i, (filename, filepath, size_mb, modified_time) in enumerate(cached_graphs):
             box = layout.box()
             
             col = box.column(align=True)
             
-            # Filename
             row = col.row()
             row.label(text=filename, icon='FILE')
             
-            # File info
             row = col.row()
             row.label(text=f"Size: {size_mb:.2f} MB")
             
-            # Modified time
             try:
                 mod_date = datetime.fromtimestamp(modified_time)
                 date_str = mod_date.strftime("%Y-%m-%d %H:%M:%S")
@@ -70,7 +62,6 @@ class SCIGRAPHS_OT_ViewCachedGraphs(bpy.types.Operator):
             except:
                 pass
             
-            # Action buttons
             row = col.row(align=True)
             op = row.operator("scigraphs.osmnx_load_from_cache", text="Load", icon='IMPORT')
             op.filepath = filepath
@@ -82,7 +73,6 @@ class SCIGRAPHS_OT_ViewCachedGraphs(bpy.types.Operator):
         
         layout.separator()
         
-        # Clear all button
         row = layout.row()
         row.operator("scigraphs.osmnx_clear_cache", text="Clear All Cache", icon='TRASH')
 
@@ -111,7 +101,6 @@ class SCIGRAPHS_OT_DeleteCachedGraph(bpy.types.Operator):
         
         if success:
             self.report({'INFO'}, f"Deleted: {self.filename}")
-            # Refresh the view
             bpy.ops.scigraphs.osmnx_view_cached_graphs('INVOKE_DEFAULT')
         else:
             self.report({'ERROR'}, f"Failed to delete: {self.filename}")
@@ -210,20 +199,18 @@ class SCIGRAPHS_OT_LoadFromCache(bpy.types.Operator):
     
     def execute(self, context):
         from ....core.osmnx import cache
-        from ....core import osmnx_analysis
+        from scigraphs_core import osmnx_analysis
         
         if not os.path.exists(self.filepath):
             self.report({'ERROR'}, f"File not found: {self.filepath}")
             return {'CANCELLED'}
         
-        # Load graph from GraphML
         G = osmnx_analysis.load_graph_graphml(self.filepath)
         
         if G is None:
             self.report({'ERROR'}, "Failed to load GraphML file")
             return {'CANCELLED'}
         
-        # Convert to graph_data
         from ....core import importer, geometry
         
         graph_data, edge_geometries = importer.osmnx_to_graph_data(G, retain_geometry=True)
@@ -232,7 +219,6 @@ class SCIGRAPHS_OT_LoadFromCache(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to convert loaded graph")
             return {'CANCELLED'}
         
-        # Create Blender object
         props = context.scene.scigraphs
         scale = props.osmnx_scale
         
@@ -241,13 +227,11 @@ class SCIGRAPHS_OT_LoadFromCache(bpy.types.Operator):
         )
         
         if obj:
-            # Store in memory cache
             from .utils import _store_osmnx_graph
             _store_osmnx_graph(obj, G)
             obj["osmnx_scale"] = scale
             
-            # Try to extract metadata from filename
-            # Format: Location_Name_networktype.graphml
+            # Cache filenames read Location_Name_networktype.graphml.
             base_name = os.path.splitext(self.filename)[0]
             parts = base_name.rsplit('_', 1)
             if len(parts) == 2:

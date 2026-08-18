@@ -9,9 +9,7 @@ from bpy.props import (
 )
 
 TEXT_OVERLAY_PROPERTIES = {
-    # ========================================
-    # TEXT OVERLAY PROPERTIES
-    # ========================================
+    # --- TEXT OVERLAY PROPERTIES --------------------------------------------
 
     'text_overlay_enabled': BoolProperty(
         name="Enable Text Overlay",

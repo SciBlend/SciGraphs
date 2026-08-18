@@ -1,5 +1,4 @@
-"""OSMnx panels — organised into Download → Graph Ops → Attributes → Routing →
-Accessibility → Statistics → Features → Elevation → IO/Export."""
+"""OSMnx panels, in workflow order from download through to export."""
 
 import bpy
 import os
@@ -20,9 +19,7 @@ def _draw_no_graph_hint(layout, msg="Import an OSMnx graph first"):
     box.label(text="Open the Download subpanel above.")
 
 
-# ---------------------------------------------------------------------------
-# Root panel
-# ---------------------------------------------------------------------------
+# --- Root panel -------------------------------------------------------------
 
 class SCIGRAPHS_PT_osmnx_main(bpy.types.Panel):
     """OSMnx main panel - root for all OSMnx subpanels."""
@@ -62,9 +59,7 @@ class SCIGRAPHS_PT_osmnx_main(bpy.types.Panel):
             info.label(text="Open 'Download' subpanel to import one")
 
 
-# ---------------------------------------------------------------------------
-# 1. Download  (renamed Import/Export split into Download + IO/Export)
-# ---------------------------------------------------------------------------
+# --- 1. Download -----------------------------------------------------------
 
 class SCIGRAPHS_PT_osmnx_download(bpy.types.Panel):
     bl_label = "Download"
@@ -135,7 +130,6 @@ class SCIGRAPHS_PT_osmnx_download(bpy.types.Panel):
             box.label(text="Local .osm XML File:", icon='FILE')
             box.prop(props, "osmnx_xml_filepath", text="")
 
-        # Filtering / network type
         layout.separator()
         box = layout.box()
         box.label(text="Network Type & Filter", icon='FILTER')
@@ -150,7 +144,6 @@ class SCIGRAPHS_PT_osmnx_download(bpy.types.Panel):
             info.label(text="Network Type is ignored (preset active)")
         col.prop(props, "osmnx_custom_filter_text", text="Advanced Filter")
 
-        # Options
         layout.separator()
         box = layout.box()
         box.label(text="Options:", icon='PREFERENCES')
@@ -167,9 +160,7 @@ class SCIGRAPHS_PT_osmnx_download(bpy.types.Panel):
         row.operator("scigraphs.import_osm_graph", text="Import from OSM", icon='IMPORT')
 
 
-# ---------------------------------------------------------------------------
-# 2. Graph Operations  (projection, conversion, simplification)
-# ---------------------------------------------------------------------------
+# --- 2. Graph Operations  (projection, conversion, simplification) ----------
 
 class SCIGRAPHS_PT_osmnx_graph_ops(bpy.types.Panel):
     bl_label = "Graph Operations"
@@ -232,9 +223,7 @@ class SCIGRAPHS_PT_osmnx_graph_ops(bpy.types.Panel):
         col.operator("scigraphs.osmnx_largest_component", text="Keep Largest Component", icon='STICKY_UVS_LOC')
 
 
-# ---------------------------------------------------------------------------
-# 3. Attributes  (lengths, speeds, bearings, travel times)
-# ---------------------------------------------------------------------------
+# --- 3. Attributes  (lengths, speeds, bearings, travel times) ---------------
 
 class SCIGRAPHS_PT_osmnx_attributes(bpy.types.Panel):
     bl_label = "Network Attributes"
@@ -293,9 +282,7 @@ class SCIGRAPHS_PT_osmnx_attributes(bpy.types.Panel):
             row.label(text="", icon='CHECKMARK')
 
 
-# ---------------------------------------------------------------------------
-# 4. Routing  (shortest / k-shortest / batch / summary)
-# ---------------------------------------------------------------------------
+# --- 4. Routing  (shortest / k-shortest / batch / summary) ------------------
 
 class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
     bl_label = "Routing & Paths"
@@ -314,7 +301,6 @@ class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
             _draw_no_graph_hint(layout)
             return
 
-        # Source / target
         box = layout.box()
         box.label(text="Source & Target Nodes", icon='CON_FOLLOWPATH')
 
@@ -331,7 +317,6 @@ class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
         if props.osmnx_path_weight == 'elevation_impedance':
             col.prop(props, "osmnx_impedance_alpha", text="Alpha")
 
-        # Single shortest path
         layout.separator()
         box = layout.box()
         box.label(text="Shortest Path", icon='PLAY')
@@ -349,7 +334,6 @@ class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
             if "osmnx_path_travel_time_min" in obj:
                 result.label(text=f"  Time: {obj.get('osmnx_path_travel_time_min', 0):.1f} min")
 
-            # Route summary + elevation profile
             row = box.row(align=True)
             row.operator("scigraphs.osmnx_route_summary", text="Summarize", icon='GRAPH')
             row.operator("scigraphs.osmnx_route_elev_profile", text="Elevation Profile", icon='CURVE_BEZCURVE')
@@ -360,7 +344,6 @@ class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
                 result2.label(text=f"  Rise: {obj.get('osmnx_route_rise_m', 0):.0f} m")
                 result2.label(text=f"  |grade|: {obj.get('osmnx_route_mean_grade_abs', 0) * 100:.1f}%")
 
-        # K-shortest
         layout.separator()
         box = layout.box()
         box.label(text="K Alternative Routes", icon='PRESET')
@@ -368,7 +351,6 @@ class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
         col.prop(props, "osmnx_k_shortest", text="K")
         col.operator("scigraphs.osmnx_k_shortest", text="Compute K Alternatives", icon='PLAY')
 
-        # Many-to-many batch
         layout.separator()
         box = layout.box()
         box.label(text="Batch (Many-to-Many)", icon='STICKY_UVS_LOC')
@@ -384,9 +366,7 @@ class SCIGRAPHS_PT_osmnx_routing(bpy.types.Panel):
             info.label(text=f"Mean dist: {obj.get('osmnx_batch_mean_dist_m', 0):.0f} m")
 
 
-# ---------------------------------------------------------------------------
-# 5. Accessibility  (isochrones / ego / DBSCAN)
-# ---------------------------------------------------------------------------
+# --- 5. Accessibility  (isochrones / ego / DBSCAN) --------------------------
 
 class SCIGRAPHS_PT_osmnx_accessibility(bpy.types.Panel):
     bl_label = "Accessibility"
@@ -405,7 +385,6 @@ class SCIGRAPHS_PT_osmnx_accessibility(bpy.types.Panel):
             _draw_no_graph_hint(layout)
             return
 
-        # Isochrones
         box = layout.box()
         box.label(text="Isochrones", icon='MESH_CIRCLE')
         col = box.column(align=True)
@@ -419,22 +398,18 @@ class SCIGRAPHS_PT_osmnx_accessibility(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.osmnx_isochrones", text="Generate Isochrones", icon='PLAY')
 
-        # Ego subgraph
         layout.separator()
         box = layout.box()
         box.label(text="Ego Subgraph", icon='STICKY_UVS_DISABLE')
         box.operator("scigraphs.osmnx_ego_subgraph", text="Extract Ego Subgraph", icon='PLAY')
 
-        # Network DBSCAN
         layout.separator()
         box = layout.box()
         box.label(text="Network-Constrained DBSCAN", icon='STICKY_UVS_LOC')
         box.operator("scigraphs.osmnx_network_dbscan", text="Cluster by Network Distance", icon='PLAY')
 
 
-# ---------------------------------------------------------------------------
-# 6. Statistics  (basic stats + centrality + orientation rose)
-# ---------------------------------------------------------------------------
+# --- 6. Statistics  (basic stats + centrality + orientation rose) -----------
 
 class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
     bl_label = "Statistics & Centrality"
@@ -453,7 +428,6 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
             _draw_no_graph_hint(layout)
             return
 
-        # Basic stats
         box = layout.box()
         box.label(text="Basic Stats", icon='INFO')
         row = box.row(align=True)
@@ -483,7 +457,6 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
                 col.label(text=f"Edges/km2: {obj.get('osmnx_stat_edge_density_per_km2', 0):.1f}")
                 col.label(text=f"Street km/km2: {obj.get('osmnx_stat_street_density_km_per_km2', 0):.2f}")
 
-        # Circuity
         layout.separator()
         box = layout.box()
         box.label(text="Circuity", icon='CURVE_PATH')
@@ -493,7 +466,6 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
             info.scale_y = 0.8
             info.label(text=f"Average: {obj.get('circuity_avg', 0):.3f}")
 
-        # Centrality
         layout.separator()
         box = layout.box()
         box.label(text="Centrality", icon='PARTICLE_POINT')
@@ -503,7 +475,6 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
         col.prop(props, "osmnx_centrality_fast")
         col.operator("scigraphs.osmnx_centrality", text="Compute Centrality", icon='PLAY')
 
-        # Bearing distribution + orientation rose
         layout.separator()
         box = layout.box()
         box.label(text="Orientation Analysis", icon='ORIENTATION_VIEW')
@@ -515,9 +486,8 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
         col.prop(props, "osmnx_rose_bins", text="Bins")
         col.operator("scigraphs.osmnx_orientation_rose", text="Render Rose to Image", icon='IMAGE_DATA')
 
-        # Node-pair distance calculator (replaces the manual lat/lon
-        # calculator: pick two graph nodes, get straight-line, network,
-        # and travel-time distances + circuity).
+        # Pick two graph nodes, get straight-line, network and travel-time
+        # distances plus circuity.
         layout.separator()
         box = layout.box()
         box.label(text="Node-Pair Distances", icon='DRIVER_DISTANCE')
@@ -558,9 +528,7 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
                 result.label(text=f"  Travel:   {tm:.1f} min")
 
 
-# ---------------------------------------------------------------------------
-# 7. Features (POIs)
-# ---------------------------------------------------------------------------
+# --- 7. Features (POIs) -----------------------------------------------------
 
 class SCIGRAPHS_PT_osmnx_features(bpy.types.Panel):
     bl_label = "Features & POIs"
@@ -604,7 +572,6 @@ class SCIGRAPHS_PT_osmnx_features(bpy.types.Panel):
         col.prop(props, "osmnx_poi_snap_mode", text="Mode")
         col.operator("scigraphs.osmnx_snap_pois", text="Snap Active POIs", icon='PLAY')
 
-        # Geocoding helpers
         layout.separator()
         box = layout.box()
         box.label(text="Geocoding & Geometry", icon='URL')
@@ -620,9 +587,7 @@ class SCIGRAPHS_PT_osmnx_features(bpy.types.Panel):
         col.operator("scigraphs.osmnx_sample_points", text="Sample Points on Graph", icon='PARTICLE_POINT')
 
 
-# ---------------------------------------------------------------------------
-# 8. Elevation & Terrain
-# ---------------------------------------------------------------------------
+# --- 8. Elevation & Terrain -------------------------------------------------
 
 class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
     bl_label = "Elevation & Terrain"
@@ -644,9 +609,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
         from ....preferences import get_preferences, ADDON_PACKAGE
         prefs = get_preferences()
 
-        # ============================================================
-        # 1. Get elevation data — unified pipeline
-        # ============================================================
+        # --- 1. Get elevation data, unified pipeline ------------------------
         box = layout.box()
         box.label(text="1 · Get Elevation Data", icon='WORLD')
 
@@ -655,7 +618,6 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
 
         source = props.osmnx_dem_source
 
-        # Source-specific options.
         sub = box.box()
         sub.scale_y = 0.95
         if source == 'OPENTOPOGRAPHY':
@@ -678,14 +640,12 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
         elif source == 'LOCAL_GEOTIFF':
             sub.prop(props, "osmnx_dem_local_path", text="GeoTIFF")
 
-        # What to do with the DEM.
         do = box.column(align=True)
         do.label(text="Apply to:")
         row = do.row(align=True)
         row.prop(props, "osmnx_dem_apply_to_nodes", toggle=True, icon='SNAP_VERTEX')
         row.prop(props, "osmnx_dem_create_terrain", toggle=True, icon='MESH_GRID')
 
-        # Terrain method only when terrain is requested.
         if props.osmnx_dem_create_terrain:
             method = do.column(align=True)
             method.prop(props, "osmnx_dem_terrain_method", text="Method")
@@ -704,7 +664,6 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
         run.enabled = props.osmnx_dem_apply_to_nodes or props.osmnx_dem_create_terrain
         run.operator("scigraphs.osmnx_get_elevation", text="Get Elevation Data", icon='IMPORT')
 
-        # Status badges.
         status = box.column(align=True)
         status.scale_y = 0.85
         if obj.get("osmnx_has_elevation", False):
@@ -723,9 +682,8 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                 icon='CHECKMARK',
             )
 
-        # Helper for users who can't / don't want to use any of the built-in
-        # sources: export the AOI bbox so they can grab the DEM elsewhere
-        # (Copernicus, EarthData, etc.) and re-enter via "Local GeoTIFF".
+        # Escape hatch for anyone not using the built-in sources: export the
+        # AOI bbox, fetch the DEM elsewhere, come back via "Local GeoTIFF".
         helper = box.row()
         helper.scale_y = 0.9
         helper.operator(
@@ -734,9 +692,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
             icon='EXPORT',
         )
 
-        # ============================================================
-        # 2. Apply / flatten 3D positions
-        # ============================================================
+        # --- 2. Apply / flatten 3D positions --------------------------------
         if obj.get("osmnx_has_elevation", False) or obj.get("osmnx_3d_applied", False):
             layout.separator()
             box = layout.box()
@@ -760,9 +716,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                     icon='MESH_PLANE',
                 )
 
-        # ============================================================
-        # 3. Slope / grade analysis
-        # ============================================================
+        # --- 3. Slope / grade analysis --------------------------------------
         if obj.get("osmnx_has_elevation", False):
             layout.separator()
             box = layout.box()
@@ -778,9 +732,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                 info.label(text=f"Max grade:  {max_grade:.1f}%")
                 info.label(text=f"Steep edges (>5%): {steep_pct:.1f}%")
 
-        # ============================================================
-        # 4. Terrain object widget — only if terrain mesh exists
-        # ============================================================
+        # --- 4. Terrain object widget, only if a terrain mesh exists --------
         if terrain_name and terrain_name in bpy.data.objects:
             layout.separator()
             terrain_obj = bpy.data.objects[terrain_name]
@@ -799,9 +751,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                 icon='X',
             )
 
-        # ============================================================
-        # 5. Basemap texture for the terrain mesh (optional)
-        # ============================================================
+        # --- 5. Basemap texture for the terrain mesh (optional) -------------
         if terrain_name and terrain_name in bpy.data.objects:
             layout.separator()
             terrain_obj = bpy.data.objects[terrain_name]
@@ -816,19 +766,18 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                 col.prop(props, "osmnx_wms_layer", text="Layer")
             else:
                 col.prop(props, "osmnx_basemap_zoom", text="Zoom")
-                # Padding is only used when the terrain has no recorded
-                # DEM bbox (legacy fallback). Hide it otherwise so users
-                # don't think it affects current basemap fetches.
+                # Padding applies only when the terrain has no recorded DEM
+                # bbox, so hiding it stops people expecting it to do something.
                 has_dem_bounds = 'dem_bounds_north' in terrain_obj
                 if not has_dem_bounds:
                     col.prop(props, "osmnx_basemap_padding", text="Bbox Padding")
 
-                # Live tile-count estimate so the user does not request
-                # gigabytes by accident. We use the terrain's recorded
-                # DEM bbox when available so the estimate matches what
-                # the operator will actually request.
+                # Live tile count so nobody requests gigabytes by accident.
+                # Estimated from the recorded DEM bbox where there is one, so
+                # the number matches what the operator will actually fetch.
                 try:
-                    from ....core.geo import imagery, terrain as _terrain_mod
+                    from scigraphs_core.geo import imagery
+                    from ....core.geo import terrain as _terrain_mod
                     bounds = None
                     if all(k in terrain_obj for k in (
                         'dem_bounds_north', 'dem_bounds_south',
@@ -860,7 +809,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
 
             # Key-required hint (generic, driven by the tile-source registry).
             if props.osmnx_basemap_source != 'WMS':
-                from ....core.geo import imagery as _imagery
+                from scigraphs_core.geo import imagery as _imagery
                 _src = _imagery.resolve_source(props.osmnx_basemap_source)
                 _cfg = _imagery.TILE_SOURCES.get(_src, {})
                 if _cfg.get('needs_key'):
@@ -907,9 +856,7 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                     sub.label(text=attribution, icon='INFO')
 
 
-# ---------------------------------------------------------------------------
-# 9. IO / Export  (GraphML, GeoPackage, OSM XML, Gephi, SVG + cache)
-# ---------------------------------------------------------------------------
+# --- 9. IO / Export  (GraphML, GeoPackage, OSM XML, Gephi, SVG + cache) -----
 
 class SCIGRAPHS_PT_osmnx_io(bpy.types.Panel):
     bl_label = "IO / Export"
@@ -928,7 +875,6 @@ class SCIGRAPHS_PT_osmnx_io(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        # GraphML IO (round trip)
         box = layout.box()
         box.label(text="GraphML (OSMnx native)", icon='FILE')
         col = box.column(align=True)
@@ -937,7 +883,6 @@ class SCIGRAPHS_PT_osmnx_io(bpy.types.Panel):
         row.operator("scigraphs.osmnx_save_graphml", text="Save", icon='EXPORT')
         row.operator("scigraphs.osmnx_load_graphml", text="Load", icon='IMPORT')
 
-        # Multi-format export
         layout.separator()
         box = layout.box()
         box.label(text="Export Formats (GIS interop)", icon='EXPORT')
@@ -945,7 +890,6 @@ class SCIGRAPHS_PT_osmnx_io(bpy.types.Panel):
         col.prop(props, "osmnx_export_format")
         col.operator("scigraphs.osmnx_export", text="Export…", icon='EXPORT')
 
-        # Cache management (only relevant for OSMnx objects)
         if obj and obj.get("is_osmnx", False):
             layout.separator()
             box = layout.box()
@@ -980,9 +924,7 @@ class SCIGRAPHS_PT_osmnx_io(bpy.types.Panel):
             box.operator("scigraphs.osmnx_view_cached_graphs", text="Manage Cache", icon='PRESET')
 
 
-# ---------------------------------------------------------------------------
-# Registration
-# ---------------------------------------------------------------------------
+# --- Registration -----------------------------------------------------------
 
 classes = [
     SCIGRAPHS_PT_osmnx_main,

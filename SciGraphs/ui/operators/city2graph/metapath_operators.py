@@ -1,14 +1,9 @@
-"""
-Metapath analysis operators for heterogeneous urban graphs.
-
-Provides operators to create street dual graphs, bridge amenities to streets,
-and compute metapaths between amenities via the street network.
-"""
+"""Metapath operators: street dual graphs, amenity bridges, metapath search."""
 
 import bpy
 import bmesh
 import time
-from ....core.city2graph import metapaths
+from scigraphs_core.city2graph import metapaths
 from ....core import importer
 from ....core.osmnx.graph_cache import get_osmnx_graph as _get_osmnx_graph, get_osmnx_graph_diagnostic as _get_osmnx_graph_diagnostic
 from ....utils.blender_helpers import get_or_create_collection as _get_or_create_collection
@@ -39,9 +34,8 @@ def _create_metapath_material():
 def _reproject_to_geographic(gdf):
     """Return the GeoDataFrame in EPSG:4326 when a projected CRS is set.
 
-    Aligning every overlay (dual nodes, bridges, metapaths) with the OSMnx
-    mesh requires geographic coordinates, since the mesh is always built with
-    an equirectangular projection centered on the network.
+    The OSMnx mesh uses an equirectangular projection centered on the network,
+    so overlays only line up in geographic coordinates.
     """
     try:
         if gdf.crs is not None and not gdf.crs.is_geographic:
@@ -74,7 +68,6 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
             self.report({'ERROR'}, "Select an OSMnx street network object")
             return {'CANCELLED'}
         
-        # Get OSMnx graph from object
         osmnx_graph_data = _get_osmnx_graph(obj)
         
         if not osmnx_graph_data:
@@ -87,38 +80,32 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
         start_time = time.time()
         
         try:
-            # Create dual graph using city2graph
             dual_nodes_gdf, dual_edges_gdf = metapaths.create_street_dual_graph_c2g(osmnx_graph_data)
             
             self.report({'INFO'}, f"Dual graph: {len(dual_nodes_gdf)} nodes, {len(dual_edges_gdf)} edges")
             
-            # Use the same scale and center as the original OSMnx object
-            # This ensures the dual graph is in the same coordinate space
+            # Reuse the source object's center and scale so both graphs share
+            # one coordinate space.
             center_lat = obj.get("osmnx_center_lat")
             center_lon = obj.get("osmnx_center_lon")
             osmnx_scale = obj.get("osmnx_scale", 0.001)
             
-            # Calculate centroid from all node coordinates
             import numpy as np
             all_coords = np.array([[geom.x, geom.y] for geom in dual_nodes_gdf.geometry])
             centroid_x, centroid_y = all_coords.mean(axis=0)
             
-            # Check if GDF uses geographic or projected CRS
             crs_is_geographic = dual_nodes_gdf.crs and dual_nodes_gdf.crs.is_geographic
             
-            # Use same scale as original OSMnx object
             dual_scale = osmnx_scale
             
-            # Import coordinate conversion function
             from ....core.mesh.geometry import _latlon_to_local_3d
             
-            # Create Blender mesh
             bm = bmesh.new()
             
-            # CRITICAL: Add is_intersection layer for setup visual compatibility
+            # Setup Visualization reads is_intersection, so the layer has to
+            # exist even here, where every node is a street segment.
             is_intersection_layer = bm.verts.layers.int.new("is_intersection")
             
-            # Create vertices (dual nodes)
             placement_nodes_gdf = _reproject_to_geographic(dual_nodes_gdf)
             place_center_lat, place_center_lon = _resolve_geo_center(
                 center_lat, center_lon, placement_nodes_gdf
@@ -139,7 +126,6 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
             
             bm.verts.ensure_lookup_table()
             
-            # Create edges (dual edges)
             created_edge_rows = []
             for row_pos, idx in enumerate(dual_edges_gdf.index):
                 if isinstance(idx, tuple) and len(idx) == 2:
@@ -151,20 +137,17 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                         except ValueError:
                             pass
             
-            # Create mesh and object
             mesh = bpy.data.meshes.new(name=f"{obj.name}_StreetDual_Mesh")
             bm.to_mesh(mesh)
             bm.free()
             
             dual_obj = bpy.data.objects.new(f"{obj.name}_StreetDual", mesh)
             
-            # Add to collection
             collection_name = f"MetapathAnalysis_{obj.name}"
             main_collection = _get_or_create_collection(collection_name)
             dual_collection = _get_or_create_collection("StreetDual", main_collection)
             dual_collection.objects.link(dual_obj)
             
-            # Store metadata
             dual_obj["is_street_dual"] = True
             dual_obj["is_city2graph"] = True
             dual_obj["num_nodes"] = len(dual_nodes_gdf)
@@ -175,15 +158,14 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
             dual_obj["dual_scale"] = dual_scale
             dual_obj["crs"] = str(dual_nodes_gdf.crs)
             
-            # CRITICAL: Store OSMnx transformation parameters for curve visualization
-            # Curves must use the SAME transformation as the original OSMnx graph
+            # Curves drawn later must use the source graph's transformation.
             dual_obj["osmnx_center_lat"] = obj.get("osmnx_center_lat")
             dual_obj["osmnx_center_lon"] = obj.get("osmnx_center_lon")
             dual_obj["osmnx_scale"] = obj.get("osmnx_scale", 0.001)
             dual_obj["crs_is_geographic"] = crs_is_geographic
             
-            # CRITICAL: Store nodes_data and edges_data for graph operations compatibility
-            # This allows the dual graph to work with layout, analysis, and visualization operators
+            # nodes_data and edges_data are what the layout, analysis and
+            # visualization operators read.
             nodes_list = [str(idx) for idx in dual_nodes_gdf.index]
             dual_obj["nodes_data"] = ",".join(nodes_list)
             
@@ -225,14 +207,12 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                     attr = mesh.attributes.new(name=f"edge_{col}", type='FLOAT', domain='EDGE')
                     attr.data.foreach_set("value", values)
             
-            # Store dual graph data for next steps
             import pickle
             dual_obj["dual_nodes_gdf_pickle"] = pickle.dumps(dual_nodes_gdf)
             dual_obj["dual_edges_gdf_pickle"] = pickle.dumps(dual_edges_gdf)
             
             elapsed = time.time() - start_time
             
-            # Verify graph attributes for debugging
             has_is_intersection = "is_intersection" in mesh.attributes
             self.report({'INFO'}, 
                 f"Street dual graph created: {len(dual_nodes_gdf)} segments as nodes, "
@@ -268,12 +248,10 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
         props = context.scene.city2graph
         obj = context.active_object
         
-        # Validate dual graph object
         if not obj or not obj.get("is_street_dual"):
             self.report({'ERROR'}, "Select a street dual graph object")
             return {'CANCELLED'}
         
-        # Get amenities object from scene properties
         props = context.scene.city2graph
         amenities_obj = props.metapath_amenities_object
         
@@ -289,12 +267,10 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
         start_time = time.time()
         
         try:
-            # Unpickle dual graph data
             import pickle
             dual_nodes_gdf = pickle.loads(obj["dual_nodes_gdf_pickle"])
             dual_edges_gdf = pickle.loads(obj["dual_edges_gdf_pickle"])
             
-            # Prepare amenities
             target_crs = obj.get("crs", "EPSG:32630")
             amenity_limit = props.metapath_amenity_limit
             
@@ -304,24 +280,19 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
             
             self.report({'INFO'}, f"Using {len(amenities_gdf)} amenities")
             
-            # Bridge amenities to segments
             k = props.metapath_k_neighbors
             nodes_dict, edges_dict = metapaths.bridge_amenities_to_segments(
                 amenities_gdf, dual_nodes_gdf, k=k
             )
             
-            # Add dual edges to edges_dict
             edges_dict[("segment", "connects_to", "segment")] = dual_edges_gdf
             
-            # Count bridge connections
             bridge_count = len(edges_dict.get(('amenity', 'is_nearby', 'segment'), []))
             
             self.report({'INFO'}, f"Created {bridge_count} bridge connections")
             
-            # Visualize bridges as curves
             self._visualize_bridges(context, obj, edges_dict, amenities_gdf)
             
-            # Store for next step
             obj["nodes_dict_pickle"] = pickle.dumps(nodes_dict)
             obj["edges_dict_pickle"] = pickle.dumps(edges_dict)
             obj["has_metapath_bridges"] = True
@@ -357,13 +328,11 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
             dual_obj.get("osmnx_center_lat"), dual_obj.get("osmnx_center_lon"), bridge_edges
         )
         
-        # Create curve
         curve_data = bpy.data.curves.new(f'{dual_obj.name}_Bridges', type='CURVE')
         curve_data.dimensions = '3D'
         curve_data.bevel_depth = 0.0001
         
-        # Add splines for each bridge edge
-        for idx, row in bridge_edges.head(200).iterrows():  # Limit visualization
+        for idx, row in bridge_edges.head(200).iterrows():  # cap what gets drawn
             if hasattr(row, 'geometry') and row.geometry:
                 coords = list(row.geometry.coords)
                 if len(coords) >= 2:
@@ -374,17 +343,14 @@ class SCIGRAPHS_OT_BridgeAmenitiesToStreets(bpy.types.Operator):
                         blender_x, blender_y, blender_z = _latlon_to_local_3d(lat, lon, center_lat, center_lon, scale)
                         polyline.points[i].co = (blender_x, blender_y, blender_z + 0.01, 1.0)
         
-        # Create object
         bridge_obj = bpy.data.objects.new(f'{dual_obj.name}_Bridges', curve_data)
         
-        # Add to collection
         original_name = dual_obj.get("original_graph", "Graph")
         collection_name = f"MetapathAnalysis_{original_name}"
         main_collection = _get_or_create_collection(collection_name)
         bridge_collection = _get_or_create_collection("Bridges", main_collection)
         bridge_collection.objects.link(bridge_obj)
         
-        # Apply material (orange for bridges)
         mat = bpy.data.materials.new(name="Bridge_Material")
         mat.use_nodes = True
         bsdf = mat.node_tree.nodes.get("Principled BSDF")
@@ -404,7 +370,6 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         props = context.scene.city2graph
         obj = context.active_object
         
-        # Validate object has bridges
         if not obj or not obj.get("has_metapath_bridges"):
             self.report({'ERROR'}, "Select a dual graph object with bridges computed")
             return {'CANCELLED'}
@@ -414,34 +379,28 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         start_time = time.time()
         
         try:
-            # Unpickle graph data
             import pickle
             nodes_dict = pickle.loads(obj["nodes_dict_pickle"])
             edges_dict = pickle.loads(obj["edges_dict_pickle"])
             
-            # Compute metapaths
             result_nodes, result_edges = metapaths.compute_metapaths(
                 nodes_dict, edges_dict, hops=hops, directed=False
             )
             
-            # Extract metapath connections (with multiplicity)
             metapath_gdf = metapaths.extract_metapath_connections(result_edges, add_multiplicity=True)
             
             if metapath_gdf is None or len(metapath_gdf) == 0:
                 self.report({'WARNING'}, "No metapaths found with current parameters")
                 return {'CANCELLED'}
             
-            # Report counts
             unique_count = len(metapath_gdf)
             total_count = metapath_gdf['multiplicity'].sum() if 'multiplicity' in metapath_gdf.columns else unique_count
             
             self.report({'INFO'}, f"Found {int(total_count)} metapaths ({unique_count} unique connections)")
             
-            # Store metapath GeoDataFrame for export
             import pickle
             obj["metapath_gdf_pickle"] = pickle.dumps(metapath_gdf)
             
-            # Visualize metapaths
             self._visualize_metapaths(context, obj, metapath_gdf, hops)
             
             elapsed = time.time() - start_time
@@ -471,7 +430,6 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
             dual_obj.get("osmnx_center_lat"), dual_obj.get("osmnx_center_lon"), metapath_gdf
         )
         
-        # Metapaths already grouped with multiplicity column
         has_multiplicity = 'multiplicity' in metapath_gdf.columns
         
         if has_multiplicity:
@@ -481,8 +439,7 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         else:
             print(f"Visualizing {len(metapath_gdf)} metapaths")
         
-        # Build a native MESH: each metapath connection becomes one edge
-        # between its endpoint amenities, with multiplicity as an EDGE attribute.
+        # One mesh edge per connection, joining its endpoint amenities.
         mesh = bpy.data.meshes.new(f'{dual_obj.name}_Metapaths_{hops}hop_mesh')
         bm = bmesh.new()
         
@@ -533,21 +490,19 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
             mesh
         )
         
-        # Add to collection
         original_name = dual_obj.get("original_graph", "Graph")
         collection_name = f"MetapathAnalysis_{original_name}"
         main_collection = _get_or_create_collection(collection_name)
         metapath_collection = _get_or_create_collection("Metapaths", main_collection)
         metapath_collection.objects.link(metapath_obj)
         
-        # Store metadata including multiplicity statistics
         import json
         import numpy as np
         
         metapath_obj["is_metapath_result"] = True
         metapath_obj["is_city2graph"] = True
         metapath_obj["num_metapaths_raw"] = int(metapath_gdf['multiplicity'].sum()) if has_multiplicity else len(metapath_gdf)
-        metapath_obj["num_metapaths_unique"] = len(metapath_gdf)  # Unique connections
+        metapath_obj["num_metapaths_unique"] = len(metapath_gdf)
         metapath_obj["metapath_hops"] = hops
         metapath_obj["num_visualized"] = visualized
         metapath_obj["num_nodes"] = len(node_positions)
@@ -560,16 +515,14 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         metapath_obj["c2g_center_lon"] = center_lon
         metapath_obj["c2g_scale"] = scale
         
-        # Multiplicity as an EDGE scalar attribute so the native coloring
-        # pipeline can colour connections by how many raw paths they carry.
+        # An EDGE scalar, so the coloring pipeline can shade connections by how
+        # many raw paths they carry.
         if len(multiplicity_list) == len(mesh.edges) and multiplicity_list:
             mult_attr = mesh.attributes.new(name="edge_multiplicity", type='FLOAT', domain='EDGE')
             mult_attr.data.foreach_set("value", [float(m) for m in multiplicity_list])
         
-        # Store multiplicity list (in order) for easy access
         metapath_obj["multiplicity_list"] = json.dumps(multiplicity_list)
         
-        # Calculate stats
         if multiplicity_list:
             avg_multiplicity = np.mean(multiplicity_list)
             max_multiplicity = np.max(multiplicity_list)
@@ -578,7 +531,6 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
             metapath_obj["max_multiplicity"] = int(max_multiplicity)
             metapath_obj["min_multiplicity"] = int(min_multiplicity)
         
-        # Add helper info
         metapath_obj["_info"] = (
             f"Metapath object with {metapath_obj['num_metapaths_raw']} raw paths in {len(metapath_gdf)} unique connections. "
             f"Access GeoDataFrame: import pickle; gdf = pickle.loads(obj['metapath_gdf_pickle'])"
@@ -613,7 +565,6 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
             self.report({'ERROR'}, "Select an OSMnx street network object")
             return {'CANCELLED'}
         
-        # Get amenities object from scene properties
         props = context.scene.city2graph
         amenities_obj = props.metapath_amenities_object
         
@@ -628,11 +579,9 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
         self.report({'INFO'}, "Starting complete metapath analysis...")
         total_start = time.time()
         
-        # Step 1: Create dual graph
         self.report({'INFO'}, "Step 1/3: Creating street dual graph...")
         bpy.ops.scigraphs.create_street_dual_graph()
         
-        # Find the created dual graph object
         dual_obj = None
         for o in bpy.data.objects:
             if o.get("is_street_dual") and o.get("original_graph") == obj.name:
@@ -643,12 +592,11 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to create dual graph")
             return {'CANCELLED'}
         
-        # Select dual graph for next step
+        # The next two operators act on the active object.
         bpy.ops.object.select_all(action='DESELECT')
         dual_obj.select_set(True)
         context.view_layer.objects.active = dual_obj
         
-        # Step 2: Bridge amenities
         self.report({'INFO'}, "Step 2/3: Bridging amenities to streets...")
         bpy.ops.scigraphs.bridge_amenities()
         
@@ -656,7 +604,6 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to bridge amenities")
             return {'CANCELLED'}
         
-        # Step 3: Compute metapaths
         self.report({'INFO'}, "Step 3/3: Computing metapaths...")
         result = bpy.ops.scigraphs.compute_metapaths()
         
@@ -665,7 +612,6 @@ class SCIGRAPHS_OT_ComputeMetapathsWizard(bpy.types.Operator):
         
         total_elapsed = time.time() - total_start
         
-        # Summary
         props = context.scene.city2graph
         self.report({'INFO'}, 
             f"Metapath analysis complete! "
@@ -703,14 +649,12 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         
         import json
         
-        # Get multiplicity data
         if "spline_multiplicity" not in obj:
             self.report({'ERROR'}, "No multiplicity data found")
             return {'CANCELLED'}
         
         spline_mult = json.loads(obj["spline_multiplicity"])
         
-        # Duplicate object
         bpy.ops.object.select_all(action='DESELECT')
         obj.select_set(True)
         context.view_layer.objects.active = obj
@@ -720,7 +664,8 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         curve_obj.name = f"{obj.name}_Filtered"
         curve_data = curve_obj.data
         
-        # FILTER SPLINES BEFORE CONVERSION
+        # Filter while this is still a curve: the splines carry the
+        # multiplicity, the mesh edges do not yet.
         if self.min_multiplicity > 1:
             splines_to_remove = []
             splines_removed = 0
@@ -738,40 +683,33 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
             
             print(f"  Filtered: Removed {splines_removed} splines with multiplicity < {self.min_multiplicity}")
         
-        # Now convert to mesh
         mesh_obj = curve_obj
         mesh_obj.name = f"{obj.name}_Mesh"
         bpy.ops.object.convert(target='MESH')
         
-        # Add multiplicity attribute
         mesh = mesh_obj.data
         
-        # Create attribute for edges
         if not mesh.attributes.get("multiplicity"):
             attr = mesh.attributes.new(name="multiplicity", type='INT', domain='EDGE')
         else:
             attr = mesh.attributes["multiplicity"]
         
-        # Map remaining splines to edges
-        # Get edge count per spline from FILTERED curve
+        # Walk the original splines and hand each survivor its edges.
         edge_idx = 0
         remaining_spline_idx = 0
         
         for orig_spline_idx in range(len(obj.data.splines)):
             mult = spline_mult.get(str(orig_spline_idx), 1)
             
-            # Skip if this spline was filtered out
             if mult < self.min_multiplicity:
                 continue
             
-            # Get the spline from the converted mesh (before conversion)
             orig_spline = obj.data.splines[orig_spline_idx]
             num_points = len(orig_spline.points)
             
             if num_points >= 2:
                 num_edges = num_points - 1
                 
-                # Assign multiplicity to all edges from this spline
                 for i in range(edge_idx, edge_idx + num_edges):
                     if i < len(attr.data):
                         attr.data[i].value = mult
@@ -779,18 +717,17 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
                 edge_idx += num_edges
                 remaining_spline_idx += 1
         
-        # CRITICAL: Remove edges with multiplicity = 0 or below threshold
-        # These are edges that weren't properly mapped or should be filtered
+        # Drop edges still below the threshold, including any the spline walk
+        # failed to map.
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bm.edges.ensure_lookup_table()
         bm.verts.ensure_lookup_table()
         
-        # Add is_intersection layer for setup visual compatibility
-        # All vertices in metapath mesh represent connection points
+        # Setup Visualization needs is_intersection; every vertex here is a
+        # connection point.
         is_intersection_layer = bm.verts.layers.int.new("is_intersection") if "is_intersection" not in bm.verts.layers.int else bm.verts.layers.int.get("is_intersection")
         
-        # Mark all vertices as intersections
         for v in bm.verts:
             v[is_intersection_layer] = 1
         
@@ -801,11 +738,9 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
                 if mult < self.min_multiplicity:
                     edges_to_delete.append(edge)
         
-        # Remove edges
         for edge in edges_to_delete:
             bm.edges.remove(edge)
         
-        # Remove loose vertices
         loose_verts = [v for v in bm.verts if not v.link_edges]
         for v in loose_verts:
             bm.verts.remove(v)
@@ -816,7 +751,6 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         if len(edges_to_delete) > 0:
             print(f"  Cleaned: Removed {len(edges_to_delete)} edges with multiplicity < {self.min_multiplicity}")
         
-        # Copy custom properties
         for key in obj.keys():
             if key not in ['_RNA_UI']:
                 mesh_obj[key] = obj[key]
@@ -824,17 +758,14 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         mesh_obj["is_metapath_mesh"] = True
         mesh_obj["min_multiplicity_filter"] = self.min_multiplicity
         
-        # CRITICAL: Add graph metadata for full operator compatibility
-        # This allows the mesh to work with layout, analysis, and other graph operators
+        # Graph metadata the layout and analysis operators expect.
         num_verts = len(mesh.vertices)
         num_edges_final = len(mesh.edges)
         mesh_obj["num_nodes"] = num_verts
         mesh_obj["num_edges"] = num_edges_final
         
-        # Create simplified nodes_data (vertex indices as node IDs)
         mesh_obj["nodes_data"] = ",".join(str(i) for i in range(num_verts))
         
-        # Store edges_data (for graph operations)
         edges_list = []
         for edge in mesh.edges:
             edges_list.append(str(edge.vertices[0]))
@@ -848,7 +779,6 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         else:
             self.report({'INFO'}, f"Converted to mesh: {total_edges} edges with multiplicity attribute")
         
-        # Verify graph compatibility
         has_is_intersection = "is_intersection" in mesh.attributes
         has_num_nodes = "num_nodes" in mesh_obj
         

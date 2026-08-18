@@ -7,9 +7,7 @@ from bpy.props import (
 )
 
 OSMNX_SCENE_PROPERTIES = {
-    # ========================================
-    # OSMnx PROPERTIES (OpenStreetMap Import)
-    # ========================================
+    # --- OSMnx PROPERTIES (OpenStreetMap Import) ----------------------------
 
     'osmnx_download_method': EnumProperty(
         name="Download Method",
@@ -282,8 +280,7 @@ OSMNX_SCENE_PROPERTIES = {
         default=0.0,
     ),
 
-    # Node-pair distance calculator (eyedropper-driven, replaces the old
-    # manual lat/lon calculator).
+    # Node-pair distance calculator, driven by the eyedropper.
     'osmnx_dist_node_a': StringProperty(
         name="Node A",
         description="First graph node ID for the distance calculator",
@@ -296,11 +293,9 @@ OSMNX_SCENE_PROPERTIES = {
         default="",
     ),
 
-    # ========================================
-    # ELEVATION & TERRAIN — UNIFIED PIPELINE
-    # ========================================
-    # The user picks ONE source, plus what to do with it (apply to nodes /
-    # create terrain mesh). Backed by a single dispatcher operator.
+    # --- Elevation and terrain, unified pipeline ----------------------------
+    # One source plus what to do with it (elevate nodes, build a terrain mesh),
+    # behind a single dispatcher operator.
 
     'osmnx_dem_source': EnumProperty(
         name="Elevation Source",
@@ -397,13 +392,9 @@ OSMNX_SCENE_PROPERTIES = {
         default='open-elevation',
     ),
 
-    # ========================================
-    # BASEMAP TEXTURE FOR TERRAIN
-    # ========================================
-    # Drape an aerial / satellite / map basemap onto the imported terrain
-    # mesh. Sources are XYZ tile styles served by Esri, OpenStreetMap,
-    # CARTO, Mapbox, MapTiler and Stadia/Stamen, or an arbitrary WMS
-    # endpoint. The full style catalog lives in core.geo.imagery.TILE_SOURCES.
+    # --- Basemap texture for terrain ----------------------------------------
+    # Drapes imagery over the terrain mesh. Sources are XYZ tile styles or an
+    # arbitrary WMS endpoint; the full catalog is core.geo.imagery.TILE_SOURCES.
 
     'osmnx_basemap_source': EnumProperty(
         name="Basemap Source",
@@ -411,19 +402,19 @@ OSMNX_SCENE_PROPERTIES = {
         items=[
             ("", "Esri (no key)", "Esri ArcGIS tiled basemaps, no API key required"),
             ('ESRI_IMAGERY', "Satellite (Imagery)",
-                "Esri World Imagery — high-resolution satellite/aerial (best default)"),
+                "Esri World Imagery, high-resolution satellite/aerial (best default)"),
             ('ESRI_STREET', "Streets",
                 "Esri World Street Map"),
             ('ESRI_TOPO', "Topographic",
                 "Esri World Topographic Map"),
             ('ESRI_DARK_GRAY', "Dark Gray Canvas",
-                "Esri Dark Gray reference canvas — great for data overlays"),
+                "Esri Dark Gray reference canvas, great for data overlays"),
             ('ESRI_LIGHT_GRAY', "Light Gray Canvas",
-                "Esri Light Gray reference canvas — great for data overlays"),
+                "Esri Light Gray reference canvas, great for data overlays"),
             ('ESRI_OCEAN', "Ocean Base",
                 "Esri World Ocean base"),
             ('ESRI_HILLSHADE', "Hillshade",
-                "Esri World Hillshade — terrain shading"),
+                "Esri World Hillshade, terrain shading"),
             ('ESRI_TERRAIN', "Terrain Base",
                 "Esri World Terrain base (low zoom)"),
 
@@ -435,11 +426,11 @@ OSMNX_SCENE_PROPERTIES = {
 
             ("", "CARTO (no key)", "CARTO basemaps, no API key required (fair-use)"),
             ('CARTO_VOYAGER', "Voyager",
-                "CARTO Voyager — colored general-purpose map"),
+                "CARTO Voyager, colored general-purpose map"),
             ('CARTO_POSITRON', "Positron (Light)",
-                "CARTO Positron — minimal light basemap"),
+                "CARTO Positron, minimal light basemap"),
             ('CARTO_DARK_MATTER', "Dark Matter",
-                "CARTO Dark Matter — minimal dark basemap"),
+                "CARTO Dark Matter, minimal dark basemap"),
 
             ("", "Custom", "User-provided endpoint"),
             ('WMS', "Custom WMS",
@@ -452,7 +443,7 @@ OSMNX_SCENE_PROPERTIES = {
         name="Zoom Level",
         description=(
             "Slippy-map zoom (XYZ sources). Higher = more detail and "
-            "exponentially more tiles. 14–17 is usually a sweet spot"
+            "exponentially more tiles. 14-17 is usually a sweet spot"
         ),
         default=16,
         min=10,
@@ -479,9 +470,7 @@ OSMNX_SCENE_PROPERTIES = {
         default="",
     ),
 
-    # ========================================
-    # OSMnx ANALYSIS PROPERTIES
-    # ========================================
+    # --- OSMnx ANALYSIS PROPERTIES ------------------------------------------
 
     'osmnx_shortest_path_source': StringProperty(
         name="Source Node",
@@ -502,7 +491,7 @@ OSMNX_SCENE_PROPERTIES = {
             ('length', "Distance (length)", "Minimize total distance in meters"),
             ('travel_time', "Travel Time", "Minimize travel time (requires speeds + travel_times)"),
             ('elevation_impedance', "Length + Elevation Penalty",
-                "length * (1 + alpha * |grade|) — requires node elevations + edge grades"),
+                "length * (1 + alpha * |grade|) - requires node elevations + edge grades"),
         ],
         default='length',
     ),
@@ -671,9 +660,7 @@ OSMNX_SCENE_PROPERTIES = {
         max=50000.0,
     ),
 
-    # ========================================
-    # OSMnx ROUTING (advanced)
-    # ========================================
+    # --- OSMnx ROUTING (advanced) -------------------------------------------
 
     'osmnx_impedance_alpha': FloatProperty(
         name="Elevation Alpha",
@@ -708,9 +695,7 @@ OSMNX_SCENE_PROPERTIES = {
         max=32,
     ),
 
-    # ========================================
-    # OSMnx ACCESSIBILITY / ISOCHRONES
-    # ========================================
+    # --- OSMnx ACCESSIBILITY / ISOCHRONES -----------------------------------
 
     'osmnx_iso_center_node': StringProperty(
         name="Center Node",
@@ -751,9 +736,7 @@ OSMNX_SCENE_PROPERTIES = {
         max=500.0,
     ),
 
-    # ========================================
-    # OSMnx CENTRALITY / COLOR-BY-ATTR
-    # ========================================
+    # --- OSMnx CENTRALITY / COLOR-BY-ATTR -----------------------------------
 
     'osmnx_centrality_kind': EnumProperty(
         name="Centrality",
@@ -812,9 +795,7 @@ OSMNX_SCENE_PROPERTIES = {
         default='NODES',
     ),
 
-    # ========================================
-    # OSMnx ORIENTATION ROSE (3D polar mesh)
-    # ========================================
+    # --- OSMnx ORIENTATION ROSE (3D polar mesh) -----------------------------
 
     'osmnx_rose_bins': IntProperty(
         name="Rose Bins",
@@ -840,9 +821,7 @@ OSMNX_SCENE_PROPERTIES = {
         max=100.0,
     ),
 
-    # ========================================
-    # OSMnx FEATURES (POIs)
-    # ========================================
+    # --- OSMnx FEATURES (POIs) ----------------------------------------------
 
     'osmnx_poi_snap_mode': EnumProperty(
         name="POI Snap Mode",
@@ -855,9 +834,7 @@ OSMNX_SCENE_PROPERTIES = {
         default='ATTR_ONLY',
     ),
 
-    # ========================================
-    # OSMnx EXPORT (GIS interop)
-    # ========================================
+    # --- OSMnx EXPORT (GIS interop) -----------------------------------------
 
     'osmnx_export_filepath': StringProperty(
         name="Export Path",
@@ -878,9 +855,7 @@ OSMNX_SCENE_PROPERTIES = {
         default='GEOPACKAGE',
     ),
 
-    # ========================================
-    # OSMnx INTERPOLATE / SAMPLE POINTS
-    # ========================================
+    # --- OSMnx INTERPOLATE / SAMPLE POINTS ----------------------------------
 
     'osmnx_sample_n': IntProperty(
         name="Number of Samples",

@@ -1,17 +1,10 @@
-# Viewport drawing helpers for OSMnx spatial operators.
-#
-# All graph-cache and mesh-bridge logic has moved to:
-#   core.osmnx.graph_cache
-#   core.osmnx.mesh_bridge
-#
-# This module re-exports those symbols under their original names so that
-# existing operator imports keep working.
+# Viewport drawing helpers for the OSMnx spatial operators, plus aliases that
+# re-export core.osmnx.graph_cache and mesh_bridge under the private names the
+# operators import.
 
 import math
 import gpu
 from gpu_extras.batch import batch_for_shader
-
-# --- Viewport GPU drawing helpers (stay here, they are UI-only) ------------
 
 _draw_handlers = {}
 
@@ -71,8 +64,6 @@ def _draw_highlight_point(position_3d, color, size=10.0):
     gpu.state.point_size_set(1.0)
 
 
-# --- Re-exports from core (backward-compatible aliases) --------------------
-
 from ....core.osmnx.graph_cache import (          # noqa: E402, F401
     get_osmnx_graph as _get_osmnx_graph,
     get_osmnx_graph_diagnostic as _get_osmnx_graph_diagnostic,
@@ -81,7 +72,7 @@ from ....core.osmnx.graph_cache import (          # noqa: E402, F401
     store_osmnx_graph as _store_osmnx_graph,
 )
 
-from ....core.osmnx.mesh_bridge import (           # noqa: E402, F401
+from scigraphs_core.osmnx.mesh_bridge import (           # noqa: E402, F401
     build_edge_mapping as _build_edge_mapping,
     find_mesh_edge_path as _find_mesh_edge_path,
     transfer_edge_attribute_to_mesh as _transfer_edge_attribute_to_mesh,

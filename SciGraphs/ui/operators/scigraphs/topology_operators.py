@@ -1,11 +1,11 @@
-# Topological analysis operators for SciGraphs addon
-# Handles planarity, genus, face detection, and surface embedding
+# Planarity, genus, face detection and surface embedding.
 
 import bpy
 import bmesh
 import numpy as np
-from ....core import topology, geometry
-from ....core.mesh.mesh_utils import (
+from scigraphs_core import topology
+from ....core import geometry
+from scigraphs_core.mesh.mesh_utils import (
     parse_graph_data_filtered as _parse_graph_data,
     get_vertex_positions as _get_vertex_positions,
     expand_node_values_to_mesh as _expand_node_values_to_mesh,
@@ -30,11 +30,9 @@ class SCIGRAPHS_OT_CheckPlanarity(bpy.types.Operator):
         
         is_planar, embedding = topology.check_planarity_nx(graph_data)
         
-        # Store results
         obj["topo_is_planar"] = is_planar
         
         if is_planar:
-            # Compute Euler characteristic for planar graph
             euler_data = topology.get_euler_characteristic(graph_data, embedding)
             obj["topo_euler_V"] = euler_data['V']
             obj["topo_euler_E"] = euler_data['E']
@@ -45,7 +43,6 @@ class SCIGRAPHS_OT_CheckPlanarity(bpy.types.Operator):
                 f"Graph is PLANAR: V={euler_data['V']}, E={euler_data['E']}, "
                 f"F={euler_data['F']}, chi={euler_data['chi']}")
         else:
-            # Find Kuratowski subgraph for non-planar
             kuratowski = topology.detect_kuratowski_subgraph(graph_data)
             obj["topo_kuratowski_type"] = kuratowski.get('kuratowski_type', 'unknown')
             
@@ -73,7 +70,6 @@ class SCIGRAPHS_OT_CalculateGenus(bpy.types.Operator):
         
         genus_result = topology.calculate_genus(graph_data)
         
-        # Store results
         obj["topo_is_planar"] = genus_result['is_planar']
         obj["topo_genus_lower_bound"] = genus_result['genus_lower_bound']
         
@@ -113,32 +109,28 @@ class SCIGRAPHS_OT_ComputeFaces(bpy.types.Operator):
         
         graph_data = _parse_graph_data(obj)
         
-        # First check planarity
         is_planar, embedding = topology.check_planarity_nx(graph_data)
         
         if not is_planar:
             self.report({'ERROR'}, "Cannot compute faces: graph is not planar")
             return {'CANCELLED'}
         
-        # Get face assignments
         face_result = topology.get_face_node_assignments(graph_data, embedding)
         
         if face_result.get('error'):
             self.report({'ERROR'}, face_result['error'])
             return {'CANCELLED'}
         
-        # Store face data
         obj["topo_num_faces"] = face_result['num_faces']
         obj["topo_faces"] = str(face_result['faces'])
         
-        # Create face_id attribute on mesh
         mesh = obj.data
         attr_name = "face_id"
         
         if attr_name in mesh.attributes:
             mesh.attributes.remove(mesh.attributes[attr_name])
         
-        # Expand for OSMnx compatibility
+        # An OSMnx mesh carries curve vertices too, so pad out to mesh size.
         node_face_ids = face_result['node_face_ids']
         expanded_values = _expand_node_values_to_mesh(obj, node_face_ids, default_value=-1)
         
@@ -171,17 +163,14 @@ class SCIGRAPHS_OT_ValidateCrossings(bpy.types.Operator):
         
         mesh = obj.data
         
-        # Get vertex positions
         vertices = []
         for v in mesh.vertices:
             vertices.append(list(v.co))
         
-        # Get edges
         edges = []
         for e in mesh.edges:
             edges.append((e.vertices[0], e.vertices[1]))
         
-        # Detect crossings
         result = topology.detect_edge_crossings_3d(vertices, edges, tolerance=0.01)
         
         obj["topo_has_crossings"] = result['has_crossings']
@@ -231,7 +220,6 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         if not is_planar:
             return {'success': False, 'message': "Graph is not planar"}
         
-        # Check if graph has nodes
         if num_nodes == 0 or len(graph_data.nodes) == 0:
             return {'success': False, 'message': "Graph has no nodes"}
         
@@ -241,36 +229,27 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         
         node_positions = layout_result['positions']
         
-        # Check if positions are valid
         if node_positions is None or len(node_positions) == 0:
             return {'success': False, 'message': "Layout returned no positions"}
         
-        # Create new mesh with is_intersection attribute
         self._rebuild_graph_mesh(obj, graph_data, node_positions)
         
-        # Create plane surface mesh
         self._create_plane_surface(context, obj, node_positions)
         
         obj["topo_layout_type"] = "planar_crossing_free"
         return {'success': True, 'message': "Planar embedding - edges DO NOT cross"}
     
     def _rebuild_graph_mesh(self, obj, graph_data, node_positions):
-        """
-        Rebuild the graph mesh with proper is_intersection attribute.
-        Creates straight edges for planar embedding.
-        """
+        """Rebuild the mesh with straight edges and an is_intersection attribute."""
         import bmesh
         
         num_nodes = len(graph_data.nodes)
         
-        # Create new bmesh
         bm = bmesh.new()
         
-        # Track vertex indices
         vertex_list = []
         is_intersection_values = []
         
-        # Add node vertices (is_intersection = 1)
         for i in range(num_nodes):
             v = bm.verts.new(node_positions[i])
             vertex_list.append(v)
@@ -278,10 +257,8 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         
         bm.verts.ensure_lookup_table()
         
-        # Build node index mapping
         node_to_idx = graph_data.node_to_index
         
-        # Add edges (straight)
         for src, tgt in graph_data.edges:
             if src not in node_to_idx or tgt not in node_to_idx:
                 continue
@@ -300,7 +277,6 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
             except ValueError:
                 pass
         
-        # Update the mesh
         old_mesh = obj.data
         new_mesh = bpy.data.meshes.new(name="SciGraph_Embedded")
         bm.to_mesh(new_mesh)
@@ -308,11 +284,9 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         
         obj.data = new_mesh
         
-        # Remove old mesh if not used elsewhere
         if old_mesh.users == 0:
             bpy.data.meshes.remove(old_mesh)
         
-        # Create is_intersection attribute
         mesh = obj.data
         if "is_intersection" in mesh.attributes:
             mesh.attributes.remove(mesh.attributes["is_intersection"])
@@ -320,7 +294,6 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         attr = mesh.attributes.new(name="is_intersection", type='INT', domain='POINT')
         attr.data.foreach_set("value", is_intersection_values)
         
-        # Update stored counts
         obj["num_nodes"] = num_nodes
         obj["num_mesh_verts"] = len(vertex_list)
         obj["num_curve_verts"] = 0
@@ -328,29 +301,23 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         mesh.update()
     def _create_plane_surface(self, context, obj, node_positions):
         """Create a plane mesh as child of the graph object."""
-        # Remove old surface if exists
         old_surface_name = obj.get("topo_surface_child", "")
         if old_surface_name and old_surface_name in bpy.data.objects:
             old_obj = bpy.data.objects[old_surface_name]
             bpy.data.objects.remove(old_obj, do_unlink=True)
         
-        # Handle empty positions
         if node_positions is None or len(node_positions) == 0:
-            # Default plane at origin
             center = np.array([0.0, 0.0, 0.0])
             size = np.array([5.0, 5.0, 0.0])
         else:
-            # Calculate bounds
             min_pos = np.min(node_positions, axis=0)
             max_pos = np.max(node_positions, axis=0)
             center = (min_pos + max_pos) / 2
             size = max_pos - min_pos
-            # Ensure minimum size
             size = np.maximum(size, 1.0)
         
         padding = 0.5
         
-        # Create plane
         bpy.ops.mesh.primitive_plane_add(
             size=1,
             location=(center[0], center[1], center[2] - 0.01)
@@ -359,17 +326,13 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
         plane.name = f"{obj.name}_Surface"
         plane.scale = (size[0] + padding, size[1] + padding, 1)
         
-        # Apply scale
         bpy.ops.object.transform_apply(scale=True)
         
-        # Semi-transparent material
         self._create_surface_material(plane, (0.3, 0.5, 0.8, 0.3), "TopoPlane_Mat")
         
-        # Parent to graph object
         plane.parent = obj
         obj["topo_surface_child"] = plane.name
         
-        # Restore active object
         context.view_layer.objects.active = obj
     def _create_surface_material(self, obj, color, mat_name):
         """Create a semi-transparent material for the surface."""
@@ -382,17 +345,14 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
             nodes = mat.node_tree.nodes
             links = mat.node_tree.links
             
-            # Clear default nodes
             nodes.clear()
             
-            # Create nodes
             output = nodes.new('ShaderNodeOutputMaterial')
             bsdf = nodes.new('ShaderNodeBsdfPrincipled')
             
             output.location = (300, 0)
             bsdf.location = (0, 0)
             
-            # Set color and transparency
             bsdf.inputs['Base Color'].default_value = color[:3] + (1.0,)
             bsdf.inputs['Alpha'].default_value = color[3]
             bsdf.inputs['Roughness'].default_value = 0.8
@@ -420,7 +380,6 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
             self.report({'ERROR'}, "No graph object selected")
             return {'CANCELLED'}
         
-        # Check if graph is planar
         is_planar = obj.get("topo_is_planar", None)
         if is_planar is None:
             self.report({'ERROR'}, "Run planarity check first")
@@ -433,26 +392,22 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
         graph_data = _parse_graph_data(obj)
         positions = _get_vertex_positions(obj)
         
-        # Use only node positions (not curve vertices)
+        # Node positions only; the tail of the array is curve vertices.
         num_nodes = obj.get("num_nodes", len(positions))
         node_positions = positions[:num_nodes]
         
-        # Compute dual graph
         dual_result = topology.compute_geometric_dual_3d(graph_data, node_positions)
         
         if not dual_result.get('success', False):
             self.report({'ERROR'}, dual_result.get('error', 'Failed to compute dual'))
             return {'CANCELLED'}
         
-        # Create the dual graph mesh object
         dual_positions = dual_result['positions']
         dual_edges = dual_result['edges']
         num_dual_nodes = len(dual_result['nodes'])
         
-        # Create mesh
         bm = bmesh.new()
         
-        # Add vertices
         dual_verts = []
         for pos in dual_positions:
             v = bm.verts.new(pos)
@@ -460,7 +415,6 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
         
         bm.verts.ensure_lookup_table()
         
-        # Add edges
         for u, v in dual_edges:
             if u < len(dual_verts) and v < len(dual_verts):
                 try:
@@ -468,7 +422,6 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
                 except ValueError:
                     pass  # Edge already exists
         
-        # Create Blender mesh and object
         mesh = bpy.data.meshes.new(name=f"{obj.name}_Dual_Mesh")
         bm.to_mesh(mesh)
         bm.free()
@@ -476,23 +429,19 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
         dual_obj = bpy.data.objects.new(f"{obj.name}_Dual", mesh)
         context.collection.objects.link(dual_obj)
         
-        # Create wireframe material for the dual
         self._create_dual_material(dual_obj)
         
-        # Parent to original graph
         dual_obj.parent = obj
         
-        # Store reference
         obj["topo_dual_child"] = dual_obj.name
         
-        # Store dual graph data on the dual object (for further analysis)
         dual_obj["is_dual_graph"] = True
         dual_obj["num_nodes"] = num_dual_nodes
         dual_obj["num_edges"] = len(dual_edges)
         dual_obj["original_graph"] = obj.name
         
-        # Store graph data in the same format as regular graphs
-        # so that topology operators can work on the dual
+        # Same shape as a regular graph, so the topology operators can be
+        # run again on the dual itself.
         dual_nodes_str = ",".join([f"face_{i}" for i in range(num_dual_nodes)])
         dual_obj["nodes_data"] = dual_nodes_str
         
@@ -503,7 +452,6 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
             edges_flat.append(f"face_{v}")
         dual_obj["edges_data"] = ",".join(edges_flat)
         
-        # Store positions for the dual (flattened)
         dual_obj["node_positions"] = dual_positions.flatten().tolist()
         
         self.report({'INFO'}, 
@@ -533,7 +481,7 @@ class SCIGRAPHS_OT_CreateDualGraph(bpy.types.Operator):
             output.location = (300, 0)
             bsdf.location = (0, 0)
             
-            # Orange-red color for dual (contrasts with typical graph blue)
+            # Orange-red, to read against the usual graph blue.
             bsdf.inputs['Base Color'].default_value = (0.9, 0.4, 0.1, 1.0)
             bsdf.inputs['Alpha'].default_value = 0.8
             bsdf.inputs['Roughness'].default_value = 0.5

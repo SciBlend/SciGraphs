@@ -1,4 +1,4 @@
-# Visualization and appearance operators
+# Appearance, rendering-preset and lighting operators.
 
 import bpy
 from mathutils import Vector
@@ -200,9 +200,8 @@ class SCIGRAPHS_OT_UpdateAppearance(bpy.types.Operator):
 
         shape_index = NODE_SHAPE_INDEX_MAP.get(self.node_shape, 0)
 
-        # Persist the choices on the object so rebuilds (centrality, layouts,
-        # edge styles, ...) restore the same look instead of going back to
-        # whatever was hard-coded in the GN tree builders.
+        # Kept on the object so that a rebuild (centrality, layout, edge style)
+        # restores this look rather than the GN builders' hard-coded defaults.
         obj["scigraphs_node_size"] = float(self.node_size)
         obj["scigraphs_node_resolution"] = int(self.node_resolution)
         obj["scigraphs_node_shape_index"] = int(shape_index)
@@ -211,9 +210,8 @@ class SCIGRAPHS_OT_UpdateAppearance(bpy.types.Operator):
 
         node_group = mod.node_group
 
-        # Older trees were built before the multi-primitive shape switch /
-        # smooth-by-angle existed. Rebuild on the fly so users don't need to
-        # re-run Setup Viz manually after an addon upgrade.
+        # Trees built before the shape switch and smooth-by-angle nodes existed
+        # are rebuilt here, so an upgrade does not force a manual Setup Viz.
         tree_name = node_group.name if node_group else ""
         is_simple_tree = not tree_name.startswith("SciGraphs_Interactive")
         needs_upgrade = is_simple_tree and (
@@ -221,15 +219,14 @@ class SCIGRAPHS_OT_UpdateAppearance(bpy.types.Operator):
             or node_group.nodes.get("SciGraphs_NodeSmoothByAngle") is None
         )
         if needs_upgrade:
-            # Use the public rebuild path so post-rebuild hooks (e.g. coloring)
-            # also re-apply themselves to the new tree.
+            # The public path, so hooks like coloring re-apply to the new tree.
             geometry._rebuild_visualization_if_present(obj)  # pylint: disable=protected-access
             node_group = mod.node_group
 
         updated = 0
 
-        # Interactive tree exposes everything as modifier sockets. Setting
-        # them is a no-op for the simple tree (no matching interface socket).
+        # The interactive tree exposes these as modifier sockets. On the simple
+        # tree there is no matching socket and each set is a no-op.
         socket_values = {
             "Node Scale": self.node_size,
             "Node Resolution": self.node_resolution,
@@ -246,8 +243,7 @@ class SCIGRAPHS_OT_UpdateAppearance(bpy.types.Operator):
             if self._set_modifier_input(mod, socket_name, value):
                 updated += 1
 
-        # Direct node tweaks (covers the simple tree where there are no
-        # interface sockets, and complements the interactive tree for size).
+        # Direct node tweaks for the simple tree, which has no sockets at all.
         if not node_group.nodes.get("SciGraphs_NodeSphere"):
             geometry.fix_node_names(obj)
 
@@ -367,7 +363,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
         else:
             mat = obj.data.materials[0]
         
-        # Configure Principled BSDF
         bsdf = mat.node_tree.nodes.get("Principled BSDF")
         if bsdf:
             bsdf.inputs['Metallic'].default_value = 0.0
@@ -392,7 +387,6 @@ class SCIGRAPHS_OT_ApplyRenderingPreset(bpy.types.Operator):
             
             bsdf.inputs['Roughness'].default_value = 0.0
             
-            # IOR may also have changed names
             if 'IOR' in bsdf.inputs:
                 bsdf.inputs['IOR'].default_value = 1.45
     
@@ -473,7 +467,6 @@ class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        # Remove existing SciGraphs lights
         for obj in bpy.data.objects:
             if obj.name.startswith("SciGraphs_Light"):
                 bpy.data.objects.remove(obj, do_unlink=True)
@@ -492,11 +485,10 @@ class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
     
     @staticmethod
     def _aim_at(light_obj, target=(0.0, 0.0, 0.0)):
-        """Rotate a light so its -Z axis points from its location at ``target``.
+        """Rotate a light so it points at ``target``.
 
-        Blender lights emit along local -Z, so a light created with the default
-        identity rotation always points straight down regardless of where it is
-        placed. This derives the euler that aims it at ``target`` instead.
+        Blender lights emit along local -Z, so a freshly added one shines
+        straight down wherever it sits until its euler is set.
         """
         direction = Vector(target) - light_obj.location
         if direction.length_squared == 0.0:
@@ -506,21 +498,18 @@ class SCIGRAPHS_OT_SetupLighting(bpy.types.Operator):
 
     def _create_three_point_lighting(self, context):
         """Create classic 3-point lighting, all three aimed at the origin."""
-        # Key light
         bpy.ops.object.light_add(type='SUN', location=(5, -5, 8))
         key = context.active_object
         key.name = "SciGraphs_Light_Key"
         key.data.energy = 2.0
         self._aim_at(key)
 
-        # Fill light
         bpy.ops.object.light_add(type='AREA', location=(-5, -3, 5))
         fill = context.active_object
         fill.name = "SciGraphs_Light_Fill"
         fill.data.energy = 0.5
         self._aim_at(fill)
 
-        # Rim light
         bpy.ops.object.light_add(type='SPOT', location=(0, 5, 3))
         rim = context.active_object
         rim.name = "SciGraphs_Light_Rim"

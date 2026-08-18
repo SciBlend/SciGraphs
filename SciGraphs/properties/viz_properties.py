@@ -79,9 +79,7 @@ def _viz_update(self, context):
 class SCIGRAPHS_PG_viz(PropertyGroup):
     """Interactive visualization settings (``scene.scigraphs_viz``)."""
 
-    # ------------------------------------------------------------------
-    # Nodes
-    # ------------------------------------------------------------------
+    # --- Nodes --------------------------------------------------------------
 
     node_scale: FloatProperty(
         name="Node Scale",
@@ -131,9 +129,7 @@ class SCIGRAPHS_PG_viz(PropertyGroup):
         update=_viz_update,
     )
 
-    # ------------------------------------------------------------------
-    # Edges
-    # ------------------------------------------------------------------
+    # --- Edges --------------------------------------------------------------
 
     edge_thickness: FloatProperty(
         name="Edge Thickness",
@@ -169,9 +165,7 @@ class SCIGRAPHS_PG_viz(PropertyGroup):
         update=_viz_update,
     )
 
-    # ------------------------------------------------------------------
-    # Direction arrows
-    # ------------------------------------------------------------------
+    # --- Direction arrows ---------------------------------------------------
 
     show_arrows: BoolProperty(
         name="Show Direction Arrows",
@@ -198,9 +192,7 @@ class SCIGRAPHS_PG_viz(PropertyGroup):
         update=_viz_update,
     )
 
-    # ------------------------------------------------------------------
-    # Filtering
-    # ------------------------------------------------------------------
+    # --- Filtering ----------------------------------------------------------
 
     enable_filtering: BoolProperty(
         name="Enable Filtering",

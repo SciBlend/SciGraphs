@@ -2,7 +2,9 @@
 
 import bpy
 import numpy as np
-from ....core import importer, geometry, graph, layout as graph_layout
+from scigraphs_core import graph, layout as graph_layout
+from ....core import importer, geometry
+from scigraphs_core.mesh.mesh_utils import layout_edge_pairs
 from ...view_utils import focus_graph_in_top_view
 
 
@@ -30,6 +32,10 @@ class SCIGRAPHS_AutoLayoutOnImport:
             iterations=props.iterations,
             scale=props.layout_scale,
             props=props,
+            # The layout package does not read meshes, and the importers that
+            # store topology in the mesh rather than in the edges_data string
+            # are exactly the ones that land here, so hand the edges down.
+            edge_pairs=layout_edge_pairs(obj),
         )
 
         if not success:
@@ -76,27 +82,23 @@ class SCIGRAPHS_OT_LoadColumns(bpy.types.Operator):
             self.report({'ERROR'}, "Could not read columns from file")
             return {'CANCELLED'}
         
-        # Read a sample to detect column types
+        # Ten rows is enough to guess the column types.
         if not importer.is_graph_file(props.filepath):
             try:
                 df = pd.read_csv(props.filepath, nrows=10, delimiter=props.csv_delimiter)
             except Exception as e:
                 self.report({'ERROR'}, f"Could not read file: {e}")
                 return {'CANCELLED'}
-        
-        # Clear existing column list
+
         props.available_csv_columns.clear()
-        
-        # Populate column list with type information
+
         for col in columns:
             item = props.available_csv_columns.add()
             item.name = col
-            
-            # Determine column type
+
             if col in df.columns:
                 dtype = df[col].dtype
-                
-                # Try to detect if column is actually numeric even if detected as object
+
                 if pd.api.types.is_numeric_dtype(dtype):
                     item.column_type = "numeric"
                     item.import_as_attribute = True
@@ -104,14 +106,13 @@ class SCIGRAPHS_OT_LoadColumns(bpy.types.Operator):
                     item.column_type = "datetime"
                     item.import_as_attribute = True
                 else:
-                    # For object columns, try to convert to numeric
-                    # If most values can be converted, it's probably numeric
+                    # Pandas calls a mixed column "object". Coerce it and count:
+                    # more than half convertible means numeric.
                     try:
                         converted = pd.to_numeric(df[col], errors='coerce')
                         non_null_count = converted.notna().sum()
                         total_count = len(df[col])
-                        
-                        # If at least 50% of values are numeric, treat as numeric
+
                         if total_count > 0 and (non_null_count / total_count) > 0.5:
                             item.column_type = "numeric"
                             item.import_as_attribute = True
@@ -122,7 +123,7 @@ class SCIGRAPHS_OT_LoadColumns(bpy.types.Operator):
                         item.column_type = "text"
                         item.import_as_attribute = False
         
-        # Auto-detect geospatial and temporal data for tabular files only.
+        # Tabular files only; a native graph file has no columns to sniff.
         if not importer.is_graph_file(props.filepath):
             bpy.ops.scigraphs.detect_geospatial()
         
@@ -146,10 +147,8 @@ class SCIGRAPHS_OT_DetectGeospatial(bpy.types.Operator):
             return {'CANCELLED'}
         
         try:
-            # Read a sample of the file for detection
             df = pd.read_csv(props.filepath, nrows=100, delimiter=props.csv_delimiter)
-            
-            # Detect lat/lon columns
+
             lat_col, lon_col = geospatial.detect_geospatial_columns(df)
             if lat_col and lon_col:
                 props.use_geospatial = True
@@ -157,20 +156,18 @@ class SCIGRAPHS_OT_DetectGeospatial(bpy.types.Operator):
                 props.longitude_column = str(df.columns.get_loc(lon_col))
                 self.report({'INFO'}, f"Detected geospatial columns: {lat_col}, {lon_col}")
             
-            # Detect country columns
             elif geospatial.detect_country_columns(df):
                 props.use_geospatial = True
                 props.geocode_columns = True
                 self.report({'INFO'}, "Detected country data - geocoding enabled")
             
-            # Detect temporal columns
             time_col = geospatial.detect_temporal_columns(df)
             if time_col:
                 props.has_temporal_data = True
                 props.time_column = str(df.columns.get_loc(time_col))
                 self.report({'INFO'}, f"Detected temporal column: {time_col}")
             
-            # Try to detect weight column (look for 'value', 'weight', 'count' etc.)
+            # First numeric column whose name looks like a weight wins.
             weight_patterns = ['value', 'weight', 'count', 'amount']
             for col in df.columns:
                 col_lower = col.lower()
@@ -208,15 +205,14 @@ class SCIGRAPHS_OT_CreateGraph(bpy.types.Operator):
             self.report({'ERROR'}, "Invalid column selection")
             return {'CANCELLED'}
         
-        # Handle geospatial mode
         if props.use_geospatial:
             self.report({'INFO'}, "Creating geospatial graph...")
-            
-            # Parse column indices
+
             lat_col = None
             lon_col = None
-            
-            # Only use lat/lon columns if NOT using geocoding
+
+            # Geocoding derives the coordinates, so the lat/lon columns are
+            # only read when it is off.
             if not props.geocode_columns:
                 if props.latitude_column != '0' and props.longitude_column != '0':
                     try:
@@ -239,11 +235,9 @@ class SCIGRAPHS_OT_CreateGraph(bpy.types.Operator):
                 except ValueError:
                     pass
             
-            # Inform user if geocoding will be performed
             if props.geocode_columns:
                 self.report({'INFO'}, "Geocoding country/city names to coordinates... (check console for progress)")
-            
-            # Load geospatial graph data
+
             graph_data = importer.load_geospatial_graph(
                 props.filepath,
                 source_col,
@@ -270,16 +264,13 @@ class SCIGRAPHS_OT_CreateGraph(bpy.types.Operator):
                     self.report({'ERROR'}, "No geographic coordinates found. Check lat/lon columns.")
                 return {'CANCELLED'}
             
-            # Calculate 3D positions from coordinates
             positions_3d = geospatial.calculate_sphere_positions(
                 graph_data.node_coordinates,
                 props.globe_radius
             )
-            
-            # Get selected attributes to import
+
             selected_attrs = [item.name for item in props.available_csv_columns if item.import_as_attribute]
-            
-            # Create geospatial graph
+
             obj = geometry.create_geospatial_graph_object(
                 graph_data,
                 positions_3d,
@@ -313,7 +304,6 @@ class SCIGRAPHS_OT_CreateGraph(bpy.types.Operator):
             self.report({'INFO'}, f"Geospatial graph created: {len(graph_data.nodes)} nodes, {len(graph_data.edges)} edges")
             
         else:
-            # Standard non-geospatial graph
             graph_data = importer.load_graph_from_file(
                 props.filepath,
                 source_col,
@@ -492,8 +482,7 @@ class SCIGRAPHS_OT_SetupVisualization(bpy.types.Operator):
 
         geometry.setup_geometry_nodes_visualization(obj, selection_attr=selection_attr)
 
-        # Switch to the Geometry Nodes engine so the result is visible in the
-        # viewport (and hide the GPU preview which would otherwise overdraw it).
+        # Switch engines, or the GPU preview overdraws the result.
         if hasattr(context.scene, "scigraphs_display_engine"):
             context.scene.scigraphs_display_engine = 'GEOMETRY_NODES'
 
@@ -543,7 +532,6 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
                 self.report({'ERROR'}, "Pick an .osm XML file")
                 return {'CANCELLED'}
 
-        # Resolve POLYGON source from a Blender mesh object.
         polygon = None
         if method == 'POLYGON':
             obj_name = props.osmnx_polygon_object.strip()
@@ -559,8 +547,8 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
             except ImportError:
                 self.report({'ERROR'}, "Shapely is required for POLYGON downloads")
                 return {'CANCELLED'}
-            # Interpret mesh vertices as lon/lat (user responsibility).
-            # Accept any mesh; flatten Z and build a simple polygon from first face.
+            # Vertex X and Y are taken as lon/lat and Z is dropped. Any mesh
+            # will do; the first face wins if there is one.
             mesh = poly_obj.data
             if len(mesh.polygons) > 0:
                 face = mesh.polygons[0]
@@ -613,7 +601,6 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to download network. Check console for details.")
             return {'CANCELLED'}
         
-        # Create the graph object in Blender
         obj = geometry.create_osmnx_graph_object(
             graph_data,
             edge_geometries,
@@ -625,26 +612,25 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to create graph object")
             return {'CANCELLED'}
         
-        # Store the OSMnx graph in cache for analysis operators
+        # The analysis operators pull the graph back out of this cache.
         if hasattr(graph_data, 'osmnx_graph') and graph_data.osmnx_graph is not None:
             import uuid
             if not hasattr(importer, '_osmnx_graph_cache'):
                 importer._osmnx_graph_cache = {}
-            
-            # Generate unique ID for this graph
+
             graph_id = str(uuid.uuid4())
             obj["osmnx_graph_id"] = graph_id
-            
-            # Store the original graph
+
             importer._osmnx_graph_cache[graph_id] = graph_data.osmnx_graph
-            
-            # Also store as unprojected version (original is always unprojected)
-            # This ensures spatial queries work even if user projects the graph
+
+            # A freshly downloaded graph is always unprojected, so keep a copy
+            # under that key. Spatial queries still work if the user later
+            # projects the main one.
             importer._osmnx_graph_cache[graph_id + "_unprojected"] = graph_data.osmnx_graph.copy()
-            
+
             obj["osmnx_scale"] = props.osmnx_scale
-            
-            # Store metadata for cache filename generation and reload
+
+            # Cache filenames and reloading are built from these.
             obj["osmnx_method"] = method
             obj["osmnx_network_type"] = props.osmnx_network_type
             
@@ -665,7 +651,6 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
                 import os as _os
                 obj["osmnx_query_name"] = f"xml_{_os.path.splitext(_os.path.basename(xml_fp))[0]}"
             
-            # Automatically save to cache
             from ....core.osmnx import cache
             success, filepath, message = cache.save_graph_to_cache(obj, graph_data.osmnx_graph)
             if success:
@@ -673,11 +658,10 @@ class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
                 filename = os.path.basename(filepath) if filepath else ""
                 self.report({'INFO'}, f"Graph cached as: {filename}")
             else:
-                # Log warning but don't interrupt workflow
-                from ....utils.logger import log
+                # A failed cache write is not worth interrupting the import.
+                from scigraphs_core.logger import log
                 log(f"Warning: Failed to auto-save graph to cache: {message}")
-        
-        # Calculate stats
+
         num_nodes = len(graph_data.nodes)
         num_edges = len(graph_data.edges)
         total_length = sum(getattr(graph_data, 'edge_lengths', [0])) / 1000  # Convert to km

@@ -1,9 +1,4 @@
-"""
-Proximity Graphs UI panel for City2Graph.
-
-Provides interface for generating single-layer and multi-layer proximity graphs
-from OSM feature objects.
-"""
+"""Panels for building single- and multi-layer proximity graphs from OSM features."""
 
 import bpy
 
@@ -373,7 +368,7 @@ class SCIGRAPHS_PT_c2g_proximity_viz(bpy.types.Panel):
         info_box.scale_y = 0.7
         info_box.label(text="Generated graphs are native SciGraphs meshes.")
         info_box.label(text="1. Setup Visualization to instance nodes/edges.")
-        info_box.label(text="2. Open Coloring to colour by attribute.")
+        info_box.label(text="2. Open Coloring to color by attribute.")
         
         col = box.column(align=True)
         col.scale_y = 1.2

@@ -38,7 +38,6 @@ class SCIGRAPHS_PT_analysis_centrality(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Centrality analysis
         box = layout.box()
         box.label(text="Node Importance Metrics", icon='DRIVER')
         col = box.column(align=True)
@@ -49,7 +48,6 @@ class SCIGRAPHS_PT_analysis_centrality(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.calculate_centrality", text="Calculate", icon='PLAY')
         
-        # Node clustering coefficient
         layout.separator()
         box = layout.box()
         box.label(text="Local Clustering", icon='MESH_UVSPHERE')
@@ -74,12 +72,10 @@ class SCIGRAPHS_PT_analysis_community(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Algorithm selection
         box = layout.box()
         box.label(text="Clustering Algorithm", icon='GROUP')
         box.prop(props, "clustering_algorithm", text="")
         
-        # Algorithm info
         layout.separator()
         box = layout.box()
         box.label(text="Algorithm Info", icon='INFO')
@@ -100,7 +96,7 @@ class SCIGRAPHS_PT_analysis_community(bpy.types.Panel):
             info.label(text="Resolution-free Potts model")
             info.label(text="Ronhovde & Nussinov, Phys. Rev. E 81 (2010)")
         elif algo == 'rnsc':
-            info.label(text="Restricted Neighbourhood Search")
+            info.label(text="Restricted Neighborhood Search")
             info.label(text="King et al., Bioinformatics 20 (2004)")
         elif algo == 'scluster':
             info.label(text="Hierarchical clustering (Jerarca)")
@@ -112,7 +108,6 @@ class SCIGRAPHS_PT_analysis_community(bpy.types.Panel):
         info.separator()
         info.label(text="Surprise metric computed automatically")
         
-        # Apply button
         layout.separator()
         row = layout.row()
         row.scale_y = 1.5
@@ -135,7 +130,6 @@ class SCIGRAPHS_PT_analysis_directed(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         
-        # Graph type indicator
         box = layout.box()
         box.label(text="Directed Graph Mode Active", icon='FORWARD')
 
@@ -155,7 +149,6 @@ class SCIGRAPHS_PT_analysis_directed_centrality(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Directed centrality metrics
         box = layout.box()
         box.label(text="Directed Importance", icon='DRIVER')
         col = box.column(align=True)
@@ -166,7 +159,6 @@ class SCIGRAPHS_PT_analysis_directed_centrality(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.calculate_directed_centrality", text="Calculate", icon='PLAY')
         
-        # Info about metrics
         info = box.box()
         info.scale_y = 0.7
         metric = props.directed_centrality_method
@@ -194,14 +186,12 @@ class SCIGRAPHS_PT_analysis_directed_structure(bpy.types.Panel):
         layout = self.layout
         obj = context.active_object
         
-        # Pattern detection
         box = layout.box()
         box.label(text="Pattern Detection", icon='MESH_DATA')
         row = box.row()
         row.scale_y = 1.3
         row.operator("scigraphs.detect_patterns", text="Detect Patterns", icon='VIEWZOOM')
         
-        # Show detected patterns if available
         if "pattern_is_dag" in obj:
             info = box.box()
             col = info.column(align=True)
@@ -218,7 +208,6 @@ class SCIGRAPHS_PT_analysis_directed_structure(bpy.types.Panel):
             num_sccs = obj.get("pattern_num_strongly_connected_components", 0)
             col.label(text=f"SCCs: {num_sccs}")
         
-        # Strong connected components
         layout.separator()
         box = layout.box()
         box.label(text="Strongly Connected Components", icon='FILE_REFRESH')
@@ -226,7 +215,6 @@ class SCIGRAPHS_PT_analysis_directed_structure(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.find_sccs", text="Find SCCs", icon='STICKY_UVS_LOC')
         
-        # Show SCC info if available
         if "num_sccs" in obj:
             info = box.box()
             col = info.column(align=True)
@@ -248,14 +236,12 @@ class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
         props = context.scene.scigraphs
         obj = context.active_object
         
-        # Flow analysis
         box = layout.box()
         box.label(text="Node Roles", icon='MOD_FLUIDSIM')
         row = box.row()
         row.scale_y = 1.3
         row.operator("scigraphs.analyze_flow", text="Analyze Flow", icon='ANIM')
         
-        # Show flow info if available
         if "flow_sources" in obj:
             info = box.box()
             col = info.column(align=True)
@@ -264,7 +250,6 @@ class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
             col.label(text=f"Sinks: {obj.get('flow_sinks', 0)}", icon='TRACKING_BACKWARDS_SINGLE')
             col.label(text=f"Intermediaries: {obj.get('flow_intermediaries', 0)}", icon='ARROW_LEFTRIGHT')
         
-        # Flow animation
         layout.separator()
         box = layout.box()
         box.label(text="Flow Animation", icon='ANIM')
@@ -273,10 +258,8 @@ class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
         info_box.scale_y = 0.7
         info_box.label(text="Animate information flow through the network", icon='INFO')
         
-        # Mode selection
         box.prop(props, "flow_animation_mode", text="Mode")
         
-        # Mode description
         mode_info = box.box()
         mode_info.scale_y = 0.7
         if props.flow_animation_mode == 'DISCRETE':
@@ -284,7 +267,6 @@ class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
         else:
             mode_info.label(text="Smooth: gradient wave propagation")
         
-        # Parameters
         col = box.column(align=True)
         col.prop(props, "flow_animation_speed")
         
@@ -293,7 +275,6 @@ class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
         
         col.prop(props, "flow_animation_loop")
         
-        # Loop explanation
         if props.flow_animation_loop:
             loop_info = box.box()
             loop_info.scale_y = 0.6
@@ -306,7 +287,6 @@ class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
         row.scale_y = 1.4
         row.operator("scigraphs.animate_flow", text="Create Flow Animation", icon='PLAY')
         
-        # Show animation info if created
         if "flow_max_distance" in obj:
             info = box.box()
             col = info.column(align=True)
@@ -339,14 +319,12 @@ class SCIGRAPHS_PT_analysis_statistical(bpy.types.Panel):
         layout = self.layout
         obj = context.active_object
         
-        # Calculate button
         box = layout.box()
         box.label(text="Global Graph Metrics", icon='GRAPH')
         row = box.row()
         row.scale_y = 1.3
         row.operator("scigraphs.calculate_global_statistics", text="Calculate Statistics", icon='PLAY')
         
-        # Show results if available
         if obj and "stat_density" in obj:
             layout.separator()
             box = layout.box()

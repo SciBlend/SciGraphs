@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-from ..algorithms import graph
-from ...utils.logger import log
+from scigraphs_core.algorithms import graph
+from scigraphs_core.logger import log
 
 
 GRAPH_FILE_EXTENSIONS = {'.gexf'}
@@ -103,10 +103,9 @@ def load_native_graph_file(filepath):
 
 
 def load_graph_from_file(filepath, source_col, target_col, delimiter=','):
-    """
-    Reads a CSV/text file or native graph file and extracts graph data.
-    Optimized for large files using numpy.
-    Returns a custom graph data object.
+    """Load a CSV or native graph file into GraphData.
+
+    source_col and target_col are column indices, not names.
     """
     if not filepath:
         return None
@@ -119,8 +118,6 @@ def load_graph_from_file(filepath, source_col, target_col, delimiter=','):
     start_time = time.time()
     
     try:
-        # Read CSV with pandas (still needed for dataframe operations)
-        # But use more efficient dtype inference
         df = pd.read_csv(filepath, low_memory=False, delimiter=delimiter)
         log(f"  CSV read in {time.time() - start_time:.2f}s")
         
@@ -128,7 +125,6 @@ def load_graph_from_file(filepath, source_col, target_col, delimiter=','):
         log(f"Error reading file: {e}")
         return None
     
-    # Get the actual column names from their indices
     try:
         source_col_name = df.columns[source_col]
         target_col_name = df.columns[target_col]
@@ -136,27 +132,23 @@ def load_graph_from_file(filepath, source_col, target_col, delimiter=','):
         log(f"Error: Column index out of range. CSV has {len(df.columns)} columns.")
         return None
     
-    # Extract edges as numpy arrays (much faster)
     edges_start = time.time()
     source_values = df[source_col_name].values
     target_values = df[target_col_name].values
     edges = list(zip(source_values, target_values))
     log(f"  Edges extracted in {time.time() - edges_start:.2f}s")
     
-    # Get unique nodes using numpy (faster than pandas)
     nodes_start = time.time()
     all_nodes = np.concatenate([source_values, target_values])
-    
-    # Convert to pandas Series to handle NaN and mixed types gracefully
+
     try:
         nodes = np.unique(all_nodes)
     except TypeError:
-        # Handle mixed types (NaN + strings) by using pandas
+        # np.unique cannot sort NaN mixed with strings; pandas drops the NaN.
         nodes = pd.Series(all_nodes).dropna().unique()
     
     log(f"  Nodes extracted in {time.time() - nodes_start:.2f}s")
     
-    # Store in our custom graph structure
     graph_data = graph.GraphData(nodes, edges, df)
     
     print(f"Total load time: {time.time() - start_time:.2f}s")
@@ -165,10 +157,7 @@ def load_graph_from_file(filepath, source_col, target_col, delimiter=','):
     return graph_data
 
 def get_columns_from_file(filepath, delimiter=','):
-    """
-    Returns list of column names from CSV/text/native graph file.
-    Optimized to read only the header.
-    """
+    """List the column names of a CSV or native graph file."""
     if not filepath:
         return []
 
@@ -179,7 +168,6 @@ def get_columns_from_file(filepath, delimiter=','):
         return list(graph_data.dataframe.columns)
     
     try:
-        # Use pandas but read only the header (much faster)
         df = pd.read_csv(filepath, nrows=0, delimiter=delimiter)
         return list(df.columns)
     except Exception as e:
@@ -200,24 +188,12 @@ def load_geospatial_graph(
     weight_col=None,
     delimiter=','
 ):
-    """
-    Load graph with geospatial and temporal awareness.
-    
-    Args:
-        filepath: Path to CSV file
-        source_col: Index of source column
-        target_col: Index of target column
-        lat_col: Index of latitude column (optional)
-        lon_col: Index of longitude column (optional)
-        geocode_mode: If True, geocode source/target as country names
-        time_col: Index of time column (optional)
-        time_agg: Time aggregation mode ('ALL', 'YEAR', 'MONTH', 'RANGE')
-        time_start: Start period for RANGE mode
-        time_end: End period for RANGE mode
-        weight_col: Index of weight column (optional)
-    
-    Returns:
-        GraphData object with node_coordinates attribute
+    """Load a CSV into GraphData carrying node coordinates and edge weights.
+
+    All the *_col arguments are column indices. Coordinates come from lat_col
+    and lon_col when both are given, otherwise from geocoding the node names
+    when geocode_mode is set. Temporal filtering runs before edges are read, so
+    time_agg ('ALL', 'YEAR', 'MONTH', 'RANGE') changes which nodes exist at all.
     """
     from ..geo import geospatial
     
@@ -235,7 +211,7 @@ def load_geospatial_graph(
         log(f"Error reading file: {e}")
         return None
     
-    # Get column names BEFORE any filtering
+    # Resolve indices to names before filtering drops or reorders columns.
     try:
         source_col_name = df.columns[source_col]
         target_col_name = df.columns[target_col]
@@ -244,7 +220,6 @@ def load_geospatial_graph(
         log(f"Error: Column index out of range. CSV has {len(df.columns)} columns.")
         return None
     
-    # Handle temporal filtering/aggregation
     if time_col is not None:
         time_col_name = df.columns[time_col]
         
@@ -259,32 +234,29 @@ def load_geospatial_graph(
         )
         log(f"  After temporal filtering: {len(df):,} rows")
     
-    # Extract edges
     edges_start = time.time()
     source_values = df[source_col_name].values
     target_values = df[target_col_name].values
     edges = list(zip(source_values, target_values))
     log(f"  Edges extracted in {time.time() - edges_start:.2f}s")
     
-    # Get unique nodes
     nodes_start = time.time()
     all_nodes = np.concatenate([source_values, target_values])
     nodes = np.unique(all_nodes)
     log(f"  Nodes extracted in {time.time() - nodes_start:.2f}s")
     
-    # Handle geospatial coordinates
     node_coordinates = {}
-    
+
     if lat_col is not None and lon_col is not None:
-        # Use explicit lat/lon columns
         log("  Using explicit lat/lon columns...")
         try:
             lat_col_name = df.columns[lat_col]
             lon_col_name = df.columns[lon_col]
-            
-            # Create mapping from node name to coordinates
+
             for node in nodes:
-                # Find first row with this node as source or target
+                # First row mentioning the node wins, whether as source or
+                # target, so a node with conflicting coordinates gets one of
+                # them arbitrarily.
                 mask = (df[source_col_name] == node) | (df[target_col_name] == node)
                 if mask.any():
                     row = df[mask].iloc[0]
@@ -295,30 +267,26 @@ def load_geospatial_graph(
                         node_coordinates[str(node)] = (float(lat), float(lon))
         except IndexError:
             log(f"Error: Lat/lon column index out of range. CSV has {len(df.columns)} columns.")
-            # Continue without coordinates instead of failing
-    
+            # Better a graph without coordinates than no graph.
+
     elif geocode_mode:
-        # Geocode node names as locations
         log("  Geocoding node names as countries...")
         geocode_start = time.time()
         node_coordinates = geospatial.geocode_locations(list(nodes))
         log(f"  Geocoding completed in {time.time() - geocode_start:.2f}s")
     
-    # Store edge weights if provided
     edge_weights = None
     if weight_col_name is not None:
-        # weight_col_name was set before any filtering, check if it exists in filtered df
+        # Temporal aggregation can drop the weight column it summed over.
         if weight_col_name in df.columns:
             edge_weights = pd.to_numeric(df[weight_col_name], errors='coerce').fillna(0).values
         else:
             log(f"  Warning: Weight column '{weight_col_name}' not found in filtered data")
     
-    # Create graph data object
     graph_data = graph.GraphData(nodes, edges, df)
     graph_data.node_coordinates = node_coordinates
     graph_data.edge_weights = edge_weights
     
-    # Store column names for source and target
     graph_data.source_column_name = source_col_name
     graph_data.target_column_name = target_col_name
     
@@ -333,9 +301,9 @@ def load_geospatial_graph(
 # OSMnx IMPORT FUNCTIONS
 # ============================================================================
 
-# Preset custom_filter strings for specialised OSM infrastructure.
-# Each preset is a Overpass-compatible "[key~'value']" filter used by OSMnx.
-# Keep this list in sync with UI enum `osmnx_custom_filter_preset` in scene properties.
+# Overpass "[key~'value']" filters for infrastructure OSMnx has no network_type
+# for. The keys must stay in sync with the osmnx_custom_filter_preset enum in
+# scene properties.
 OSMNX_CUSTOM_FILTER_PRESETS = {
     'NONE': None,
     'RAIL': '["railway"~"rail|subway|tram|light_rail|monorail|narrow_gauge"]',
@@ -372,38 +340,22 @@ def load_osmnx_graph(
     custom_filter=None,
     which_result=None,
 ):
-    """
-    Download street network from OpenStreetMap using OSMnx.
+    """Download an OSM street network. Returns (GraphData, edge_geometries).
 
-    Args:
-        method: Download method. One of:
-            'PLACE'       -> ox.graph_from_place(place_name)
-            'POINT'       -> ox.graph_from_point((lat, lon), dist=distance)
-            'ADDRESS'     -> ox.graph_from_address(address, dist=distance)
-            'BBOX'        -> ox.graph_from_bbox(bbox=(north, south, east, west))
-            'POLYGON'     -> ox.graph_from_polygon(polygon)  (shapely Polygon)
-            'XML'         -> ox.graph_from_xml(xml_filepath)  (local .osm file)
-            'MULTI_PLACE' -> ox.graph_from_place(place_list)  (list of places)
-        place_name: Name of the place for PLACE method.
-        latitude, longitude: Center coordinates for POINT method.
-        distance: Radius in meters for POINT/ADDRESS methods.
-        address: Postal address for ADDRESS method.
-        bbox_north/south/east/west: Bounding box coords for BBOX method.
-        polygon: A shapely Polygon (or MultiPolygon) for POLYGON method.
-        xml_filepath: Path to a local .osm XML file for XML method.
-        place_list: List of place-name strings for MULTI_PLACE method.
-        network_type: Type of network ('drive', 'walk', 'bike', 'all', ...).
-        simplify: Remove intermediate nodes that are not intersections.
-        retain_geometry: Keep curved street geometry in Blender edges.
-        truncate_by_edge: Retain edges that cross the boundary.
-        retain_all: Keep disconnected components (islands).
-        custom_filter: Overpass custom_filter string (e.g. '["railway"~"rail"]')
-            or a key of ``OSMNX_CUSTOM_FILTER_PRESETS``. When set, overrides
-            ``network_type`` for infrastructure-specific downloads.
-        which_result: For geocoder disambiguation in PLACE (1-indexed).
+    method picks both the OSMnx call and which arguments matter:
 
-    Returns:
-        Tuple of (GraphData, edge_geometries).  Returns (None, None) on error.
+        'PLACE'        ox.graph_from_place(place_name)
+        'MULTI_PLACE'  ox.graph_from_place(place_list)
+        'POINT'        ox.graph_from_point((latitude, longitude), distance)
+        'ADDRESS'      ox.graph_from_address(address, distance)
+        'BBOX'         ox.graph_from_bbox(bbox_north/south/east/west)
+        'POLYGON'      ox.graph_from_polygon(polygon), a shapely geometry
+        'XML'          ox.graph_from_xml(xml_filepath), a local .osm file
+
+    distance is a radius in meters. custom_filter takes an Overpass string or
+    a key of OSMNX_CUSTOM_FILTER_PRESETS and, when set, replaces network_type.
+    which_result is 1-indexed and disambiguates PLACE geocoding. Errors give
+    (None, None).
     """
     import time
     start_time = time.time()
@@ -414,7 +366,6 @@ def load_osmnx_graph(
         log("Error: OSMnx is not installed. Please install it with 'pip install osmnx'")
         return None, None
 
-    # Resolve custom_filter preset keyword → actual filter string.
     if isinstance(custom_filter, str) and custom_filter in OSMNX_CUSTOM_FILTER_PRESETS:
         custom_filter = OSMNX_CUSTOM_FILTER_PRESETS[custom_filter]
     if custom_filter == '' or custom_filter == 'NONE':
@@ -426,7 +377,6 @@ def load_osmnx_graph(
     if retain_all:
         log("  retain_all: True (disconnected components kept)")
 
-    # Shared kwargs passed to every graph_from_* constructor.
     kwargs = dict(
         simplify=simplify,
         truncate_by_edge=truncate_by_edge,
@@ -477,7 +427,7 @@ def load_osmnx_graph(
         G = _osmnx_graph_from_polygon(ox, polygon, **kwargs)
 
     elif method == 'XML':
-        # XML graphs are loaded from file; they do not accept network_type / retain_all.
+        # The XML loader takes none of the shared kwargs.
         log(f"  XML file: {xml_filepath}")
         G = _osmnx_graph_from_xml(ox, xml_filepath, simplify=simplify)
 
@@ -540,14 +490,11 @@ def _osmnx_graph_from_address(ox, address, distance, **kwargs):
 
 
 def _osmnx_graph_from_bbox(ox, north, south, east, west, **kwargs):
-    """Download graph within a bounding box.
+    """Download a graph inside a bounding box, ordering the tuple per version.
 
-    OSMnx 2.x switched from the historic ``(north, south, east, west)``
-    tuple to ``(left, bottom, right, top) = (west, south, east, north)``
-    for all spatial helpers. We detect the major version and reorder
-    accordingly; otherwise the polygon Built from the tuple becomes
-    degenerate (spans a hemisphere) and Overpass subdivides into
-    thousands of sub-queries.
+    OSMnx 1.x wants (north, south, east, west); 2.x wants (west, south, east,
+    north). Get it wrong and the polygon spans a hemisphere, so Overpass splits
+    the request into thousands of sub-queries instead of failing outright.
     """
     try:
         version = getattr(ox, "__version__", "1.0")
@@ -577,11 +524,10 @@ def _osmnx_graph_from_polygon(ox, polygon, **kwargs):
 
 
 def _osmnx_graph_from_xml(ox, xml_filepath, simplify=True):
-    """Load graph from a local OSM XML file.
+    """Load a graph from a local OSM XML file.
 
-    ``graph_from_xml`` only accepts ``simplify``; ``network_type``,
-    ``truncate_by_edge``, ``retain_all`` and ``custom_filter`` are not
-    applicable to the XML loader.
+    graph_from_xml accepts only simplify: network_type, truncate_by_edge,
+    retain_all and custom_filter mean nothing to a file already downloaded.
     """
     try:
         import os
@@ -596,23 +542,16 @@ def _osmnx_graph_from_xml(ox, xml_filepath, simplify=True):
 
 
 def osmnx_to_graph_data(G, retain_geometry=True):
-    """
-    Convert an OSMnx MultiDiGraph to our internal GraphData format.
-    
-    Args:
-        G: OSMnx MultiDiGraph
-        retain_geometry: Whether to extract curved street geometries
-    
-    Returns:
-        Tuple of (GraphData, edge_geometries)
+    """Convert an OSMnx MultiDiGraph to GraphData plus per-edge geometries.
+
+    Coordinates come out as (lat, lon) throughout, including the geometries,
+    which OSMnx itself stores the other way round.
     """
     import osmnx as ox
     
-    # Get nodes with their coordinates
     nodes_gdf = ox.graph_to_gdfs(G, nodes=True, edges=False)
     edges_gdf = ox.graph_to_gdfs(G, nodes=False, edges=True)
     
-    # Extract node information
     nodes = list(nodes_gdf.index)
     node_coordinates = {}
     
@@ -623,39 +562,32 @@ def osmnx_to_graph_data(G, retain_geometry=True):
             lon = row['x']
             node_coordinates[node_id] = (lat, lon)
     
-    # Extract edges and their geometries
     edges = []
     edge_geometries = {}
     edge_lengths = []
     
     for idx, row in edges_gdf.iterrows():
-        u, v, key = idx  # MultiDiGraph index is (u, v, key)
+        u, v, key = idx  # A MultiDiGraph edge index is (u, v, key).
         edges.append((u, v))
         
-        # Get edge length
         length = row.get('length', 0)
         edge_lengths.append(length)
         
-        # Extract geometry if available and requested
         if retain_geometry and 'geometry' in row and row['geometry'] is not None:
             geom = row['geometry']
-            # Convert LineString to list of (lat, lon) tuples
             if hasattr(geom, 'coords'):
-                # Note: OSMnx uses (lon, lat) order in geometries
+                # OSMnx geometries are (lon, lat); flip to (lat, lon).
                 coords = [(y, x) for x, y in geom.coords]
                 edge_geometries[(u, v)] = coords
     
-    # Create GraphData object
     graph_data = graph.GraphData(nodes, edges, None)
     graph_data.node_coordinates = node_coordinates
     graph_data.edge_lengths = edge_lengths
     graph_data.is_osmnx = True
-    # OSMnx returns MultiDiGraph by default; propagate the actual directedness
-    # so downstream code in pathfinding / export_utils builds DiGraphs / writes
-    # 'edgedefault="directed"' GraphML correctly.
+    # Pathfinding builds its DiGraph from this flag, and export_utils uses it to
+    # write edgedefault="directed" in GraphML.
     graph_data.is_directed = bool(getattr(G, "is_directed", lambda: True)())
 
-    # Store original graph reference for additional analysis
     graph_data.osmnx_graph = G
 
     return graph_data, edge_geometries

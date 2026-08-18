@@ -7,9 +7,7 @@ from bpy.props import (
 )
 
 LAYOUT_PROPERTIES = {
-    # ========================================
-    # ALGORITHM-SPECIFIC PARAMETERS
-    # ========================================
+    # --- ALGORITHM-SPECIFIC PARAMETERS --------------------------------------
 
     # --- ForceAtlas2 Parameters ---
     'fa2_scaling_ratio': FloatProperty(

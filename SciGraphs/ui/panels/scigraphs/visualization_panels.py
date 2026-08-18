@@ -53,7 +53,6 @@ class SCIGRAPHS_PT_visualization_appearance(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Node appearance
         box = layout.box()
         box.label(text="Nodes", icon='MESH_CIRCLE')
         col = box.column(align=True)
@@ -62,7 +61,6 @@ class SCIGRAPHS_PT_visualization_appearance(bpy.types.Panel):
         col.prop(props, "node_shape", text="Shape")
         col.prop(props, "node_scale_multiplier", text="Attr Mult")
         
-        # Edge appearance
         box = layout.box()
         box.label(text="Edges", icon='CURVE_PATH')
         col = box.column(align=True)
@@ -78,7 +76,6 @@ class SCIGRAPHS_PT_visualization_appearance(bpy.types.Panel):
             col.prop(props, "arrow_size", text="Size")
             col.prop(props, "arrow_position", text="Position", slider=True)
         
-        # Apply button
         layout.separator()
         row = layout.row()
         row.scale_y = 1.5
@@ -135,7 +132,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Style Selection
         box = layout.box()
         box.label(text="Style", icon='CURVE_DATA')
         
@@ -144,13 +140,11 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
         col.separator()
         col.prop(props, "edge_style_type", text="Type")
         
-        # Show current style indicator
         if obj and "edge_style_applied" in obj:
             row = box.row()
             row.alert = False
             row.label(text=f"Current: {obj['edge_style_applied']}", icon='CHECKMARK')
         
-        # Curve Settings (show for curved types)
         if props.edge_style_type in ('CURVED', 'QUADRATIC', 'ARC', 'TAPERED'):
             layout.separator()
             box = layout.box()
@@ -161,7 +155,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             col.prop(props, "edge_segments", text="Segments")
             col.prop(props, "edge_curve_direction", text="Direction")
         
-        # Orthogonal Settings
         if props.edge_style_type == 'ORTHOGONAL':
             layout.separator()
             box = layout.box()
@@ -182,7 +175,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             box.label(text="Available in GPU Preview only", icon='INFO')
             box.label(text="Enable GPU Edge Styles to use this shape")
 
-        # Bundling Settings
         if props.edge_style_type == 'BUNDLED':
             layout.separator()
             box = layout.box()
@@ -194,7 +186,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             col.prop(props, "edge_bundle_compatibility_threshold", text="Compatibility", slider=True)
             col.prop(props, "edge_segments", text="Segments")
         
-        # Tapered Settings
         if props.edge_style_type == 'TAPERED':
             layout.separator()
             box = layout.box()
@@ -204,7 +195,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             col.prop(props, "edge_taper_start", text="Start Thickness")
             col.prop(props, "edge_taper_end", text="End Thickness")
         
-        # Multi-Edge Settings
         layout.separator()
         box = layout.box()
         box.label(text="Multi-Edge Handling", icon='MOD_ARRAY')
@@ -218,7 +208,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
         col.separator()
         col.prop(props, "edge_self_loop_radius", text="Self-Loop Radius")
         
-        # OSMnx Option
         if obj and obj.get("is_osmnx", False):
             layout.separator()
             box = layout.box()
@@ -226,7 +215,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             col = box.column()
             col.prop(props, "edge_style_preserve_osmnx", text="Preserve Street Geometry")
         
-        # Preset Buttons
         layout.separator()
         box = layout.box()
         box.label(text="Quick Presets", icon='PRESET')
@@ -247,7 +235,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
         op = row.operator("scigraphs.apply_edge_style_preset", text="Minimal")
         op.preset = 'MINIMAL'
         
-        # Action Buttons
         layout.separator()
         row = layout.row(align=True)
         row.scale_y = 1.5
@@ -255,7 +242,6 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
         row.operator("scigraphs.preview_edge_style", text="", icon='HIDE_OFF')
         row.operator("scigraphs.reset_edge_style", text="", icon='LOOP_BACK')
         
-        # Info
         if obj and "num_curve_verts" in obj:
             info_box = layout.box()
             info_box.scale_y = 0.7
@@ -282,24 +268,20 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Status indicator
         if props.text_overlay_enabled:
             row = layout.row()
             row.alert = False
             row.label(text="Overlay active in compositor", icon='CHECKMARK')
         
-        # Text Source Section
         box = layout.box()
         box.label(text="Text Source", icon='TEXT')
         
         col = box.column(align=True)
         col.prop(props, "text_source", text="Source")
         
-        # Show attribute selector if using attribute as source
         if props.text_source == 'ATTRIBUTE':
             col.prop(props, "text_attribute", text="Attribute")
             
-            # Number Format subsection
             col.separator()
             col.label(text="Number Format:")
             col.prop(props, "text_format_type", text="Type")
@@ -313,7 +295,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
             row.prop(props, "text_format_prefix", text="Prefix")
             row.prop(props, "text_format_suffix", text="Suffix")
         
-        # Size Settings Section
         layout.separator()
         box = layout.box()
         box.label(text="Size Settings", icon='FIXED_SIZE')
@@ -327,7 +308,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
         if props.text_size_mode in ('PROPORTIONAL', 'ADAPTIVE'):
             col.prop(props, "text_size_scale", text="Scale Factor")
         
-        # Distance Settings
         layout.separator()
         box = layout.box()
         box.label(text="Visibility", icon='HIDE_OFF')
@@ -337,7 +317,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
         col.prop(props, "text_depth_occlusion", text="Depth Occlusion")
         col.prop(props, "text_declutter", text="Declutter")
         
-        # Attribute Filter Section
         layout.separator()
         box = layout.box()
         header_row = box.row()
@@ -350,7 +329,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
             col.prop(props, "text_filter_operator", text="Operator")
             col.prop(props, "text_filter_value", text="Value")
         
-        # Font Section
         layout.separator()
         box = layout.box()
         box.label(text="Font", icon='OUTLINER_DATA_FONT')
@@ -363,7 +341,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
         else:
             col.prop(props, "text_font_custom", text="")
         
-        # Appearance Section
         layout.separator()
         box = layout.box()
         box.label(text="Appearance", icon='COLOR')
@@ -378,7 +355,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
             col.prop(props, "text_background_color", text="Background")
             col.prop(props, "text_background_alpha", text="Opacity", slider=True)
         
-        # Auto-Update Section
         layout.separator()
         box = layout.box()
         header_row = box.row()
@@ -389,13 +365,11 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
             col = box.column(align=True)
             col.prop(props, "text_auto_update_interval", text="Interval (s)")
             
-            # Start/Stop button for auto-update modal
             if context.window_manager.get("scigraphs_auto_update_running", False):
                 col.operator("scigraphs.stop_auto_update", text="Stop Auto Update", icon='PAUSE')
             else:
                 col.operator("scigraphs.start_auto_update", text="Start Auto Update", icon='PLAY')
         
-        # Action Buttons
         layout.separator()
         row = layout.row(align=True)
         row.scale_y = 1.5
@@ -406,7 +380,6 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
         else:
             row.operator("scigraphs.generate_text_overlay", text="Generate Text Overlay", icon='OUTLINER_DATA_FONT')
         
-        # Info box
         info_box = layout.box()
         info_box.scale_y = 0.7
         info_box.label(text="Uses scene camera and render resolution")

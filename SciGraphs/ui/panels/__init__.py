@@ -1,4 +1,3 @@
-# Panel modules for SciGraphs addon
 
 import bpy
 

@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import StringProperty, FloatProperty, BoolProperty, EnumProperty
-from ....core import osmnx_analysis
+from scigraphs_core import osmnx_analysis
 from .utils import (
     _get_osmnx_graph,
     _get_unprojected_graph,
@@ -459,7 +459,7 @@ class SCIGRAPHS_OT_ConvertToUndirected(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import convert
+        from scigraphs_core.osmnx import convert
         
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -498,7 +498,7 @@ class SCIGRAPHS_OT_ConvertToDiGraph(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import convert
+        from scigraphs_core.osmnx import convert
         
         obj = context.active_object
         props = context.scene.scigraphs
@@ -520,8 +520,7 @@ class SCIGRAPHS_OT_ConvertToDiGraph(bpy.types.Operator):
             graph_id = obj.get("osmnx_graph_id", obj.name)
             importer._osmnx_graph_cache[graph_id] = G_simple
 
-        # Keep the Blender-side flag aligned with the actual graph type
-        # (mirror of SCIGRAPHS_OT_ConvertToUndirected setting it to False).
+        # Keep the Blender-side flag in step with the real graph type.
         obj["is_directed"] = True
 
         self.report({'INFO'}, f"Converted to DiGraph (by {weight})")
@@ -542,7 +541,7 @@ class SCIGRAPHS_OT_SimplifyGraph(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import simplification
+        from scigraphs_core.osmnx import simplification
         import osmnx as ox
         
         obj = context.active_object
@@ -609,7 +608,7 @@ class SCIGRAPHS_OT_ConsolidateIntersections(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        from ....core.osmnx import simplification
+        from scigraphs_core.osmnx import simplification
         
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -683,7 +682,7 @@ class SCIGRAPHS_OT_TruncateBBox(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import truncate
+        from scigraphs_core.osmnx import truncate
         
         obj = context.active_object
         props = context.scene.scigraphs
@@ -734,7 +733,7 @@ class SCIGRAPHS_OT_LargestComponent(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import truncate
+        from scigraphs_core.osmnx import truncate
         
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -776,7 +775,7 @@ class SCIGRAPHS_OT_GeocodeAddress(bpy.types.Operator):
     )
     
     def execute(self, context):
-        from ....core.osmnx import geocoder
+        from scigraphs_core.osmnx import geocoder
         
         if not self.address.strip():
             self.report({'ERROR'}, "Please enter an address")
@@ -814,7 +813,7 @@ class SCIGRAPHS_OT_OrientationEntropy(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import bearing
+        from scigraphs_core.osmnx import bearing
         
         obj = context.active_object
         G = _get_unprojected_graph(obj)
@@ -848,7 +847,7 @@ class SCIGRAPHS_OT_CalculateCircuity(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import convert, stats
+        from scigraphs_core.osmnx import convert, stats
         
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -882,7 +881,7 @@ class SCIGRAPHS_OT_CalculateBearingPoints(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        from ....core.osmnx import bearing
+        from scigraphs_core.osmnx import bearing
         
         props = context.scene.scigraphs
         
@@ -916,7 +915,7 @@ class SCIGRAPHS_OT_BearingsDistribution(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import bearing
+        from scigraphs_core.osmnx import bearing
         
         obj = context.active_object
         G = _get_unprojected_graph(obj)
@@ -950,7 +949,7 @@ class SCIGRAPHS_OT_CalcEuclidean(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        from ....core.osmnx import distance
+        from scigraphs_core.osmnx import distance
         
         props = context.scene.scigraphs
         
@@ -979,7 +978,7 @@ class SCIGRAPHS_OT_CalcGreatCircle(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        from ....core.osmnx import distance
+        from scigraphs_core.osmnx import distance
         
         props = context.scene.scigraphs
         
@@ -1039,7 +1038,7 @@ class SCIGRAPHS_OT_GraphToGDFs(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def execute(self, context):
-        from ....core.osmnx import convert
+        from scigraphs_core.osmnx import convert
         
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -1099,7 +1098,7 @@ class SCIGRAPHS_OT_GDFsToGraph(bpy.types.Operator):
     
     def execute(self, context):
         import geopandas as gpd
-        from ....core.osmnx import convert
+        from scigraphs_core.osmnx import convert
         from ....core import geometry, importer
         
         nodes_path = bpy.path.abspath(self.nodes_filepath)

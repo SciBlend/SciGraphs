@@ -13,6 +13,14 @@ bl_info = {
 }
 
 
+# Put scigraphs_core within reach before any submodule imports from it. It is
+# a separate distribution: installed as a wheel in the normal case, resolved
+# from <repo>/core in a checkout. See _locate_core for the two-case search and
+# why there is no vendored third case.
+from . import _locate_core as _locate_core_module
+
+_locate_core_module.locate()
+
 try:
     import bpy
     from bpy.app.handlers import persistent
@@ -26,6 +34,12 @@ if bpy is not None:
     from . import preferences
     from . import properties
     from . import ui
+    # Still the subpackage, not the wheel. The analysis half moved out to
+    # `scigraphs_core`, but twenty-one modules stayed here because their job is
+    # Blender: building meshes, projecting terrain, driving the scene, replaying
+    # a pipeline. Binding the wheel under this name would shadow them, and
+    # `from .core.osmnx.graph_cache import ...` below would then resolve through
+    # the file system to a package the attribute no longer describes.
     from . import core
     from . import utils
 

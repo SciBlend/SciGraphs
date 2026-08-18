@@ -1,30 +1,14 @@
-"""Resolve a download area for the unified city2graph Data Import panel.
+"""Resolve the download area for the city2graph Data Import panel.
 
-The new panel mirrors the OSMnx download methods so the user can fetch
-Overture / city2graph features without first importing a street graph.
-This module is the single point that, given the panel state, returns:
-
-    bbox        — (north, south, east, west) in WGS84.
-    center_lat  — projection origin latitude (for alignment in Blender).
-    center_lon  — projection origin longitude.
-    scale       — meters → Blender units factor.
-    osmnx_obj   — the active OSMnx object when available (used by
-                  ``gdf_to_blender_mesh`` to share the same local
-                  equirectangular projection).
-    source      — short label describing where the area came from
-                  (used in operator reports).
-
-The function is deliberately tolerant: when geocoding is unavailable
-or the user inputs are inconsistent, ``resolve_area`` raises a
-``ValueError`` with a human-readable message that the operator can
-forward via ``self.report({'ERROR'}, ...)``.
+The panel mirrors the OSMnx download methods, so Overture and city2graph
+features can be fetched without importing a street graph first.
 """
 from __future__ import annotations
 
 import math
 from typing import Optional
 
-from ...utils.logger import log
+from scigraphs_core.logger import log
 
 
 _DEFAULT_SCALE = 0.001  # 1 unit = 1 km, consistent with the OSMnx importer.
@@ -33,9 +17,8 @@ _DEFAULT_SCALE = 0.001  # 1 unit = 1 km, consistent with the OSMnx importer.
 def _bbox_from_radius(lat: float, lon: float, radius_m: float) -> tuple:
     """Return (N, S, E, W) for a geodesic disk of ``radius_m`` around (lat, lon).
 
-    Uses the equirectangular approximation: it's exact enough for the
-    radii Overture/c2g handle (≤ 5 km) and avoids pulling pyproj into
-    the call site.
+    Equirectangular approximation: exact enough at the radii Overture and
+    city2graph handle, up to 5 km, and it keeps pyproj out of the call site.
     """
     earth_radius_m = 6_371_000.0
     deg_per_meter_lat = (180.0 / math.pi) / earth_radius_m
@@ -50,11 +33,10 @@ def _bbox_from_radius(lat: float, lon: float, radius_m: float) -> tuple:
 
 
 def _bbox_from_active_osmnx(osmnx_obj) -> Optional[tuple]:
-    """Recreate the bbox helper from ``data_ops.py`` (legacy path).
+    """Return the bbox of an OSMnx object, or None if neither route works.
 
-    Reads the cached bbox custom properties first; if missing, derives
-    them from the mesh extent + ``osmnx_center_*`` / ``osmnx_scale``.
-    Returns ``None`` if neither path is viable.
+    Prefers the cached ``osmnx_bbox_*`` properties, else the mesh extent plus
+    ``osmnx_center_*`` / ``osmnx_scale``.
     """
     if osmnx_obj is None:
         return None
@@ -93,11 +75,9 @@ def _bbox_from_active_osmnx(osmnx_obj) -> Optional[tuple]:
 
 
 def _geocode_place_bbox(place_name: str, which_result: int = 0) -> tuple:
-    """Resolve a place name to a bbox via OSMnx's geocoder.
-
-    OSMnx is already a hard dependency of the addon, so reusing it
-    avoids requiring Nominatim configuration here. Falls back to
-    Nominatim search if the OSMnx import fails (older builds).
+    """Resolve a place name to a bbox with OSMnx's geocoder, which is already a
+    hard dependency and so needs no Nominatim setup here. Raises ValueError
+    when the name does not resolve.
     """
     place_name = (place_name or "").strip()
     if not place_name:
@@ -122,10 +102,8 @@ def _geocode_place_bbox(place_name: str, which_result: int = 0) -> tuple:
 
 
 def _bbox_from_polygon_object(obj_name: str) -> tuple:
-    """Compute (N, S, E, W) from a Blender mesh's vertex bounds.
-
-    Mesh vertices are interpreted as (lon, lat) (same convention used
-    elsewhere in the addon for boundary polygons).
+    """Compute (N, S, E, W) from a mesh's vertex bounds, reading verts as
+    (lon, lat), the convention this add-on uses for boundary polygons.
     """
     import bpy
     obj = bpy.data.objects.get(obj_name)
@@ -151,11 +129,13 @@ def _osmnx_alignment(osmnx_obj):
 
 
 def resolve_area(context):
-    """Resolve the download area from the unified Data Import panel.
+    """Resolve the download area from the Data Import panel.
 
-    Returns a dict with keys: ``bbox``, ``center_lat``, ``center_lon``,
-    ``scale``, ``osmnx_obj``, ``source``. Raises ``ValueError`` with a
-    user-facing message if the inputs are invalid.
+    Returns a dict holding the WGS84 ``bbox`` as (north, south, east, west),
+    the projection origin ``center_lat`` / ``center_lon``, the meters to
+    Blender units ``scale``, the active ``osmnx_obj`` if there is one, and a
+    short ``source`` label for operator reports. Raises ``ValueError`` with a
+    user-facing message when the panel inputs are unusable.
     """
     props = context.scene.city2graph
     scene_props = context.scene.scigraphs
@@ -181,7 +161,6 @@ def resolve_area(context):
             )
         center_lat, center_lon, scale = _osmnx_alignment(osmnx_obj)
         if center_lat is None or center_lon is None:
-            # Use bbox centre as a reasonable default.
             n, s, e, w = bbox
             center_lat = (n + s) / 2.0
             center_lon = (e + w) / 2.0
@@ -232,14 +211,12 @@ def resolve_area(context):
         radius = float(scene_props.osmnx_distance)
         if not addr:
             raise ValueError("Address is empty (set it in the OSMnx panel or here).")
-        # Use the same geocoder as PLACE.
         bbox = _geocode_place_bbox(addr)
         n, s, e, w = bbox
         center_lat = (n + s) / 2.0
         center_lon = (e + w) / 2.0
-        # Tighten the bbox to the requested radius so the user gets the
-        # area they actually asked for (geocoder bbox can be huge for
-        # cities with the same address-name).
+        # Tighten to the requested radius: the geocoder bbox can cover a whole
+        # city when several places share the address name.
         bbox = _bbox_from_radius(center_lat, center_lon, radius)
         return {
             'bbox': bbox,

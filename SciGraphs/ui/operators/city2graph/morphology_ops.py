@@ -69,12 +69,8 @@ class SCIGRAPHS_OT_C2G_MorphologicalGraph(bpy.types.Operator):
             )
             return {'CANCELLED'}
 
-        # Heuristics to identify the role of each selected object:
-        #  - Buildings = a mesh with face polygons (Polygon footprints).
-        #  - Streets   = a mesh with edges but no faces (LineStrings).
-        #  - The legacy 'is_tessellation' flag is also accepted as a
-        #    "buildings stand-in" because the previous workflow asked
-        #    the user to feed tessellations directly.
+        # Guess each object's role: buildings have faces, streets have edges
+        # and no faces. An 'is_tessellation' object counts as buildings.
         buildings_obj = None
         street_network_obj = None
         for obj in selected:
@@ -101,13 +97,12 @@ class SCIGRAPHS_OT_C2G_MorphologicalGraph(bpy.types.Operator):
                     street_network_obj = obj
 
         if buildings_obj is None or street_network_obj is None:
-            # Fall back to positional order: first selected = buildings,
-            # second = streets, just so an unguessable selection still
-            # produces a meaningful error from the core function.
+            # Unguessable selection: fall back to selection order so the core
+            # function can raise a meaningful error.
             buildings_obj = buildings_obj or selected[0]
             street_network_obj = street_network_obj or selected[1]
 
-        # Resolve the centre for distance-based filtering.
+        # Resolve the center for distance-based filtering.
         center_lat = None
         center_lon = None
         if props.morpho_use_center_from_osmnx:
@@ -160,7 +155,7 @@ class SCIGRAPHS_OT_C2G_MorphologicalGraph(bpy.types.Operator):
             return {'CANCELLED'}
 
         # ``result`` is a single object in full mode and a list of
-        # objects in subset mode. Normalise for reporting / activation.
+        # objects in subset mode. Normalize for reporting / activation.
         if isinstance(result, list):
             for o in result:
                 o.select_set(True)
@@ -189,7 +184,7 @@ class SCIGRAPHS_OT_C2G_SegmentsToGraph(bpy.types.Operator):
         return context.active_object is not None and context.active_object.type == 'MESH'
 
     def execute(self, context):
-        from ....core.city2graph.get_c2g import get_city2graph
+        from scigraphs_core.city2graph.get_c2g import get_city2graph
         from ....core.city2graph import utils as c2g_utils
         from ....core.city2graph.morphology import create_graph_from_networkx
 
@@ -208,16 +203,14 @@ class SCIGRAPHS_OT_C2G_SegmentsToGraph(bpy.types.Operator):
 
         try:
             from city2graph.morphology import segments_to_graph as c2g_seg2graph
-            # city2graph >= 0.3 returns a (nodes_gdf, edges_gdf) tuple
-            # by default; ``as_nx=True`` collapses that into the
-            # NetworkX graph the rest of this operator expects.
+            # city2graph >= 0.3 returns a (nodes_gdf, edges_gdf) tuple unless
+            # as_nx=True, and the rest of this operator wants the graph.
             graph = c2g_seg2graph(segments_gdf, as_nx=True)
         except Exception as e:
             self.report({'ERROR'}, f"segments_to_graph failed: {e}")
             return {'CANCELLED'}
 
-        # Be tolerant of older c2g versions that still returned the
-        # tuple even when as_nx=True wasn't supported.
+        # Older versions ignore as_nx and hand back the tuple anyway.
         if isinstance(graph, tuple):
             try:
                 import networkx as nx

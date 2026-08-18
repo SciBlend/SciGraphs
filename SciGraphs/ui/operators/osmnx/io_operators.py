@@ -1,7 +1,7 @@
 import bpy
 import os
 from bpy.props import StringProperty
-from ....core import osmnx_analysis
+from scigraphs_core import osmnx_analysis
 from .utils import _get_osmnx_graph, _store_osmnx_graph
 
 

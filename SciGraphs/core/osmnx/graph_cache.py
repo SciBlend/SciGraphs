@@ -1,22 +1,21 @@
-# OSMnx graph cache management.
-#
-# Centralises the in-memory cache of NetworkX graphs so that both operators
-# and other core modules can retrieve / store graphs by object metadata.
+# In-memory cache of NetworkX graphs, keyed by Blender object metadata, shared
+# by the operators and the rest of core.
 
 import uuid
 
 
 def get_osmnx_graph(obj):
-    """Retrieve the NetworkX graph associated with a Blender object.
+    """Find the NetworkX graph behind a Blender object, or None.
 
-    Looks up the in-memory cache first (by graph_id, then by object name,
-    then by node-count heuristic).  Falls back to loading from the on-disk
-    GraphML cache.  Returns ``None`` when the graph cannot be found.
+    Tries the in-memory cache by graph_id, then by object name, then by
+    matching node count, before falling back to the on-disk GraphML cache. The
+    node-count match is a guess and will pick the wrong graph if two networks
+    happen to have the same size.
     """
     if obj is None or not obj.get("is_osmnx", False):
         return None
 
-    from .. import importer
+    from ...core import importer
 
     graph_id = obj.get("osmnx_graph_id", "")
     if graph_id and hasattr(importer, '_osmnx_graph_cache'):
@@ -60,11 +59,7 @@ def get_osmnx_graph(obj):
 
 
 def get_osmnx_graph_diagnostic(obj):
-    """Diagnose why a graph cannot be retrieved.
-
-    Returns:
-        Tuple ``(diagnostic_message, suggested_action)``.
-    """
+    """Explain why get_osmnx_graph failed, as (message, suggested action)."""
     import os
     from . import cache
 
@@ -99,8 +94,8 @@ def get_osmnx_graph_diagnostic(obj):
 
 
 def get_unprojected_graph(obj):
-    """Return the unprojected copy of the cached graph (e.g. for bearings)."""
-    from .. import importer
+    """Return the unprojected copy of the cached graph, as bearings need."""
+    from ...core import importer
 
     graph_id = obj.get("osmnx_graph_id", "")
     if not graph_id or not hasattr(importer, '_osmnx_graph_cache'):
@@ -111,7 +106,7 @@ def get_unprojected_graph(obj):
 
 def store_unprojected_graph(obj, G):
     """Cache the unprojected version of a graph."""
-    from .. import importer
+    from ...core import importer
 
     graph_id = obj.get("osmnx_graph_id", "")
     if not graph_id:
@@ -124,8 +119,8 @@ def store_unprojected_graph(obj, G):
 
 
 def store_osmnx_graph(obj, G):
-    """Store a NetworkX graph in the in-memory cache for *obj*."""
-    from .. import importer
+    """Put a graph in the in-memory cache, assigning obj a graph_id if needed."""
+    from ...core import importer
 
     if not hasattr(importer, '_osmnx_graph_cache'):
         importer._osmnx_graph_cache = {}
@@ -139,14 +134,14 @@ def store_osmnx_graph(obj, G):
 
 
 def restore_all_graphs_from_cache():
-    """Pre-load every OSMnx graph found in the scene from disk cache.
+    """Load every OSMnx graph in the scene from the disk cache.
 
-    Intended to be called from a ``bpy.app.handlers.load_post`` handler so
-    that graph data is available immediately after opening a ``.blend`` file.
+    Belongs on a bpy.app.handlers.load_post handler: graph data has to be there
+    the moment a .blend opens, since nothing in the file itself holds it.
     """
     import bpy
-    from .. import importer
-    from ...utils.logger import log
+    from ...core import importer
+    from scigraphs_core.logger import log
     from . import cache
 
     if not hasattr(importer, '_osmnx_graph_cache'):

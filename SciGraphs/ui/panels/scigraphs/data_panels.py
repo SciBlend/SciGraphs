@@ -34,7 +34,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         box.separator()
         
         if props.data_source == 'FILE':
-            # File-based import UI
             box.prop(props, "filepath", text="")
 
             from ....core import importer
@@ -48,15 +47,12 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
             row.operator("scigraphs.load_columns", text="Load File", icon='IMPORT')
         
         elif props.data_source == 'DATABASE':
-            # Database import UI
             self._draw_database_ui(box, props)
         
         elif props.data_source == 'SUITESPARSE':
-            # SuiteSparse import UI
             self._draw_suitesparse_ui(box, props)
 
         elif props.data_source == 'REPRO':
-            # Reproducible pipeline UI
             self._draw_repro_ui(context, box)
         
         # SuiteSparse and reproducible pipelines have their own streamlined flows.
@@ -206,22 +202,18 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         """Draw the SuiteSparse Matrix Collection import UI."""
         col = box.column(align=True)
         
-        # Matrix identifier input
         col.label(text="Matrix Identifier:", icon='URL')
         col.prop(props, "suitesparse_id", text="")
         
-        # Help text
         info = col.box()
         info.scale_y = 0.7
         info.label(text="Format: Group/Name  (e.g. Grund/bayer09)")
         
         col.separator()
         
-        # Graph mode
         col.label(text="Graph Representation:", icon='MESH_DATA')
         col.prop(props, "suitesparse_mode", text="")
         
-        # Mode description
         desc = col.box()
         desc.scale_y = 0.7
         if props.suitesparse_mode == 'BIPARTITE':
@@ -233,7 +225,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         
         col.separator()
         
-        # Giant component toggle
         col.prop(props, "suitesparse_giant_only")
 
         col.separator()
@@ -245,16 +236,13 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         
         col.separator()
         
-        # Download button
         row = col.row()
         row.scale_y = 1.5
         row.operator("scigraphs.download_suitesparse", text="Download & Create Graph", icon='IMPORT')
         
-        # Browse button
         row = col.row()
         row.operator("scigraphs.browse_suitesparse", text="Browse Collection", icon='URL')
         
-        # Status
         if props.suitesparse_status:
             status_box = col.box()
             status_box.scale_y = 0.7
@@ -299,7 +287,6 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         from ....preferences import get_preferences
         prefs = get_preferences()
         
-        # Connection profile selector
         col = box.column(align=True)
         
         if prefs and prefs.db_profiles:
@@ -307,12 +294,10 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
             row.prop(props, "db_profile_index", text="Connection")
             row.operator("scigraphs.open_db_preferences", text="", icon='PREFERENCES')
             
-            # Show connection test button
             row = col.row(align=True)
             row.operator("scigraphs.test_sql_connection", text="Test", icon='PLUGIN')
             row.operator("scigraphs.open_db_preferences", text="Add New", icon='ADD')
         else:
-            # No profiles configured
             info = col.box()
             info.scale_y = 0.7
             info.label(text="No database connections configured", icon='INFO')
@@ -320,30 +305,25 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         
         col.separator()
         
-        # SQL Query input
         col.label(text="SQL Query:", icon='TEXT')
         col.prop(props, "sql_query", text="")
         
-        # Query actions
         row = col.row(align=True)
         row.scale_y = 1.2
         row.operator("scigraphs.load_sql_columns", text="Load Columns", icon='IMPORT')
         row.operator("scigraphs.preview_sql_query", text="Preview", icon='HIDE_OFF')
         
-        # Query status
         if props.sql_query_status:
             status_box = col.box()
             status_box.scale_y = 0.7
             status_box.label(text=props.sql_query_status, icon='INFO')
         
-        # Show loaded columns count
         if props.sql_columns_cache:
             columns = props.sql_columns_cache.split('|')
             info = col.box()
             info.scale_y = 0.7
             info.label(text=f"Loaded {len(columns)} columns")
         
-        # Security notice
         sec_box = col.box()
         sec_box.scale_y = 0.6
         sec_box.label(text="Only SELECT queries allowed", icon='LOCKED')
@@ -360,7 +340,6 @@ class SCIGRAPHS_PT_data_geospatial(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         props = context.scene.scigraphs
-        # Show if file is loaded or SQL columns are available
         if props.data_source == 'FILE':
             return bool(props.filepath)
         return bool(props.sql_columns_cache)
@@ -379,19 +358,16 @@ class SCIGRAPHS_PT_data_geospatial(bpy.types.Panel):
             col = layout.column(align=True)
             col.label(text="Coordinate Source:", icon='EMPTY_AXIS')
             
-            # Geocoding option (prominently displayed)
             row = col.row()
             row.prop(props, "geocode_columns", 
                      text="Auto-Geocode Source/Target as Countries/Cities")
             
-            # Show info box if geocoding is enabled
             if props.geocode_columns:
                 info_box = col.box()
                 info_box.scale_y = 0.7
                 info_box.label(text="Node names will be geocoded to coordinates", icon='INFO')
                 info_box.label(text="(First run may take time, then cached)")
             
-            # Coordinate columns (only if NOT geocoding)
             if not props.geocode_columns:
                 col.separator()
                 col.label(text="OR use explicit coordinate columns:")
@@ -463,7 +439,6 @@ class SCIGRAPHS_PT_data_temporal(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         props = context.scene.scigraphs
-        # Show if file is loaded or SQL columns are available
         if props.data_source == 'FILE':
             return bool(props.filepath)
         return bool(props.sql_columns_cache)

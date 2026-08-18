@@ -1,8 +1,8 @@
 # Export and utility operators
 
 import bpy
-from ....core import export_utils, statistics
-from ....core.mesh.mesh_utils import parse_graph_data_filtered, collect_mesh_attributes
+from scigraphs_core import export_utils, statistics
+from scigraphs_core.mesh.mesh_utils import parse_graph_data_filtered, collect_mesh_attributes
 
 
 class SCIGRAPHS_OT_ExportGraph(bpy.types.Operator):

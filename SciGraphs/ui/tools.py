@@ -1,5 +1,4 @@
-# SciGraphs Custom Tools
-# Interactive tools for graph editing in the viewport
+# Interactive tools for editing graphs in the viewport.
 
 import bpy
 import numpy as np
@@ -20,21 +19,17 @@ def _get_nearest_node_index(context, event, obj):
     if not obj or "node_positions" not in obj:
         return None, None
     
-    # Get mouse coordinates
     coord = (event.mouse_region_x, event.mouse_region_y)
     
-    # Get view ray
     region = context.region
     rv3d = context.region_data
     
-    # Get node positions
     pos_flat = obj.get("node_positions", [])
     if not pos_flat:
         return None, None
     
     positions = np.array(pos_flat).reshape(-1, 3)
     
-    # Find nearest node by projecting to screen
     min_dist = float('inf')
     nearest_idx = None
     nearest_pos = None
@@ -175,7 +170,6 @@ class SCIGRAPHS_OT_select_node_tool(bpy.types.Operator):
             return {'CANCELLED'}
         
         if event.type == 'MOUSEMOVE':
-            # Highlight nearest node
             idx, pos = _get_nearest_node_index(context, event, obj)
             self._highlight_idx = idx
             self._highlight_pos = pos
@@ -183,7 +177,6 @@ class SCIGRAPHS_OT_select_node_tool(bpy.types.Operator):
         elif event.type == 'LEFTMOUSE' and event.value == 'PRESS':
             idx, pos = _get_nearest_node_index(context, event, obj)
             if idx is not None:
-                # Store selection
                 obj["selected_node"] = idx
                 self.report({'INFO'}, f"Selected node {idx}")
             self._cleanup(context)
@@ -199,7 +192,6 @@ class SCIGRAPHS_OT_select_node_tool(bpy.types.Operator):
         if context.area.type != 'VIEW_3D':
             return {'CANCELLED'}
         
-        # Add draw handler
         self._draw_handle = bpy.types.SpaceView3D.draw_handler_add(
             self._draw_callback, (context,), 'WINDOW', 'POST_VIEW'
         )
@@ -209,12 +201,10 @@ class SCIGRAPHS_OT_select_node_tool(bpy.types.Operator):
     
     def _draw_callback(self, _context):
         if self._highlight_pos:
-            # Draw highlight sphere
             shader = gpu.shader.from_builtin('UNIFORM_COLOR')
             gpu.state.blend_set('ALPHA')
             gpu.state.depth_test_set('LESS_EQUAL')
             
-            # Draw a point marker
             batch = batch_for_shader(shader, 'POINTS', {"pos": [self._highlight_pos[:]]})
             gpu.state.point_size_set(15.0)
             shader.bind()
@@ -305,7 +295,7 @@ class SCIGRAPHS_OT_pick_path_node(bpy.types.Operator):
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self._cleanup(context)
-            self.report({'INFO'}, "Node picking cancelled")
+            self.report({'INFO'}, "Node picking canceled")
             return {'CANCELLED'}
 
         return {'RUNNING_MODAL'}
@@ -384,7 +374,6 @@ class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
                     obj["path_target"] = idx
                     self.report({'INFO'}, f"Path: {self._source_idx} -> {idx}")
                     
-                    # Try to compute and visualize path
                     try:
                         bpy.ops.scigraphs.find_shortest_path()
                     except Exception:
@@ -419,7 +408,6 @@ class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
         shader = gpu.shader.from_builtin('UNIFORM_COLOR')
         gpu.state.blend_set('ALPHA')
         
-        # Draw source if set
         if self._source_pos:
             batch = batch_for_shader(shader, 'POINTS', {"pos": [self._source_pos[:]]})
             gpu.state.point_size_set(20.0)
@@ -427,7 +415,6 @@ class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
             shader.uniform_float("color", (0.0, 1.0, 0.0, 1.0))
             batch.draw(shader)
         
-        # Draw highlight
         if self._highlight_pos:
             color = (1.0, 0.0, 0.0, 1.0) if self._source_idx is not None else (0.0, 1.0, 0.0, 1.0)
             batch = batch_for_shader(shader, 'POINTS', {"pos": [self._highlight_pos[:]]})
@@ -436,7 +423,6 @@ class SCIGRAPHS_OT_path_tool(bpy.types.Operator):
             shader.uniform_float("color", color)
             batch.draw(shader)
             
-            # Draw line from source to highlight
             if self._source_pos:
                 vertices = [self._source_pos[:], self._highlight_pos[:]]
                 batch = batch_for_shader(shader, 'LINES', {"pos": vertices})
@@ -485,7 +471,6 @@ class SCIGRAPHS_OT_move_node_tool(bpy.types.Operator):
         
         if event.type == 'MOUSEMOVE':
             if self._dragging and self._drag_idx is not None:
-                # Move node to new position
                 coord = (event.mouse_region_x, event.mouse_region_y)
                 
                 # Get depth from current node position
@@ -503,11 +488,9 @@ class SCIGRAPHS_OT_move_node_tool(bpy.types.Operator):
                 # Transform back to local space
                 new_local = obj.matrix_world.inverted() @ new_world
                 
-                # Update position
                 positions[self._drag_idx] = [new_local.x, new_local.y, new_local.z]
                 obj["node_positions"] = positions.flatten().tolist()
                 
-                # Update mesh
                 geometry.update_node_positions_from_property(obj)
                 geometry.rebuild_edges(obj)
                 
@@ -636,7 +619,6 @@ class SCIGRAPHS_OT_lasso_select_tool(bpy.types.Operator):
         positions = np.array(pos_flat).reshape(-1, 3)
         selected = []
         
-        # Simple point-in-polygon test
         lasso = self._lasso_points
         n = len(lasso)
         
@@ -657,7 +639,6 @@ class SCIGRAPHS_OT_lasso_select_tool(bpy.types.Operator):
                 if inside:
                     selected.append(i)
         
-        # Store selection
         obj["selected_nodes"] = selected
         return selected
     
@@ -682,7 +663,6 @@ class SCIGRAPHS_OT_lasso_select_tool(bpy.types.Operator):
             gpu.state.blend_set('ALPHA')
             gpu.state.line_width_set(2.0)
             
-            # Draw lasso line
             vertices = [(p[0], p[1]) for p in self._lasso_points]
             if len(vertices) > 1:
                 batch = batch_for_shader(shader, 'LINE_STRIP', {"pos": vertices})

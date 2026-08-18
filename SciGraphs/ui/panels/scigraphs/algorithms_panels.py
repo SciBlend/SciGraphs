@@ -39,20 +39,16 @@ class SCIGRAPHS_PT_algorithms_traversal(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Main traversal box
         box = layout.box()
         box.label(text="BFS / DFS Animation", icon='ORIENTATION_VIEW')
         
-        # Algorithm and start nodes in columns
         row = box.row(align=True)
         row.prop(props, "traversal_algorithm", text="")
         row.prop(props, "traversal_start_mode", text="", icon='PINNED')
         
-        # Manual node input if needed
         if props.traversal_start_mode == 'MANUAL':
             box.prop(props, "traversal_start_nodes", text="Nodes")
         
-        # Animation mode and parameters
         box.separator()
         col = box.column(align=True)
         col.prop(props, "traversal_animation_mode", text="Mode")
@@ -63,13 +59,11 @@ class SCIGRAPHS_PT_algorithms_traversal(bpy.types.Panel):
         
         col.prop(props, "traversal_animation_loop", text="Loop")
         
-        # Animate button
         box.separator()
         row = box.row()
         row.scale_y = 1.3
         row.operator("scigraphs.animate_traversal", text="Animate Traversal", icon='PLAY')
         
-        # Show animation info if created
         if "traversal_max_order" in obj:
             info = box.box()
             info.scale_y = 0.7
@@ -96,7 +90,6 @@ class SCIGRAPHS_PT_algorithms_pathfinding(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Algorithm selection
         box = layout.box()
         box.label(text="Shortest Path", icon='CURVE_PATH')
         col = box.column(align=True)
@@ -112,7 +105,6 @@ class SCIGRAPHS_PT_algorithms_pathfinding(bpy.types.Panel):
         op = row.operator("scigraphs.pick_path_node", text="", icon='EYEDROPPER')
         op.target = 'TARGET'
         
-        # Info box
         info = box.box()
         info.scale_y = 0.7
         algo = props.pathfinding_algorithm
@@ -123,7 +115,6 @@ class SCIGRAPHS_PT_algorithms_pathfinding(bpy.types.Panel):
         else:
             info.label(text="Bellman-Ford: Handles negative weights")
         
-        # Execute button
         box.separator()
         row = box.row()
         row.scale_y = 1.3
@@ -146,12 +137,10 @@ class SCIGRAPHS_PT_algorithms_spanning(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Algorithm selection
         box = layout.box()
         box.label(text="Spanning Tree", icon='OUTLINER_OB_FORCE_FIELD')
         box.prop(props, "spanning_algorithm", text="Algorithm")
         
-        # Info
         info = box.box()
         info.scale_y = 0.7
         algo = props.spanning_algorithm
@@ -162,7 +151,6 @@ class SCIGRAPHS_PT_algorithms_spanning(bpy.types.Panel):
         else:
             info.label(text="Maximum: Heaviest spanning tree")
         
-        # Execute button
         box.separator()
         row = box.row()
         row.scale_y = 1.3
@@ -189,20 +177,17 @@ class SCIGRAPHS_PT_algorithms_flow(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Node selection
         box = layout.box()
         box.label(text="Max Flow / Min Cut", icon='MOD_FLUIDSIM')
         col = box.column(align=True)
         col.prop(props, "flow_source", text="Source Node")
         col.prop(props, "flow_sink", text="Sink Node")
         
-        # Info
         info = box.box()
         info.scale_y = 0.7
         info.label(text="Requires directed graph")
         info.label(text="Ford-Fulkerson algorithm")
         
-        # Buttons
         box.separator()
         row = box.row(align=True)
         row.scale_y = 1.3

@@ -1,10 +1,6 @@
 """GIS-interchange export operators for the OSMnx panel.
 
-Supports:
-    - GeoPackage (.gpkg)      — ox.io.save_graph_geopackage
-    - OSM XML (.osm)          — ox.io.save_graph_xml  (sets all_oneway first)
-    - Gephi-compatible GraphML — ox.io.save_graphml(gephi=True)
-    - SVG                      — matplotlib vector render of the graph
+Writes GeoPackage, OSM XML, Gephi-flavored GraphML, or an SVG render.
 """
 
 import os

@@ -19,7 +19,7 @@ class SCIGRAPHS_OT_GeocodeToGDF(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        from ....core.osmnx import geocoder
+        from scigraphs_core.osmnx import geocoder
         
         if not self.query.strip():
             self.report({'ERROR'}, "Please enter a query")
@@ -73,7 +73,7 @@ class SCIGRAPHS_OT_BBoxFromPoint(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        from ....core.osmnx import utils_geo
+        from scigraphs_core.osmnx import utils_geo
         
         point = (self.latitude, self.longitude)
         bbox = utils_geo.bbox_from_point(point, dist=self.distance)
@@ -102,7 +102,7 @@ class SCIGRAPHS_OT_BBoxToPoly(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        from ....core.osmnx import utils_geo
+        from scigraphs_core.osmnx import utils_geo
         
         props = context.scene.scigraphs
         bbox = (props.osmnx_bbox_north, props.osmnx_bbox_south,
@@ -141,7 +141,7 @@ class SCIGRAPHS_OT_BufferGeometry(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        from ....core.osmnx import utils_geo
+        from scigraphs_core.osmnx import utils_geo
         from shapely.geometry import Point
         
         obj = context.active_object
@@ -195,7 +195,7 @@ class SCIGRAPHS_OT_InterpolatePoints(bpy.types.Operator):
         spacing_units = self.spacing * scale  # spacing given in meters, mesh in blender units
 
         try:
-            from ....core.osmnx import utils_geo  # noqa: F401 - keep lazy import in case we switch
+            from scigraphs_core.osmnx import utils_geo  # noqa: F401 - keep lazy import in case we switch
         except Exception:
             pass
 

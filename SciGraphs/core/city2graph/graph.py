@@ -1,18 +1,13 @@
 import json
-from ...utils.logger import log
+from scigraphs_core.logger import log
 from . import utils
 
 
 def export_to_graphml(obj, filepath):
-    """
-    Export Blender graph object to GraphML format.
-    
-    Args:
-        obj: Blender mesh object representing a graph
-        filepath: Output file path (.graphml)
-    
-    Returns:
-        bool: True if export succeeded
+    """Export a Blender graph object to GraphML.
+
+    List and tuple attributes are stringified first, since GraphML has no type
+    for them. Returns True on success.
     """
     try:
         import networkx as nx
@@ -47,16 +42,7 @@ def export_to_graphml(obj, filepath):
 
 
 def export_to_json(obj, filepath):
-    """
-    Export Blender graph object to JSON format (node-link data).
-    
-    Args:
-        obj: Blender mesh object representing a graph
-        filepath: Output file path (.json)
-    
-    Returns:
-        bool: True if export succeeded
-    """
+    """Export a Blender graph object as NetworkX node-link JSON. True on success."""
     try:
         import networkx as nx
         from networkx.readwrite import json_graph
@@ -85,17 +71,7 @@ def export_to_json(obj, filepath):
 
 
 def export_graph(obj, filepath, format='JSON'):
-    """
-    Export graph to specified format.
-    
-    Args:
-        obj: Blender mesh object representing a graph
-        filepath: Output file path
-        format: Export format ('JSON' or 'GRAPHML')
-    
-    Returns:
-        bool: True if export succeeded
-    """
+    """Export a graph as 'JSON' or 'GRAPHML'. True on success."""
     format = format.upper()
     
     if format == 'JSON':
@@ -247,25 +223,12 @@ if __name__ == "__main__":
 
 
 def get_external_loader_script():
-    """
-    Get the external PyTorch Geometric loader script.
-    
-    Returns:
-        str: Python script for loading SciGraphs exports in external environments
-    """
+    """Return the standalone script that loads these exports into PyTorch Geometric."""
     return EXTERNAL_LOADER_SCRIPT
 
 
 def save_external_loader_script(filepath):
-    """
-    Save the external loader script to a file.
-    
-    Args:
-        filepath: Output path for the Python script
-    
-    Returns:
-        bool: True if save succeeded
-    """
+    """Write the external loader script to ``filepath``. True on success."""
     try:
         with open(filepath, 'w') as f:
             f.write(EXTERNAL_LOADER_SCRIPT)

@@ -131,7 +131,7 @@ class SCIGRAPHS_PT_c2g_data(bpy.types.Panel):
             icon='SNAP_VERTEX', text="Convert Selected to Centroids",
         )
 
-        # --- Local file fallback (kept, less prominent) ---
+        # --- Local file fallback ---
         layout.separator()
         box = layout.box()
         box.label(text="Local File (GeoJSON / Shapefile)", icon='FILE')
@@ -328,7 +328,7 @@ class SCIGRAPHS_PT_c2g_transport(bpy.types.Panel):
             warn.alert = True
             warn.scale_y = 0.85
             warn.label(
-                text="No limit set — large feeds may exhaust memory",
+                text="No limit set, large feeds may exhaust memory",
                 icon='ERROR',
             )
 

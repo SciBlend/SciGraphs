@@ -2,7 +2,7 @@
 
 import bpy
 
-from ....core.osmnx.centrality import (
+from scigraphs_core.osmnx.centrality import (
     edge_betweenness_line,
     get_colors_by_values,
     node_betweenness,
@@ -16,10 +16,6 @@ def _pick_graph(obj):
     G_un = _get_unprojected_graph(obj)
     return G or G_un
 
-
-# ---------------------------------------------------------------------------
-# Centrality computation + write-back to mesh
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
     """Compute node or edge centrality and store it as mesh attribute."""
@@ -121,8 +117,7 @@ class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
                 if attr in mesh.attributes:
                     mesh.attributes.remove(mesh.attributes[attr])
                 mattr = mesh.attributes.new(name=attr, type='FLOAT', domain='EDGE')
-                # Best-effort fill; edge-to-(u,v) mapping depends on core.osmnx.mesh_bridge.
-                # Leave zeros if we cannot resolve the mapping.
+                # Without an edge-to-(u,v) mapping the values stay at zero.
                 for i in range(len(mattr.data)):
                     mattr.data[i].value = 0.0
         except Exception as e:
@@ -139,10 +134,6 @@ class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
         self.report({'INFO'}, f"{attr}: {len(values)} values, range [{vmin:.4f}, {vmax:.4f}]")
         return {'FINISHED'}
 
-
-# ---------------------------------------------------------------------------
-# Apply attribute → vertex colors (POINT / EDGE)
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxAttrToColors(bpy.types.Operator):
     """Map a float mesh attribute (nodes or edges) to vertex colors."""
@@ -200,19 +191,14 @@ class SCIGRAPHS_OT_OSMnxAttrToColors(bpy.types.Operator):
                     break
                 color.data[i].color = (float(c[0]), float(c[1]), float(c[2]), float(c[3]))
         else:
-            # Map edge values onto loops: each loop belongs to a polygon, but
-            # for plain edge-only meshes (no faces), this domain is moot. We
-            # fallback to per-loop color = 0.5.
+            # Loops belong to polygons, and an edge-only mesh has none, so
+            # every loop gets the same flat gray.
             for i in range(len(color.data)):
                 color.data[i].color = (0.5, 0.5, 0.5, 1.0)
 
         self.report({'INFO'}, f"Applied {len(rgba)} colors to '{color_name}'")
         return {'FINISHED'}
 
-
-# ---------------------------------------------------------------------------
-# 3D orientation rose mesh
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxOrientationRose(bpy.types.Operator):
     """Generate a 2D polar rose plot from edge bearings as a Blender image."""
@@ -273,7 +259,6 @@ class SCIGRAPHS_OT_OSMnxOrientationRose(bpy.types.Operator):
         cx = cy = size // 2
         radius = (size // 2) - margin
 
-        # Concentric grid + cardinal cross.
         grid_color = (210, 210, 215, 255)
         for frac in (0.25, 0.5, 0.75, 1.0):
             r = radius * frac
@@ -285,9 +270,8 @@ class SCIGRAPHS_OT_OSMnxOrientationRose(bpy.types.Operator):
         draw.line((cx - radius, cy, cx + radius, cy), fill=grid_color, width=1)
         draw.line((cx, cy - radius, cx, cy + radius), fill=grid_color, width=1)
 
-        # Wedges. Compass convention: angle measured clockwise from north,
-        # which in image coords (y-down) means we rotate the standard math
-        # angle by -90° and invert the rotation direction.
+        # Compass angles run clockwise from north, so in y-down image space
+        # they are the math angle rotated by -90° with the direction flipped.
         bar_color = (31, 119, 180, 230)   # matplotlib default blue
         edge_color = (255, 255, 255, 255)
         for i, count in enumerate(counts):
@@ -311,7 +295,6 @@ class SCIGRAPHS_OT_OSMnxOrientationRose(bpy.types.Operator):
                 width=1,
             )
 
-        # Cardinal labels.
         try:
             font = ImageFont.truetype("DejaVuSans.ttf", 22)
             font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 26)

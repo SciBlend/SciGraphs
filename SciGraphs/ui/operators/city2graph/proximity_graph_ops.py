@@ -1,9 +1,5 @@
-"""
-Proximity graph operators for City2Graph.
-
-Implements operators for generating single-layer and multi-layer proximity graphs
-from OSM feature objects, with visualization support.
-"""
+"""Operators that build single-layer and multi-layer proximity graphs from OSM
+feature objects."""
 
 import bpy
 import bmesh
@@ -20,12 +16,11 @@ from ....core.mesh.geo_mesh import (
 
 
 def _effective_feature_count(obj):
-    """Count the real features of a feature object from its mesh geometry.
+    """Count a feature object's real features from its mesh geometry.
 
-    Mirrors how the geometry is interpreted downstream: one feature per face
-    (polygons), per connected edge chain (lines), or per isolated vertex
-    (points). Used as a fallback when the ``feature_count`` custom property is
-    missing or zero.
+    Counts the way downstream code reads the geometry: one feature per face,
+    per connected edge chain, or per isolated vertex. Used when the
+    ``feature_count`` custom property is missing or zero.
     """
     if obj is None or obj.type != 'MESH' or not obj.data:
         return 0
@@ -70,7 +65,7 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
     
     def execute(self, context):
         from ....core.city2graph import proximity
-        from ....utils.logger import log
+        from scigraphs_core.logger import log
         
         props = context.scene.city2graph
         feature_obj = props.prox_feature_object
@@ -83,8 +78,8 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
             self.report({'ERROR'}, "Selected object is not a feature object (OSM or city2graph)")
             return {'CANCELLED'}
         
-        # Validate feature count. ``feature_count`` may be missing or stale on
-        # derived objects (e.g. centroids), so fall back to the real geometry.
+        # ``feature_count`` can be missing or stale on derived objects such as
+        # centroids, so fall back to the geometry.
         feature_count = feature_obj.get("feature_count", 0) or _effective_feature_count(feature_obj)
         if feature_count < 2:
             self.report({'ERROR'}, f"Need at least 2 features, found {feature_count}")
@@ -93,7 +88,6 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
         graph_type = props.prox_graph_type
         distance_metric = props.prox_distance_metric.lower()
         
-        # Validate K parameter for KNN
         if graph_type == 'KNN' and props.prox_knn_k >= feature_count:
             self.report({'ERROR'}, f"K ({props.prox_knn_k}) must be less than feature count ({feature_count})")
             return {'CANCELLED'}
@@ -112,7 +106,6 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
         start_time = time.time()
         
         try:
-            # Common parameters for all graph types
             common_params = {
                 'deduplicate': props.prox_deduplicate,
                 'tolerance': props.prox_dedup_tolerance,
@@ -189,7 +182,7 @@ class SCIGRAPHS_OT_GenerateProximityGraph(bpy.types.Operator):
             )
             
             if graph_obj is None:
-                self.report({'ERROR'}, "Failed to materialise graph mesh")
+                self.report({'ERROR'}, "Failed to materialize graph mesh")
                 return {'CANCELLED'}
             
             collection.objects.link(graph_obj)
@@ -293,7 +286,7 @@ class SCIGRAPHS_OT_GenerateMultilayerGraph(bpy.types.Operator):
             )
             
             if graph_obj is None:
-                self.report({'ERROR'}, "Failed to materialise multi-layer graph mesh")
+                self.report({'ERROR'}, "Failed to materialize multi-layer graph mesh")
                 return {'CANCELLED'}
             
             main_collection.objects.link(graph_obj)
@@ -321,7 +314,7 @@ class SCIGRAPHS_OT_GenerateGroupNodesGraph(bpy.types.Operator):
     
     def execute(self, context):
         from ....core.city2graph import proximity
-        from ....utils.logger import log
+        from scigraphs_core.logger import log
         
         props = context.scene.city2graph
         
@@ -387,7 +380,7 @@ class SCIGRAPHS_OT_GenerateGroupNodesGraph(bpy.types.Operator):
             )
             
             if graph_obj is None:
-                self.report({'ERROR'}, "Failed to materialise group nodes graph mesh")
+                self.report({'ERROR'}, "Failed to materialize group nodes graph mesh")
                 return {'CANCELLED'}
             
             main_collection.objects.link(graph_obj)

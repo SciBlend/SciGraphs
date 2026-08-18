@@ -1,20 +1,17 @@
-# Conversion of GeoDataFrames to Blender mesh / curve objects.
-#
-# Used by both OSMnx feature operators and City2Graph proximity operators
-# to materialise geospatial data inside the 3D viewport.
+# GeoDataFrames to Blender mesh and curve objects, for both the OSMnx feature
+# operators and the city2graph proximity operators.
 
 import bpy
 import bmesh
 from .geometry import _latlon_to_local_3d
-from ...utils.logger import log
+from scigraphs_core.logger import log
 
 
 def _resolve_projection_metadata(obj):
     """Return the (center_lat, center_lon, scale) projection metadata of an object.
 
-    OSMnx feature objects store the projection under ``osmnx_*`` keys, while
-    Overture/city2graph objects use the ``c2g_*`` keys. This resolver accepts
-    either so visualization works with both sources.
+    OSMnx objects store it under ``osmnx_*`` keys, Overture/city2graph objects
+    under ``c2g_*``. Either is accepted.
     """
     center_lat = obj.get("osmnx_center_lat")
     center_lon = obj.get("osmnx_center_lon")
@@ -32,17 +29,10 @@ def _resolve_projection_metadata(obj):
 
 
 def create_feature_mesh_from_gdf(gdf, name="OSM_Features", separate_by_type=False, osmnx_obj=None):
-    """
-    Create Blender mesh objects from a GeoDataFrame.
+    """Create Blender mesh objects from a GeoDataFrame, one per feature group.
 
-    Args:
-        gdf: GeoDataFrame with a geometry column.
-        name: Base name for the created objects.
-        separate_by_type: Group features by the ``building`` column.
-        osmnx_obj: Optional OSMnx object to align coordinate systems.
-
-    Returns:
-        list of created Blender objects.
+    ``separate_by_type`` groups by the ``building`` column. Without ``osmnx_obj``
+    to align coordinate systems, lon/lat are used unprojected.
     """
     from shapely.geometry import Point, LineString, Polygon, MultiPolygon, MultiLineString
 
@@ -138,12 +128,27 @@ def _numeric_columns(gdf, skip=()):
     return columns
 
 
+def _as_float(values, row_pos):
+    """One value from a column list as a float, with 0.0 for anything unusable.
+
+    ``values`` is None when the layer or relation does not carry the column,
+    which in a heterograph is normal rather than an error.
+    """
+    if values is None or row_pos >= len(values):
+        return 0.0
+    value = values[row_pos]
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return out if out == out else 0.0  # NaN reads as 0.0, as elsewhere
+
+
 def _edge_endpoint_indices(edges_gdf, nodes_gdf):
     """Map each edge to a (src_idx, tgt_idx) pair of positional node indices.
 
-    Uses the edge MultiIndex (source_id, target_id) referencing the node index
-    when available. Returns a list aligned with ``edges_gdf`` rows; entries that
-    cannot be resolved are ``None``.
+    Reads the edge MultiIndex (source_id, target_id) against the node index.
+    The result is aligned with ``edges_gdf`` rows; unresolvable rows are None.
     """
     import pandas as pd
 
@@ -161,27 +166,14 @@ def _edge_endpoint_indices(edges_gdf, nodes_gdf):
 
 def create_native_graph_from_gdfs(nodes_gdf, edges_gdf, name, ref_obj,
                                    markers=None, node_attr_skip=(), edge_attr_skip=()):
-    """Materialise a city2graph result as a native SciGraphs MESH graph.
+    """Materialize a city2graph result as a native SciGraphs MESH graph, or None.
 
-    Builds a single mesh object whose vertices are the graph nodes and whose
-    edges are the graph edges, writing the markers the native coloring/setup
-    pipeline expects (num_nodes, num_edges, nodes_data, edges_data,
-    node_positions, is_directed) plus numeric GeoDataFrame columns as scalar
-    mesh attributes (POINT for nodes, EDGE for edges). Coordinates are projected
-    with the reference object's geographic alignment so the result overlays the
-    source network.
-
-    Args:
-        nodes_gdf: GeoDataFrame of Point nodes (positional index used as id).
-        edges_gdf: GeoDataFrame of edges with a (source, target) MultiIndex.
-        name: Object name.
-        ref_obj: Object providing projection metadata (osmnx_* or c2g_*).
-        markers: Optional dict of extra custom properties to set on the object.
-        node_attr_skip: Node column names to exclude from attribute import.
-        edge_attr_skip: Edge column names to exclude from attribute import.
-
-    Returns:
-        The created MESH object, or ``None`` on failure.
+    One mesh object: vertices are nodes, mesh edges are graph edges. Writes the
+    markers the native coloring and setup pipeline expects (num_nodes,
+    num_edges, nodes_data, edges_data, node_positions, is_directed), and every
+    numeric GeoDataFrame column as a scalar mesh attribute, POINT for nodes and
+    EDGE for edges. ``ref_obj`` supplies the projection so the result overlays
+    the source network.
     """
     from shapely.geometry import Point
 
@@ -196,13 +188,29 @@ def create_native_graph_from_gdfs(nodes_gdf, edges_gdf, name, ref_obj,
     if nodes_gdf.crs and str(nodes_gdf.crs).upper() != "EPSG:4326":
         nodes_4326 = nodes_gdf.to_crs("EPSG:4326")
 
+    # One position per row, whatever the geometry. `_edge_endpoint_indices`
+    # resolves endpoints against the *positional* index of nodes_gdf, so
+    # dropping a row here would silently renumber every edge after it. Polygons
+    # are the case that bites: `od_matrix_to_graph()` returns zones, and
+    # collapsing those to the origin gave an object with the right num_nodes and
+    # num_edges that rendered as an empty frame. Representative point, not
+    # centroid, because a centroid can land outside a concave or multi-part zone.
     positions = []
+    degenerate = 0
     for geom in nodes_4326.geometry:
         if isinstance(geom, Point):
-            x, y, z = _latlon_to_local_3d(geom.y, geom.x, center_lat, center_lon, scale)
-            positions.append((x, y, z))
-        else:
+            point = geom
+        elif geom is None or geom.is_empty:
             positions.append((0.0, 0.0, 0.0))
+            degenerate += 1
+            continue
+        else:
+            point = geom.representative_point()
+        x, y, z = _latlon_to_local_3d(point.y, point.x, center_lat, center_lon, scale)
+        positions.append((x, y, z))
+
+    if degenerate:
+        log(f"{name}: {degenerate} node(s) had no geometry and sit at the origin")
 
     mesh = bpy.data.meshes.new(f"{name}_mesh")
     bm = bmesh.new()
@@ -302,22 +310,14 @@ def _write_edge_attributes(obj, edges_gdf, created_edge_rows, skip=()):
 
 
 def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, markers=None):
-    """Materialise a heterogeneous city2graph result as a native MESH graph.
+    """Materialize a heterogeneous city2graph result as a native MESH graph, or None.
 
-    Combines all node layers into one mesh (vertices) and all edge relations
-    into mesh edges, tagging each vertex with a ``layer_id`` (POINT) and each
-    edge with an ``edge_type_id`` (EDGE) so the native coloring pipeline can
-    colour by layer or relation type. Writes the native graph markers.
+    All node layers become vertices of one mesh and all relations become mesh
+    edges, tagged with ``layer_id`` (POINT) and ``edge_type_id`` (EDGE) so the
+    native coloring pipeline can color by layer or by relation type.
 
-    Args:
-        nodes_dict: Mapping layer_name -> nodes GeoDataFrame (Point geometry).
-        edges_dict: Mapping (src_layer, relation, tgt_layer) -> edges GeoDataFrame.
-        name: Object name.
-        ref_obj: Object providing projection metadata.
-        markers: Optional dict of extra custom properties.
-
-    Returns:
-        The created MESH object, or ``None`` on failure.
+    ``nodes_dict`` maps layer_name to a nodes GeoDataFrame; ``edges_dict`` maps
+    (src_layer, relation, tgt_layer) to an edges GeoDataFrame.
     """
     from shapely.geometry import Point
 
@@ -334,12 +334,25 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
     layer_id_map = {name_: i for i, name_ in enumerate(layer_names)}
     node_index = {}
 
+    # Union of numeric columns over all layers, so a heterograph can be colored
+    # by a measurement and not only by layer. A column present in one layer and
+    # absent in another is normal; the absent side reads 0.0.
+    node_columns = []
+    for layer_gdf in nodes_dict.values():
+        for col in _numeric_columns(layer_gdf):
+            if col not in node_columns:
+                node_columns.append(col)
+    node_values = {col: [] for col in node_columns}
+
     for layer_name in layer_names:
         layer_gdf = nodes_dict[layer_name]
         gdf_4326 = layer_gdf
         if layer_gdf.crs and str(layer_gdf.crs).upper() != "EPSG:4326":
             gdf_4326 = layer_gdf.to_crs("EPSG:4326")
-        for node_id, geom in zip(layer_gdf.index, gdf_4326.geometry):
+        columns_here = {col: layer_gdf[col].tolist() for col in node_columns
+                        if col in layer_gdf.columns}
+        for row_pos, (node_id, geom) in enumerate(zip(layer_gdf.index,
+                                                      gdf_4326.geometry)):
             if geom is None or geom.is_empty:
                 continue
             point = geom if isinstance(geom, Point) else geom.representative_point()
@@ -347,6 +360,8 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
             node_index[(layer_name, node_id)] = len(positions)
             positions.append((x, y, z))
             layer_ids.append(layer_id_map[layer_name])
+            for col in node_columns:
+                node_values[col].append(_as_float(columns_here.get(col), row_pos))
 
     if not positions:
         return None
@@ -362,6 +377,15 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
     edges_flat = []
     seen = set()
 
+    edge_columns = []
+    for rel_gdf in edges_dict.values():
+        if rel_gdf is None or len(rel_gdf) == 0:
+            continue
+        for col in _numeric_columns(rel_gdf):
+            if col not in edge_columns:
+                edge_columns.append(col)
+    edge_values = {col: [] for col in edge_columns}
+
     for rel_key, rel_gdf in edges_dict.items():
         if rel_gdf is None or len(rel_gdf) == 0:
             continue
@@ -369,7 +393,9 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
         import pandas as pd
         if not isinstance(rel_gdf.index, pd.MultiIndex) or rel_gdf.index.nlevels < 2:
             continue
-        for key in rel_gdf.index:
+        columns_here = {col: rel_gdf[col].tolist() for col in edge_columns
+                        if col in rel_gdf.columns}
+        for row_pos, key in enumerate(rel_gdf.index):
             src = node_index.get((src_layer, key[0]))
             tgt = node_index.get((tgt_layer, key[1]))
             if src is None or tgt is None or src == tgt:
@@ -379,12 +405,15 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
                 continue
             try:
                 bm.edges.new([verts[src], verts[tgt]])
-                seen.add(dedup)
-                edge_type_ids.append(relation_id_map[rel_key])
-                edges_flat.append(str(src))
-                edges_flat.append(str(tgt))
             except ValueError:
-                pass
+                # The pair already exists, contributed by another relation.
+                continue
+            seen.add(dedup)
+            edge_type_ids.append(relation_id_map[rel_key])
+            edges_flat.append(str(src))
+            edges_flat.append(str(tgt))
+            for col in edge_columns:
+                edge_values[col].append(_as_float(columns_here.get(col), row_pos))
 
     bm.to_mesh(mesh)
     bm.free()
@@ -413,26 +442,32 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
     if len(mesh.vertices) == len(layer_ids):
         attr = mesh.attributes.new(name="layer_id", type='INT', domain='POINT')
         attr.data.foreach_set("value", layer_ids)
+        id_attr = mesh.attributes.new(name="node_id", type='INT', domain='POINT')
+        id_attr.data.foreach_set("value", list(range(len(layer_ids))))
+        for col, values in node_values.items():
+            if len(values) != len(layer_ids):
+                continue
+            col_attr = mesh.attributes.new(name=f"node_{col}", type='FLOAT',
+                                           domain='POINT')
+            col_attr.data.foreach_set("value", values)
     if len(mesh.edges) == len(edge_type_ids):
         eattr = mesh.attributes.new(name="edge_type_id", type='INT', domain='EDGE')
         eattr.data.foreach_set("value", edge_type_ids)
+        for col, values in edge_values.items():
+            if len(values) != len(edge_type_ids):
+                continue
+            col_attr = mesh.attributes.new(name=f"edge_{col}", type='FLOAT',
+                                          domain='EDGE')
+            col_attr.data.foreach_set("value", values)
 
     return obj
 
 
 def create_curves_from_gdf(edges_gdf, name, feature_obj, thickness=0.0002, limit=1000):
-    """
-    Create a Blender curve object from an edges GeoDataFrame.
+    """Create a Blender curve object from LineString edges, or None if none drawn.
 
-    Args:
-        edges_gdf: GeoDataFrame with LineString geometries.
-        name: Object name.
-        feature_obj: Source feature object used for coordinate transform parameters.
-        thickness: Bevel depth of the curve.
-        limit: Maximum number of edges to visualise.
-
-    Returns:
-        Curve object, or ``None``.
+    ``thickness`` is the bevel depth; ``limit`` caps how many edges are drawn.
+    ``feature_obj`` supplies the projection.
     """
     from shapely.geometry import LineString
 
@@ -483,17 +518,7 @@ def create_curves_from_gdf(edges_gdf, name, feature_obj, thickness=0.0002, limit
 
 
 def create_nodes_mesh_from_gdf(nodes_gdf, name, feature_obj):
-    """
-    Create a point-cloud mesh from a nodes GeoDataFrame.
-
-    Args:
-        nodes_gdf: GeoDataFrame with Point geometries.
-        name: Object name.
-        feature_obj: Source feature object for coordinate transform.
-
-    Returns:
-        Mesh object, or ``None``.
-    """
+    """Create a point-cloud mesh from Point nodes, projected via ``feature_obj``."""
     from shapely.geometry import Point
 
     if nodes_gdf is None or len(nodes_gdf) == 0:

@@ -1,5 +1,4 @@
-# Topological analysis panels for SciGraphs addon
-# Provides UI for planarity, genus, face detection, and surface embedding
+# Topology panels: planarity, genus, face detection, surface embedding.
 
 import bpy
 
@@ -23,7 +22,6 @@ class SCIGRAPHS_PT_topology(bpy.types.Panel):
             box.label(text="Create a graph first in Data panel")
             return
         
-        # Mode selector
         layout.prop(props, "topology_analysis_mode", expand=True)
 
 
@@ -51,12 +49,10 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Surface type selector
         box = layout.box()
         box.label(text="Embedding Surface", icon='SURFACE_NSURFACE')
         box.prop(props, "topology_surface_type", text="")
         
-        # Planarity check
         layout.separator()
         box = layout.box()
         box.label(text="Planarity Analysis", icon='MESH_PLANE')
@@ -65,7 +61,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.check_planarity", text="Check Planarity", icon='VIEWZOOM')
         
-        # Show planarity result if available
         if "topo_is_planar" in obj:
             info = box.box()
             info.scale_y = 0.8
@@ -79,7 +74,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
                 if k_type:
                     info.label(text=f"Contains {k_type} subdivision")
         
-        # Genus calculation
         layout.separator()
         box = layout.box()
         box.label(text="Genus Computation", icon='MESH_TORUS')
@@ -88,7 +82,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.calculate_genus", text="Calculate Genus", icon='PLAY')
         
-        # Show genus result
         if "topo_genus_lower_bound" in obj:
             info = box.box()
             info.scale_y = 0.8
@@ -101,7 +94,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
             else:
                 info.label(text=f"Genus >= {genus_bound}")
             
-            # Euler characteristic
             if "topo_euler_V" in obj:
                 V = obj.get("topo_euler_V", 0)
                 E = obj.get("topo_euler_E", 0)
@@ -112,7 +104,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
                     chi = obj.get("topo_euler_chi", 0)
                     info.label(text=f"F={F}, chi={chi}")
         
-        # Face computation (only for planar graphs)
         if obj.get("topo_is_planar", False):
             layout.separator()
             box = layout.box()
@@ -146,7 +137,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
             row.scale_y = 1.2
             row.operator("scigraphs.create_dual_graph", text="Create Dual Graph", icon='OUTLINER_OB_MESH')
             
-            # Show dual graph controls if exists
             dual_name = obj.get("topo_dual_child", "")
             if dual_name and dual_name in bpy.data.objects:
                 dual_box = box.box()
@@ -159,17 +149,14 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
                 row.operator("scigraphs.toggle_dual_graph", text="Toggle", icon=icon)
                 row.operator("scigraphs.remove_dual_graph", text="Remove", icon='X')
         
-        # Surface visualization
         layout.separator()
         box = layout.box()
         box.label(text="Embedding Layout", icon='RESTRICT_VIEW_OFF')
         
-        # Operator
         row = box.row()
         row.scale_y = 1.2
         row.operator("scigraphs.visualize_surface", text="Compute Embedding", icon='MOD_WARP')
         
-        # Info about visualization - explain what happens
         viz_info = box.box()
         viz_info.scale_y = 0.7
         if props.topology_surface_type == 'PLANE':
@@ -177,7 +164,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
             viz_info.label(text="Edges will NOT cross!")
             viz_info.label(text="Creates: Plane surface mesh")
         
-        # Validate crossings
         box.separator()
         row = box.row()
         row.operator("scigraphs.validate_crossings", text="Validate Crossings", icon='ERROR')
@@ -192,7 +178,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
             else:
                 cross_info.label(text="No edge crossings!", icon='CHECKMARK')
         
-        # Show surface info if exists
         surface_name = obj.get("topo_surface_child", "")
         if surface_name and surface_name in bpy.data.objects:
             layout.separator()
@@ -214,7 +199,6 @@ class SCIGRAPHS_PT_topology_surface(bpy.types.Panel):
                 col.label(text=f"  Nodes (is_intersection=1): {num_nodes}")
                 col.label(text=f"  Curve points (is_intersection=0): {curve_verts}")
             
-            # Toggle and remove buttons
             row = surf_box.row(align=True)
             surface_obj = bpy.data.objects[surface_name]
             icon = 'HIDE_OFF' if not surface_obj.hide_viewport else 'HIDE_ON'
@@ -233,7 +217,6 @@ class SCIGRAPHS_PT_topology_results(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        # Only show if some analysis has been done
         return obj and any(key.startswith("topo_") for key in obj.keys())
     
     def draw(self, context):
@@ -251,7 +234,6 @@ class SCIGRAPHS_PT_topology_results(bpy.types.Panel):
         col = box.column(align=True)
         col.scale_y = 0.8
         
-        # Surface embedding results
         if "topo_is_planar" in obj:
             is_planar = obj.get("topo_is_planar", False)
             col.label(text=f"Planar: {'Yes' if is_planar else 'No'}")
@@ -266,7 +248,6 @@ class SCIGRAPHS_PT_topology_results(bpy.types.Panel):
         
         col.separator()
         
-        # Spatial results
         if "topo_num_cycles" in obj:
             cycles = obj.get("topo_num_cycles", 0)
             col.label(text=f"Cycles: {cycles}")
@@ -279,7 +260,6 @@ class SCIGRAPHS_PT_topology_results(bpy.types.Panel):
             intrinsic = obj.get("topo_intrinsically_linked", False)
             col.label(text=f"Intrinsically linked: {'Yes' if intrinsic else 'No'}")
         
-        # Euler characteristic
         if "topo_euler_V" in obj and "topo_euler_E" in obj:
             V = obj.get("topo_euler_V", 0)
             E = obj.get("topo_euler_E", 0)

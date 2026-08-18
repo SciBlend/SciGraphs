@@ -15,12 +15,7 @@ TEXTURE_CACHE_DIR = os.path.join(
 
 
 def get_preferences():
-    """
-    Get SciGraphs addon preferences.
-    
-    Returns:
-        AddonPreferences instance or None if not available
-    """
+    """Return the addon preferences, or None outside Blender."""
     try:
         import bpy
         addon = bpy.context.preferences.addons.get("SciGraphs")
@@ -32,50 +27,24 @@ def get_preferences():
 
 
 def get_cache_filepath(theme: str, resolution: str, provider: str = "default") -> str:
-    """
-    Generate a cache filepath for a given texture theme and resolution.
-    
-    Args:
-        theme: Texture theme identifier
-        resolution: Resolution identifier
-        provider: API provider name
-    
-    Returns:
-        Full path to the cached texture file
-    """
+    """Return the cache path for one texture, creating the cache dir."""
     os.makedirs(TEXTURE_CACHE_DIR, exist_ok=True)
     filename = f"{provider}_{theme}_{resolution}.jpg"
     return os.path.join(TEXTURE_CACHE_DIR, filename)
 
 
 def is_texture_cached(theme: str, resolution: str, provider: str = "default") -> bool:
-    """
-    Check if a texture is already cached locally.
-    
-    Args:
-        theme: Texture theme identifier
-        resolution: Resolution identifier
-        provider: API provider name
-    
-    Returns:
-        True if the texture file exists in cache
+    """Report whether a usable copy of the texture is already on disk.
+
+    Files under 1000 bytes count as absent: a failed download leaves an error
+    page behind, and it would otherwise be served as the texture forever.
     """
     filepath = get_cache_filepath(theme, resolution, provider)
     return os.path.exists(filepath) and os.path.getsize(filepath) > 1000
 
 
 def _make_request(url: str, headers: dict = None, timeout: int = 60) -> bytes:
-    """
-    Make an HTTP request with proper headers and error handling.
-    
-    Args:
-        url: URL to request
-        headers: Optional headers dict
-        timeout: Request timeout in seconds
-    
-    Returns:
-        Response content as bytes
-    """
+    """GET a URL and return the body. Raises on any HTTP or network error."""
     if headers is None:
         headers = {}
     
@@ -93,19 +62,10 @@ def download_nasa_texture(
     resolution: str,
     api_key: str = "DEMO_KEY"
 ) -> Optional[str]:
-    """
-    Download Earth imagery using NASA APIs.
-    
-    Uses NASA EPIC (Earth Polychromatic Imaging Camera) API for recent imagery
-    or falls back to pre-rendered Blue Marble composites.
-    
-    Args:
-        theme: Theme identifier
-        resolution: Target resolution
-        api_key: NASA API key (DEMO_KEY has rate limits)
-    
-    Returns:
-        Path to downloaded texture or None
+    """Fetch NASA Earth imagery for a theme, returning the cached file path.
+
+    DEMO_KEY works but is rate limited. Themes other than NASA_BLUE_MARBLE and
+    NASA_VIIRS are generated procedurally instead.
     """
     cache_path = get_cache_filepath(theme, resolution, "nasa")
     
@@ -126,16 +86,15 @@ def download_nasa_texture(
 
 
 def _download_nasa_blue_marble(cache_path: str, resolution: str, api_key: str) -> Optional[str]:
-    """
-    Download NASA Blue Marble imagery.
-    
-    Uses NASA Worldview GIBS service for reliable tile downloads,
-    then stitches tiles into an equirectangular projection.
+    """Stitch Blue Marble from GIBS WMTS tiles in EPSG:4326.
+
+    The EPSG:4326 endpoint is what makes the result equirectangular; the Web
+    Mercator endpoint would need reprojecting before it could wrap a globe.
     """
     resolution_map = {
-        '2K': (8, 4),    # 8x4 = 32 tiles at 256px = 2048x1024
-        '4K': (16, 8),   # 16x8 = 128 tiles
-        '8K': (32, 16),  # 32x16 = 512 tiles
+        '2K': (8, 4),    # 32 tiles of 256 px = 2048x1024
+        '4K': (16, 8),
+        '8K': (32, 16),
     }
     
     tiles_x, tiles_y = resolution_map.get(resolution, (16, 8))
@@ -162,11 +121,7 @@ def _download_nasa_blue_marble(cache_path: str, resolution: str, api_key: str) -
 
 
 def _try_alternative_blue_marble(cache_path: str, resolution: str) -> Optional[str]:
-    """
-    Try alternative sources for Blue Marble imagery.
-    
-    Falls back to publicly available composite images from reliable CDNs.
-    """
+    """Pull a Blue Marble composite from public CDNs when GIBS is unreachable."""
     alternative_urls = [
         "https://www.solarsystemscope.com/textures/download/2k_earth_daymap.jpg",
         "https://www.solarsystemscope.com/textures/download/8k_earth_daymap.jpg",
@@ -196,9 +151,7 @@ def _try_alternative_blue_marble(cache_path: str, resolution: str) -> Optional[s
 
 
 def _download_nasa_viirs_nightlights(cache_path: str, resolution: str, api_key: str) -> Optional[str]:
-    """
-    Download NASA VIIRS Earth at Night imagery.
-    """
+    """Download the VIIRS Earth at Night texture."""
     alternative_urls = [
         "https://www.solarsystemscope.com/textures/download/2k_earth_nightmap.jpg",
         "https://www.solarsystemscope.com/textures/download/8k_earth_nightmap.jpg",
@@ -231,19 +184,10 @@ def _stitch_wmts_tiles(
     tile_size: int,
     output_path: str
 ) -> bool:
-    """
-    Download and stitch WMTS tiles into a single equirectangular image.
-    
-    Args:
-        base_url: WMTS service base URL
-        layer: Layer name to request
-        tiles_x: Number of tiles horizontally
-        tiles_y: Number of tiles vertically
-        tile_size: Size of each tile in pixels
-        output_path: Path to save the stitched image
-    
-    Returns:
-        True if successful
+    """Download a WMTS tile grid in parallel and paste it into one image.
+
+    Missing tiles are left at the background fill rather than aborting, so a
+    partial download still produces a usable texture.
     """
     try:
         from PIL import Image
@@ -308,20 +252,11 @@ def download_texture(
     resolution: str = '4K',
     force_download: bool = False
 ) -> Optional[str]:
-    """
-    Download an equirectangular Earth texture using the configured provider.
-    
-    This is the main entry point for texture downloads. It reads the provider
-    and API key from addon preferences and delegates to the appropriate
-    download function.
-    
-    Args:
-        theme: Texture theme identifier
-        resolution: Texture resolution ('2K', '4K', '8K')
-        force_download: If True, re-download even if cached
-    
-    Returns:
-        Path to the downloaded texture file, or None if download failed
+    """Get an equirectangular Earth texture from the configured provider.
+
+    Reads provider and API key from addon preferences, falling back to NASA.
+    A failed download always ends in a procedural texture, so this returns None
+    only if even that fails.
     """
     prefs = get_preferences()
     
@@ -356,18 +291,7 @@ def download_texture(
 
 
 def _generate_procedural_texture(theme: str, resolution: str) -> Optional[str]:
-    """
-    Generate a procedural texture for themes that do not use external downloads.
-    
-    Creates gradient or pattern textures locally using numpy and PIL.
-    
-    Args:
-        theme: Theme identifier
-        resolution: Target resolution
-    
-    Returns:
-        Path to generated texture file or None
-    """
+    """Synthesize a texture locally with numpy and PIL. Needs both installed."""
     try:
         import numpy as np
         from PIL import Image
@@ -409,8 +333,10 @@ def _generate_procedural_texture(theme: str, resolution: str) -> Optional[str]:
 
 
 def _create_earth_texture(width: int, height: int):
-    """
-    Create a procedural Earth-like texture with land and ocean.
+    """Fake continents: blobs of land over ocean, with ice past 63 degrees.
+
+    The seed is fixed so the same invented geography comes back every run.
+    These landmasses are decorative and do not correspond to real ones.
     """
     import numpy as np
     
@@ -463,8 +389,8 @@ def _create_earth_texture(width: int, height: int):
 
 
 def _create_night_lights_texture(width: int, height: int):
-    """
-    Create a procedural Earth at night texture with city lights.
+    """Night lights: 15 real cities at their true coordinates, plus 200 random
+    glows scattered between 60 south and 70 north.
     """
     import numpy as np
     
@@ -500,6 +426,7 @@ def _create_night_lights_texture(width: int, height: int):
         intensity = np.random.uniform(0.1, 0.5)
         cities.append((lat, lon, intensity))
     
+    # Row 0 is the north pole, so latitude runs 90 down to -90 here.
     y_coords = np.linspace(90, -90, height)[:, np.newaxis]
     x_coords = np.linspace(-180, 180, width)[np.newaxis, :]
     
@@ -518,9 +445,7 @@ def _create_night_lights_texture(width: int, height: int):
 
 
 def _create_urban_dark_texture(width: int, height: int):
-    """
-    Create a dark map texture with subtle continental outlines.
-    """
+    """Dark blue-gray base texture with noise, for overlaying data on."""
     import numpy as np
     
     img = np.zeros((height, width, 3), dtype=np.float32)
@@ -538,9 +463,7 @@ def _create_urban_dark_texture(width: int, height: int):
 
 
 def _create_topographic_texture(width: int, height: int):
-    """
-    Create a topographic-style texture with elevation gradients.
-    """
+    """Topographic-style bands, shading by distance from the equator."""
     import numpy as np
     
     img = np.zeros((height, width, 3), dtype=np.float32)
@@ -558,9 +481,7 @@ def _create_topographic_texture(width: int, height: int):
 
 
 def _create_data_overlay_texture(width: int, height: int):
-    """
-    Create a semi-transparent neutral texture for data overlay mode.
-    """
+    """Neutral dark gradient meant to sit under semitransparent data."""
     import numpy as np
     
     img = np.ones((height, width, 3), dtype=np.float32) * 40
@@ -580,18 +501,11 @@ def get_texture_for_globe(
     theme: str,
     resolution: str = '4K'
 ) -> Tuple[Optional[str], dict]:
-    """
-    Get the appropriate texture for globe rendering along with material hints.
-    
-    This is the main entry point for obtaining textures. It handles downloading,
-    caching, and provides material configuration hints based on the theme.
-    
-    Args:
-        theme: Globe theme identifier
-        resolution: Desired texture resolution
-    
-    Returns:
-        Tuple of (texture_path, material_hints_dict)
+    """Return (texture_path, material_hints) for a globe theme.
+
+    The hints are the shading settings that go with each texture: roughness and
+    specular for land and water, bump and emission strength, and alpha for
+    DATA_OVERLAY. Theme 'NONE' returns no path, just default hints.
     """
     material_hints = {
         'NASA_BLUE_MARBLE': {
@@ -656,12 +570,7 @@ def get_texture_for_globe(
 
 
 def clear_texture_cache() -> int:
-    """
-    Remove all cached textures to free disk space.
-    
-    Returns:
-        Number of files deleted
-    """
+    """Delete every cached texture and return how many files went."""
     if not os.path.exists(TEXTURE_CACHE_DIR):
         return 0
     
@@ -680,12 +589,7 @@ def clear_texture_cache() -> int:
 
 
 def get_cache_size() -> Tuple[int, str]:
-    """
-    Calculate the total size of cached textures.
-    
-    Returns:
-        Tuple of (size_in_bytes, human_readable_string)
-    """
+    """Return the texture cache size as (bytes, formatted string)."""
     if not os.path.exists(TEXTURE_CACHE_DIR):
         return 0, "0 B"
     

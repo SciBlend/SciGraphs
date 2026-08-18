@@ -2,19 +2,15 @@
 
 import bpy
 
-from ....core.osmnx import (
+from scigraphs_core.osmnx import (
     add_travel_time_from_speed,
     ego_subgraph,
     make_iso_polygons,
     network_dbscan,
 )
-from ....core.osmnx.metadata import get_graph_extent
+from scigraphs_core.osmnx.metadata import get_graph_extent
 from .utils import _get_osmnx_graph, _get_unprojected_graph, _store_osmnx_graph
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _pick_routing_graph(obj):
     G = _get_osmnx_graph(obj)
@@ -64,10 +60,6 @@ def _resolve_iso_center(props, obj, G):
     except StopIteration:
         return None
 
-
-# ---------------------------------------------------------------------------
-# Isochrone generation
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxIsochrones(bpy.types.Operator):
     """Generate concentric isochrone polygons from a center node."""
@@ -177,10 +169,6 @@ class SCIGRAPHS_OT_OSMnxIsochrones(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Ego subgraph extraction
-# ---------------------------------------------------------------------------
-
 class SCIGRAPHS_OT_OSMnxEgoSubgraph(bpy.types.Operator):
     """Keep only nodes reachable within a network distance from a center node."""
     bl_idname = "scigraphs.osmnx_ego_subgraph"
@@ -233,10 +221,6 @@ class SCIGRAPHS_OT_OSMnxEgoSubgraph(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Network-constrained DBSCAN
-# ---------------------------------------------------------------------------
-
 class SCIGRAPHS_OT_OSMnxNetworkDBSCAN(bpy.types.Operator):
     """Cluster graph nodes by network distance using DBSCAN."""
     bl_idname = "scigraphs.osmnx_network_dbscan"
@@ -288,7 +272,7 @@ class SCIGRAPHS_OT_OSMnxNetworkDBSCAN(bpy.types.Operator):
             self.report({'ERROR'}, "DBSCAN failed (missing scikit-learn?)")
             return {'CANCELLED'}
 
-        # Write labels into the graph as node attribute and into mesh as vertex attribute.
+        # Labels go onto the graph nodes and onto the mesh points.
         import networkx as nx
         for n, lbl in labels.items():
             G.nodes[n]["dbscan_cluster"] = int(lbl)

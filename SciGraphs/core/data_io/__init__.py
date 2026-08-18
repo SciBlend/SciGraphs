@@ -1,5 +1,5 @@
-from . import db_connector
-from . import export_utils
-from . import importer
-from . import sql_importer
-from . import suitesparse_importer
+"""the importer that writes a mesh; the rest of data_io is in the wheel.
+
+The Blender-free half is `scigraphs_core.data_io`. See `SciGraphs.core` for the
+split and why this package has no lazy table.
+"""

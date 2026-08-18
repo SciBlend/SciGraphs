@@ -1,12 +1,108 @@
-"""
-Mobility / OD Matrix operators for City2Graph.
+"""Operators to load OD matrices, turn them into graphs, and draw the flows.
 
-Provides operators to load OD matrices, convert them to graphs,
-and visualize origin-destination flows.
+``core.city2graph.mobility`` computes and returns GeoDataFrames and NetworkX
+graphs; the two helpers here are the only step that touches bpy, which is what
+keeps that module importable without Blender.
 """
 
 import bpy
 from bpy.props import StringProperty
+
+
+def create_od_graph_blender(od_data, zones_gdf, zone_id_col, osmnx_obj=None,
+                            matrix_type="edgelist", directed=True,
+                            weight_cols=None, threshold=None):
+    """Create a Blender mesh graph from OD matrix data, or None on failure.
+
+    ``matrix_type`` is 'edgelist' or 'adjacency'; ``osmnx_obj`` aligns the
+    result with an existing street network.
+    """
+    from scigraphs_core.city2graph.mobility import od_matrix_to_graph
+    from ....core.city2graph.morphology import create_graph_from_networkx
+    from scigraphs_core.logger import log
+
+    graph = od_matrix_to_graph(
+        od_data=od_data,
+        zones_gdf=zones_gdf,
+        zone_id_col=zone_id_col,
+        matrix_type=matrix_type,
+        weight_cols=weight_cols,
+        threshold=threshold,
+        directed=directed,
+        as_nx=True,
+    )
+
+    if graph is None:
+        return None
+
+    try:
+        graph_obj = create_graph_from_networkx(
+            graph,
+            name="OD_Graph",
+            use_positions=True,
+            osmnx_obj=osmnx_obj,
+        )
+
+        if graph_obj:
+            graph_obj["is_od_graph"] = True
+            graph_obj["od_directed"] = directed
+            if threshold:
+                graph_obj["od_threshold"] = threshold
+
+        return graph_obj
+
+    except Exception as e:
+        log(f"Error creating Blender OD graph: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def visualize_od_flows(od_data, zones_gdf, zone_id_col, feature_obj=None,
+                       weight_col=None, threshold=None, curve_thickness=0.0002,
+                       limit=1000):
+    """Draw OD flows as Blender curves and return the created objects.
+
+    ``mobility.od_flow_edges`` produces the geometry; this only turns the
+    GeoDataFrame into curves. ``feature_obj`` supplies the coordinate transform.
+    """
+    from scigraphs_core.city2graph.mobility import od_flow_edges
+    from ....core.mesh.geo_mesh import create_curves_from_gdf
+    from scigraphs_core.logger import log
+
+    edges_gdf = od_flow_edges(
+        od_data=od_data,
+        zones_gdf=zones_gdf,
+        zone_id_col=zone_id_col,
+        weight_col=weight_col,
+        threshold=threshold,
+        limit=limit,
+    )
+
+    if edges_gdf is None or len(edges_gdf) == 0:
+        return []
+
+    try:
+        curves_obj = create_curves_from_gdf(
+            edges_gdf,
+            name="OD_Flows",
+            feature_obj=feature_obj,
+            thickness=curve_thickness,
+            limit=limit,
+        )
+
+        if curves_obj:
+            curves_obj["is_od_flow"] = True
+            log(f"Created OD flow curves with {len(edges_gdf)} edges")
+            return [curves_obj]
+
+        return []
+
+    except Exception as e:
+        log(f"Error visualizing OD flows: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 class SCIGRAPHS_OT_C2G_LoadODMatrix(bpy.types.Operator):
@@ -59,7 +155,6 @@ class SCIGRAPHS_OT_C2G_ODToGraph(bpy.types.Operator):
         return "c2g_od_data" in context.scene
 
     def execute(self, context):
-        from ....core.city2graph import mobility
         from ....core.city2graph import utils as c2g_utils
 
         props = context.scene.city2graph
@@ -94,7 +189,7 @@ class SCIGRAPHS_OT_C2G_ODToGraph(bpy.types.Operator):
 
         self.report({'INFO'}, "Converting OD matrix to graph...")
 
-        graph_obj = mobility.create_od_graph_blender(
+        graph_obj = create_od_graph_blender(
             od_data=od_data,
             zones_gdf=zones_gdf,
             zone_id_col=zone_id_col,

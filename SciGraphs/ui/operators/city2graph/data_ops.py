@@ -2,6 +2,16 @@ import bpy
 from bpy.props import StringProperty
 
 
+def _overture_api_key():
+    """Read the Overture key from preferences; None lets core fall back.
+
+    Keeping the lookup here leaves core.city2graph.overture_api free of bpy.
+    """
+    from ....preferences import get_preferences
+    prefs = get_preferences()
+    return prefs.overture_api_key if prefs else None
+
+
 def _flatten_result_objects(result):
     """Return a flat list of objects from a feature-download result dict."""
     objects = []
@@ -13,14 +23,7 @@ def _flatten_result_objects(result):
 
 
 class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
-    """Download urban features as polygons/lines from Overture Maps.
-
-    Replaces the old fragmented panel: a single dispatcher that takes
-    the area resolved by :func:`area_resolver.resolve_area` (which
-    mirrors the OSMnx area methods, plus a "From OSMnx Graph" mode
-    that reuses the active graph's bbox + projection) and pushes the
-    result through the Overture REST API.
-    """
+    """Download urban features as polygons/lines from Overture Maps."""
     bl_idname = "scigraphs.c2g_load_overture"
     bl_label = "Get as Polygons"
     bl_description = (
@@ -59,6 +62,7 @@ class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
             limit=scene_props.feat_limit,
             nodes_only=scene_props.feat_nodes_only,
             place_name=place_name,
+            overture_api_key=_overture_api_key(),
         )
 
         if result is None or len(result) == 0:
@@ -72,15 +76,7 @@ class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
-    """Download POIs/places as native points from Overture Maps.
-
-    Complement of :class:`SCIGRAPHS_OT_C2G_LoadOverture`: same area
-    resolution and alignment, but the request goes to the *places*
-    endpoint (which natively returns points) plus, optionally, any
-    polygon feature reduced to its representative point so the result
-    is always a point cloud — useful for proximity graphs or
-    centrality-on-POIs analyses.
-    """
+    """Download POIs/places as native points from Overture Maps."""
     bl_idname = "scigraphs.c2g_load_overture_points"
     bl_label = "Get as Points"
     bl_description = (
@@ -119,6 +115,7 @@ class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
             limit=scene_props.feat_limit,
             nodes_only=scene_props.feat_nodes_only,
             place_name=place_name,
+            overture_api_key=_overture_api_key(),
         )
         objects = _flatten_result_objects(full)
         if not objects:
@@ -144,13 +141,7 @@ class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
 
 
 class SCIGRAPHS_OT_C2G_ConvertToCentroids(bpy.types.Operator):
-    """Reduce the active polygon/line object to its representative points.
-
-    Operates on whatever the user has selected (typically a polygon
-    object created by *Get as Polygons*) and creates a sibling object
-    with one vertex per feature's centroid. Original object is kept,
-    so the user can decide to delete it manually.
-    """
+    """Reduce the active polygon/line object to its representative points."""
     bl_idname = "scigraphs.c2g_convert_to_centroids"
     bl_label = "Convert Selected to Centroids"
     bl_description = (
@@ -232,13 +223,11 @@ class SCIGRAPHS_OT_C2G_ImportGTFS(bpy.types.Operator):
         context.scene["c2g_gtfs_loaded"] = True
         context.scene["c2g_gtfs_path"] = self.filepath
         context.scene["c2g_gtfs_tables"] = tables
-        # Legacy key kept for backwards compatibility with any panel
-        # that still polls "c2g_gtfs_data". Safe truthy marker.
+        # Truthy marker for panels that still poll "c2g_gtfs_data".
         context.scene["c2g_gtfs_data"] = self.filepath
 
-        # Discover the set of service dates present in the feed so the
-        # Calendar Start/End dropdowns can offer real choices instead
-        # of asking the user to type YYYYMMDD by hand.
+        # Collect the feed's service dates so the Calendar Start/End dropdowns
+        # offer real choices instead of hand-typed YYYYMMDD.
         try:
             dates = []
             if 'calendar' in tables:
@@ -289,7 +278,7 @@ class SCIGRAPHS_OT_C2G_VisualizeGTFS(bpy.types.Operator):
         if gtfs_data is None:
             self.report(
                 {'ERROR'},
-                "No GTFS data loaded (the cached connection was lost — re-import).",
+                "No GTFS data loaded (the cached connection was lost, re-import).",
             )
             return {'CANCELLED'}
         props = context.scene.city2graph

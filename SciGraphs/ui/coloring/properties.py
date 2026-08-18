@@ -16,22 +16,20 @@ from bpy.props import (
 )
 from bpy.types import PropertyGroup
 
-from ...core.coloring.colormaps import (
+from scigraphs_core.coloring.colormaps import (
     QUICK_COLORMAPS,
     colormap_items_for_enum,
     norm_mode_items_for_enum,
 )
-from ...core.coloring.attributes import (
+from scigraphs_core.coloring.attributes import (
     list_scalar_attributes,
 )
 
 
-# ---------------------------------------------------------------------------
-# Dynamic enums
-# ---------------------------------------------------------------------------
+# --- Dynamic enums ---------------------------------------------------------
 
-# We keep references to the dynamically generated enum items because Blender
-# does not retain them: returning a plain list each call leaks the strings.
+# Blender does not keep a reference to enum items built on the fly, so a plain
+# list returned each call leaks its strings. Hold them here instead.
 _ATTRIBUTE_ITEMS_CACHE = []
 
 
@@ -53,9 +51,8 @@ def _attribute_enum_items(_self, context):
 def _on_attribute_enum_change(self, _context):
     """Mirror the enum selection into the persistent ``attribute_name`` string.
 
-    Blender forbids writing to ID-block properties from a panel/operator
-    ``draw`` method, so we keep the bridge in this update callback instead
-    of touching ``attribute_name`` while the popup is being drawn.
+    Blender forbids writing ID-block properties from a ``draw`` method, so the
+    bridge has to happen here rather than while the popup is drawn.
     """
     value = getattr(self, "attribute_enum", "") or ""
     if value and value != "__NONE__":
@@ -74,9 +71,7 @@ def _colormap_enum_items(_self, _context):
 _NORM_MODE_ITEMS = norm_mode_items_for_enum()
 
 
-# ---------------------------------------------------------------------------
-# Property group
-# ---------------------------------------------------------------------------
+# --- Property group --------------------------------------------------------
 
 class SCIGRAPHS_PG_coloring(PropertyGroup):
     """Persistent settings that drive the floating coloring toolbar."""
@@ -249,9 +244,7 @@ class SCIGRAPHS_PG_coloring(PropertyGroup):
     )
 
 
-# ---------------------------------------------------------------------------
-# WindowManager (transient state)
-# ---------------------------------------------------------------------------
+# --- WindowManager (transient state) ---------------------------------------
 
 def _register_window_manager_properties():
     bpy.types.WindowManager.scigraphs_show_color_toolbar = BoolProperty(
@@ -281,9 +274,7 @@ def _unregister_window_manager_properties():
             delattr(bpy.types.WindowManager, attr)
 
 
-# ---------------------------------------------------------------------------
-# Registration
-# ---------------------------------------------------------------------------
+# --- Registration ----------------------------------------------------------
 
 _classes = (SCIGRAPHS_PG_coloring,)
 

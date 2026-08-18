@@ -1,6 +1,4 @@
-# Reproducibility Panel for SciGraphs
-#
-# Lightweight sidebar panel for managing reproducible pipelines.
+# Sidebar panel for managing reproducible pipelines.
 
 import bpy
 from bpy.types import Panel
@@ -20,7 +18,6 @@ class SCIGRAPHS_PT_reproducibility(Panel):
         layout = self.layout
         props = context.scene.scigraphs_repro
 
-        # Pipeline file selector
         box = layout.box()
         box.label(text="Pipeline", icon='FILE_CACHE')
 
@@ -31,7 +28,6 @@ class SCIGRAPHS_PT_reproducibility(Panel):
         row.operator("scigraphs.validate_pipeline", text="Validate", icon='CHECKMARK')
         row.operator("scigraphs.run_pipeline", text="Run", icon='PLAY')
 
-        # Quick actions
         layout.separator()
         box = layout.box()
         box.label(text="Templates", icon='FILE_NEW')
@@ -41,7 +37,6 @@ class SCIGRAPHS_PT_reproducibility(Panel):
         col.operator("scigraphs.export_current_repro_spec", text="Export Current Scene", icon='SCENE_DATA')
         col.operator("scigraphs.export_repro_reference", text="Export Options Reference", icon='HELP')
 
-        # Output folder
         layout.separator()
         box = layout.box()
         box.label(text="Artifacts", icon='FOLDER_REDIRECT')
@@ -50,7 +45,6 @@ class SCIGRAPHS_PT_reproducibility(Panel):
         col.prop(props, "artifacts_path", text="")
         col.operator("scigraphs.open_artifacts_folder", text="Open Folder", icon='FILEBROWSER')
 
-        # Info box
         obj = context.active_object
         if obj and "num_nodes" in obj:
             layout.separator()

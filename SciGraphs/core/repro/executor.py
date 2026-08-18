@@ -1,7 +1,5 @@
-# Pipeline executor for reproducible SciGraphs workflows
-#
-# Executes declarative pipelines with logging, timing, error handling
-# and artifact generation.
+# Executes declarative SciGraphs pipelines, with timing, logging, error
+# handling and provenance artifacts.
 
 import datetime
 import json
@@ -12,13 +10,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .schema import (
+from scigraphs_core.repro.schema import (
     PipelineSchema, DatasetSpec, AnalysisSpec, LayoutSpec, VisualSpec,
     LabelsSpec, WorldSpec, LightingSpec, RenderSpec, ExportsSpec, OpSpec,
 )
-from .parser import save_canonical, canonicalize_pipeline
-from .determinism import set_pipeline_seed, get_seed_context
-from .provenance import (
+from scigraphs_core.repro.parser import save_canonical, canonicalize_pipeline
+from scigraphs_core.repro.determinism import set_pipeline_seed, get_seed_context
+from scigraphs_core.repro.provenance import (
     ProvenanceManifest, create_manifest, add_input, add_output,
     add_step, finalize_manifest, save_manifest
 )
@@ -39,24 +37,13 @@ class ExecutionResult:
 
 
 class PipelineExecutor:
-    """
-    Executes reproducible pipelines from declarative specifications.
+    """Executes reproducible pipelines from declarative specifications.
 
-    Handles:
-    - Deterministic seeding
-    - Step-by-step execution with timing
-    - Error handling and recovery
-    - Artifact and provenance generation
+    Seeds deterministically, runs each stage with timing and error recovery,
+    then writes the provenance artifacts.
     """
 
     def __init__(self, stop_on_error: bool = True, verbose: bool = True):
-        """
-        Initialize executor.
-
-        Args:
-            stop_on_error: Whether to stop execution on first error
-            verbose: Whether to log execution progress
-        """
         self.stop_on_error = stop_on_error
         self.verbose = verbose
         self.logger = logging.getLogger("scigraphs.repro")
@@ -112,17 +99,7 @@ class PipelineExecutor:
         raw_dict: Dict[str, Any],
         pipeline_hash: str,
     ) -> ExecutionResult:
-        """
-        Execute a validated pipeline.
-
-        Args:
-            schema: Parsed pipeline schema
-            raw_dict: Original pipeline dictionary
-            pipeline_hash: Pre-computed pipeline hash
-
-        Returns:
-            ExecutionResult with status and artifacts
-        """
+        """Execute a validated pipeline, returning its status and artifacts."""
         bpy = self._get_bpy()
 
         self._metric_attributes = {}
@@ -136,7 +113,6 @@ class PipelineExecutor:
             output_dir="",
         )
 
-        # Prepare output directory
         output_dir = self._prepare_output_dir(schema.meta.output_dir)
         result.output_dir = output_dir
 
@@ -144,75 +120,70 @@ class PipelineExecutor:
         self._log(f"Output directory: {output_dir}")
         self._log(f"Pipeline hash: {pipeline_hash[:16]}...")
 
-        # Set deterministic seed
         seed = schema.meta.seed
         set_pipeline_seed(seed)
         self._log(f"Set global seed: {seed}")
 
-        # Create provenance manifest
-        manifest = create_manifest(pipeline_hash, schema.meta.title, seed)
+        # The Blender version is passed in rather than looked up inside
+        # provenance.py, which otherwise never touches Blender. It also records
+        # the Blender actually running the pipeline, which a lookup there could
+        # not promise once a `bpy` wheel exists on PyPI.
+        manifest = create_manifest(
+            pipeline_hash, schema.meta.title, seed,
+            blender_version=".".join(str(v) for v in bpy.app.version),
+        )
+        manifest.output_dir = output_dir
 
-        # Save canonical pipeline
         canonical_path = os.path.join(output_dir, "pipeline.normalized.json")
         save_canonical(raw_dict, canonical_path)
         result.artifacts.append(canonical_path)
 
-        # Execute stages
         try:
             # Start from an empty scene: leftovers from the startup file get
             # rendered, or picked up as the active object.
             if getattr(schema.meta, "clear_scene", True):
                 self._clear_scene(result)
 
-            # Dataset stage
             if schema.dataset:
                 self._execute_dataset(schema.dataset, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Analysis stage
             if schema.analysis:
                 self._execute_analysis(schema.analysis, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Layout stage
             if schema.layout:
                 self._execute_layout(schema.layout, seed, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Visual stage
             if schema.visual:
                 self._execute_visual(schema.visual, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # World stage
             if schema.world:
                 self._execute_world(schema.world, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Lighting stage
             if schema.lighting:
                 self._execute_lighting(schema.lighting, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Generic ops
             if schema.ops:
                 self._execute_ops(schema.ops, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Render stage
             if schema.render:
                 self._execute_render(schema.render, output_dir, manifest, result)
                 if result.errors and self.stop_on_error:
                     raise RuntimeError(result.errors[-1])
 
-            # Exports stage
             if schema.exports:
                 self._execute_exports(schema.exports, output_dir, manifest, result)
                 if result.errors and self.stop_on_error:
@@ -224,17 +195,14 @@ class PipelineExecutor:
             result.errors.append(str(e))
             self._log(f"Pipeline failed: {e}", "error")
 
-        # Finalize manifest
         finalize_manifest(manifest, result.success)
         manifest.warnings = result.warnings
 
-        # Save manifest
         manifest_path = os.path.join(output_dir, "run_manifest.json")
         save_manifest(manifest, manifest_path)
         result.manifest_path = manifest_path
         result.artifacts.append(manifest_path)
 
-        # Save execution log
         log_path = os.path.join(output_dir, "run.log")
         self._save_log(log_path, schema, result)
         result.artifacts.append(log_path)
@@ -260,6 +228,23 @@ class PipelineExecutor:
 
         `auto_range` must be off for `vmin`/`vmax` to reach the shader.
         """
+        # Coloring a heavy-tailed measure through the linear default puts almost
+        # every node in one bin. Cheap to detect, invisible otherwise, and the
+        # most common mistake in a hand-written or generated specification.
+        heavy_tailed = ("betweenness", "degree", "closeness",
+                        "eigenvector", "pagerank", "katz")
+        clip = list(spec.color_clip_percentile or [0.0, 100.0])
+        clipped = len(clip) == 2 and (clip[0] > 0.0 or clip[1] < 100.0)
+        if (spec.color_norm == "LINEAR"
+                and not clipped
+                and spec.node_color
+                and any(m in spec.node_color.lower() for m in heavy_tailed)):
+            result.warnings.append(
+                "visual.node_color is '%s' with the linear default; centrality "
+                "measures are heavy-tailed, so consider color_norm RANK or LOG"
+                % spec.node_color
+            )
+
         explicit = spec.color_vmin is not None or spec.color_vmax is not None
         coloring.auto_range = not explicit
         if spec.color_vmin is not None and hasattr(coloring, "vmin"):
@@ -376,7 +361,10 @@ class PipelineExecutor:
         scene = bpy.context.scene
 
         def _set(owner, name, value, label):
-            if value is None:
+            # An empty string is not a value: it is a field the caller left
+            # blank, and every enum in Blender rejects "" with a confusing
+            # message about the identifier not being found.
+            if value is None or value == "":
                 return
             if not hasattr(owner, name):
                 result.warnings.append(f"{label} unsupported on this build")
@@ -386,21 +374,20 @@ class PipelineExecutor:
             except Exception as e:
                 result.warnings.append(f"{label} rejected: {e}")
 
-        # -- color management. view_transform first: valid `look` values are
+        # Color management. view_transform first: valid `look` values are
         # scoped to it, so the reverse order rejects every look.
         _set(scene.view_settings, "view_transform", spec.view_transform, "view_transform")
         _set(scene.view_settings, "look", spec.look, "look")
         _set(scene.view_settings, "exposure", spec.exposure, "exposure")
         _set(scene.view_settings, "gamma", spec.gamma, "gamma")
 
-        # -- image
         _set(scene.render, "resolution_percentage", spec.resolution_percentage, "resolution_percentage")
         _set(scene.render.image_settings, "file_format", spec.file_format, "file_format")
         _set(scene.render.image_settings, "color_depth", spec.color_depth, "color_depth")
         if spec.dpi is not None:
             _set(scene.render, "ppm_factor", float(spec.dpi), "dpi")
 
-        # -- reconstruction filter. The two properties are not aliased: Cycles
+        # Reconstruction filter. The two properties are not aliased: Cycles
         # ignores render.filter_size and reads cycles.filter_width (on 5.2).
         if spec.filter_width is not None:
             if spec.engine == "CYCLES":
@@ -532,7 +519,7 @@ class PipelineExecutor:
         if not values:
             result.warnings.append(
                 f"Label ranking attribute '{spec.rank_by}' not found; "
-                "labelling by camera distance instead"
+                "labeling by camera distance instead"
             )
             ranked = sorted(projected, key=lambda p: p.distance)
         else:
@@ -688,7 +675,26 @@ class PipelineExecutor:
 
         center = [(lo[a] + hi[a]) * 0.5 for a in range(3)]
         radius = 0.5 * math.sqrt(sum((hi[a] - lo[a]) ** 2 for a in range(3)))
-        return center, max(radius, 1e-6)
+
+        # The corners of an axis-aligned box around a diagonal graph are empty
+        # space, so framing on them still leaves the drawing small. Use the real
+        # vertices instead, subsampled: framing only needs the silhouette.
+        points = []
+        budget = 20000
+        for obj in bpy.data.objects:
+            if obj.type != 'MESH':
+                continue
+            evaluated = obj.evaluated_get(depsgraph)
+            mesh = evaluated.data
+            step = max(1, len(mesh.vertices) // budget)
+            matrix = evaluated.matrix_world
+            for i in range(0, len(mesh.vertices), step):
+                points.append(matrix @ mesh.vertices[i].co)
+        if not points:
+            points = [Vector((lo[0] if i & 1 else hi[0],
+                              lo[1] if i & 2 else hi[1],
+                              lo[2] if i & 4 else hi[2])) for i in range(8)]
+        return center, max(radius, 1e-6), lo, hi, points
 
     def _frame_camera(self, spec: RenderSpec, result: ExecutionResult) -> None:
         """Place and aim a camera so the whole graph fits the frame."""
@@ -702,7 +708,7 @@ class PipelineExecutor:
         if bounds is None:
             result.warnings.append("Nothing to frame; camera left as-is")
             return
-        center, radius = bounds
+        center, radius, lo, hi, points = bounds
 
         cam_obj = bpy.context.scene.camera
         if cam_obj is None or cam_obj.type != 'CAMERA':
@@ -715,20 +721,38 @@ class PipelineExecutor:
         if spec.camera_lens is not None:
             cam.lens = float(spec.camera_lens)
 
-        # Fit the bounding sphere in the narrower of the two field angles, so
-        # the graph fits regardless of the aspect ratio.
-        sensor = cam.sensor_width or 36.0
-        half_angle = math.atan((sensor * 0.5) / max(cam.lens, 1e-6))
-        res_x = max(bpy.context.scene.render.resolution_x, 1)
-        res_y = max(bpy.context.scene.render.resolution_y, 1)
-        if res_y > res_x:
-            half_angle = math.atan(math.tan(half_angle) * res_x / res_y)
-        distance = (radius * float(spec.camera_margin)) / max(math.sin(half_angle), 1e-6)
-
         direction = Vector(spec.camera_direction or [0.48, -0.72, 0.50])
         if direction.length < 1e-9:
             direction = Vector((0.48, -0.72, 0.50))
         direction.normalize()
+
+        # Fit the projected bounding box, not a bounding sphere. The sphere's
+        # radius is half the box diagonal, which for an elongated graph is far
+        # larger than anything visible, so the drawing ended up small in a wide
+        # empty frame. Projecting the eight corners is cheap and exact.
+        sensor = cam.sensor_width or 36.0
+        half_h = math.atan((sensor * 0.5) / max(cam.lens, 1e-6))
+        res_x = max(bpy.context.scene.render.resolution_x, 1)
+        res_y = max(bpy.context.scene.render.resolution_y, 1)
+        half_v = math.atan(math.tan(half_h) * res_y / res_x)
+        tan_h = max(math.tan(half_h), 1e-6)
+        tan_v = max(math.tan(half_v), 1e-6)
+
+        center_vec = Vector(center)
+        rotation = (direction).to_track_quat('Z', 'Y')
+        right = rotation @ Vector((1.0, 0.0, 0.0))
+        up = rotation @ Vector((0.0, 1.0, 0.0))
+
+        margin = float(spec.camera_margin)
+        distance = 0.0
+        for point in points:
+            offset = point - center_vec
+            # Depth toward the camera, and the two on-screen half-extents.
+            depth = offset.dot(direction)
+            need_h = depth + abs(offset.dot(right)) * margin / tan_h
+            need_v = depth + abs(offset.dot(up)) * margin / tan_v
+            distance = max(distance, need_h, need_v)
+        distance = max(distance, radius * 1e-3)
 
         center_vec = Vector(center)
         cam_obj.location = center_vec + direction * distance
@@ -741,7 +765,9 @@ class PipelineExecutor:
         # encodes a value stays comparable across the frame.
         if spec.camera_ortho:
             cam.type = 'ORTHO'
-            cam.ortho_scale = 2.0 * radius * float(spec.camera_margin)
+            half_w = max(abs((p - center_vec).dot(right)) for p in points)
+            half_ht = max(abs((p - center_vec).dot(up)) for p in points)
+            cam.ortho_scale = 2.0 * margin * max(half_w, half_ht * res_x / res_y)
         else:
             cam.type = 'PERSP'
 
@@ -773,7 +799,6 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute dataset loading stage."""
         bpy = self._get_bpy()
         self._log(f"Loading dataset: {spec.source}")
         start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -784,8 +809,7 @@ class PipelineExecutor:
 
         try:
             if spec.source == "osmnx":
-                # Import OSMnx graph. The operator reads everything from
-                # ``scene.scigraphs`` (osmnx_* properties live there).
+                # The operator reads the osmnx_* properties from scene.scigraphs.
                 scene_props = {
                     "osmnx_download_method": spec.method or "PLACE",
                     "osmnx_place_name": spec.query or "",
@@ -799,12 +823,10 @@ class PipelineExecutor:
                 if res["status"] == "error":
                     raise RuntimeError(res.get("error", "Unknown error"))
 
-                # Mark as network source
                 add_input(manifest, f"osmnx://{spec.query}", source="network", pinned=spec.cache)
 
             elif spec.source in ("gexf", "graphml", "csv"):
-                # File-based import goes through scigraphs.create_graph, which
-                # reads the file path and column mapping from scene.scigraphs.
+                # create_graph reads the path and column mapping from scene.scigraphs.
                 if not spec.filepath:
                     raise ValueError(f"filepath required for {spec.source} source")
 
@@ -839,11 +861,19 @@ class PipelineExecutor:
                 add_input(manifest, resolved, source="file", pinned=True)
 
             elif spec.source == "suitesparse":
-                # Import from SuiteSparse Matrix Collection. The operator reads
-                # the matrix identifier from scene.scigraphs.suitesparse_id.
                 if not spec.matrix_name:
                     raise ValueError("matrix_name required for suitesparse source")
-                scene_props = {"suitesparse_id": spec.matrix_name}
+                # auto_layout_on_import matters for the same reason as on the
+                # flat-file path: the importer otherwise runs a layout of its own
+                # the moment the mesh exists, overwriting the auxiliary
+                # coordinates a matrix may ship with. A spec that omits the
+                # layout section to keep them must also say auto_layout: false.
+                scene_props = {
+                    "suitesparse_id": spec.matrix_name,
+                    "suitesparse_mode": spec.matrix_mode,
+                    "suitesparse_giant_only": spec.giant_only,
+                    "auto_layout_on_import": bool(spec.auto_layout),
+                }
                 res = call_operator("scigraphs.download_suitesparse", scene_props=scene_props)
                 self._collect_warnings(res, result)
                 if res["status"] == "error":
@@ -851,8 +881,6 @@ class PipelineExecutor:
                 add_input(manifest, f"suitesparse://{spec.matrix_name}", source="network", pinned=True)
 
             elif spec.source == "sql":
-                # Import from a configured SQL connection. The operator reads
-                # the query and connection from scene.scigraphs.
                 scene_props = {}
                 if spec.nodes_query:
                     scene_props["sql_query"] = spec.nodes_query
@@ -872,8 +900,7 @@ class PipelineExecutor:
                 )
 
             elif spec.source == "city2graph":
-                # City2Graph / Overture import. Use a place name when given,
-                # otherwise the bbox-based REST download.
+                # Place name when given, otherwise the bbox REST download.
                 if spec.query:
                     scene_props = {"city2graph": {"geocode_place_name": spec.query}}
                     op_id = "scigraphs.c2g_load_overture_place"
@@ -919,21 +946,17 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute analysis stage."""
         self._log(f"Running analysis: metrics={spec.metrics}")
         start_time = datetime.datetime.now(datetime.timezone.utc)
         status = "success"
         error = None
 
         try:
-            # Compute metrics. The real operator is ``scigraphs.calculate_centrality``
-            # which takes a ``method`` enum and stores the result on a mesh
-            # attribute named ``centrality_<method>``. We remember that mapping so
-            # the visual stage can resolve friendly names like "betweenness" to the
-            # attribute that was actually produced.
+            # calculate_centrality takes a `method` enum and stores its result
+            # on a mesh attribute named centrality_<method>. That mapping is
+            # remembered so the visual stage can resolve a friendly name like
+            # "betweenness" to the attribute actually produced.
             if spec.metrics:
-                # scigraphs.calculate_centrality supports these methods and
-                # stores the result on a mesh attribute named centrality_<method>.
                 method_map = {
                     "degree": "degree",
                     "in_degree": "degree",
@@ -977,10 +1000,8 @@ class PipelineExecutor:
                         self._metric_attributes[metric_lower] = attr_name
                         self._metric_attributes[method] = attr_name
 
-            # Clustering (community detection). The operator reads algorithm,
-            # resolution and seed from scene.scigraphs; pass resolution there.
+            # apply_clustering reads algorithm, resolution and seed from scene.scigraphs.
             if spec.clustering:
-                # Map common modularity-based names onto the operator's set.
                 algo_aliases = {"louvain": "rb", "leiden": "rb", "label_prop": "rb"}
                 algo = spec.clustering.algorithm.lower()
                 algo = algo_aliases.get(algo, algo)
@@ -1019,20 +1040,18 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute layout stage."""
         self._log(f"Applying layout: {spec.algorithm}")
         start_time = datetime.datetime.now(datetime.timezone.utc)
         status = "success"
         error = None
 
         try:
-            # Determine seed (re-seed so the layout itself is deterministic).
+            # Re-seed so the layout itself is deterministic.
             layout_seed = spec.seed if spec.seed is not None else global_seed
             set_pipeline_seed(layout_seed)
 
-            # apply_layout reads algorithm/scale/iterations and all algorithm
-            # specific parameters from scene.scigraphs. Map the friendly typed
-            # fields onto the actual scene property names.
+            # apply_layout reads everything from scene.scigraphs, so map the
+            # friendly typed fields onto the real scene property names.
             scene_props: Dict[str, Any] = {
                 "layout_algorithm": spec.algorithm,
                 "layout_scale": spec.scale,
@@ -1146,7 +1165,6 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute visualization stage."""
         bpy = self._get_bpy()
         self._log("Applying visual settings")
         start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -1158,16 +1176,14 @@ class PipelineExecutor:
             # built, so they have to be staged on the object first.
             self._apply_glyph_settings(spec, result)
 
-            # Setup geometry nodes
             if spec.setup_geometry_nodes:
                 res = call_operator("scigraphs.setup_visualization")
                 self._collect_warnings(res, result)
                 if res.get("status") == "error":
                     result.warnings.append(f"Geometry nodes setup failed: {res.get('error')}")
 
-            # Apply node/edge size ranges onto the interactive viz settings.
-            # The viz tree exposes node_scale and edge_thickness as the upper
-            # bounds for attribute-driven sizing.
+            # node_scale and edge_thickness are the upper bounds the viz tree
+            # uses for attribute-driven sizing.
             viz = getattr(bpy.context.scene, "scigraphs_viz", None)
             if viz is not None:
                 size_map = {
@@ -1183,7 +1199,6 @@ class PipelineExecutor:
                                 f"Could not set viz.{attr_name}={value}"
                             )
 
-            # Rendering preset (scientific/presentation/print).
             if spec.rendering_preset:
                 res = call_operator(
                     "scigraphs.apply_rendering_preset",
@@ -1195,8 +1210,6 @@ class PipelineExecutor:
                         f"Rendering preset failed: {res.get('error')}"
                     )
 
-            # Node coloring (driven through the coloring toolbar settings +
-            # the real ``scigraphs.color_apply`` operator).
             if spec.node_color:
                 attr = self._resolve_visual_attribute(spec.node_color)
                 if attr is None:
@@ -1228,7 +1241,6 @@ class PipelineExecutor:
                 if obj is not None and obj.type == 'MESH':
                     self._apply_material_overrides(spec, obj, result)
 
-            # Node sizing by attribute (interactive geometry-nodes tree).
             if spec.node_size:
                 attr = self._resolve_visual_attribute(spec.node_size)
                 if attr is None:
@@ -1238,7 +1250,6 @@ class PipelineExecutor:
                 else:
                     self._apply_node_size_attribute(attr, result)
 
-            # Edge width by attribute (interactive geometry-nodes tree).
             if spec.edge_width:
                 attr = self._resolve_visual_attribute(spec.edge_width)
                 if attr is None:
@@ -1255,7 +1266,6 @@ class PipelineExecutor:
                                 f"Edge width attribute '{attr}' not selectable"
                             )
 
-            # Edge style
             if spec.edge_style:
                 props = {"preset": spec.edge_style}
                 res = call_operator("scigraphs.apply_edge_style_preset", props)
@@ -1278,7 +1288,6 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute generic operator calls."""
         for i, op in enumerate(ops):
             self._log(f"Executing op {i+1}/{len(ops)}: {op.id}")
             start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -1309,7 +1318,6 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute render stage."""
         self._log(f"Rendering with {spec.engine}")
         start_time = datetime.datetime.now(datetime.timezone.utc)
         status = "success"
@@ -1318,31 +1326,24 @@ class PipelineExecutor:
         bpy = self._get_bpy()
 
         try:
-            # Set render engine
             bpy.context.scene.render.engine = spec.engine
 
-            # Set resolution
             bpy.context.scene.render.resolution_x = spec.resolution[0]
             bpy.context.scene.render.resolution_y = spec.resolution[1]
 
-            # Set samples
             if spec.engine == "CYCLES":
                 bpy.context.scene.cycles.samples = spec.samples
             elif spec.engine == "BLENDER_EEVEE_NEXT":
                 bpy.context.scene.eevee.taa_render_samples = spec.samples
 
-            # Set output path
             output_path = os.path.join(output_dir, spec.output)
             bpy.context.scene.render.filepath = output_path
 
-            # Set transparency
             bpy.context.scene.render.film_transparent = spec.transparent
 
-            # Set denoising
             if spec.engine == "CYCLES":
                 bpy.context.scene.cycles.use_denoising = spec.denoise
 
-            # Set camera if specified
             if spec.camera:
                 cam_obj = bpy.data.objects.get(spec.camera)
                 if cam_obj and cam_obj.type == 'CAMERA':
@@ -1364,10 +1365,8 @@ class PipelineExecutor:
                 )
                 self._pending_labels = None
 
-            # Render
             bpy.ops.render.render(write_still=True)
 
-            # Record output
             add_output(manifest, output_path, "render")
             result.artifacts.append(output_path)
 
@@ -1387,7 +1386,6 @@ class PipelineExecutor:
         manifest: ProvenanceManifest,
         result: ExecutionResult,
     ) -> None:
-        """Execute exports stage."""
         self._log("Exporting artifacts")
         start_time = datetime.datetime.now(datetime.timezone.utc)
         status = "success"
@@ -1396,7 +1394,6 @@ class PipelineExecutor:
         bpy = self._get_bpy()
 
         try:
-            # Export graph
             if spec.graph:
                 output_path = os.path.join(output_dir, spec.graph)
                 export_format = "GEXF"
@@ -1417,7 +1414,6 @@ class PipelineExecutor:
                 else:
                     result.warnings.append(f"Graph export failed: {res.get('error')}")
 
-            # Export positions
             if spec.positions:
                 output_path = os.path.join(output_dir, spec.positions)
                 res = call_operator(
@@ -1430,7 +1426,6 @@ class PipelineExecutor:
                 else:
                     result.warnings.append(f"Positions export failed: {res.get('error')}")
 
-            # Export statistics
             if spec.statistics:
                 output_path = os.path.join(output_dir, spec.statistics)
                 res = call_operator(
@@ -1443,7 +1438,6 @@ class PipelineExecutor:
                 else:
                     result.warnings.append(f"Statistics export failed: {res.get('error')}")
 
-            # Save blend file copy
             if spec.blend:
                 output_path = os.path.join(output_dir, spec.blend)
                 bpy.ops.wm.save_as_mainfile(filepath=output_path, copy=True)
@@ -1465,7 +1459,6 @@ class PipelineExecutor:
         schema: PipelineSchema,
         result: ExecutionResult,
     ) -> None:
-        """Save execution log to file."""
         with open(log_path, 'w', encoding='utf-8') as f:
             f.write(f"SciGraphs Pipeline Execution Log\n")
             f.write(f"================================\n\n")
@@ -1499,19 +1492,8 @@ def run_pipeline(
     stop_on_error: bool = True,
     verbose: bool = True,
 ) -> ExecutionResult:
-    """
-    Convenience function to parse and execute a pipeline.
-
-    Args:
-        source: Pipeline file path, content string, or dictionary
-        base_dir: Base directory for resolving paths
-        stop_on_error: Whether to stop on first error
-        verbose: Whether to log progress
-
-    Returns:
-        ExecutionResult
-    """
-    from .parser import parse_pipeline
+    """Parse and execute a pipeline in one call."""
+    from scigraphs_core.repro.parser import parse_pipeline
 
     schema, raw_dict, pipeline_hash = parse_pipeline(source, base_dir)
     executor = PipelineExecutor(stop_on_error=stop_on_error, verbose=verbose)

@@ -370,7 +370,7 @@ class City2GraphProperties(bpy.types.PropertyGroup):
     
     prox_visualize_limit: IntProperty(
         name="Visualization Limit",
-        description="Maximum number of edges to materialise in the graph mesh",
+        description="Maximum number of edges to materialize in the graph mesh",
         default=1000000,
         min=10,
         max=10000000,
@@ -637,18 +637,15 @@ class City2GraphProperties(bpy.types.PropertyGroup):
     )
 
     # --- Relation toggles for the morphological graph ---
-    # When all three are enabled the operator falls back to the
-    # high-level c2g.morphological_graph (faster, builds a coherent
-    # heterogeneous graph). When any is disabled, the operator wires
-    # the requested subset using the individual c2g calls
-    # (private_to_private_graph, public_to_public_graph,
-    # private_to_public_graph) and produces one Blender object per
-    # active relation type.
+    # All three on takes the fast path through c2g.morphological_graph, which
+    # builds one coherent heterogeneous graph. Any of them off and the operator
+    # calls the individual c2g functions instead, one Blender object per active
+    # relation type.
 
     morpho_rel_priv_priv: BoolProperty(
         name="Private ↔ Private",
         description=(
-            "Adjacency between tessellation cells (parcel neighbours). "
+            "Adjacency between tessellation cells (parcel neighbors). "
             "Uses city2graph.morphology.private_to_private_graph"
         ),
         default=True,
@@ -674,11 +671,9 @@ class City2GraphProperties(bpy.types.PropertyGroup):
     
     # --- GTFS calendar dates ---
     
-    # ``gtfs_calendar_start/end`` are populated dynamically with the
-    # set of dates discovered in the active GTFS feed (calendar +
-    # calendar_dates). The list lives in ``Scene["c2g_gtfs_dates"]``
-    # and is rebuilt every time a feed is imported.
-    def _gtfs_date_items(self, _context):  # noqa: ARG002 — Blender API
+    # The dates come from the active GTFS feed (calendar and calendar_dates)
+    # and are cached in ``Scene["c2g_gtfs_dates"]``, rebuilt on every import.
+    def _gtfs_date_items(self, _context):  # noqa: ARG002 - Blender API
         scene = bpy.context.scene if bpy.context else None
         if scene is None:
             return [("", "All", "Use the full calendar range")]
@@ -722,7 +717,7 @@ class City2GraphProperties(bpy.types.PropertyGroup):
     gtfs_od_top_n: IntProperty(
         name="Top N Pairs",
         description=(
-            "Maximum number of OD pairs to materialise. Big GTFS feeds "
+            "Maximum number of OD pairs to materialize. Big GTFS feeds "
             "can produce millions of pairs; cap to avoid OOM. "
             "0 = no limit (use with caution)"
         ),

@@ -2,9 +2,9 @@
 
 import bpy
 import numpy as np
-from ....core import analysis, pathfinding, spanning, network_flow
-from ....core.mesh.mesh_utils import parse_graph_data, expand_node_values_to_mesh
-from ....core.visualization.animation import update_traversal_activation
+from scigraphs_core import analysis, pathfinding, spanning, network_flow
+from scigraphs_core.mesh.mesh_utils import parse_graph_data, expand_node_values_to_mesh
+from scigraphs_core.visualization.animation import update_traversal_activation
 
 
 class SCIGRAPHS_OT_AnimateTraversal(bpy.types.Operator):

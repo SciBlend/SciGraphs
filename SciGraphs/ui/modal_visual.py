@@ -1,5 +1,4 @@
-# SciGraphs Modal Visual Operators
-# Interactive operators with real-time visual feedback
+# Modal operators with live visual feedback in the viewport.
 
 import bpy
 import numpy as np
@@ -53,7 +52,6 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
         if self._node_positions is None:
             return
         
-        # Find nearest node
         min_dist = float('inf')
         nearest_cluster = None
         
@@ -76,32 +74,26 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
     def invoke(self, context, event):
         obj = context.active_object
         
-        # Build cluster map
         mesh = obj.data
         cluster_attr = mesh.attributes.get("cluster_id")
         if not cluster_attr:
             self.report({'ERROR'}, "No cluster_id attribute found. Run clustering first.")
             return {'CANCELLED'}
         
-        # Get cluster assignments
         cluster_ids = [int(cluster_attr.data[i].value) for i in range(len(cluster_attr.data))]
         
-        # Build cluster -> node mapping
         self._cluster_nodes = {}
         for i, cid in enumerate(cluster_ids):
             if cid not in self._cluster_nodes:
                 self._cluster_nodes[cid] = []
             self._cluster_nodes[cid].append(i)
         
-        # Get node positions
         pos_flat = obj.get("node_positions", [])
         if pos_flat:
             self._node_positions = np.array(pos_flat).reshape(-1, 3)
         else:
-            # Fall back to vertex positions
             self._node_positions = np.array([v.co[:] for v in mesh.vertices[:obj.get("num_nodes", 0)]])
         
-        # Add draw handler
         self._draw_handle = bpy.types.SpaceView3D.draw_handler_add(
             self._draw_callback, (context,), 'WINDOW', 'POST_VIEW'
         )
@@ -120,18 +112,15 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
         
         nodes = self._cluster_nodes[self._current_cluster]
         
-        # Draw highlighted nodes
         shader = gpu.shader.from_builtin('UNIFORM_COLOR')
         gpu.state.blend_set('ALPHA')
         gpu.state.depth_test_set('ALWAYS')
         
-        # Generate cluster color
         hue = (self._current_cluster * 0.618) % 1.0  # Golden ratio for color distribution
         import colorsys
         rgb = colorsys.hsv_to_rgb(hue, 0.8, 1.0)
         color = (*rgb, 0.9)
         
-        # Draw points for cluster nodes
         positions = []
         for i in nodes:
             if i < len(self._node_positions):
@@ -148,7 +137,6 @@ class SCIGRAPHS_OT_highlight_communities(bpy.types.Operator):
         gpu.state.depth_test_set('NONE')
         gpu.state.blend_set('NONE')
         
-        # Draw info text
         self._draw_cluster_info(context, self._current_cluster, len(nodes))
     
     def _draw_cluster_info(self, context, cluster_id, node_count):
@@ -186,7 +174,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
         obj = context.active_object
         if not obj or "num_nodes" not in obj:
             return False
-        # Check for any centrality attribute
         mesh = obj.data
         return any(a.name.startswith("centrality_") for a in mesh.attributes)
     
@@ -203,7 +190,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
         elif event.type == 'WHEELDOWNMOUSE':
             self._threshold = max(0.0, self._threshold - 0.05)
         elif event.type == 'MOUSEMOVE' and event.shift:
-            # Fine control with shift+mouse
             delta = event.mouse_x - event.mouse_prev_x
             self._threshold = max(0.0, min(1.0, self._threshold + delta * 0.001))
         elif event.type in {'RIGHTMOUSE', 'ESC', 'RET'}:
@@ -216,7 +202,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
         obj = context.active_object
         mesh = obj.data
         
-        # Find centrality attribute
         centrality_attr = None
         for attr in mesh.attributes:
             if attr.name.startswith("centrality_"):
@@ -227,18 +212,15 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
             self.report({'ERROR'}, "No centrality attribute found")
             return {'CANCELLED'}
         
-        # Get values
         num_nodes = obj.get("num_nodes", len(mesh.vertices))
         self._centrality_values = np.array([
             centrality_attr.data[i].value for i in range(min(len(centrality_attr.data), num_nodes))
         ])
         
-        # Normalize to 0-1
         vmin, vmax = self._centrality_values.min(), self._centrality_values.max()
         if vmax > vmin:
             self._centrality_values = (self._centrality_values - vmin) / (vmax - vmin)
         
-        # Get positions
         pos_flat = obj.get("node_positions", [])
         if pos_flat:
             self._node_positions = np.array(pos_flat).reshape(-1, 3)
@@ -274,7 +256,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
                 else:
                     cold_positions.append(world_pos[:])
         
-        # Draw cold nodes (small, blue)
         if cold_positions:
             batch = batch_for_shader(shader, 'POINTS', {"pos": cold_positions})
             gpu.state.point_size_set(4.0)
@@ -282,7 +263,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
             shader.uniform_float("color", (0.2, 0.4, 0.8, 0.4))
             batch.draw(shader)
         
-        # Draw hot nodes (large, red/orange)
         if hot_positions:
             batch = batch_for_shader(shader, 'POINTS', {"pos": hot_positions})
             gpu.state.point_size_set(12.0)
@@ -293,7 +273,6 @@ class SCIGRAPHS_OT_visualize_centrality_interactive(bpy.types.Operator):
         gpu.state.depth_test_set('NONE')
         gpu.state.blend_set('NONE')
         
-        # Draw threshold info
         self._draw_info(context)
     
     def _draw_info(self, context):
@@ -339,7 +318,6 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
             context.area.tag_redraw()
         
         elif event.type == 'RET':
-            # Apply the layout
             obj = context.active_object
             if obj and self._preview_positions is not None:
                 obj["node_positions"] = self._preview_positions.flatten().tolist()
@@ -351,29 +329,27 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
             return {'FINISHED'}
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
-            # Cancel - restore original
             obj = context.active_object
             if obj and self._original_positions is not None:
                 obj["node_positions"] = self._original_positions.flatten().tolist()
             self._cleanup(context)
-            self.report({'INFO'}, "Layout preview cancelled")
+            self.report({'INFO'}, "Layout preview canceled")
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
     
     def _iterate_layout(self, context):
         """Perform one layout iteration."""
-        from ..core import layout
-        
+        from scigraphs_core import layout
+        from scigraphs_core.mesh.mesh_utils import layout_edge_pairs
+
         obj = context.active_object
         if not obj:
             return
         
         props = context.scene.scigraphs
         
-        # Simple force-directed iteration
         if self._preview_positions is not None:
-            # Temporarily set positions for iteration
             obj["node_positions"] = self._preview_positions.flatten().tolist()
             
             success = layout.apply_graph_layout(
@@ -381,7 +357,12 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
                 algorithm=props.layout_algorithm,
                 iterations=1,
                 scale=props.layout_scale,
-                props=props
+                props=props,
+                # A mesh-native object keeps its edges in mesh.edges, which the
+                # layout package may not read, so read them here. Otherwise the
+                # preview animates isolated points and the applied layout then
+                # looks like a completely different algorithm.
+                edge_pairs=layout_edge_pairs(obj),
             )
             
             if success:
@@ -393,7 +374,6 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
     def invoke(self, context, event):
         obj = context.active_object
         
-        # Store original positions
         pos_flat = obj.get("node_positions", [])
         if pos_flat:
             self._original_positions = np.array(pos_flat).reshape(-1, 3).copy()
@@ -402,12 +382,10 @@ class SCIGRAPHS_OT_preview_layout(bpy.types.Operator):
             self.report({'ERROR'}, "No node positions found")
             return {'CANCELLED'}
         
-        # Add draw handler
         self._draw_handle = bpy.types.SpaceView3D.draw_handler_add(
             self._draw_callback, (context,), 'WINDOW', 'POST_VIEW'
         )
         
-        # Add timer for animation
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.05, window=context.window)
         

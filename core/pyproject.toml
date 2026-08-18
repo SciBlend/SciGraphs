@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scigraphs-core"
+version = "0.2.1"
+description = "Blender-free SciGraphs library: graphs, layouts, colormaps, OSM/geo, pipeline schema."
+readme = "README.md"
+# Match scigraphs-engine so both wheels install into the same interpreter.
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "José Marín" }]
+keywords = ["graph", "network", "layout", "osm", "geospatial", "blender"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+# Only hard dep. Everything else is optional and guarded at import.
+dependencies = ["numpy>=1.23"]
+
+[project.urls]
+Homepage = "https://github.com/SciBlend/SciGraphs"
+Repository = "https://github.com/SciBlend/SciGraphs"
+Issues = "https://github.com/SciBlend/SciGraphs/issues"
+Documentation = "https://github.com/SciBlend/SciGraphs/tree/main/docs"
+
+[project.optional-dependencies]
+# Names match what the code prints ("install the 'networkx' extra", etc.).
+networkx = ["networkx>=2.8"]
+scipy = ["scipy>=1.9"]
+igraph = ["python-igraph>=0.10"]
+rustworkx = ["rustworkx>=0.13"]
+geo = ["geopandas>=0.13", "shapely>=2.0", "pyproj>=3.4", "osmnx>=1.6"]
+# GDAL wheels are flaky; keep out of `all`. Use [all,raster] for everything.
+raster = ["rasterio>=1.3", "pillow>=9", "GDAL>=3.6"]
+urban = ["city2graph>=0.3"]
+sql = [
+    "pandas>=2.0",
+    "psycopg[binary]>=3.1",
+    "mysql-connector-python>=8.0",
+    "pymssql>=2.2",
+]
+pipeline = ["PyYAML>=6.0"]
+net = ["requests>=2.28"]
+cluster = ["pysurprise>=1.1", "scikit-learn>=1.2"]
+colormaps = ["matplotlib>=3.6"]
+
+all = [
+    "networkx>=2.8",
+    "scipy>=1.9",
+    "python-igraph>=0.10",
+    "rustworkx>=0.13",
+    "geopandas>=0.13",
+    "shapely>=2.0",
+    "pyproj>=3.4",
+    "osmnx>=1.6",
+    "city2graph>=0.3",
+    "pandas>=2.0",
+    "psycopg[binary]>=3.1",
+    "mysql-connector-python>=8.0",
+    "pymssql>=2.2",
+    "PyYAML>=6.0",
+    "requests>=2.28",
+    "pysurprise>=1.1",
+    "scikit-learn>=1.2",
+    "matplotlib>=3.6",
+]
+
+# Not listed: fa2 (unmaintained), scigraphs_utils (cp313-only), scigraphs_engine
+# (add-on glue, not this wheel).
+
+[tool.setuptools]
+# Explicit list so stray dirs cannot sneak into the wheel.
+packages = [
+    "scigraphs_core",
+    "scigraphs_core.algorithms",
+    "scigraphs_core.city2graph",
+    "scigraphs_core.coloring",
+    "scigraphs_core.data_io",
+    "scigraphs_core.geo",
+    "scigraphs_core.mesh",
+    "scigraphs_core.mesh.layouts",
+    "scigraphs_core.osmnx",
+    "scigraphs_core.repro",
+    "scigraphs_core.visualization",
+]
+license-files = ["LICENSE"]

@@ -9,16 +9,14 @@ from bpy.props import (
     StringProperty,
 )
 
-from ...core.coloring.colormaps import (
+from scigraphs_core.coloring.colormaps import (
     COLORMAP_CATALOG,
     QUICK_COLORMAPS,
 )
 from . import functions as fn
 
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
+# --- Shared helpers ---------------------------------------------------------
 
 def _tag_3d_views(context):
     screen = getattr(context, "screen", None)
@@ -29,9 +27,7 @@ def _tag_3d_views(context):
             area.tag_redraw()
 
 
-# ---------------------------------------------------------------------------
-# Toolbar visibility / switching
-# ---------------------------------------------------------------------------
+# --- Toolbar visibility / switching -----------------------------------------
 
 class SCIGRAPHS_OT_color_toggle_toolbar(bpy.types.Operator):
     """Show or hide the floating coloring toolbar."""
@@ -60,9 +56,7 @@ class SCIGRAPHS_OT_color_show_toolbar(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Drag handle
-# ---------------------------------------------------------------------------
+# --- Drag handle ------------------------------------------------------------
 
 class SCIGRAPHS_OT_color_drag_toolbar(bpy.types.Operator):
     """Drag the floating coloring toolbar."""
@@ -113,7 +107,7 @@ class SCIGRAPHS_OT_color_drag_toolbar(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        # Plain click without drag: re-center against the top of the viewport.
+        # Click without drag: re-center against the top of the viewport.
         region = context.region
         wm = context.window_manager
         if region is not None:
@@ -123,9 +117,7 @@ class SCIGRAPHS_OT_color_drag_toolbar(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Apply / refresh / colormap chips
-# ---------------------------------------------------------------------------
+# --- Apply / refresh / colormap chips ---------------------------------------
 
 class SCIGRAPHS_OT_color_apply(bpy.types.Operator):
     """Apply the current coloring settings to the active mesh."""
@@ -454,9 +446,7 @@ class SCIGRAPHS_OT_color_remove(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Settings popup
-# ---------------------------------------------------------------------------
+# --- Settings popup ---------------------------------------------------------
 
 class SCIGRAPHS_OT_color_settings_dialog(bpy.types.Operator):
     """Open a popup with the full coloring configuration (attribute, colormap, range, ...)."""
@@ -465,8 +455,8 @@ class SCIGRAPHS_OT_color_settings_dialog(bpy.types.Operator):
     bl_description = "Configure attribute, colormap, range, opacity, and material auto-setup"
 
     def invoke(self, context, _event):
-        # Sync the enum with the stored string so the popup reflects the
-        # currently active attribute.
+        # Sync the enum with the stored string so the popup opens on the
+        # attribute that is actually active.
         props = fn.coloring_props(context)
         obj = fn.active_mesh_object(context)
         if props and obj:
@@ -508,9 +498,8 @@ class SCIGRAPHS_OT_color_settings_dialog(bpy.types.Operator):
 
         source_box = layout.box()
         source_box.label(text="Source", icon='OUTLINER_DATA_POINTCLOUD')
-        # The enum's update callback (in properties.py) writes the chosen
-        # name into ``attribute_name``; we must NOT touch ID properties here
-        # because Blender disallows ID writes during draw().
+        # Blender disallows ID writes during draw(), so the enum's update
+        # callback in properties.py is what fills in ``attribute_name``.
         source_box.prop(props, "attribute_enum", text="Attribute")
         info_row = source_box.row(align=True)
         info_row.alignment = 'RIGHT'
@@ -600,9 +589,7 @@ class SCIGRAPHS_OT_color_settings_dialog(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Registration
-# ---------------------------------------------------------------------------
+# --- Registration -----------------------------------------------------------
 
 _classes = (
     SCIGRAPHS_OT_color_toggle_toolbar,

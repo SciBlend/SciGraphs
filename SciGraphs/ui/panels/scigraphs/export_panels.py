@@ -38,7 +38,6 @@ class SCIGRAPHS_PT_export_options(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
         
-        # Export settings
         box = layout.box()
         box.label(text="Export Graph Data", icon='EXPORT')
         col = box.column(align=True)
@@ -46,7 +45,6 @@ class SCIGRAPHS_PT_export_options(bpy.types.Panel):
         col.prop(props, "export_format", text="Format")
         col.prop(props, "export_include_attributes", text="Attributes")
         
-        # Export buttons
         box.separator()
         row = box.row(align=True)
         row.scale_y = 1.3
@@ -77,7 +75,6 @@ class SCIGRAPHS_PT_export_utilities(bpy.types.Panel):
         layout = self.layout
         props = context.scene.scigraphs
         
-        # Statistics report
         box = layout.box()
         box.label(text="Statistics Report", icon='TEXT')
         box.prop(props, "report_include_powerlaw", text="Power Law Fit")

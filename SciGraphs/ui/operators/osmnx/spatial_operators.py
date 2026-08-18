@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import StringProperty
-from ....core import osmnx_analysis
+from scigraphs_core import osmnx_analysis
 from .utils import (
     _get_osmnx_graph,
     _get_unprojected_graph,
@@ -12,10 +12,10 @@ from .utils import (
 
 
 def _graph_has_edge_attribute(G, attr):
-    """Return True iff ``attr`` is present and non-empty on every edge of G.
+    """Return True if ``attr`` is present and non-empty on every edge of G.
 
-    Tolerates both MultiDiGraph (the OSMnx default) and DiGraph / Graph
-    variants produced by ``to_digraph`` / ``to_undirected``.
+    Handles both the MultiDiGraph that OSMnx builds and the plain DiGraph or
+    Graph you get back from ``to_digraph`` / ``to_undirected``.
     """
     if G is None or G.number_of_edges() == 0:
         return False
@@ -75,7 +75,7 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self._remove_draw_handler(context)
-            self.report({'INFO'}, "Node selection cancelled")
+            self.report({'INFO'}, "Node selection canceled")
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
@@ -131,11 +131,10 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
         self.vertex_positions = np.array(positions) if positions else np.array([])
     
     def _update_highlight(self, context, event):
-        """
-        Update the highlighted node based on cursor position.
-        
-        Projects mesh vertices to screen space and finds the nearest one
-        to the cursor. Works regardless of Geometry Nodes or 3D elevation.
+        """Highlight the mesh vertex nearest the cursor.
+
+        Works in screen space rather than 3D, so Geometry Nodes and elevated
+        (non-flat) graphs do not throw the pick off.
         """
         from bpy_extras import view3d_utils
         import numpy as np
@@ -191,7 +190,6 @@ class SCIGRAPHS_OT_SelectNearestNode(bpy.types.Operator):
         _draw_highlight_point(self.highlight_pos, (1.0, 0.5, 0.0, 1.0), size=12.0)
     
     def _remove_draw_handler(self, context):
-        """Remove the draw handler."""
         if hasattr(self, '_draw_handle') and self._draw_handle is not None:
             bpy.types.SpaceView3D.draw_handler_remove(self._draw_handle, 'WINDOW')
             self._draw_handle = None
@@ -297,7 +295,7 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self._remove_draw_handler(context)
-            self.report({'INFO'}, "Edge selection cancelled")
+            self.report({'INFO'}, "Edge selection canceled")
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
@@ -375,11 +373,9 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
         self.num_intersections = num_intersections
     
     def _update_highlight(self, context, event):
-        """
-        Update highlighted edge based on cursor position.
-        
-        Projects edge midpoints to screen space and finds the nearest one.
-        Works regardless of Geometry Nodes.
+        """Highlight the edge whose midpoint is nearest the cursor.
+
+        Screen-space, so Geometry Nodes do not throw the pick off.
         """
         from bpy_extras import view3d_utils
         import numpy as np
@@ -437,7 +433,6 @@ class SCIGRAPHS_OT_SelectNearestEdge(bpy.types.Operator):
             _draw_highlight_line(start, end, color, width=6.0)
     
     def _remove_draw_handler(self, context):
-        """Remove the draw handler."""
         if hasattr(self, '_draw_handle') and self._draw_handle is not None:
             bpy.types.SpaceView3D.draw_handler_remove(self._draw_handle, 'WINDOW')
             self._draw_handle = None
@@ -564,7 +559,7 @@ class SCIGRAPHS_OT_CalculateShortestPath(bpy.types.Operator):
             self.report({'ERROR'}, "Node elevations not calculated. Add elevations first.")
             return {'CANCELLED'}
 
-        from ....core.osmnx import routing as _routing
+        from scigraphs_core.osmnx import routing as _routing
         result = _routing.calculate_shortest_path(
             routing_graph, source, target,
             weight=weight,
@@ -630,7 +625,7 @@ class SCIGRAPHS_OT_SelectPathSource(bpy.types.Operator):
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self._remove_draw_handler(context)
-            self.report({'INFO'}, "Source selection cancelled")
+            self.report({'INFO'}, "Source selection canceled")
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
@@ -652,7 +647,6 @@ class SCIGRAPHS_OT_SelectPathSource(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _build_vertex_lookup(self):
-        """Build vertex position lookup."""
         import numpy as np
         
         mesh = self.obj.data
@@ -763,7 +757,7 @@ class SCIGRAPHS_OT_SelectPathTarget(bpy.types.Operator):
         
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self._remove_draw_handler(context)
-            self.report({'INFO'}, "Target selection cancelled")
+            self.report({'INFO'}, "Target selection canceled")
             return {'CANCELLED'}
         
         return {'RUNNING_MODAL'}
@@ -785,7 +779,6 @@ class SCIGRAPHS_OT_SelectPathTarget(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def _build_vertex_lookup(self):
-        """Build vertex position lookup."""
         import numpy as np
         
         mesh = self.obj.data
@@ -912,7 +905,7 @@ class SCIGRAPHS_OT_TruncatePolygon(bpy.types.Operator):
         return obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
-        from ....core.osmnx import truncate
+        from scigraphs_core.osmnx import truncate
         
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -1002,7 +995,7 @@ class SCIGRAPHS_OT_TruncateDistance(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        from ....core.osmnx import truncate, spatial_queries as osmnx_spatial
+        from scigraphs_core.osmnx import truncate, spatial_queries as osmnx_spatial
 
         obj = context.active_object
         G = _get_osmnx_graph(obj)
@@ -1013,8 +1006,8 @@ class SCIGRAPHS_OT_TruncateDistance(bpy.types.Operator):
         
         nodes_before = G.number_of_nodes()
 
-        # find_nearest_node expects (G, x, y); for unprojected lat/lon graphs
-        # x = longitude, y = latitude.
+        # On an unprojected graph, find_nearest_node's x is longitude and y is
+        # latitude, not the other way round.
         nearest_node = osmnx_spatial.find_nearest_node(
             G, x=self.center_lon, y=self.center_lat
         )
@@ -1043,8 +1036,8 @@ class SCIGRAPHS_OT_TruncateDistance(bpy.types.Operator):
 class _SelectDistanceNodeBase(bpy.types.Operator):
     """Base modal eyedropper for the node-pair distance calculator.
 
-    Subclasses must set ``_target_prop`` to either ``"osmnx_dist_node_a"``
-    or ``"osmnx_dist_node_b"``.
+    Subclasses set ``_target_prop`` to ``"osmnx_dist_node_a"`` or
+    ``"osmnx_dist_node_b"``.
     """
 
     bl_options = {'REGISTER', 'UNDO'}
@@ -1077,7 +1070,7 @@ class _SelectDistanceNodeBase(bpy.types.Operator):
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             self._remove_draw_handler(context)
-            self.report({'INFO'}, f"{self._label_text} selection cancelled")
+            self.report({'INFO'}, f"{self._label_text} selection canceled")
             return {'CANCELLED'}
 
         return {'RUNNING_MODAL'}
@@ -1176,13 +1169,11 @@ class SCIGRAPHS_OT_SelectDistanceNodeB(_SelectDistanceNodeBase):
 
 
 class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
-    """Compute several distance metrics between two graph nodes.
+    """Compare distance metrics between two graph nodes.
 
-    Reports straight-line distance (great-circle for unprojected graphs,
-    Euclidean for projected ones), shortest network distance, the resulting
-    circuity, and (when ``travel_time`` is available) shortest travel time.
-    Mirrors the typical OSMnx notebook pattern of comparing route length to
-    crow-flies distance.
+    Straight-line distance (great-circle when unprojected, Euclidean when
+    projected), shortest network distance, their ratio as circuity, and travel
+    time where ``travel_time`` exists on the edges.
     """
 
     bl_idname = "scigraphs.osmnx_calc_node_pair_distance"
@@ -1202,8 +1193,8 @@ class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
         return bool(props.osmnx_dist_node_a) and bool(props.osmnx_dist_node_b)
 
     def execute(self, context):
-        from ....core.osmnx import distance as osmnx_distance
-        from ....core.osmnx import routing as osmnx_routing
+        from scigraphs_core.osmnx import distance as osmnx_distance
+        from scigraphs_core.osmnx import routing as osmnx_routing
 
         obj = context.active_object
         props = context.scene.scigraphs
@@ -1224,7 +1215,6 @@ class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
         if node_a == node_b:
             self.report({'WARNING'}, "Node A and Node B are the same")
 
-        # Pick a graph that contains both nodes.
         G_active = None
         if G is not None and node_a in G.nodes and node_b in G.nodes:
             G_active = G
@@ -1246,7 +1236,6 @@ class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
             self.report({'ERROR'}, "Node coordinates missing on the graph")
             return {'CANCELLED'}
 
-        # Straight-line (crow-flies) distance.
         if is_projected:
             straight_m = osmnx_distance.euclidean(ay, ax, by, bx)
             straight_method = "Euclidean (projected)"
@@ -1258,7 +1247,6 @@ class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to compute straight-line distance")
             return {'CANCELLED'}
 
-        # Shortest network distance (length-weighted).
         net_result = osmnx_routing.calculate_shortest_path(
             G_active, node_a, node_b, weight='length'
         )
@@ -1270,12 +1258,11 @@ class SCIGRAPHS_OT_CalcNodePairDistance(bpy.types.Operator):
         network_m = float(net_result['distance_m'])
         circuity = network_m / straight_m if straight_m > 0 else float('nan')
 
-        # Optional travel-time on the same path.
         travel_min = None
         if 'travel_time_minutes' in net_result:
             travel_min = float(net_result['travel_time_minutes'])
 
-        # Persist the results so the panel can render them.
+        # The panel reads these back off the object.
         obj["osmnx_pair_node_a"] = str(node_a)
         obj["osmnx_pair_node_b"] = str(node_b)
         obj["osmnx_pair_straight_m"] = float(straight_m)

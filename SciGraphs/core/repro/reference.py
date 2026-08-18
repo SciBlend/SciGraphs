@@ -1,16 +1,15 @@
 """Reference generator for reproducible SciGraphs pipelines.
 
-Introspects the live Blender property groups, the declarative pipeline
-``SCHEMA`` and the operator registry to produce an exhaustive Markdown
-reference of every option a pipeline JSON/YAML can set. This keeps the
-authoring documentation in sync with the code instead of being hand-maintained.
+Introspects the live Blender property groups, the pipeline ``SCHEMA`` and the
+operator registry to write out every option a pipeline JSON/YAML can set, so
+the authoring docs cannot drift from the code.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from .schema import SCHEMA
+from scigraphs_core.repro.schema import SCHEMA
 from .registry import SCENE_PROPERTY_GROUPS, get_registry
 
 
@@ -82,10 +81,7 @@ def _group_table(group) -> List[str]:
 
 
 def _schema_section_table(section: Dict[str, Any]) -> List[str]:
-    """Build a Markdown table for one declarative schema section.
-
-    Pipes in descriptions are escaped so they do not break the table.
-    """
+    """Build a Markdown table for one schema section, escaping pipes in descriptions."""
     props = section.get("properties", {})
     lines = [
         "| Field | Type | Default | Enum | Description |",
@@ -115,7 +111,6 @@ def generate_reference_markdown() -> str:
     )
     lines.append("")
 
-    # 1. Declarative schema sections.
     lines.append("## Declarative stages")
     lines.append("")
     lines.append(
@@ -144,7 +139,6 @@ def generate_reference_markdown() -> str:
                 lines.extend(_schema_section_table(definition))
                 lines.append("")
 
-    # 2. Generic ops + registry shortcuts.
     lines.append("## Generic ops")
     lines.append("")
     lines.append(
@@ -173,7 +167,6 @@ def generate_reference_markdown() -> str:
             lines.append(f"| `{short}` | `{full}` |")
         lines.append("")
 
-    # 3. Scene property groups (requires bpy).
     bpy = _bpy()
     lines.append("## Scene property groups")
     lines.append("")

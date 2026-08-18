@@ -19,7 +19,7 @@ class SCIGRAPHS_OT_C2G_TravelSummaryGraph(bpy.types.Operator):
         if gtfs_data is None:
             self.report(
                 {'ERROR'},
-                "No GTFS connection in memory — re-import the feed.",
+                "No GTFS connection in memory, re-import the feed.",
             )
             return {'CANCELLED'}
         props = context.scene.city2graph
@@ -29,9 +29,8 @@ class SCIGRAPHS_OT_C2G_TravelSummaryGraph(bpy.types.Operator):
 
         self.report({'INFO'}, "Creating travel summary graph...")
 
-        # Pass the active OSMnx graph (when there is one) so the GTFS
-        # graph lands on top of the road network — matches the
-        # behaviour of "Visualize GTFS Network".
+        # An active OSMnx graph puts the GTFS graph on top of the road network,
+        # matching "Visualize GTFS Network".
         active = context.active_object
         osmnx_obj = active if (active and active.get("is_osmnx")) else None
 
@@ -69,7 +68,7 @@ class SCIGRAPHS_OT_C2G_GetODPairs(bpy.types.Operator):
         if gtfs_data is None:
             self.report(
                 {'ERROR'},
-                "No GTFS connection in memory — re-import the feed.",
+                "No GTFS connection in memory, re-import the feed.",
             )
             return {'CANCELLED'}
         props = context.scene.city2graph

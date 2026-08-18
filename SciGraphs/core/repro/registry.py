@@ -1,15 +1,11 @@
-# Operator registry for reproducible SciGraphs pipelines
-#
-# Provides adapters and mappings between declarative pipeline specs
-# and actual Blender operators.
+# Adapters and mappings between declarative pipeline specs and Blender operators.
 
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .schema import PipelineSchema
+    from scigraphs_core.repro.schema import PipelineSchema
 
-# Singleton registry instance
 _registry: Optional["OperatorRegistry"] = None
 
 
@@ -21,17 +17,12 @@ class OperatorAdapter:
     description: str
     property_mapping: Dict[str, str]  # pipeline_prop -> operator_prop
     scene_props: List[str]  # scene.scigraphs properties to set before calling
-    pre_call: Optional[Callable] = None  # Optional pre-processing
-    post_call: Optional[Callable] = None  # Optional post-processing
+    pre_call: Optional[Callable] = None
+    post_call: Optional[Callable] = None
 
 
 class OperatorRegistry:
-    """
-    Registry of operator adapters for pipeline execution.
-
-    Maps declarative pipeline specs to Blender operators with
-    proper property translation and scene setup.
-    """
+    """Registry of operator adapters, with property translation and scene setup."""
 
     def __init__(self):
         self._adapters: Dict[str, OperatorAdapter] = {}
@@ -52,7 +43,6 @@ class OperatorRegistry:
 
     def get(self, bl_idname: str) -> Optional[OperatorAdapter]:
         """Get adapter by bl_idname or shortcut."""
-        # Try shortcut first
         if bl_idname in self._shortcuts:
             bl_idname = self._shortcuts[bl_idname]
         return self._adapters.get(bl_idname)
@@ -71,26 +61,18 @@ class OperatorRegistry:
         return list(self._by_category.keys())
 
     def resolve_operator(self, spec: str) -> Tuple[str, bool]:
-        """
-        Resolve an operator specification to bl_idname.
+        """Resolve a bl_idname, shortcut or bpy.ops path.
 
-        Args:
-            spec: Operator spec (bl_idname, shortcut, or bpy.ops path)
-
-        Returns:
-            Tuple of (resolved_bl_idname, has_adapter)
+        Returns (resolved_bl_idname, has_adapter).
         """
-        # Try shortcut
         if spec in self._shortcuts:
             return self._shortcuts[spec], True
 
-        # Try direct adapter lookup
         if spec in self._adapters:
             return spec, True
 
-        # Check if it's a valid bpy.ops path (e.g., "scigraphs.apply_layout")
+        # A bare bl_idname such as "scigraphs.apply_layout".
         if "." in spec and not spec.startswith("bpy."):
-            # It's a bare bl_idname - check if operator exists
             return spec, spec in self._adapters
 
         return spec, False
@@ -112,7 +94,6 @@ class OperatorRegistry:
         self._register_shortcuts()
 
     def _register_dataset_adapters(self) -> None:
-        """Register dataset/import adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.import_osm_graph",
             category="dataset",
@@ -174,7 +155,6 @@ class OperatorRegistry:
         ))
 
     def _register_analysis_adapters(self) -> None:
-        """Register analysis adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.calculate_centrality",
             category="analysis",
@@ -246,7 +226,6 @@ class OperatorRegistry:
         ))
 
     def _register_layout_adapters(self) -> None:
-        """Register layout adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.apply_layout",
             category="layout",
@@ -285,7 +264,6 @@ class OperatorRegistry:
         ))
 
     def _register_visual_adapters(self) -> None:
-        """Register visualization adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.setup_visualization",
             category="visual",
@@ -350,7 +328,6 @@ class OperatorRegistry:
         ))
 
     def _register_topology_adapters(self) -> None:
-        """Register topology adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.check_planarity",
             category="topology",
@@ -400,7 +377,6 @@ class OperatorRegistry:
         ))
 
     def _register_osmnx_adapters(self) -> None:
-        """Register OSMnx-specific adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.osmnx_centrality",
             category="osmnx",
@@ -490,7 +466,6 @@ class OperatorRegistry:
         ))
 
     def _register_export_adapters(self) -> None:
-        """Register export adapters."""
         self.register(OperatorAdapter(
             bl_idname="scigraphs.export_graph",
             category="export",
@@ -554,7 +529,6 @@ class OperatorRegistry:
         ))
 
     def _register_render_adapters(self) -> None:
-        """Register render adapters."""
         self.register(OperatorAdapter(
             bl_idname="render.render",
             category="render",
@@ -566,7 +540,6 @@ class OperatorRegistry:
         ))
 
     def _register_shortcuts(self) -> None:
-        """Register common shortcut names."""
         shortcuts = {
             # Datasets
             "import_osmnx": "scigraphs.import_osm_graph",
@@ -637,10 +610,8 @@ def get_registry() -> OperatorRegistry:
     return _registry
 
 
-# Scene property-group aliases. Maps a friendly pipeline group name to the
-# ``bpy.types.Scene`` attribute that holds the corresponding PointerProperty.
-# This lets pipelines expose every SciGraphs property group, not just
-# ``scene.scigraphs``.
+# Friendly pipeline group name -> the ``bpy.types.Scene`` attribute holding that
+# PointerProperty, so a pipeline can reach every group, not just scene.scigraphs.
 SCENE_PROPERTY_GROUPS: Dict[str, str] = {
     "scigraphs": "scigraphs",
     "city2graph": "city2graph",
@@ -654,18 +625,9 @@ SCENE_PROPERTY_GROUPS: Dict[str, str] = {
 def apply_scene_props(scene_props: Optional[Dict[str, Any]]) -> List[str]:
     """Apply pipeline ``scene_props`` onto the matching scene property groups.
 
-    Two shapes are accepted:
-
-    * Flat ``{"prop": value, ...}`` is applied to ``scene.scigraphs`` for
-      backward compatibility.
-    * Nested ``{"scigraphs": {...}, "city2graph": {...}, "coloring": {...},
-      "viz": {...}, ...}`` applies each sub-mapping to the named group.
-
-    Args:
-        scene_props: Pipeline scene properties (flat or nested).
-
-    Returns:
-        List of human-readable warnings for properties that could not be set.
+    A flat mapping goes to ``scene.scigraphs``; a mapping keyed by group name
+    goes to each named group. Returns one warning per property that would not
+    set.
     """
     warnings: List[str] = []
     if not scene_props:
@@ -719,19 +681,11 @@ def call_operator(
     props: Optional[Dict[str, Any]] = None,
     scene_props: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Call a Blender operator with given properties.
+    """Call a Blender operator with the given properties.
 
-    Args:
-        bl_idname: Operator bl_idname (e.g., "scigraphs.apply_layout")
-        props: Properties to pass to operator
-        scene_props: Scene properties to set before calling. Either a flat
-            mapping applied to ``scene.scigraphs``, or a nested mapping keyed by
-            property-group name (see :func:`apply_scene_props`).
-
-    Returns:
-        Result dictionary with 'status', optional 'error', and optional
-        'warnings' for scene properties that could not be set.
+    ``scene_props`` is either flat, applied to ``scene.scigraphs``, or keyed by
+    property-group name (see :func:`apply_scene_props`). Returns a dict with
+    'status', plus 'error' and 'warnings' when there are any.
     """
     try:
         import bpy
@@ -741,10 +695,8 @@ def call_operator(
     props = props or {}
     scene_props = scene_props or {}
 
-    # Set scene properties (flat or nested by property group).
     prop_warnings = apply_scene_props(scene_props)
 
-    # Get operator
     parts = bl_idname.split(".")
     if len(parts) != 2:
         return {"status": "error", "error": f"Invalid bl_idname: {bl_idname}"}
@@ -764,7 +716,7 @@ def call_operator(
         if result == {"FINISHED"}:
             return {"status": "success", "warnings": prop_warnings}
         elif result == {"CANCELLED"}:
-            return {"status": "cancelled", "warnings": prop_warnings}
+            return {"status": "canceled", "warnings": prop_warnings}
         else:
             return {"status": "unknown", "result": str(result), "warnings": prop_warnings}
     except Exception as e:
@@ -775,27 +727,15 @@ def prepare_operator_props(
     adapter: OperatorAdapter,
     pipeline_props: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """
-    Prepare operator and scene properties from pipeline properties.
-
-    Args:
-        adapter: Operator adapter with mappings
-        pipeline_props: Properties from pipeline spec
-
-    Returns:
-        Tuple of (operator_props, scene_props)
-    """
+    """Split pipeline props into (operator_props, scene_props) via the adapter."""
     op_props = {}
     scene_props = {}
 
-    # Map pipeline props to operator props
     for pipeline_key, op_key in adapter.property_mapping.items():
         if pipeline_key in pipeline_props:
             op_props[op_key] = pipeline_props[pipeline_key]
 
-    # Extract scene props
     for scene_key in adapter.scene_props:
-        # Map common names
         mapping = {
             "osmnx_method": "method",
             "osmnx_place": "query",

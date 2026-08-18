@@ -1,7 +1,4 @@
-# Reproducible pipeline operators for SciGraphs
-#
-# Provides UI operators for validating, executing, and exporting
-# reproducible pipelines.
+# Operators for validating, executing and exporting reproducible pipelines.
 
 import bpy
 from bpy.props import StringProperty, BoolProperty, EnumProperty
@@ -42,7 +39,10 @@ class SCIGRAPHS_OT_RunPipeline(Operator, ImportHelper):
         return ImportHelper.invoke(self, context, event)
 
     def execute(self, context):
-        from ....core.repro import parse_pipeline, PipelineExecutor
+        # Two packages on purpose: the parser is Blender-free and ships in the
+        # wheel, the executor drives a scene and stays in the add-on.
+        from scigraphs_core.repro import parse_pipeline
+        from ....core.repro.executor import PipelineExecutor
 
         filepath = bpy.path.abspath(self.filepath)
         if not os.path.isfile(filepath):
@@ -50,10 +50,8 @@ class SCIGRAPHS_OT_RunPipeline(Operator, ImportHelper):
             return {'CANCELLED'}
 
         try:
-            # Parse pipeline
             schema, raw_dict, pipeline_hash = parse_pipeline(filepath)
 
-            # Execute
             executor = PipelineExecutor(
                 stop_on_error=self.stop_on_error,
                 verbose=self.verbose,
@@ -66,7 +64,9 @@ class SCIGRAPHS_OT_RunPipeline(Operator, ImportHelper):
                 errors = "; ".join(result.errors[:3])
                 self.report({'WARNING'}, f"Pipeline completed with errors: {errors}")
 
-            return {'FINISHED'}
+            # CANCELLED on failure, so a script driving this can tell a broken
+            # specification from a good one.
+            return {'FINISHED'} if result.success else {'CANCELLED'}
 
         except Exception as e:
             self.report({'ERROR'}, f"Pipeline execution failed: {e}")
@@ -93,8 +93,8 @@ class SCIGRAPHS_OT_ValidatePipeline(Operator, ImportHelper):
         return ImportHelper.invoke(self, context, event)
 
     def execute(self, context):
-        from ....core.repro.parser import parse_pipeline
-        from ....core.repro.schema import ValidationError
+        from scigraphs_core.repro.parser import parse_pipeline
+        from scigraphs_core.repro.schema import ValidationError
 
         filepath = bpy.path.abspath(self.filepath)
         if not os.path.isfile(filepath):
@@ -284,7 +284,6 @@ class SCIGRAPHS_OT_ExportPipelineTemplate(Operator, ExportHelper):
         template = templates.get(self.template_type, templates['MINIMAL'])
         filepath = self.filepath
 
-        # Ensure correct extension
         if self.format == 'YAML':
             if not filepath.endswith(('.yaml', '.yml')):
                 filepath = os.path.splitext(filepath)[0] + '.yaml'
@@ -338,7 +337,6 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
     def execute(self, context):
         import json
 
-        # Find active graph object
         obj = context.active_object
         if obj is None or "num_nodes" not in obj:
             self.report({'ERROR'}, "No graph object selected")
@@ -346,7 +344,6 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
 
         props = context.scene.scigraphs
 
-        # Build spec from current state
         spec = {
             "meta": {
                 "title": f"scene_{obj.name}",
@@ -356,7 +353,6 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
             },
         }
 
-        # Detect source type
         if obj.get("is_osmnx"):
             spec["dataset"] = {
                 "source": "osmnx",
@@ -370,14 +366,12 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
                 "filepath": "//data/graph.gexf",
             }
 
-        # Layout info
         if "layout_algorithm" in obj:
             spec["layout"] = {
                 "algorithm": obj["layout_algorithm"],
                 "scale": props.layout_scale if hasattr(props, 'layout_scale') else 5.0,
             }
 
-        # Visual settings
         spec["visual"] = {
             "setup_geometry_nodes": True,
         }
@@ -386,7 +380,6 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
         if hasattr(props, 'edge_style_preset') and props.edge_style_preset:
             spec["visual"]["edge_style"] = props.edge_style_preset
 
-        # Render settings
         render = context.scene.render
         spec["render"] = {
             "engine": render.engine,
@@ -396,7 +389,6 @@ class SCIGRAPHS_OT_ExportCurrentReproSpec(Operator, ExportHelper):
 
         filepath = self.filepath
 
-        # Ensure correct extension
         if self.format == 'YAML':
             if not filepath.endswith(('.yaml', '.yml')):
                 filepath = os.path.splitext(filepath)[0] + '.yaml'
@@ -470,7 +462,6 @@ class SCIGRAPHS_OT_OpenArtifactsFolder(Operator):
 
         path = self.folder_path
         if not path:
-            # Use default repro folder relative to blend file
             blend_path = bpy.data.filepath
             if blend_path:
                 path = os.path.join(os.path.dirname(blend_path), "repro")
@@ -481,7 +472,6 @@ class SCIGRAPHS_OT_OpenArtifactsFolder(Operator):
         if not os.path.isdir(path):
             os.makedirs(path, exist_ok=True)
 
-        # Open folder in system file browser
         system = platform.system()
         try:
             if system == 'Windows':
@@ -507,18 +497,21 @@ class SCIGRAPHS_OT_DropPipeline(Operator):
     # second drop would silently re-run the first file.
     filepath: StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE'})
 
-    # Deliberately not SCIGRAPHS_OT_RunPipeline. That operator's invoke()
-    # prefers the path stored in the panel over its own filepath, which is
-    # right for a button and wrong for a drop.
+    # Deliberately not SCIGRAPHS_OT_RunPipeline, whose invoke() prefers the path
+    # stored in the panel over its own filepath: right for a button, wrong for
+    # a drop.
 
-    @classmethod
-    def poll(cls, context):
-        return context.area is not None and context.area.type == 'VIEW_3D'
+    # No poll() either. A failing poll makes Blender reject the drop silently,
+    # which looks exactly like the drop never arriving. The area check belongs
+    # to the file handler's poll_drop.
 
     def execute(self, context):
-        from ....core.repro import parse_pipeline, PipelineExecutor
+        # Parser from the wheel, executor from the add-on; see RunPipeline.
+        from scigraphs_core.repro import parse_pipeline
+        from ....core.repro.executor import PipelineExecutor
 
         path = self.filepath
+        print("[SciGraphs] drop received: %r" % path)
         if not path or not path.lower().endswith(('.json', '.yaml', '.yml')):
             self.report({'ERROR'}, "Not a pipeline specification")
             return {'CANCELLED'}
@@ -563,7 +556,6 @@ class SCIGRAPHS_FH_pipeline(bpy.types.FileHandler):
         return context.area is not None and context.area.type == 'VIEW_3D'
 
 
-# Registration
 classes = (
     SCIGRAPHS_OT_RunPipeline,
     SCIGRAPHS_OT_DropPipeline,

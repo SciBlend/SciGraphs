@@ -1,9 +1,22 @@
 """
 Proximity graph generation from Blender feature objects.
 
-Provides wrapper functions that convert Blender meshes (OSMnx or
-Overture/city2graph feature objects) to GeoDataFrames, call city2graph
-proximity functions, and return results ready for visualization.
+Wrapper functions that convert Blender meshes (OSMnx or Overture/city2graph
+feature objects) to GeoDataFrames, call the matching city2graph proximity
+function, and return results ready for visualization.
+
+Every `generate_*_from_features` below shares the same parameters, documented
+here rather than on each one:
+
+    feature_obj      Blender object carrying OSM or Overture features
+    distance_metric  'euclidean', 'manhattan', or 'network'
+    network_obj      OSMnx street network, required by 'network' distance
+    deduplicate      collapse duplicate and near-coincident points
+    tolerance        deduplication threshold in meters, after CRS conversion
+    as_nx            return a NetworkX graph instead of GeoDataFrames
+
+and each returns `(nodes_gdf, edges_gdf)`, or a NetworkX graph when `as_nx`.
+The docstrings below cover only what is specific to that generator.
 """
 
 def _extract_gdf_from_feature_object(obj, target_crs=None, deduplicate=True,
@@ -11,23 +24,12 @@ def _extract_gdf_from_feature_object(obj, target_crs=None, deduplicate=True,
     """
     Extract a GeoDataFrame from a Blender feature object.
     
-    Args:
-        obj: Blender feature object (OSMnx or Overture/city2graph)
-        target_crs: Optional CRS to project to (defaults to UTM based on location)
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication (after CRS conversion)
-        as_points: If True, reduce non-point geometries to their representative
-            point so the result is point-only. Set to False to preserve the
-            original polygon/line geometry (e.g. for containment predicates).
-        
-    Returns:
-        GeoDataFrame: Features extracted from the object
-        
-    Note:
-        Point objects map each vertex to one node. When ``as_points`` is True,
-        polygon/line objects (such as Overture buildings) are reduced to one
-        representative point per feature so they can be used as proximity-graph
-        nodes. Use deduplicate=True to consolidate nearby points (default).
+    `target_crs` defaults to the UTM zone for the object's location.
+
+    A point object maps each vertex to one node. With `as_points`, polygon and
+    line objects such as Overture buildings are reduced to one representative
+    point per feature, so they can serve as proximity-graph nodes; pass False to
+    keep the original geometry, which containment predicates need.
     """
     if not obj or not obj.data:
         raise ValueError("Invalid object: no mesh data")
@@ -77,21 +79,16 @@ def _extract_gdf_from_feature_object(obj, target_crs=None, deduplicate=True,
 
 
 def _extract_network_gdf(network_obj, target_crs=None):
-    """
-    Extract network GeoDataFrame from OSMnx street network object.
-    
-    Args:
-        network_obj: Blender object with OSMnx street network
-        target_crs: Optional CRS to project to (to match features CRS)
-        
-    Returns:
-        GeoDataFrame: Street edges for network distance calculation
+    """Return the street edges of an OSMnx object, projected to ``target_crs``.
+
+    The graph itself comes from the importer's in-memory cache, so a network
+    imported in an earlier session raises and has to be re-imported.
     """
     if not network_obj or not network_obj.get("is_osmnx"):
         raise ValueError("Invalid network object: not an OSMnx street network")
     
     import city2graph as c2g
-    from .. import importer
+    from ...core import importer
     
     graph_id = network_obj.get("osmnx_graph_id")
     if not graph_id:
@@ -119,17 +116,7 @@ def generate_knn_graph_from_features(feature_obj, k=5, distance_metric="euclidea
     """
     Generate K-Nearest Neighbors graph from OSM feature object.
     
-    Args:
-        feature_obj: Blender object with OSM features
-        k: Number of nearest neighbors
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
+    `k` is the number of nearest neighbors.
     """
     import city2graph as c2g
     
@@ -153,20 +140,7 @@ def generate_knn_graph_from_features(feature_obj, k=5, distance_metric="euclidea
 def generate_delaunay_graph_from_features(feature_obj, distance_metric="euclidean",
                                           network_obj=None, deduplicate=True, tolerance=0.5,
                                           as_nx=False):
-    """
-    Generate Delaunay triangulation graph from OSM feature object.
-    
-    Args:
-        feature_obj: Blender object with OSM features
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
-    """
+    """Generate Delaunay triangulation graph from OSM feature object."""
     import city2graph as c2g
     
     gdf = _extract_gdf_from_feature_object(feature_obj, deduplicate=deduplicate, tolerance=tolerance)
@@ -192,17 +166,7 @@ def generate_fixed_radius_graph_from_features(feature_obj, radius=100.0,
     """
     Generate fixed-radius (Gilbert) graph from OSM feature object.
     
-    Args:
-        feature_obj: Blender object with OSM features
-        radius: Connection radius in meters
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
+    `radius` is the connection radius in meters.
     """
     import city2graph as c2g
     
@@ -230,19 +194,8 @@ def generate_waxman_graph_from_features(feature_obj, beta=0.5, r0=100.0, seed=No
     """
     Generate Waxman probabilistic graph from OSM feature object.
     
-    Args:
-        feature_obj: Blender object with OSM features
-        beta: Probability scaling parameter (0-1)
-        r0: Maximum distance parameter
-        seed: Random seed for reproducibility
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
+    `beta` scales the connection probability (0-1), `r0` is the maximum
+    distance, and `seed` makes the draw reproducible.
     """
     import city2graph as c2g
     
@@ -268,20 +221,7 @@ def generate_waxman_graph_from_features(feature_obj, beta=0.5, r0=100.0, seed=No
 def generate_gabriel_graph_from_features(feature_obj, distance_metric="euclidean",
                                         network_obj=None, deduplicate=True, tolerance=0.5,
                                         as_nx=False):
-    """
-    Generate Gabriel graph from OSM feature object.
-    
-    Args:
-        feature_obj: Blender object with OSM features
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
-    """
+    """Generate Gabriel graph from OSM feature object."""
     import city2graph as c2g
     
     gdf = _extract_gdf_from_feature_object(feature_obj, deduplicate=deduplicate, tolerance=tolerance)
@@ -303,20 +243,7 @@ def generate_gabriel_graph_from_features(feature_obj, distance_metric="euclidean
 def generate_rng_graph_from_features(feature_obj, distance_metric="euclidean",
                                      network_obj=None, deduplicate=True, tolerance=0.5,
                                      as_nx=False):
-    """
-    Generate Relative Neighborhood Graph from OSM feature object.
-    
-    Args:
-        feature_obj: Blender object with OSM features
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
-    """
+    """Generate Relative Neighborhood Graph from OSM feature object."""
     import city2graph as c2g
     
     gdf = _extract_gdf_from_feature_object(feature_obj, deduplicate=deduplicate, tolerance=tolerance)
@@ -338,20 +265,7 @@ def generate_rng_graph_from_features(feature_obj, distance_metric="euclidean",
 def generate_emst_graph_from_features(feature_obj, distance_metric="euclidean",
                                       network_obj=None, deduplicate=True, tolerance=0.5,
                                       as_nx=False):
-    """
-    Generate Euclidean Minimum Spanning Tree from OSM feature object.
-    
-    Args:
-        feature_obj: Blender object with OSM features
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
-    """
+    """Generate Euclidean Minimum Spanning Tree from OSM feature object."""
     import city2graph as c2g
     
     gdf = _extract_gdf_from_feature_object(feature_obj, deduplicate=deduplicate, tolerance=tolerance)
@@ -377,21 +291,9 @@ def generate_contiguity_graph_from_features(feature_obj, contiguity="queen",
     """
     Generate contiguity graph from polygon features.
     
-    Args:
-        feature_obj: Blender object with polygon features
-        contiguity: 'queen' or 'rook'
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        deduplicate: If True, remove duplicate/nearby points
-        tolerance: Distance threshold in meters for deduplication
-        as_nx: Return NetworkX graph instead of GeoDataFrames
-        
-    Returns:
-        tuple: (nodes_gdf, edges_gdf) or NetworkX graph if as_nx=True
-        
-    Note:
-        Contiguity is determined by libpysal's spatial weights (Queen/Rook rules).
-        No separate predicate parameter needed - contiguity type defines adjacency.
+    `feature_obj` must carry polygons. `contiguity` is 'queen' or 'rook', and
+    adjacency comes from libpysal's spatial weights, so there is no separate
+    predicate parameter.
     """
     import city2graph as c2g
     
@@ -418,19 +320,12 @@ def generate_bridge_nodes_from_features(feature_objects, proximity_method="knn",
     """
     Generate multi-layer graph connecting different feature types.
     
-    Args:
-        feature_objects: Dictionary of {layer_name: blender_object}
-        proximity_method: 'knn' or 'fixed_radius'
-        k: Number of neighbors for KNN
-        radius: Radius for fixed_radius
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        network_obj: Optional OSMnx street network for network distance
-        as_nx: Return NetworkX graph instead of dictionaries
-        
-    Returns:
-        tuple: (nodes_dict, edges_dict) or NetworkX graph if as_nx=True
-        nodes_dict: {layer_name: gdf}
-        edges_dict: {(src_layer, relation, tgt_layer): gdf}
+    `feature_objects` maps layer name to Blender object. `proximity_method` is
+    'knn' (using `k`) or 'fixed_radius' (using `radius`).
+
+    Returns `(nodes_dict, edges_dict)`, keyed by layer name and by the
+    `(src_layer, relation, tgt_layer)` triplet respectively, or a NetworkX graph
+    when `as_nx`.
     """
     import city2graph as c2g
     
@@ -471,16 +366,8 @@ def generate_group_nodes_from_features(polygons_obj, points_obj,
     """
     Generate graph connecting polygon zones to contained points.
     
-    Args:
-        polygons_obj: Blender object with polygon features
-        points_obj: Blender object with point features
-        distance_metric: 'euclidean', 'manhattan', or 'network'
-        predicate: Spatial predicate ('covered_by', 'within', 'intersects')
-        network_obj: Optional OSMnx street network for network distance
-        as_nx: Return NetworkX graph instead of dictionaries
-        
-    Returns:
-        tuple: (nodes_dict, edges_dict) or NetworkX graph if as_nx=True
+    `predicate` is the spatial test: 'covered_by', 'within' or 'intersects'.
+    Returns `(nodes_dict, edges_dict)`, or a NetworkX graph when `as_nx`.
     """
     import city2graph as c2g
     

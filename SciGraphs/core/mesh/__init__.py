@@ -1,5 +1,4 @@
-from . import edge_styles
-from . import geo_mesh
-from . import geometry
-from . import layout
-from . import mesh_utils
+"""Mesh builders that need Blender: geo_mesh and geometry.
+
+The Blender-free half lives in `scigraphs_core.mesh`.
+"""

@@ -1,8 +1,18 @@
 import bpy
 from bpy.props import StringProperty, EnumProperty, FloatProperty, IntProperty, BoolProperty
 
-from ....core.feature_tags import FEATURE_TYPE_ITEMS, tags_from_preset
+from scigraphs_core.feature_tags import FEATURE_TYPE_ITEMS, tags_from_preset
 from ....core.mesh.geo_mesh import create_feature_mesh_from_gdf as _create_feature_mesh_from_gdf
+
+
+def _overture_api_key():
+    """Read the Overture key from preferences; None lets core fall back.
+
+    Keeping the lookup here leaves core.city2graph.overture_api free of bpy.
+    """
+    from ....preferences import get_preferences
+    prefs = get_preferences()
+    return prefs.overture_api_key if prefs else None
 
 
 def _tags_from_preset(preset, custom_tags_str=""):
@@ -36,6 +46,7 @@ def _download_overture_from_bbox(context, bbox, feature_type, custom_tags, opera
         custom_tags=custom_tags,
         osmnx_obj=_find_osmnx_object(context),
         limit=props.feat_limit,
+        overture_api_key=_overture_api_key(),
     )
     if not result:
         operator.report({'ERROR'}, "No features found")
@@ -78,7 +89,7 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
     )
     
     def execute(self, context):
-        from ....core.osmnx import features
+        from scigraphs_core.osmnx import features
         
         if not self.place.strip():
             self.report({'ERROR'}, "Please enter a place name")
@@ -106,10 +117,8 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
             self.report({'ERROR'}, "No features found")
             return {'CANCELLED'}
         
-        # Filter to nodes only if requested (matching notebook behavior)
         if self.filter_nodes_only and hasattr(gdf.index, 'names'):
             initial_count = len(gdf)
-            # Find the element type level in the multiindex
             element_level_name = None
             for name in gdf.index.names:
                 if name and 'element' in name.lower():
@@ -125,12 +134,10 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
                     self.report({'ERROR'}, "No node elements found after filtering")
                     return {'CANCELLED'}
         
-        # Find OSMnx object in scene for coordinate transformation
         osmnx_obj = None
         if context.active_object and context.active_object.get("is_osmnx", False):
             osmnx_obj = context.active_object
         else:
-            # Search for any OSMnx object in scene
             for obj in bpy.data.objects:
                 if obj.get("is_osmnx", False):
                     osmnx_obj = obj
@@ -145,13 +152,12 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to create mesh objects")
             return {'CANCELLED'}
         
-        # Store place name and metadata in objects for later use (e.g., metapath analysis)
+        # Metadata that later steps such as metapath analysis read back.
         for obj in objects:
             obj["place_name"] = self.place
             obj["feature_type"] = self.feature_type
             obj["crs"] = str(gdf.crs) if gdf.crs else "EPSG:4326"
             
-            # Store coordinate transformation info from OSMnx object
             if osmnx_obj:
                 obj["osmnx_center_lat"] = osmnx_obj.get("osmnx_center_lat")
                 obj["osmnx_center_lon"] = osmnx_obj.get("osmnx_center_lon")
@@ -222,7 +228,7 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
     )
     
     def execute(self, context):
-        from ....core.osmnx import features
+        from scigraphs_core.osmnx import features
         
         center_point = (self.latitude, self.longitude)
         
@@ -248,10 +254,8 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
             self.report({'ERROR'}, "No features found")
             return {'CANCELLED'}
         
-        # Filter to nodes only if requested (matching notebook behavior)
         if self.filter_nodes_only and hasattr(gdf.index, 'names'):
             initial_count = len(gdf)
-            # Find the element type level in the multiindex
             element_level_name = None
             for name in gdf.index.names:
                 if name and 'element' in name.lower():
@@ -267,12 +271,10 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
                     self.report({'ERROR'}, "No node elements found after filtering")
                     return {'CANCELLED'}
         
-        # Find OSMnx object in scene for coordinate transformation
         osmnx_obj = None
         if context.active_object and context.active_object.get("is_osmnx", False):
             osmnx_obj = context.active_object
         else:
-            # Search for any OSMnx object in scene
             for obj in bpy.data.objects:
                 if obj.get("is_osmnx", False):
                     osmnx_obj = obj
@@ -284,7 +286,6 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to create mesh objects")
             return {'CANCELLED'}
         
-        # Store metadata for later use
         for obj in objects:
             obj["place_name"] = f"Point ({self.latitude:.4f}, {self.longitude:.4f})"
             obj["feature_type"] = self.feature_type
@@ -293,7 +294,6 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
             obj["search_radius"] = self.distance
             obj["crs"] = str(gdf.crs) if gdf.crs else "EPSG:4326"
             
-            # Store coordinate transformation info from OSMnx object
             if osmnx_obj:
                 obj["osmnx_center_lat"] = osmnx_obj.get("osmnx_center_lat")
                 obj["osmnx_center_lon"] = osmnx_obj.get("osmnx_center_lon")
@@ -340,7 +340,7 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     
     def execute(self, context):
-        from ....core.osmnx import features
+        from scigraphs_core.osmnx import features
         
         props = context.scene.scigraphs
         bbox = (props.osmnx_bbox_north, props.osmnx_bbox_south,
@@ -365,12 +365,10 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
             self.report({'ERROR'}, "No features found")
             return {'CANCELLED'}
         
-        # Find OSMnx object in scene for coordinate transformation
         osmnx_obj = None
         if context.active_object and context.active_object.get("is_osmnx", False):
             osmnx_obj = context.active_object
         else:
-            # Search for any OSMnx object in scene
             for obj in bpy.data.objects:
                 if obj.get("is_osmnx", False):
                     osmnx_obj = obj
@@ -382,7 +380,6 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
             self.report({'ERROR'}, "Failed to create mesh objects")
             return {'CANCELLED'}
         
-        # Store metadata for later use
         for obj in objects:
             obj["place_name"] = f"BBox ({bbox[0]:.4f}, {bbox[1]:.4f}, {bbox[2]:.4f}, {bbox[3]:.4f})"
             obj["feature_type"] = self.feature_type
@@ -392,7 +389,6 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
             obj["bbox_west"] = bbox[3]
             obj["crs"] = str(gdf.crs) if gdf.crs else "EPSG:4326"
             
-            # Store coordinate transformation info from OSMnx object
             if osmnx_obj:
                 obj["osmnx_center_lat"] = osmnx_obj.get("osmnx_center_lat")
                 obj["osmnx_center_lon"] = osmnx_obj.get("osmnx_center_lon")
@@ -445,7 +441,7 @@ class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
-        from ....core.osmnx import features
+        from scigraphs_core.osmnx import features
 
         if not self.address.strip():
             self.report({'ERROR'}, "Please enter an address")
@@ -517,7 +513,7 @@ class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
-        from ....core.osmnx import features
+        from scigraphs_core.osmnx import features
         try:
             from shapely.geometry import Polygon
         except ImportError:
@@ -604,7 +600,7 @@ class SCIGRAPHS_OT_FeaturesFromXML(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        from ....core.osmnx import features
+        from scigraphs_core.osmnx import features
         import os
         fp = bpy.path.abspath(self.filepath)
         if not fp or not os.path.exists(fp):
@@ -668,8 +664,8 @@ class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
             self.report({'ERROR'}, "Street-network graph not found in memory")
             return {'CANCELLED'}
 
-        from ....core.osmnx.spatial_queries import find_nearest_node
-        from ....core.osmnx.metadata import get_graph_extent
+        from scigraphs_core.osmnx.spatial_queries import find_nearest_node
+        from scigraphs_core.osmnx.metadata import get_graph_extent
         import math
 
         extent = get_graph_extent(G) or {"center_lat": 0.0, "center_lon": 0.0}
@@ -689,7 +685,6 @@ class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
         mode = props.osmnx_poi_snap_mode
         mesh = obj.data
 
-        # Store nearest_node_id as POINT int attribute.
         attr_name = "nearest_node_id"
         if attr_name in mesh.attributes:
             mesh.attributes.remove(mesh.attributes[attr_name])

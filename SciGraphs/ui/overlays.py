@@ -1,5 +1,4 @@
-# SciGraphs HUD Overlay
-# Draws graph statistics and info directly in the 3D viewport
+# HUD overlay: draws graph statistics into the 3D viewport.
 
 import bpy
 import blf
@@ -64,7 +63,6 @@ def _get_graph_stats(obj):
         'degree_max': obj.get("stat_degree_max", None),
     }
     
-    # Additional OSMnx stats
     if stats['is_osmnx']:
         stats['osmnx_place'] = obj.get("osmnx_query_name", obj.get("osmnx_place", "Network"))
     
@@ -111,11 +109,9 @@ def _draw_hud_callback():
     """Main draw callback for the HUD overlay."""
     context = bpy.context
     
-    # Only draw in 3D View
     if context.area is None or context.area.type != 'VIEW_3D':
         return
     
-    # Check if overlay is enabled
     props = getattr(context.scene, 'scigraphs', None)
     if props is None:
         return
@@ -128,7 +124,6 @@ def _draw_hud_callback():
     if not stats:
         return
     
-    # Build text lines
     lines = []
     lines.append(f"Graph: {stats['name']}")
     lines.append(f"Nodes: {stats['nodes']:,}  |  Edges: {stats['edges']:,}")
@@ -216,14 +211,12 @@ def _draw_hud_callback():
     x = region.width - max_width + 8 - padding
     y = padding + 8
     
-    # Draw background at bottom-right
     _draw_background(x - 8, y - 8, max_width, bg_height, (0.05, 0.05, 0.08, 0.8))
     
     # Draw lines (from bottom up)
     for i, line in enumerate(lines):
         text_y = y + (len(lines) - 1 - i) * line_height
         
-        # Header in different color
         if i == 0:
             _draw_text(x, text_y, line, size=15, color=(0.4, 0.8, 1.0, 1.0))
         else:
@@ -268,7 +261,6 @@ class SCIGRAPHS_OT_toggle_hud(bpy.types.Operator):
             props.show_hud_overlay = True
             self.report({'INFO'}, "HUD overlay enabled")
         
-        # Force redraw
         for area in context.screen.areas:
             if area.type == 'VIEW_3D':
                 area.tag_redraw()
@@ -285,7 +277,6 @@ def register():
     for cls in _CLASSES:
         bpy.utils.register_class(cls)
     
-    # Add property for HUD toggle
     bpy.types.Scene.scigraphs_show_hud = bpy.props.BoolProperty(
         name="Show Graph HUD",
         description="Display graph statistics overlay in viewport",
@@ -293,7 +284,6 @@ def register():
         update=lambda self, ctx: enable_hud() if self.scigraphs_show_hud else disable_hud()
     )
     
-    # Auto-enable on startup
     enable_hud()
 
 

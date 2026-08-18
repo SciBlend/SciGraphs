@@ -1,20 +1,10 @@
-"""
-Graph utility operators for City2Graph.
-
-Provides operators for graph filtering, clipping, isochrone generation,
-and removing isolated components.
-"""
+"""City2Graph utility operators: filter, clip, isochrone, remove isolated."""
 
 import bpy
 
 
 def _mesh_to_planar_polygon(mesh_obj):
-    """Build a shapely polygon from a mesh object's faces using world XY coordinates.
-
-    The boundary vertices are transformed by the object's world matrix so the
-    polygon shares the same world coordinate space as the graph nodes, which are
-    also compared in world space.
-    """
+    """Build a shapely polygon from a mesh object's faces, in world XY."""
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
 
@@ -35,12 +25,7 @@ def _mesh_to_planar_polygon(mesh_obj):
 
 
 def _planar_geometry_to_object(geometry, name, collection_name, matrix_world):
-    """Create a Blender mesh object from a shapely polygon in planar XY coordinates.
-
-    Vertices are written directly from the geometry coordinates without any
-    geographic reprojection, and the source object's world matrix is applied so
-    the result overlays the originating graph.
-    """
+    """Create a mesh object from a shapely polygon, planar XY, no reprojection."""
     import bmesh
     from shapely.geometry import Polygon, MultiPolygon
 
@@ -82,10 +67,10 @@ def _planar_geometry_to_object(geometry, name, collection_name, matrix_world):
 
 
 def _graph_with_2d_positions(graph):
-    """Return a copy of the graph whose node 'pos' attributes are 2D (x, y).
+    """Return a copy of the graph with node 'pos' attributes cut down to (x, y).
 
-    Several city2graph spatial helpers snap a 2D center point against a KD-tree
-    built from node positions, which requires the stored positions to be 2D.
+    Several city2graph spatial helpers snap a 2D center against a KD-tree built
+    from these positions, and reject 3D ones.
     """
     duplicate = graph.copy()
     for _node, data in duplicate.nodes(data=True):

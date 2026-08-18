@@ -1,15 +1,10 @@
-"""Advanced routing operators for the OSMnx panel.
-
-Provides:
-    - K-shortest alternative paths.
-    - Many-to-many batch routing (with optional random OD sampling).
-    - Route-to-GDF summary (length, time, grade, rise).
-    - Route elevation profile → creates a Blender curve.
+"""Routing operators for the OSMnx panel: k-shortest paths, many-to-many batch
+routing over random OD pairs, route summaries, and elevation profiles.
 """
 
 import bpy
 
-from ....core.osmnx import (
+from scigraphs_core.osmnx import (
     batch_shortest_paths,
     k_shortest_paths,
     route_elevation_profile,
@@ -22,10 +17,6 @@ from .utils import (
     _mark_shortest_path_attributes,
 )
 
-
-# ---------------------------------------------------------------------------
-# Shared utilities
-# ---------------------------------------------------------------------------
 
 def _pick_routing_graph(obj):
     """Return the best available NetworkX graph for routing (projected preferred)."""
@@ -40,10 +31,6 @@ def _parse_int(value, default=None):
     except (TypeError, ValueError):
         return default
 
-
-# ---------------------------------------------------------------------------
-# K-shortest alternative routes
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxKShortest(bpy.types.Operator):
     """Compute K alternative shortest paths between source and target."""
@@ -91,7 +78,6 @@ class SCIGRAPHS_OT_OSMnxKShortest(bpy.types.Operator):
         obj["osmnx_k_shortest_count"] = len(results)
         obj["osmnx_k_shortest_km"] = [r["distance_km"] for r in results]
 
-        # Mark the first (best) route on the mesh as the "current" path.
         first_path = results[0]["path"]
         _mark_shortest_path_attributes(obj, first_path)
         obj["osmnx_last_path"] = str(first_path)
@@ -100,10 +86,6 @@ class SCIGRAPHS_OT_OSMnxKShortest(bpy.types.Operator):
         self.report({'INFO'}, f"Found {len(results)} routes: {lengths}")
         return {'FINISHED'}
 
-
-# ---------------------------------------------------------------------------
-# Many-to-many batch routing
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxBatchRoutes(bpy.types.Operator):
     """Compute many-to-many routes between random origin-destination pairs."""
@@ -164,12 +146,8 @@ class SCIGRAPHS_OT_OSMnxBatchRoutes(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ---------------------------------------------------------------------------
-# Route summary (route_to_gdf aggregates)
-# ---------------------------------------------------------------------------
-
 class SCIGRAPHS_OT_OSMnxRouteSummary(bpy.types.Operator):
-    """Summarise the last computed shortest path (length, time, grade, rise)."""
+    """Summarize the last computed shortest path (length, time, grade, rise)."""
     bl_idname = "scigraphs.osmnx_route_summary"
     bl_label = "Summarize Last Route"
     bl_description = "Compute aggregate metrics for the last shortest path"
@@ -218,10 +196,6 @@ class SCIGRAPHS_OT_OSMnxRouteSummary(bpy.types.Operator):
         self.report({'INFO'}, msg)
         return {'FINISHED'}
 
-
-# ---------------------------------------------------------------------------
-# Route elevation profile (creates a Blender curve)
-# ---------------------------------------------------------------------------
 
 class SCIGRAPHS_OT_OSMnxRouteElevationProfile(bpy.types.Operator):
     """Generate a 2D curve showing elevation along the last route."""
@@ -272,7 +246,7 @@ class SCIGRAPHS_OT_OSMnxRouteElevationProfile(bpy.types.Operator):
         if not profile:
             self.report(
                 {'ERROR'},
-                "Route elevations unavailable — add node elevations first",
+                "Route elevations unavailable, add node elevations first",
             )
             return {'CANCELLED'}
 
