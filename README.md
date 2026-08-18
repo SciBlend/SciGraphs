@@ -112,8 +112,6 @@ SciGraphs can replay an entire pipeline — dataset, analysis, layout, visualiza
 }
 ```
 
-Each run emits a canonical specification, a provenance manifest (with input/output hashes and timing) and an execution log, so the same seed and inputs reproduce the same result. See [`examples/pipelines/`](./examples/pipelines) for ready-to-run pipelines and the full schema reference.
-
 ## Workflow Overview
 
 ![SciGraphs pipeline](./images/graphical_abstract3.png)
@@ -170,6 +168,15 @@ For inquiries or support:
 
 ## License
 
-SciGraphs is released under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**.
+The add-on is released under the **GNU General Public License v3.0 or later**
+([`LICENSE`](LICENSE)), which is what Blender's extensions platform requires.
+
+The two library halves ship separately under **MIT**, so they can be used
+without Blender and without taking on the GPL: `scigraphs-core` from
+[`core/`](core/) and `scigraphs-engine` from [`engine/`](engine/). Both install
+from PyPI with numpy as their only requirement.
+
+[`LICENSES.md`](LICENSES.md) explains the split and covers the bundled
+third-party wheels.
 
 
