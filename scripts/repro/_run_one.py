@@ -1,14 +1,12 @@
 """Execute one pipeline specification inside Blender and report the outcome.
 
-One Blender process per spec, so a crash cannot affect the next one:
-
     env -u LD_LIBRARY_PATH blender -b --python scripts/repro/_run_one.py -- \
         --spec examples/pipelines/figures/fig1_flatfile_lesmiserables.json \
         --report /tmp/result.json
 
-The outcome goes to a JSON report rather than stdout, which Blender fills with
-log lines that look plausible even when the pipeline failed halfway.
-"""
+One process per spec, so a crash cannot affect the next. The outcome goes to a
+JSON report, not to stdout, which Blender fills with plausible log lines even
+when the pipeline failed halfway."""
 
 import json
 import os
@@ -33,16 +31,10 @@ def parse_args(argv):
 
 
 def reregister_worktree_properties():
-    """Force the working tree's property groups over the installed add-on's.
-
-    Blender auto-loads the installed extension and registered classes do not
-    follow sys.path, so without this a spec's new fields are silently dropped.
-    The guard checks that EVERY expected property is present, not just one: a
-    background sync copies them across gradually, so a single-name check goes
-    green while the rest are still missing.
-
-    Returns a list of the groups that were re-registered.
-    """
+    """Force the working tree's property groups over the installed add-on's,
+    and return them. Registered classes do not follow sys.path, so without this a
+    spec's new fields are dropped silently. The guard checks EVERY expected
+    property, since a partial background sync passes a single-name check."""
     import bpy
 
     reregistered = []
@@ -99,7 +91,7 @@ def main(argv):
 
     try:
         # Scene clearing and camera framing are pipeline stages
-        # (meta.clear_scene, render.frame_camera); this runner only executes.
+        # (meta.clear_scene, render.frame_camera), not this runner's job.
         report["reregistered"] = reregister_worktree_properties()
 
         # Not re-exported by the package __init__, so import the module.
@@ -139,8 +131,8 @@ def main(argv):
 if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     code = main(argv)
-    # Blender segfaults during interpreter teardown with this add-on, which
-    # would replace the exit code with 134 after a clean run.
+    # Blender segfaults during teardown with this add-on, turning a clean run
+    # into exit 134.
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(code)

@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scigraphs-engine"
+version = "0.1.1"
+description = "Blender-free graph visualization engine: filters, backbones, bundling, PNG render."
+readme = "README.md"
+# Floor matches Blender 4.1+ / 5.x Python.
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "José Marín" }]
+keywords = ["graph", "network", "visualization", "rendering", "layout"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+# Only hard dep. igraph/scipy/networkx are optional and degrade to None.
+dependencies = ["numpy>=1.23"]
+
+[project.urls]
+Homepage = "https://github.com/SciBlend/SciGraphs"
+Repository = "https://github.com/SciBlend/SciGraphs"
+Issues = "https://github.com/SciBlend/SciGraphs/issues"
+Documentation = "https://github.com/SciBlend/SciGraphs/tree/main/docs"
+
+[project.optional-dependencies]
+igraph = ["python-igraph>=0.10"]
+scipy = ["scipy>=1.9"]
+networkx = ["networkx>=2.8"]
+all = ["python-igraph>=0.10", "scipy>=1.9", "networkx>=2.8"]
+# Only needed for Graph.render(); import stays lazy.
+wgpu = ["wgpu>=0.32", "pillow>=9"]
+
+[tool.setuptools]
+# Listed one by one rather than discovered, so a new subpackage has to be added
+# here on purpose. Leaving one out ships a wheel that imports and then fails on
+# the first call into the missing module.
+packages = [
+    "scigraphs_engine",
+    "scigraphs_engine.backends",
+    "scigraphs_engine.backends.wgpu",
+    "scigraphs_engine.bundling",
+]
+license-files = ["LICENSE"]
+
+[tool.setuptools.package-data]
+"scigraphs_engine.backends.wgpu" = ["wgsl/*.wgsl", "wgsl/*.json"]

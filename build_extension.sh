@@ -7,23 +7,28 @@ set -e
 EXTENSION_ID="scigraphs"
 BUILD_DIR="build_temp"
 
-# Detect Blender config directory per-platform
 if [ "$(uname)" = "Darwin" ]; then
     BLENDER_CONFIG_BASE="$HOME/Library/Application Support/Blender"
 else
     BLENDER_CONFIG_BASE="${XDG_CONFIG_HOME:-$HOME/.config}/blender"
 fi
 
-# Allow overriding the target Blender version (default: auto-detect from manifest)
+# Overrides the auto-detection below.
 BLENDER_VERSION="${BLENDER_TARGET_VERSION:-}"
 
 # ---------------------------------------------------------------------------
 # Parse flags
 # ---------------------------------------------------------------------------
 SKIP_INSTALL=false
+# The GPU render engine ships by default. --no-engine drops it, which is only
+# useful for checking that the guarded imports still hold. --private and
+# --with-engine used to select this and are kept as no-ops.
+NO_ENGINE=false
 for arg in "$@"; do
     case "$arg" in
         --no-install) SKIP_INSTALL=true ;;
+        --no-engine) NO_ENGINE=true ;;
+        --private|--with-engine) ;;
     esac
 done
 
@@ -47,23 +52,29 @@ if [ ! -d "SciGraphs" ]; then
 fi
 cp -r SciGraphs/* "$BUILD_DIR/"
 
-# Optional components. Present in some working trees, absent from the build:
-# the add-on guards their import and runs without them.
-for optional in ui/gpu_render core/render; do
-    rm -rf "$BUILD_DIR/$optional"
+# The Blender side of the render engine and the shim over the scigraphs_engine
+# wheel. The cp -r above already copied both; this loop only removes them.
+for component in ui/gpu_render core/render; do
+    if [ "$NO_ENGINE" = true ]; then
+        echo "  Dropping $component (--no-engine)"
+        rm -rf "$BUILD_DIR/$component"
+    elif [ ! -d "$BUILD_DIR/$component" ]; then
+        echo "  $component is not in this tree; building without it"
+    fi
 done
+
+# cp -r takes any markdown left in the source tree. Notes for whoever edits the
+# code do not belong in a released zip.
+find "$BUILD_DIR" -name '*.md' -print -delete
 
 if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
     echo "  Copying wheels referenced in manifest..."
     mkdir -p "$BUILD_DIR/wheels"
     MISSING_WHEELS=false
 
-    # Resolve the platform family of a wheel filename's platform tag (the
-    # last '-'-delimited field). Used to reconcile manylinux tag-spelling
-    # differences between environments (e.g. pip fetching a manylinux_2_28
-    # wheel where the manifest pins the manylinux2014/2_17 spelling, or vice
-    # versa). PyPI publishes both for some packages and the resolver may pick
-    # either depending on platform-tag priority and pip version.
+    # pip and the manifest can spell the same linux wheel differently
+    # (manylinux_2_28 vs manylinux2014/2_17), since PyPI publishes both for some
+    # packages. Reduce a platform tag to its family so the two can be matched.
     _wheel_family() {
         case "$1" in
             *manylinux*|*musllinux*) echo "linux" ;;
@@ -110,6 +121,9 @@ if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
             echo "  NOTE: reconciling '$wheel' -> '$alt'"
             cp "wheels/$alt" "$BUILD_DIR/wheels/"
             sed -i "s|./wheels/$wheel|./wheels/$alt|" "$BUILD_DIR/blender_manifest.toml"
+        elif [[ "$wheel" == scigraphs_engine-* || "$wheel" == scigraphs_core-* ]]; then
+            echo "  NOTE: $wheel not in wheels/; building without it"
+            sed -i "\|\./wheels/$wheel|d" "$BUILD_DIR/blender_manifest.toml"
         else
             echo "  WARNING: manifest references missing wheel: $wheel"
             MISSING_WHEELS=true
@@ -187,7 +201,7 @@ if [ -z "$BLENDER_VERSION" ]; then
     fi
 fi
 
-# Read blender_version_min from manifest to find the right config folder
+# The manifest floor names the config folder when Blender itself did not answer.
 if [ -z "$BLENDER_VERSION" ]; then
     MANIFEST_VER=$(grep -oP 'blender_version_min\s*=\s*"\K[0-9]+\.[0-9]+' blender_manifest.toml 2>/dev/null || true)
     if [ -n "$MANIFEST_VER" ]; then
@@ -207,7 +221,6 @@ INSTALL_DIR="$BLENDER_CONFIG_BASE/$BLENDER_VERSION/extensions/user_default/$EXTE
 echo "  Blender version: $BLENDER_VERSION"
 echo "  Install target:  $INSTALL_DIR"
 
-# Determine which zip to install based on current platform
 PLATFORM="$(uname -s)-$(uname -m)"
 case "$PLATFORM" in
     Linux-x86_64)  ZIP_SUFFIX="linux_x64" ;;
@@ -231,7 +244,6 @@ fi
 echo ""
 echo "[5/5] Installing to Blender $BLENDER_VERSION..."
 
-# Clean previous installation completely
 if [ -d "$INSTALL_DIR" ]; then
     echo "  Removing old installation..."
     rm -rf "$INSTALL_DIR"
@@ -240,7 +252,6 @@ fi
 mkdir -p "$INSTALL_DIR"
 unzip -q -o "$ZIP_FILE" -d "$INSTALL_DIR"
 
-# Verify the installed manifest is correct
 INSTALLED_VER=$(grep -oP 'blender_version_min\s*=\s*"\K[^"]+' "$INSTALL_DIR/blender_manifest.toml" 2>/dev/null || echo "UNKNOWN")
 CP311_COUNT=$(grep -c "cp311" "$INSTALL_DIR/blender_manifest.toml" 2>/dev/null; true)
 

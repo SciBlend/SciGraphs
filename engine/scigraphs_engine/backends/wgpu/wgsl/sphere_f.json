@@ -1,0 +1,152 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "corner",
+      "location": 1,
+      "format": "float32x2"
+    },
+    {
+      "name": "radius",
+      "location": 2,
+      "format": "float32"
+    },
+    {
+      "name": "color",
+      "location": 3,
+      "format": "float32x4"
+    },
+    {
+      "name": "frow",
+      "location": 4,
+      "format": "float32x3"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex",
+        "fragment"
+      ]
+    },
+    {
+      "name": "lights",
+      "group": 0,
+      "binding": 2,
+      "type": "uniform",
+      "visibility": [
+        "fragment"
+      ],
+      "block_size": 80,
+      "block_packed_by": "SciGraphs/ui/gpu_render/draw.py::_lighting_ubo",
+      "block_fields": [
+        {
+          "name": "key_dir",
+          "offset": 0,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "key_col",
+          "offset": 16,
+          "type": "vec4<f32>",
+          "note": "w = rim strength"
+        },
+        {
+          "name": "fill_dir",
+          "offset": 32,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "fill_col",
+          "offset": 48,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "ambient",
+          "offset": 64,
+          "type": "vec4<f32>"
+        }
+      ]
+    },
+    {
+      "name": "fstack",
+      "group": 0,
+      "binding": 3,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ],
+      "block_size": 128,
+      "block_packed_by": "SciGraphs/ui/gpu_render/filter_gpu.py::uniform_rows",
+      "block_fields": [
+        {
+          "name": "lo",
+          "offset": 0,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "hi",
+          "offset": 16,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "inv",
+          "offset": 32,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "act",
+          "offset": 48,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "elo",
+          "offset": 64,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "ehi",
+          "offset": 80,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "einv",
+          "offset": 96,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "eact",
+          "offset": 112,
+          "type": "vec4<f32>"
+        }
+      ]
+    },
+    {
+      "name": "fchan",
+      "group": 0,
+      "binding": 4,
+      "type": "read-only-storage",
+      "visibility": [
+        "vertex"
+      ],
+      "block_packed_by": "SciGraphs/ui/gpu_render/filter_gpu.py::channel_rows",
+      "note": "array<vec4<f32>>: one texel per node then one per edge. The GLSL reads the same array from a 2D texture tiled into rows of 4096, which exists only because Blender's gpu module has no SSBO; the indices are unchanged. Bound at the whole buffer size, so the caller must build it with STORAGE usage -- Renderer.block_buffer only makes UNIFORM buffers today."
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "Sphere impostor with the filter-stack predicate in the vertex shader: identical to `sphere` below the guard, plus a rejected vertex thrown outside the clip volume.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_sphere(filtered=True)",
+  "spec_builder": "scigraphs_engine.mesh.sphere_spec(frows=...)",
+  "writes_frag_depth": true
+}

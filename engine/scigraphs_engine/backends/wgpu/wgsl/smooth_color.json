@@ -1,0 +1,32 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "color",
+      "location": 1,
+      "format": "float32x4"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ]
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "The flat line with a color at each end, interpolated perspective-correctly (WGSL's default, which is GLSL's 'smooth', not @interpolate(linear)). No draw binding: the color is the attribute, so there is no uniform to read. Alpha is passed through unchanged because the bundled representation varies opacity per edge. One pixel wide, and no fragment depth written; see the header of smooth_color.wgsl. 'cull' is inert for a line topology and is present only because every declaration here carries one.",
+  "ported_from": "Blender's builtin SMOOTH_COLOR, named by SciGraphs/ui/gpu_render/batches.py::_SHADERS",
+  "spec_builder": "scigraphs_engine.mesh.segment_line_spec (col_a given)"
+}

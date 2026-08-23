@@ -1,0 +1,108 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "frow",
+      "location": 1,
+      "format": "float32x3"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex",
+        "fragment"
+      ]
+    },
+    {
+      "name": "draw",
+      "group": 0,
+      "binding": 1,
+      "type": "uniform",
+      "visibility": [
+        "vertex",
+        "fragment"
+      ],
+      "dynamic": true
+    },
+    {
+      "name": "fstack",
+      "group": 0,
+      "binding": 3,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ],
+      "block_size": 128,
+      "block_packed_by": "SciGraphs/ui/gpu_render/filter_gpu.py::uniform_rows",
+      "block_fields": [
+        {
+          "name": "lo",
+          "offset": 0,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "hi",
+          "offset": 16,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "inv",
+          "offset": 32,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "act",
+          "offset": 48,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "elo",
+          "offset": 64,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "ehi",
+          "offset": 80,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "einv",
+          "offset": 96,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "eact",
+          "offset": 112,
+          "type": "vec4<f32>"
+        }
+      ]
+    },
+    {
+      "name": "fchan",
+      "group": 0,
+      "binding": 4,
+      "type": "read-only-storage",
+      "visibility": [
+        "vertex"
+      ],
+      "block_packed_by": "SciGraphs/ui/gpu_render/filter_gpu.py::channel_rows",
+      "note": "array<vec4<f32>>: one texel per node then one per edge. The GLSL reads the same array from a 2D texture tiled into rows of 4096, which exists only because Blender's gpu module has no SSBO; the indices are unchanged. Bound at the whole buffer size, so the caller must build it with STORAGE usage -- Renderer.block_buffer only makes UNIFORM buffers today."
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "The flat filtered line: one uniform color from draw.tint, one position, and the filter predicate. Still a shader of its own on WebGPU, but for a different reason than in GLSL; see the header of line_f.wgsl.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_line_filter",
+  "spec_builder": "scigraphs_engine.mesh.filtered_line_spec"
+}

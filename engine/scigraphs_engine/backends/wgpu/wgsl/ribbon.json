@@ -1,0 +1,93 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos_a",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "pos_b",
+      "location": 1,
+      "format": "float32x3"
+    },
+    {
+      "name": "side",
+      "location": 2,
+      "format": "float32"
+    },
+    {
+      "name": "endsel",
+      "location": 3,
+      "format": "float32"
+    },
+    {
+      "name": "radius",
+      "location": 4,
+      "format": "float32"
+    },
+    {
+      "name": "color",
+      "location": 5,
+      "format": "float32x4"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex",
+        "fragment"
+      ]
+    },
+    {
+      "name": "lights",
+      "group": 0,
+      "binding": 2,
+      "type": "uniform",
+      "visibility": [
+        "fragment"
+      ],
+      "block_size": 80,
+      "block_packed_by": "SciGraphs/ui/gpu_render/draw.py::_lighting_ubo",
+      "block_fields": [
+        {
+          "name": "key_dir",
+          "offset": 0,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "key_col",
+          "offset": 16,
+          "type": "vec4<f32>",
+          "note": "w = rim strength"
+        },
+        {
+          "name": "fill_dir",
+          "offset": 32,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "fill_col",
+          "offset": 48,
+          "type": "vec4<f32>"
+        },
+        {
+          "name": "ambient",
+          "offset": 64,
+          "type": "vec4<f32>"
+        }
+      ]
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "Cylinder impostor: one square-capped quad per edge segment, shaded as a lit cylinder section, writing the true tube-surface depth.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_ribbon",
+  "spec_builder": "scigraphs_engine.mesh.ribbon_spec",
+  "writes_frag_depth": true
+}

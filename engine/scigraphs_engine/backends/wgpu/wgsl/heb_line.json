@@ -1,0 +1,81 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "col_a",
+      "location": 0,
+      "format": "float32x4"
+    },
+    {
+      "name": "col_b",
+      "location": 1,
+      "format": "float32x4"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ]
+    },
+    {
+      "name": "heb",
+      "group": 0,
+      "binding": 5,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ],
+      "block_size": 16,
+      "block_fields": [
+        {
+          "name": "beta",
+          "offset": 0,
+          "type": "f32",
+          "note": "bundling strength in [0, 1]; the GLSL's u_beta push constant"
+        },
+        {
+          "name": "stride",
+          "offset": 4,
+          "type": "f32",
+          "note": "control points allocated per edge; the GLSL's u_stride, carried as a float because block_buffer uploads float32"
+        },
+        {
+          "name": "pad0",
+          "offset": 8,
+          "type": "f32"
+        },
+        {
+          "name": "pad1",
+          "offset": 12,
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "ctrl",
+      "group": 0,
+      "binding": 6,
+      "type": "read-only-storage",
+      "visibility": [
+        "vertex"
+      ],
+      "note": "array<vec4<f32>>: `stride` control points per edge, edge after edge. xyz is the point; the .w of an edge's first point is that edge's control point count, which is variable. The GLSL reads the same array from a 2D texture tiled into rows of 4096 (u_ctrl_row), which exists only because Blender's gpu module has no SSBO; the index arithmetic is otherwise unchanged. The caller must build the buffer with STORAGE usage -- Renderer.block_buffer only makes UNIFORM buffers today."
+    }
+  ],
+  "expand": {
+    "mode": "instanced_quad",
+    "vertex_count": 33,
+    "topology": "line-strip"
+  },
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "Hierarchical edge bundling with the cubic B-spline evaluated by de Boor's algorithm in the vertex shader, one instance per edge over a control polygon of variable length. There is no sample vertex buffer, so the sample count is `expand.vertex_count` here and the SAMPLES constant in heb_line.wgsl, and the two must agree. `expand.mode` says \"instanced_quad\" because that is the only mode the loader accepts; nothing here is a quad, and \"instanced_primitive\" would be the accurate name for what README 1.1 says the mode does.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_heb_line",
+  "spec_builder": "none yet -- the engine has no heb_line MeshSpec builder; SciGraphs/ui/gpu_render/heb_gpu.py::build is the Blender-side equivalent and tests/test_heb_line.py builds the spec by hand"
+}

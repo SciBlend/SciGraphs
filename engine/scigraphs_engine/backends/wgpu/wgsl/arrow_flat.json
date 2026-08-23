@@ -1,0 +1,48 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos_a",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "pos_b",
+      "location": 1,
+      "format": "float32x3"
+    },
+    {
+      "name": "corner",
+      "location": 2,
+      "format": "float32"
+    },
+    {
+      "name": "cone",
+      "location": 3,
+      "format": "float32x3"
+    },
+    {
+      "name": "color",
+      "location": 4,
+      "format": "float32x4"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ]
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "Flat billboard arrowhead: one unlit triangle per head, its direction resolved in view space and all three vertices sharing the tip's depth. `cull` is \"none\" by choice, not necessity, since `perp` is always `dir` rotated the same way and the winding is constant; tests/test_arrow_flat.py::test_the_triangle_winding_does_not_depend_on_the_direction finds all eight directions drawn under back-face culling and none under front-face. Nothing is won by culling one triangle per arrow, and the wrong sense makes every head invisible at once.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_arrow_flat",
+  "spec_builder": "scigraphs_engine.mesh.arrow_flat_spec",
+  "writes_frag_depth": false
+}

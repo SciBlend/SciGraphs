@@ -1,15 +1,11 @@
 """Extract the live SciGraphs vocabulary and validate pipeline specs against it.
 
-Run inside Blender:
-
     env -u LD_LIBRARY_PATH blender -b --python scripts/repro/spec_doctor.py -- \
         --out /tmp/vocab.json examples/pipelines/*.json
 
 `schema.py` hardcodes enum lists that drift from the operator RNA, so a spec can
-pass `validate_pipeline` and still be rejected at call time; this script catches
-that by checking specs against the registered RNA. It only reads RNA -- nothing
-here writes to the scene or executes a pipeline.
-"""
+pass `validate_pipeline` and still be rejected at call time. Read-only, and it
+needs a running Blender."""
 
 import json
 import os
@@ -19,17 +15,22 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+# scigraphs_core is a wheel built from core/, so its package root is core/
+# and not the repository root.
+CORE = os.path.join(ROOT, "core")
+if CORE not in sys.path:
+    sys.path.insert(0, CORE)
+
 import bpy  # noqa: E402
 
-# Property groups a spec may address through `ops[].scene_props`. The spec-side
-# name and the scene attribute differ ("coloring" -> scene.scigraphs_coloring).
+# Groups a spec addresses through `ops[].scene_props`; the spec-side name and
+# the scene attribute differ ("coloring" -> scene.scigraphs_coloring).
 from SciGraphs.core.repro.registry import SCENE_PROPERTY_GROUPS  # noqa: E402
 
 GROUPS = tuple(SCENE_PROPERTY_GROUPS)
 
-# Where a `visual` field ends up. The names differ on the two sides (spec
-# `edge_style` -> operator `preset`), so the binding cannot be inferred by
-# matching identifiers. Taken from executor.py:629-696.
+# Where a `visual` field ends up. The names differ across the boundary (spec
+# `edge_style` -> operator `preset`), so this is taken from executor.py.
 VISUAL_BINDINGS = {
     "edge_style": ("scigraphs.apply_edge_style_preset", "preset"),
     "rendering_preset": ("scigraphs.apply_rendering_preset", "preset"),
@@ -44,11 +45,8 @@ def _enum_items(prop):
 
 
 def collect_vocabulary():
-    """Read the registered RNA into a plain dict.
-
-    Re-registers the working-tree property groups first; otherwise the report
-    describes the installed extension in ~/.config/blender.
-    """
+    """Read the registered RNA into a plain dict, re-registering the working-tree
+    property groups first or the report describes the installed add-on."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     try:
         from _run_one import reregister_worktree_properties
@@ -126,8 +124,8 @@ def validate(spec, vocab):
                 "scene_props %s.%s does not exist%s" % (group, name, hint)
             )
 
-    # The schema validates these against a hardcoded list, but applies them
-    # through an operator whose enum may have moved. The operator is authority.
+    # The schema validates these against a hardcoded list but applies them
+    # through an operator whose enum may have moved. The operator wins.
     visual = spec.get("visual") or {}
     for field, (op_name, param) in VISUAL_BINDINGS.items():
         value = visual.get(field)
@@ -147,8 +145,7 @@ def validate(spec, vocab):
                 % (field, value, op_name, param, ", ".join(allowed))
             )
 
-    # Operator ids referenced directly must exist, and their enum props must
-    # hold values the operator still accepts.
+    # Operator ids must exist and their enum values must still be accepted.
     for op in spec.get("ops", []) or []:
         op_id = op.get("id", "")
         if not op_id.startswith("scigraphs."):
@@ -173,7 +170,7 @@ def validate(spec, vocab):
 
 def schema_drift(vocab):
     """Report enum lists that schema.py hardcodes and the RNA no longer matches."""
-    from SciGraphs.core.repro.schema import SCHEMA
+    from scigraphs_core.repro.schema import SCHEMA
 
     drift = []
     for field, (op_name, param) in VISUAL_BINDINGS.items():
@@ -259,8 +256,8 @@ def main(argv):
 if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     code = main(argv)
-    # Blender segfaults during interpreter teardown with this add-on, which
-    # would replace the verdict with 134.
+    # Blender segfaults during teardown with this add-on, replacing the
+    # verdict with 134.
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(code)

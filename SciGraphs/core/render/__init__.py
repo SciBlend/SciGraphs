@@ -6,9 +6,13 @@ import os as _os
 import sys as _sys
 
 _MODULES = (
-    "adaptive", "blocks", "channels", "edge_styles", "filters", "gpu_compute",
-    "lod", "mesh", "settings", "simplify", "source",
+    "adaptive", "blocks", "bundling", "channels", "edge_styles", "filters",
+    "gpu_compute", "lod", "mesh", "settings", "simplify", "source",
 )
+
+# The add-on imports these submodules by name, and aliasing only the package
+# leaves them to a __path__ lookup, so each one is registered separately.
+_SUBMODULES = {"bundling": ("fdeb", "mingle", "routed", "sbeb")}
 
 
 def _locate_engine():
@@ -44,6 +48,8 @@ for _name in _MODULES:
     _module = _importlib.import_module("scigraphs_engine." + _name)
     _sys.modules[__name__ + "." + _name] = _module
     setattr(_self, _name, _module)
+    for _sub in _SUBMODULES.get(_name, ()):
+        _sys.modules["%s.%s.%s" % (__name__, _name, _sub)] = getattr(_module, _sub)
 
 # Older engine builds may still use the British spelling.
 _RENAMED = {"filters": (("neighborhood_overlap", "neighbourhood_overlap"),)}
@@ -56,7 +62,8 @@ for _name, _pairs in _RENAMED.items():
 
 
 def _communities_from_edges(edges_int, num_nodes, algorithm):
-    """Bridge to add-on analysis; imported lazily so the engine stays standalone."""
+    """Community detection from the add-on. Imported inside the function,
+    since scigraphs_engine has to import without scigraphs_core."""
     from scigraphs_core.algorithms.analysis import communities_from_edges
     return communities_from_edges(edges_int, num_nodes, algorithm)
 

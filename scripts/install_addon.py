@@ -1,7 +1,5 @@
-"""
-Install SciGraphs addon in Blender from a built extension ZIP file.
+"""Install the SciGraphs add-on in Blender from a built extension ZIP.
 
-Usage:
     blender --background --python install_addon.py -- /path/to/scigraphs-*.zip
 """
 

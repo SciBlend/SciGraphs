@@ -1,0 +1,22 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+
+  "attributes": [
+    {"name": "pos",   "location": 0, "format": "float32x3"},
+    {"name": "color", "location": 1, "format": "float32x4"}
+  ],
+
+  "bindings": [
+    {"name": "camera", "group": 0, "binding": 0, "type": "uniform",
+     "visibility": ["vertex", "fragment"]},
+    {"name": "draw", "group": 0, "binding": 1, "type": "uniform",
+     "visibility": ["vertex", "fragment"], "dynamic": true}
+  ],
+
+  "expand": {"mode": "instanced_quad", "vertex_count": 4,
+             "topology": "triangle-strip"},
+
+  "cull": "none",
+  "writes_depth": true
+}

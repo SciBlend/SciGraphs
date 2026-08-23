@@ -1,0 +1,37 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos",
+      "location": 0,
+      "format": "float32x3"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex"
+      ]
+    },
+    {
+      "name": "draw",
+      "group": 0,
+      "binding": 1,
+      "type": "uniform",
+      "visibility": [
+        "fragment"
+      ],
+      "dynamic": true
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "The plain flat line: one position, one color for the whole draw, taken from draw.tint because MeshSpec has no field for a uniform color. Draws one pixel wide, WebGPU's line-list being one pixel everywhere, and draw.line_width is bound but unread. No fragment depth is written, the rasterizer's interpolated depth between the two endpoints being exact for a segment; writes_depth is true because that is the absence of a claim rather than a claim. 'cull' is inert for a line topology and is present only because every declaration here carries one.",
+  "ported_from": "Blender's builtin UNIFORM_COLOR, named by SciGraphs/ui/gpu_render/batches.py::_SHADERS",
+  "spec_builder": "scigraphs_engine.mesh.line_spec, scigraphs_engine.mesh.segment_line_spec (col_a=None)"
+}

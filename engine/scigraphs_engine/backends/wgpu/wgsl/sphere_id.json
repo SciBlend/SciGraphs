@@ -1,0 +1,44 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "corner",
+      "location": 1,
+      "format": "float32x2"
+    },
+    {
+      "name": "radius",
+      "location": 2,
+      "format": "float32"
+    },
+    {
+      "name": "color",
+      "location": 3,
+      "format": "float32x4"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex",
+        "fragment"
+      ]
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "sphere with the lighting removed; color carries a 24-bit encoded node id. Depth write kept so the ID pass resolves the same contest as the beauty pass.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_sphere_id",
+  "spec_builder": "scigraphs_engine.mesh.sphere_spec(shader_base='sphere_id')",
+  "writes_frag_depth": true
+}

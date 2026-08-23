@@ -1,0 +1,54 @@
+{
+  "vertex_entry": "vs_main",
+  "fragment_entry": "fs_main",
+  "attributes": [
+    {
+      "name": "pos_a",
+      "location": 0,
+      "format": "float32x3"
+    },
+    {
+      "name": "pos_b",
+      "location": 1,
+      "format": "float32x3"
+    },
+    {
+      "name": "side",
+      "location": 2,
+      "format": "float32"
+    },
+    {
+      "name": "endsel",
+      "location": 3,
+      "format": "float32"
+    },
+    {
+      "name": "radius",
+      "location": 4,
+      "format": "float32"
+    },
+    {
+      "name": "color",
+      "location": 5,
+      "format": "float32x4"
+    }
+  ],
+  "bindings": [
+    {
+      "name": "camera",
+      "group": 0,
+      "binding": 0,
+      "type": "uniform",
+      "visibility": [
+        "vertex",
+        "fragment"
+      ]
+    }
+  ],
+  "cull": "none",
+  "writes_depth": true,
+  "doc": "ribbon with the lighting removed; color carries a 24-bit encoded segment id.",
+  "ported_from": "SciGraphs/ui/gpu_render/shaders.py::_build_ribbon_id",
+  "spec_builder": "scigraphs_engine.mesh.ribbon_spec(shader_base='ribbon_id')",
+  "writes_frag_depth": true
+}
