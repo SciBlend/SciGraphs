@@ -37,9 +37,10 @@ name: Release wheels
 #
 # WHAT GETS PUBLISHED
 #
-# Tags publish. workflow_dispatch builds and verifies the same way but attaches
-# the wheels to the run as artifacts instead, so a maintainer can check a wheel
-# without spending a tag on it.
+# Tags publish, to PyPI and to a GitHub release. workflow_dispatch builds and
+# verifies the same way but attaches the distributions to the run as artifacts
+# instead, so a maintainer can check one without spending a tag on it.
+#
 
 on:
   push:
@@ -100,13 +101,19 @@ jobs:
           import tomllib
           from pathlib import Path
 
-          # dir, distribution and import name for each half. Nothing else in
-          # this workflow hardcodes the mapping.
+          # dir, distribution, import name and deployment environment for each
+          # half. Nothing else in this workflow hardcodes the mapping.
+          #
+          # The environments differ per project because PyPI keys a trusted
+          # publisher on (owner, repository, workflow, environment) and refuses
+          # to register the same four for a second project name. Distinct
+          # environments also let each project carry its own protection rules.
           DISTS = {
               "core": {"dir": "core", "dist": "scigraphs-core",
-                       "module": "scigraphs_core"},
+                       "module": "scigraphs_core", "environment": "pypi-core"},
               "render": {"dir": "engine", "dist": "scigraphs-engine",
-                         "module": "scigraphs_engine"},
+                         "module": "scigraphs_engine",
+                         "environment": "pypi-engine"},
           }
 
           tag = os.environ.get("TAG", "")
@@ -209,10 +216,10 @@ jobs:
       - name: Install the build requirement
         run: |
           set -euo pipefail
-          # Both pyproject.toml files require setuptools >= 68, and the build
-          # below runs with --no-build-isolation, so the requirement has to be
-          # satisfied here rather than fetched per build.
-          python3 -m pip install --upgrade pip "setuptools>=68" wheel
+          # Both pyproject.toml files require setuptools >= 68, and the builds
+          # below run without isolation, so the requirement has to be satisfied
+          # here rather than fetched per build.
+          python3 -m pip install --upgrade pip "setuptools>=68" wheel build twine
 
       - name: Build the wheel
         run: |
@@ -223,6 +230,17 @@ jobs:
           # built the same way. Change one and change the other.
           python3 -m pip wheel "./${{ matrix.dist.dir }}" --no-deps \
             --no-build-isolation --wheel-dir ./wheelhouse
+          ls -l wheelhouse
+
+      - name: Build the sdist
+        run: |
+          set -euo pipefail
+          # PyPI takes both. The wheel is what almost everyone installs; the
+          # sdist is what a distro packager, a locked-down mirror or an
+          # unsupported platform falls back to, and PyPI cannot generate it
+          # afterwards. Same interpreter and same setuptools as the wheel above.
+          python3 -m build --sdist --no-isolation \
+            --outdir ./wheelhouse "./${{ matrix.dist.dir }}"
           ls -l wheelhouse
 
       - name: Check the wheel filename
@@ -244,6 +262,32 @@ jobs:
           fi
           echo "WHEEL=$PWD/wheelhouse/$built" >> "$GITHUB_ENV"
           echo "built $built"
+
+      - name: Check the sdist filename
+        run: |
+          set -euo pipefail
+          expected="${{ matrix.dist.module }}-${{ matrix.dist.version }}.tar.gz"
+          count=$(find wheelhouse -maxdepth 1 -name '*.tar.gz' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly one sdist in wheelhouse/, found $count"
+            exit 1
+          fi
+          built=$(basename "$(find wheelhouse -maxdepth 1 -name '*.tar.gz')")
+          if [ "$built" != "$expected" ]; then
+            echo "::error::built $built but the tag and pyproject.toml call for $expected"
+            exit 1
+          fi
+          echo "SDIST=$PWD/wheelhouse/$built" >> "$GITHUB_ENV"
+          echo "built $built"
+
+      - name: Check both against what PyPI will accept
+        run: |
+          set -euo pipefail
+          # PyPI rejects an unrenderable long_description at upload time, after
+          # the wheel has already been built and verified. Failing here costs a
+          # re-run; failing there costs a version number, since PyPI will not
+          # accept the same one twice.
+          python3 -m twine check --strict "$WHEEL" "$SDIST"
 
       - name: Install the wheel into a clean virtualenv
         run: |
@@ -315,18 +359,23 @@ jobs:
       - name: Write down what was verified
         run: |
           set -euo pipefail
-          mkdir -p out
-          cp "$WHEEL" out/
+          # dist/ holds the distributions and nothing else: the publish job
+          # points twine at that directory, and twine refuses a directory
+          # carrying anything it cannot upload. The notes go beside it.
+          mkdir -p out/dist
+          cp "$WHEEL" "$SDIST" out/dist/
           {
             echo "### ${{ matrix.dist.dist }} ${{ matrix.dist.version }}"
             echo
             echo "Wheel: \`$(basename "$WHEEL")\`, pure Python, one file for every platform."
+            echo "Sdist: \`$(basename "$SDIST")\`."
             echo "Built from \`${{ matrix.dist.dir }}/\` with \`pip wheel --no-deps --no-build-isolation\`,"
             echo "the same invocation \`scripts/fetch_wheels.sh\` uses locally."
             echo
             echo "Verified on Python ${{ env.PYTHON_VERSION }} in a clean virtualenv:"
             echo
             echo "- installed from the wheel, imported as \`${{ matrix.dist.module }}\`, and \`__version__\` checked against the tag"
+            echo "- both distributions passed \`twine check --strict\`"
           } > "out/notes-${{ matrix.dist.name }}.md"
           if [ "${{ matrix.dist.name }}" = "render" ]; then
             echo "- \`engine/scigraphs_engine/tests/run.py\` against the installed wheel: 321 checks over four files, with \`test_render.py\` skipped because the runner has no GPU" >> "out/notes-${{ matrix.dist.name }}.md"
@@ -339,19 +388,71 @@ jobs:
             echo "Install it with:"
             echo
             echo '```'
-            echo "pip install $(basename "$WHEEL")"
+            echo "pip install ${{ matrix.dist.dist }}==${{ matrix.dist.version }}"
             echo '```'
             echo
           } >> "out/notes-${{ matrix.dist.name }}.md"
           cat "out/notes-${{ matrix.dist.name }}.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload the wheel
+      # Two artifacts rather than one, because the publish job needs a directory
+      # holding only distributions and the release job needs the notes.
+      - name: Upload the distributions
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-${{ matrix.dist.name }}
-          path: out/*
+          name: dist-${{ matrix.dist.name }}
+          path: out/dist/*
           compression-level: 0
           if-no-files-found: error
+
+      - name: Upload the notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-${{ matrix.dist.name }}
+          path: out/notes-${{ matrix.dist.name }}.md
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ matrix.dist.dist }} to PyPI
+    needs: [select, build]
+    if: needs.select.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      # One project failing to upload should not stop the other from shipping,
+      # and a half-published tag is recoverable while a re-tag is not.
+      fail-fast: false
+      matrix:
+        dist: ${{ fromJSON(needs.select.outputs.matrix) }}
+    environment:
+      name: ${{ matrix.dist.environment }}
+      url: https://pypi.org/project/${{ matrix.dist.dist }}/${{ matrix.dist.version }}
+    permissions:
+      # The OIDC claim PyPI exchanges for a per-project upload token. It is the
+      # only credential involved, and it is minted per job and expires with it.
+      id-token: write
+    steps:
+      - name: Download the distributions for ${{ matrix.dist.dist }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.dist.name }}
+          path: dist
+
+      - name: List what is about to be uploaded
+        run: |
+          set -euo pipefail
+          ls -l dist
+          # An upload is not reversible: PyPI never lets a version number be
+          # reused, even after a delete. Print the exact filenames first so a
+          # failed run says what did and did not reach the index.
+          echo "uploading the above to https://pypi.org/project/${{ matrix.dist.dist }}/"
+
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          # A tag that reruns after a partial failure would otherwise fail on
+          # the file that already landed and never reach the one that did not.
+          skip-existing: true
+          print-hash: true
 
   release:
     name: Attach the wheels to the release
@@ -364,10 +465,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download the wheels
+      - name: Download the distributions
         uses: actions/download-artifact@v4
         with:
-          pattern: wheel-*
+          pattern: dist-*
+          merge-multiple: true
+          path: release
+
+      - name: Download the notes
+        uses: actions/download-artifact@v4
+        with:
+          pattern: notes-*
           merge-multiple: true
           path: release
 
@@ -379,7 +487,9 @@ jobs:
           set -euo pipefail
           ls -l release
           {
-            echo "Wheels for ${TITLE}, built from tag \`${TAG}\`."
+            echo "Wheels and sdists for ${TITLE}, built from tag \`${TAG}\`."
+            echo "These are the same files this tag uploads to PyPI; the"
+            echo "per-distribution install command is below."
             echo
             echo "numpy is the only hard dependency. Everything else is an"
             echo "optional extra, and a feature whose extra is absent reports"
@@ -408,4 +518,4 @@ jobs:
             --verify-tag \
             --title "$TITLE" \
             --notes-file notes.md \
-            release/*.whl
+            release/*.whl release/*.tar.gz

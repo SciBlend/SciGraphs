@@ -115,6 +115,30 @@ def run_cell(client, source, timeout=CELL_TIMEOUT):
     return outputs, failed
 
 
+def split_lines(notebook):
+    """Store every multiline string as a list of lines, as nbformat writes it.
+
+    The kernel sends `text` and `data[mime]` as single strings and dumping them
+    verbatim is still valid nbformat, but Quarto reads them as arrays: a string
+    `text/plain` next to an image crashes `quarto render` with
+    `textPlain.some is not a function`, and a string `text/html` would hit
+    `.join` the same way. `application/json` is an object, not text.
+    """
+    for cell in notebook.get("cells", ()):
+        source = cell.get("source")
+        if isinstance(source, str):
+            cell["source"] = source.splitlines(True)
+        for out in cell.get("outputs", ()) or ():
+            text = out.get("text")
+            if isinstance(text, str):
+                out["text"] = text.splitlines(True)
+            data = out.get("data") or {}
+            for mime, payload in data.items():
+                if mime != "application/json" and isinstance(payload, str):
+                    data[mime] = payload.splitlines(True)
+    return notebook
+
+
 # The kernel outlives every edit: after `import nb`, Python's cache serves
 # that copy for the rest of Blender's life and outputs come from the old code.
 # Registered classes are kept, since re-registering duplicates every panel.
@@ -187,8 +211,9 @@ def execute(client, path, verbose=True):
             sys.stdout.write(mark)
             sys.stdout.flush()
 
-    path.write_text(json.dumps(notebook, indent=1, ensure_ascii=False) + "\n",
-                    encoding="utf-8")
+    path.write_text(
+        json.dumps(split_lines(notebook), indent=1, ensure_ascii=False) + "\n",
+        encoding="utf-8")
 
     images = sum(
         1 for cell in notebook["cells"]
