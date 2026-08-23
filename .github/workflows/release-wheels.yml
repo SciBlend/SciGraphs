@@ -515,7 +515,7 @@ jobs:
           cat release/notes-*.md >> notes.md
           cat notes.md
 
-      - name: Create the release
+      - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -527,11 +527,18 @@ jobs:
             echo "::error::no wheels were built, so there is nothing to release"
             exit 1
           fi
-          # --verify-tag refuses to invent a tag. The tag is what selected the
-          # wheels and what their versions were checked against, so a release
-          # built on a tag that is not in the repository would be meaningless.
-          gh release create "$TAG" \
-            --verify-tag \
-            --title "$TITLE" \
-            --notes-file notes.md \
-            release/*.whl release/*.tar.gz
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice title=Release exists::updating the assets and notes of $TAG in place"
+            gh release upload "$TAG" release/*.whl release/*.tar.gz --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file notes.md
+          else
+            # --verify-tag refuses to invent a tag. The tag is what selected the
+            # wheels and what their versions were checked against, so a release
+            # built on a tag that is not in the repository would be meaningless.
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TITLE" \
+              --notes-file notes.md \
+              release/*.whl release/*.tar.gz
+          fi
