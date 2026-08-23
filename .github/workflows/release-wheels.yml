@@ -321,17 +321,26 @@ jobs:
         if: matrix.dist.name == 'render'
         run: |
           set -euo pipefail
-          # 321 checks over five files, no Blender anywhere in them. run.py
-          # starts each file in its own process with the working directory set
-          # outside the repository and only the tests directory on sys.path, so
-          # every import of scigraphs_engine resolves to the wheel installed
-          # above and not to engine/.
+          suite=engine/scigraphs_engine/tests/run.py
+          if [ ! -f "$suite" ]; then
+            # The suites are deliberately not in the public repository. Warning
+            # rather than notice, so the run carries an annotation saying the
+            # wheel it is about to publish was never exercised.
+            echo "SUITE_RAN=no" >> "$GITHUB_ENV"
+            echo "::warning title=engine suite not run::$suite is not in this checkout, so the wheel was verified by install and import only. Run it locally before tagging."
+            exit 0
+          fi
+          # No Blender anywhere in them. run.py starts each file in its own
+          # process with the working directory set outside the repository and
+          # only the tests directory on sys.path, so every import of
+          # scigraphs_engine resolves to the wheel installed above, not engine/.
           #
           # test_render.py exits 77 when there is no GPU, which run.py prints as
           # SKIP and excludes from the total rather than counting as a pass.
           # GitHub runners have no GPU and the wgpu extra is not installed, so
-          # that file skips here and the run stays green on the other four.
-          "$VENV_PYTHON" engine/scigraphs_engine/tests/run.py
+          # that file skips here and the run stays green on the others.
+          "$VENV_PYTHON" "$suite"
+          echo "SUITE_RAN=yes" >> "$GITHUB_ENV"
 
       - name: Run the scigraphs-core standalone suite against the installed wheel
         if: matrix.dist.name == 'core'
@@ -339,7 +348,8 @@ jobs:
           set -euo pipefail
           suite=scripts/extract/test_core_standalone.py
           if [ ! -f "$suite" ]; then
-            echo "::notice title=core suite not run::$suite is not in this checkout, so the wheel was verified by install and import only."
+            echo "SUITE_RAN=no" >> "$GITHUB_ENV"
+            echo "::warning title=core suite not run::$suite is not in this checkout, so the wheel was verified by install and import only. Run it locally before tagging."
             exit 0
           fi
           # --package-root has to be absolute. The suite runs each configuration
@@ -355,6 +365,7 @@ jobs:
           # and is never counted as a failure, which is what makes the suite
           # runnable on a runner that has numpy and nothing else.
           "$VENV_PYTHON" "$suite" --package scigraphs_core --package-root "$site"
+          echo "SUITE_RAN=yes" >> "$GITHUB_ENV"
 
       - name: Write down what was verified
         run: |
@@ -377,11 +388,16 @@ jobs:
             echo "- installed from the wheel, imported as \`${{ matrix.dist.module }}\`, and \`__version__\` checked against the tag"
             echo "- both distributions passed \`twine check --strict\`"
           } > "out/notes-${{ matrix.dist.name }}.md"
-          if [ "${{ matrix.dist.name }}" = "render" ]; then
-            echo "- \`engine/scigraphs_engine/tests/run.py\` against the installed wheel: 321 checks over four files, with \`test_render.py\` skipped because the runner has no GPU" >> "out/notes-${{ matrix.dist.name }}.md"
-          fi
-          if [ "${{ matrix.dist.name }}" = "core" ] && [ -f scripts/extract/test_core_standalone.py ]; then
-            echo "- \`scripts/extract/test_core_standalone.py\` against the installed package: 25 configurations, including one that imports every member with Blender refused at \`sys.meta_path\` and one per optional extra" >> "out/notes-${{ matrix.dist.name }}.md"
+          # The notes say what this run actually did. A release that claims a
+          # suite ran when the checkout had none is the failure mode the
+          # SUITE_RAN flag exists to prevent.
+          notes="out/notes-${{ matrix.dist.name }}.md"
+          if [ "${SUITE_RAN:-no}" != "yes" ]; then
+            echo "- the functional suite was **not** in this checkout, so nothing beyond the above was exercised" >> "$notes"
+          elif [ "${{ matrix.dist.name }}" = "render" ]; then
+            echo "- \`engine/scigraphs_engine/tests/run.py\` against the installed wheel, with \`test_render.py\` skipped because the runner has no GPU" >> "$notes"
+          else
+            echo "- \`scripts/extract/test_core_standalone.py\` against the installed package: 25 configurations, including one that imports every member with Blender refused at \`sys.meta_path\` and one per optional extra" >> "$notes"
           fi
           {
             echo
