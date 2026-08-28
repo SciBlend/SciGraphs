@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scigraphs-core"
-version = "0.2.1"
+version = "0.3.0"
 description = "Blender-free SciGraphs library: graphs, layouts, colormaps, OSM/geo, pipeline schema."
 readme = "README.md"
 # Match scigraphs-engine so both wheels install into the same interpreter.

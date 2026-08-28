@@ -4,7 +4,7 @@
 
 import importlib as _importlib
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 from .mesh import (  # noqa: F401
     DrawState, MeshGroup, MeshSpec, ShaderRef, LINES, POINTS, TRIS,
