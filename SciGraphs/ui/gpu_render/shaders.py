@@ -38,7 +38,8 @@ def _add_filter(info, sampler_slot, attr_slot, ubo_slot, typedefs=""):
     info.typedef_source(typedefs + _FILTER_STRUCT)
     info.uniform_buf(ubo_slot, "FilterStack", "u_filter")
     info.sampler(sampler_slot, 'FLOAT_2D', "u_fchan")
-    info.vertex_in(attr_slot, 'VEC3', "frow")
+    if attr_slot is not None:
+        info.vertex_in(attr_slot, 'VEC3', "frow")
 
 
 def _guard(filtered):
@@ -329,6 +330,152 @@ def _build_ribbon_id():
     return gpu.shader.create_from_info(info)
 
 
+STYLE_TEX_ROW = 4096
+
+STYLE_CODE = {
+    'STRAIGHT': 0, 'CURVED': 1, 'QUADRATIC': 2, 'ARC': 3, 'TAPERED': 4,
+    'ORTHOGONAL': 5,
+    'SELF_LOOP': 6,
+}
+STYLE_ANIMATED = frozenset(k for k in STYLE_CODE if k != 'SELF_LOOP')
+
+DIRECTION_CODE = {'AUTO': 0, 'CLOCKWISE': 1, 'COUNTER_CLOCKWISE': 2,
+                  'ALTERNATING': 3}
+ORTHOGONAL_CODE = {'CENTERED': 0, 'HORIZONTAL_FIRST': 1, 'VERTICAL_FIRST': 2,
+                   'SHORTEST': 3}
+TAPER_MODE_CODE = {'NONE': 0, 'FORWARD': 1, 'BACKWARD': 2}
+
+_STYLE_STRUCT = glsl("edge_style_struct")
+_STYLE_GLSL = glsl("edge_style")
+
+_STYLE_KEEP = {
+    False: "bool scig_style_keep(int e) { return true; }\n",
+    True: "bool scig_style_keep(int e) { return scig_keep(scig_edge_frow(e)); }\n",
+}
+
+
+def _add_style(info, filtered, ubo_slot, typedefs=""):
+    """Position texture, per-edge texture and the settings block. Sampler slot 0
+    is the filter's when there is one, as everywhere else in this file."""
+    if filtered:
+        _add_filter(info, sampler_slot=0, attr_slot=None, ubo_slot=ubo_slot + 1,
+                    typedefs=typedefs + _STYLE_STRUCT)
+    else:
+        info.typedef_source(typedefs + _STYLE_STRUCT)
+    info.uniform_buf(ubo_slot, "EdgeStyle", "u_style")
+    _add_pos(info, sampler_slot=1 if filtered else 0)
+    info.sampler(2 if filtered else 1, 'FLOAT_2D', "u_edge")
+
+
+def _style_prelude(filtered):
+    return (_prelude(filtered) + _POS_GLSL + _STYLE_GLSL
+            + _STYLE_KEEP[bool(filtered)])
+
+
+def _build_style_line(filtered=False):
+    """Thin styled lines. One LINES instance per edge over the sample points."""
+    vout = gpu.types.GPUStageInterfaceInfo(
+        "scig_style_line_f_iface" if filtered else "scig_style_line_iface")
+    vout.smooth('VEC4', "f_color")
+
+    info = gpu.types.GPUShaderCreateInfo()
+    info.push_constant('MAT4', "u_mvp")
+    _add_style(info, filtered, ubo_slot=0)
+    info.vertex_in(0, 'FLOAT', "sample_t")
+    info.vertex_out(vout)
+    info.fragment_out(0, 'VEC4', "fragColor")
+    info.vertex_source(_style_prelude(filtered) + glsl("style_line_vert"))
+    info.fragment_source(glsl("style_line_frag"))
+    return gpu.shader.create_from_info(info)
+
+
+def _build_style_line_wide(filtered=False):
+    """Styled lines as screen-space quads, so an edge can carry its own width."""
+    vout = gpu.types.GPUStageInterfaceInfo(
+        "scig_style_wide_f_iface" if filtered else "scig_style_wide_iface")
+    vout.smooth('VEC4', "f_color")
+
+    info = gpu.types.GPUShaderCreateInfo()
+    info.push_constant('MAT4', "u_mvp")
+    info.push_constant('VEC2', "u_viewport")
+    _add_style(info, filtered, ubo_slot=0)
+    info.vertex_in(0, 'VEC4', "seg")
+    info.vertex_out(vout)
+    info.fragment_out(0, 'VEC4', "fragColor")
+    info.vertex_source(_style_prelude(filtered) + glsl("style_line_wide_vert"))
+    info.fragment_source(glsl("style_line_frag"))
+    return gpu.shader.create_from_info(info)
+
+
+def _build_style_ribbon(filtered=False):
+    """Cylinder impostors along the curve. Two mat4 fill the 128-byte push block,
+    so the color and the widths ride in the settings UBO rather than beside them."""
+    vout = gpu.types.GPUStageInterfaceInfo(
+        "scig_style_ribbon_f_iface" if filtered else "scig_style_ribbon_iface")
+    vout.smooth('FLOAT', "v_side")
+    vout.smooth('VEC4', "v_color")
+    vout.smooth('VEC3', "v_normal_basis")
+    vout.smooth('VEC3', "v_view_pos")
+    vout.smooth('FLOAT', "v_radius")
+
+    info = gpu.types.GPUShaderCreateInfo()
+    info.push_constant('MAT4', "u_view")
+    info.push_constant('MAT4', "u_proj")
+    info.uniform_buf(0, "LightRig", "u_light")
+    _add_style(info, filtered, ubo_slot=1, typedefs=_LIGHT_RIG_STRUCT)
+    info.vertex_in(0, 'VEC4', "seg")
+    info.vertex_out(vout)
+    info.fragment_out(0, 'VEC4', "fragColor")
+    info.vertex_source(_style_prelude(filtered) + glsl("style_ribbon_vert"))
+    info.fragment_source(glsl("ribbon_frag"))
+    return gpu.shader.create_from_info(info)
+
+
+def style_segments(params, style=None):
+    """Spans per edge the batch must carry, following tessellate's own branch:
+    below 1e-3 curvature it emits a single straight segment, and ORTHOGONAL is
+    always the three spans of a four-point routing."""
+    style = style or params["style_type"]
+    if style == 'SELF_LOOP':
+        return max(int(params["segments"]), 8)
+    if style == 'ORTHOGONAL':
+        return 3
+    if style == 'STRAIGHT' or float(params["curvature"]) < 1e-3:
+        return 1
+    return max(1, int(params["segments"]))
+
+
+def style_uniform_block(params, color, width=(1.0, 1.0),
+                        end_taper=(1.0, 'NONE'), style=None):
+    """Settings block for the styled shaders; the caller holds it until after
+    the draw, as with the filter and light blocks. ``width`` is (lo, hi) full
+    line widths in device pixels for the line tiers, and (base radius, unused)
+    for the ribbon. ``end_taper`` is batches._taper_segment_radii's factor and
+    mode. ``style`` overrides the params' own, which the self-loop pass needs."""
+    style = style or params["style_type"]
+    values = [
+        float(STYLE_CODE[style]), float(params["curvature"]),
+        float(DIRECTION_CODE[params["direction"]]),
+        float(ORTHOGONAL_CODE[params["orthogonal_style"]]),
+        float(params["self_loop_radius"]), float(params["taper_start"]),
+        float(params["taper_end"]), 0.0,
+        float(color[0]), float(color[1]), float(color[2]), float(color[3]),
+        float(width[0]), float(width[1]), float(end_taper[0]),
+        float(TAPER_MODE_CODE[end_taper[1]]),
+    ]
+    return gpu.types.GPUUniformBuf(
+        gpu.types.Buffer('FLOAT', len(values), values))
+
+
+def get_style_line_shader(filtered=False, wide=False):
+    return _compile(("style_wide" if wide else "style_line")
+                    + ("_f" if filtered else ""))
+
+
+def get_style_ribbon_shader(filtered=False):
+    return _compile("style_ribbon_f" if filtered else "style_ribbon")
+
+
 # Must agree with scigraphs_engine.mesh.ARROW_SIDES, which indexes the vertices
 # placed here; dynamic.py reads it for the vertex count (2*SIDES + 2).
 ARROW_SIDES = 8
@@ -607,14 +754,32 @@ _DOF_FRAG = _DOF_HELPERS + glsl("dof_common_frag")
 
 def _build_resolve():
     """Average each s x s block of a supersampled buffer; the saving is the readback,
-    not the averaging (18 ms in numpy). ``gl_FragCoord`` avoids a half-texel shift."""
+    not the averaging (18 ms in numpy). ``gl_FragCoord`` avoids a half-texel shift.
+    ``u_premul`` also folds in the clip and the alpha associate: see resolve_frag."""
     info = gpu.types.GPUShaderCreateInfo()
     info.sampler(0, 'FLOAT_2D', "src")
     info.push_constant('INT', "u_s")
+    info.push_constant('INT', "u_premul")
     info.vertex_in(0, 'VEC2', "pos")
     info.fragment_out(0, 'VEC4', "fragColor")
     info.vertex_source(glsl("resolve_vert"))
     info.fragment_source(glsl("resolve_frag"))
+    return gpu.shader.create_from_info(info)
+
+
+def _build_depth_resolve():
+    """Reduce and linearize the depth buffer on the GPU, so the beauty pass never
+    reads a supersampled depth back. Needs the depth as a sampler, which is why
+    _render_beauty draws into a GPUFrameBuffer instead of a GPUOffScreen."""
+    info = gpu.types.GPUShaderCreateInfo()
+    info.sampler(0, 'DEPTH_2D', "src")
+    info.push_constant('INT', "u_s")
+    info.push_constant('FLOAT', "u_a")
+    info.push_constant('FLOAT', "u_b")
+    info.vertex_in(0, 'VEC2', "pos")
+    info.fragment_out(0, 'VEC4', "fragColor")
+    info.vertex_source(glsl("resolve_vert"))
+    info.fragment_source(glsl("depth_resolve_frag"))
     return gpu.shader.create_from_info(info)
 
 
@@ -700,6 +865,12 @@ _BUILDERS = {
     "line_wide_d": _build_line_dynamic_wide,
     "line_fd": lambda: _build_line_dynamic(filtered=True),
     "ribbon_id": _build_ribbon_id,
+    "style_line": _build_style_line,
+    "style_line_f": lambda: _build_style_line(filtered=True),
+    "style_wide": _build_style_line_wide,
+    "style_wide_f": lambda: _build_style_line_wide(filtered=True),
+    "style_ribbon": _build_style_ribbon,
+    "style_ribbon_f": lambda: _build_style_ribbon(filtered=True),
     "arrow": _build_arrow,
     "line_count": _build_line_count,
     "heb_line": _build_heb_line,
@@ -707,6 +878,7 @@ _BUILDERS = {
     "heb_count": _build_heb_count,
     "volume": _build_volume_slice,
     "resolve": _build_resolve,
+    "depth_resolve": _build_depth_resolve,
     "dof": _build_dof,
     "dof_tex": _build_dof_tex,
     "dof_comp": _build_dof_comp,
@@ -829,6 +1001,10 @@ def get_dof_shader():
 
 def get_resolve_shader():
     return _compile("resolve")
+
+
+def get_depth_resolve_shader():
+    return _compile("depth_resolve")
 
 
 def get_dof_tex_shader():

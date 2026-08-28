@@ -1,5 +1,7 @@
 """Public layout dispatcher."""
 
+import traceback
+
 from .common import *
 from .basic import *
 from .networkx_layouts import *
@@ -14,150 +16,161 @@ def apply_graph_layout(obj, algorithm='SPRING_3D', iterations=50, scale=5.0, pro
     """Run a layout and store the result in ``obj["node_positions"]``. *props*
     supplies algorithm-specific parameters and may be None. *edge_pairs* carries
     a mesh-native object's topology, since this package never reads meshes; an
-    object with neither it nor ``edges_data`` is refused, not laid out flat."""
+    object with neither it nor ``edges_data`` is refused, not laid out flat.
+    An unknown *algorithm* is refused too, rather than laid out at random."""
     start_time = time.time()
     _reset_layout_rng()
 
-    G, num_nodes = _build_networkx_graph(obj, edge_pairs)
-    if G is None:
-        _log_layout(algorithm, 0, 0, None, start_time, False, "Graph construction failed")
-        return False
-
-    num_edges = G.number_of_edges()
-
-    params = {
-        'algorithm': algorithm,
-        'iterations': iterations,
-        'scale': scale,
-        'num_nodes': num_nodes,
-        'num_edges': num_edges
-    }
+    num_nodes = 0
+    num_edges = 0
+    params = None
+    radii = None
 
     # Diverges from `algorithm` when a library is missing and we fall back.
-    actual_algorithm = algorithm
+    missing_library, actual_algorithm = _resolve_fallback(algorithm)
+    if algorithm == 'FORCEATLAS2':
+        missing_library, actual_algorithm = _forceatlas2_fallback()
+    if actual_algorithm is None:
+        actual_algorithm = algorithm
 
     try:
+        G, num_nodes = _build_networkx_graph(obj, edge_pairs)
+        if G is None:
+            _log_layout(algorithm, 0, 0, None, start_time, False, "Graph construction failed")
+            return False
+
+        num_edges = G.number_of_edges()
+
+        params = {
+            'iterations': iterations,
+            'scale': scale,
+            'num_nodes': num_nodes,
+            'num_edges': num_edges
+        }
+
         if algorithm == 'RANDOM':
-            pos = _random_layout(num_nodes, scale)
+            pos = _call_with_props(_random_layout, num_nodes, scale, props=props)
         elif algorithm == 'GRID':
-            pos = _grid_layout(num_nodes, scale)
+            pos = _call_with_props(_grid_layout, num_nodes, scale, props=props)
         elif algorithm == 'SPRING':
-            pos = _spring_layout_2d(G, iterations, scale)
+            pos = _call_with_props(_spring_layout_2d, G, iterations, scale, props=props)
         elif algorithm == 'SPRING_3D':
-            pos = _spring_layout_3d(G, iterations, scale)
+            pos = _call_with_props(_spring_layout_3d, G, iterations, scale, props=props)
         elif algorithm == 'CIRCLE_PACKING':
-            pos, radii = _circle_packing_layout(G, iterations, scale)
-            obj["circle_packing_radii"] = radii.tolist()
-            _store_radii_as_mesh_attribute(obj, radii)
+            pos, radii = _call_with_props(_circle_packing_layout, G, iterations, scale,
+                                          props=props)
         elif algorithm == 'FORCEATLAS2':
-            if not FA2_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
-            pos = _forceatlas2_layout(G, iterations, scale)
+            pos = _forceatlas2_layout(G, iterations, scale,
+                                      **_fa2_kwargs_from_props(props))
         elif algorithm == 'IGRAPH_FR':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
-            pos = _igraph_fruchterman_reingold(G, iterations, scale)
+            pos = _call_with_props(_igraph_fruchterman_reingold, G, iterations, scale,
+                                   props=props)
         elif algorithm == 'IGRAPH_KK':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
             if props:
                 pos = _igraph_kamada_kawai(
                     G, scale,
-                    maxiter=props.igraph_kk_maxiter if props.igraph_kk_maxiter > 0 else None,
-                    epsilon=props.igraph_kk_epsilon if props.igraph_kk_epsilon > 0 else None,
-                    kkconst=props.igraph_kk_kkconst if props.igraph_kk_kkconst > 0 else None
+                    maxiter=_positive_prop(props, 'igraph_kk_maxiter'),
+                    epsilon=_positive_prop(props, 'igraph_kk_epsilon'),
+                    kkconst=_positive_prop(props, 'igraph_kk_kkconst')
                 )
             else:
                 pos = _igraph_kamada_kawai(G, scale)
         elif algorithm == 'IGRAPH_DRL':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
             if props:
                 pos = _igraph_drl(G, iterations, scale, **_get_drl_kwargs_from_props(props))
             else:
                 pos = _igraph_drl(G, iterations, scale)
         elif algorithm == 'IGRAPH_DRL_2D':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
             if props:
                 pos = _igraph_drl_2d(G, iterations, scale, **_get_drl_kwargs_from_props(props))
             else:
                 pos = _igraph_drl_2d(G, iterations, scale)
         elif algorithm == 'IGRAPH_LGL':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
             if props:
                 pos = _igraph_lgl(
                     G, scale,
                     maxiter=props.igraph_lgl_maxiter,
-                    maxdelta=props.igraph_lgl_maxdelta if props.igraph_lgl_maxdelta > 0 else None,
-                    area=props.igraph_lgl_area if props.igraph_lgl_area > 0 else None,
+                    maxdelta=_positive_prop(props, 'igraph_lgl_maxdelta'),
+                    area=_positive_prop(props, 'igraph_lgl_area'),
                     coolexp=props.igraph_lgl_coolexp,
-                    repulserad=props.igraph_lgl_repulserad if props.igraph_lgl_repulserad > 0 else None,
-                    cellsize=props.igraph_lgl_cellsize if props.igraph_lgl_cellsize > 0 else None
+                    repulserad=_positive_prop(props, 'igraph_lgl_repulserad'),
+                    cellsize=_positive_prop(props, 'igraph_lgl_cellsize')
                 )
             else:
                 pos = _igraph_lgl(G, scale)
         elif algorithm == 'SPHERE':
-            pos = _sphere_layout(num_nodes, scale)
+            pos = _call_with_props(_sphere_layout, num_nodes, scale, props=props)
         elif algorithm == 'SPECTRAL_3D':
-            pos = _spectral_layout_3d(G, scale)
+            pos = _call_with_props(_spectral_layout_3d, G, scale, props=props)
         elif algorithm == 'SPIRAL_3D':
-            pos = _spiral_layout_3d(num_nodes, scale)
+            pos = _call_with_props(_spiral_layout_3d, num_nodes, scale, props=props)
         elif algorithm == 'HELIX':
-            pos = _helix_layout(num_nodes, scale)
+            pos = _call_with_props(_helix_layout, num_nodes, scale, props=props)
         elif algorithm == 'CUBE':
-            pos = _cube_layout(num_nodes, scale)
+            pos = _call_with_props(_cube_layout, num_nodes, scale, props=props)
         elif algorithm == 'HIERARCHICAL_3D':
-            pos = _hierarchical_layout_3d(G, scale)
+            pos = _call_with_props(_hierarchical_layout_3d, G, scale, props=props)
         elif algorithm == 'BIPARTITE_3D':
-            pos = _bipartite_layout_3d(G, scale)
+            pos = _call_with_props(_bipartite_layout_3d, G, scale, props=props)
         elif algorithm == 'IGRAPH_DH':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
             if props:
                 pos = _igraph_davidson_harel(
                     G, iterations, scale,
                     maxiter=props.igraph_dh_maxiter,
                     fineiter=props.igraph_dh_fineiter,
-                    cool_fact=props.igraph_dh_cool_fact
+                    cool_fact=props.igraph_dh_cool_fact,
+                    weight_node_dist=props.igraph_dh_weight_node_dist,
+                    weight_border=props.igraph_dh_weight_border,
+                    weight_edge_lengths=props.igraph_dh_weight_edge_lengths,
+                    weight_edge_crossings=props.igraph_dh_weight_edge_crossings,
+                    weight_node_edge_dist=props.igraph_dh_weight_node_edge_dist
                 )
             else:
                 pos = _igraph_davidson_harel(G, iterations, scale)
         elif algorithm == 'IGRAPH_GRAPHOPT':
-            if not IGRAPH_AVAILABLE:
-                actual_algorithm = 'SPRING (2D fallback)'
             if props:
-                pos = _igraph_graphopt(
-                    G, iterations, scale,
-                    spring_length=props.igraph_graphopt_spring_length if props.igraph_graphopt_spring_length > 0 else None,
-                    node_charge=props.igraph_graphopt_node_charge if props.igraph_graphopt_node_charge != 0 else None,
-                    spring_constant=props.igraph_graphopt_spring_constant if props.igraph_graphopt_spring_constant > 0 else None,
-                    node_mass=props.igraph_graphopt_node_mass if props.igraph_graphopt_node_mass > 0 else None
-                )
+                pos = _igraph_graphopt(G, iterations, scale,
+                                       **_graphopt_kwargs_from_props(props))
             else:
                 pos = _igraph_graphopt(G, iterations, scale)
         elif algorithm == 'MDS_3D':
-            pos = _mds_layout_3d(G, scale)
+            pos = _call_with_props(_mds_layout_3d, G, scale, props=props)
         elif algorithm == 'YIFAN_HU':
             pos = _yifan_hu_layout(G, iterations, scale, props=props)
         elif algorithm in GRAPHVIZ_ENGINES:
             pos = _graphviz_engine_layout(G, algorithm, iterations, scale, props=props)
         elif algorithm == 'SUGIYAMA':
-            pos = _sugiyama_layout(G, scale)
+            pos = _call_with_props(_sugiyama_layout, G, scale, props=props)
         elif algorithm == 'CIRCULAR_HIERARCHY':
-            pos = _circular_hierarchy_layout(G, scale)
+            pos = _call_with_props(_circular_hierarchy_layout, G, scale, props=props)
         else:
-            pos = _random_layout(num_nodes, scale)
+            raise ValueError("unknown layout algorithm %r" % (algorithm,))
+
+        pos = _check_positions(pos, num_nodes, actual_algorithm)
 
         obj["node_positions"] = pos.flatten().tolist()
+        if actual_algorithm != algorithm:
+            obj["layout_substituted"] = "%s (no %s)" % (actual_algorithm,
+                                                        missing_library)
+        elif "layout_substituted" in obj:
+            del obj["layout_substituted"]
+        if radii is not None:
+            obj["circle_packing_radii"] = np.asarray(radii, dtype=float).tolist()
+            _store_radii_as_mesh_attribute(obj, radii)
 
-        _log_layout(algorithm, num_nodes, num_edges, params, start_time, True, None, actual_algorithm)
+        _log_layout(algorithm, num_nodes, num_edges, params, start_time, True, None,
+                    actual_algorithm, missing_library)
         return True
 
+    except MemoryError:
+        _log_layout(algorithm, num_nodes, num_edges, params, start_time, False,
+                    "MemoryError: out of memory", actual_algorithm, missing_library)
+        raise
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
-        _log_layout(algorithm, num_nodes, num_edges, params, start_time, False, error_msg, actual_algorithm)
+        traceback.print_exc()
+        _log_layout(algorithm, num_nodes, num_edges, params, start_time, False, error_msg,
+                    actual_algorithm, missing_library)
         return False
 
 __all__ = [name for name in globals() if not name.startswith('__')]

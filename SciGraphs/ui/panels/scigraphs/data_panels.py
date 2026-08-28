@@ -6,6 +6,7 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
     """Main data panel for importing and configuring data sources."""
     bl_label = "Data"
     bl_parent_id = "SCIGRAPHS_PT_main"
+    bl_order = 0
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
@@ -258,6 +259,7 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         template_box.label(text="Templates", icon='FILE_NEW')
         template_box.operator("scigraphs.export_pipeline_template", text="Export Template", icon='EXPORT')
         template_box.operator("scigraphs.export_current_repro_spec", text="Export Current Scene", icon='SCENE_DATA')
+        template_box.operator("scigraphs.export_repro_reference", text="Export Options Reference", icon='HELP')
 
         col.separator()
 
@@ -452,34 +454,6 @@ class SCIGRAPHS_PT_data_temporal(bpy.types.Panel):
                 subcol = col.column(align=True)
                 subcol.prop(props, "time_range_start", text="From")
                 subcol.prop(props, "time_range_end", text="To")
-            
-            layout.separator()
-            box = layout.box()
-            box.label(text="Temporal Analysis", icon='TIME')
-            row = box.row()
-            row.scale_y = 1.2
-            row.operator("scigraphs.analyze_time_column", text="Analyze Time Column", icon='VIEWZOOM')
-            
-            if getattr(props, "temporal_analyzed", False):
-                row = box.row()
-                row.scale_y = 1.2
-                row.operator("scigraphs.create_temporal_graphs", text="Create Temporal Graphs", icon='ADD')
-            
-            if getattr(props, "temporal_graph_loaded", False):
-                layout.separator()
-                box = layout.box()
-                box.label(text="Playback", icon='PLAY')
-                
-                row = box.row(align=True)
-                row.operator("scigraphs.temporal_first", text="", icon='REW')
-                row.operator("scigraphs.temporal_previous", text="", icon='PLAY_REVERSE')
-                row.operator("scigraphs.temporal_play", text="", icon='PLAY')
-                row.operator("scigraphs.temporal_next", text="", icon='FF')
-                row.operator("scigraphs.temporal_last", text="", icon='NEXT_KEYFRAME')
-                
-                row = box.row(align=True)
-                row.operator("scigraphs.temporal_refresh", text="Refresh", icon='FILE_REFRESH')
-                row.operator("scigraphs.temporal_clear", text="Clear", icon='X')
 
 
 def register():

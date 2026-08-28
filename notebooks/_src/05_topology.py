@@ -1016,17 +1016,20 @@ nb.figure(best, "renders/17_topology/5_k5_best",
 # this graph has fewer.
 #
 # > **Two properties of the detector.**
-# > `topology.detect_edge_crossings_3d` compares every pair of edges, O(E²),
-# > which is 1,128 pairs for this grid and would be 500,000 for a street network
-# > of a thousand edges. It works in **3D**, by closest approach between two
+# > `topology.detect_edge_crossings_3d` sorts the edge bounding boxes along one
+# > axis and only compares the ones that can be close, so a street network of a
+# > thousand edges costs far less than its 500,000 pairs: a 40x40 grid drawn as
+# > a grid takes 4 ms where the old all-pairs loop took 25 s. What it cannot
+# > beat is its own output, which on a drawing packed into a fixed box grows as
+# > E² all by itself. It works in **3D**, by closest approach between two
 # > segments with a distance tolerance the operator fixes at 0.01 Blender units
-# > (`topology_operators.py:185`). On a flat drawing that is a true crossing
+# > (`topology_operators.py:170`). On a flat drawing that is a true crossing
 # > test, but two edges passing within 0.01 units of each other **without
 # > touching** are counted as a crossing, and 0.01 is not a fraction of the
 # > drawing: on a graph imported at `scale=0.001`, where a neighborhood spans
 # > one unit, it is 1 % of the whole scene. Two *collinear overlapping* segments
 # > are missed entirely, because the parallel case returns `False` at
-# > `topology.py:642` before any overlap test.
+# > `topology.py:595` before any overlap test.
 
 # %% [markdown] ## 7 · The embedding surface
 #

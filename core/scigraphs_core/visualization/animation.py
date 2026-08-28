@@ -1,3 +1,4 @@
+import numpy as np
 # ``bpy.app.handlers.frame_change_post`` handlers: they rewrite mesh attributes
 # every frame so Geometry Nodes and shaders can follow the animation progress.
 
@@ -65,30 +66,18 @@ def update_traversal_activation(scene):
         traversal_activation_attr = mesh.attributes["traversal_activation"]
 
         num_verts = len(mesh.vertices)
-        activations = []
+
+        order = np.empty(num_verts, dtype=np.float32)
+        traversal_order_attr.data.foreach_get("value", order)
+        unvisited = order < 0
 
         if mode == "DISCRETE":
-            for i in range(num_verts):
-                order = traversal_order_attr.data[i].value
-                if order < 0:
-                    activation = 0.0
-                else:
-                    activation = 1.0 if order <= traversal_time else 0.0
-                activations.append(activation)
+            activations = (order <= traversal_time).astype(np.float32)
         else:
-            for i in range(num_verts):
-                order = traversal_order_attr.data[i].value
-                if order < 0:
-                    activation = 0.0
-                else:
-                    diff = traversal_time - order
-                    if diff >= smoothness:
-                        activation = 1.0
-                    elif diff <= 0:
-                        activation = 0.0
-                    else:
-                        activation = diff / smoothness
-                activations.append(activation)
+            span = float(smoothness) if smoothness else 1.0
+            activations = np.clip((traversal_time - order) / span,
+                                  0.0, 1.0).astype(np.float32)
+        activations[unvisited] = 0.0
 
         traversal_activation_attr.data.foreach_set("value", activations)
         mesh.update()

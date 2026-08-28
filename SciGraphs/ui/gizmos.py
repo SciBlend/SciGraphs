@@ -1108,7 +1108,6 @@ _SCIGRAPHS_SUBPANELS = (
     ("sg_layout", "Layout & Positioning", 'NODETREE', "SCIGRAPHS_PT_layout"),
     ("sg_algorithms", "Graph Algorithms", 'SCRIPT', "SCIGRAPHS_PT_algorithms"),
     ("sg_analysis", "Analysis", 'VIEWZOOM', "SCIGRAPHS_PT_analysis"),
-    ("sg_visualization", "Visualization", 'GEOMETRY_NODES', "SCIGRAPHS_PT_visualization"),
     ("sg_export", "Export & Tools", 'EXPORT', "SCIGRAPHS_PT_export"),
 )
 

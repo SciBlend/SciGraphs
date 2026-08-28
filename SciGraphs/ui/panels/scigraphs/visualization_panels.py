@@ -3,48 +3,117 @@
 import bpy
 
 
-class SCIGRAPHS_PT_visualization(bpy.types.Panel):
-    """Main visualization panel."""
-    bl_label = "Visualization"
-    bl_parent_id = "SCIGRAPHS_PT_main"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
+class _MeshRenderPanel:
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = 'render'
     bl_options = {'DEFAULT_CLOSED'}
-    
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-        obj = context.active_object
-        
-        if not obj or "num_nodes" not in obj:
-            box = layout.box()
-            box.label(text="No graph loaded", icon='ERROR')
-            box.label(text="Create a graph first in Data panel")
-            return
-        
-        # Display engine switch: GPU (fast preview) vs CPU (Geometry Nodes).
-        if hasattr(scene, "scigraphs_display_engine"):
-            box = layout.box()
-            box.label(text="Display Engine", icon='RESTRICT_VIEW_OFF')
-            row = box.row()
-            row.scale_y = 1.4
-            row.prop(scene, "scigraphs_display_engine", expand=True)
-            engine = scene.scigraphs_display_engine
-            if engine == 'GPU':
-                box.label(text="Fast viewport preview - not in final render", icon='INFO')
-            else:
-                box.label(text="Geometry Nodes - renderable in Cycles/EEVEE", icon='INFO')
+    COMPAT_ENGINES = {'BLENDER_EEVEE', 'CYCLES', 'BLENDER_WORKBENCH'}
 
-        layout.label(text="Visual representation settings", icon='SHADING_RENDERED')
+    @classmethod
+    def poll(cls, context):
+        return context.engine in cls.COMPAT_ENGINES
 
 
-class SCIGRAPHS_PT_visualization_appearance(bpy.types.Panel):
+def draw_text_style(layout, props, obj):
+    """The label style, shared by both render paths.
+
+    The SciGraphs engine draws its own overlay and reads these very
+    properties, so the two panels have to agree. One function instead of
+    two copies: the engine's panel pointed at the sidebar for style, and
+    once that panel moved into the Render tab under EEVEE and Cycles,
+    size, font and depth occlusion had no reachable control at all under
+    the SciGraphs engine.
+
+    Declutter is not here. Each path has its own, and the engine's also
+    chooses which labels survive.
+    """
+    box = layout.box()
+    box.label(text="Text Source", icon='TEXT')
+
+    col = box.column(align=True)
+    col.prop(props, "text_source", text="Source")
+
+    if props.text_source == 'ATTRIBUTE':
+        col.prop(props, "text_attribute", text="Attribute")
+
+        col.separator()
+        col.label(text="Number Format:")
+        col.prop(props, "text_format_type", text="Type")
+
+        if props.text_format_type in ('FLOAT', 'SCIENTIFIC', 'PERCENTAGE'):
+            col.prop(props, "text_float_decimals", text="Decimals")
+
+        col.prop(props, "text_thousands_separator", text="Thousands Separator")
+
+        row = col.row(align=True)
+        row.prop(props, "text_format_prefix", text="Prefix")
+        row.prop(props, "text_format_suffix", text="Suffix")
+
+    layout.separator()
+    box = layout.box()
+    box.label(text="Size Settings", icon='FIXED_SIZE')
+
+    col = box.column(align=True)
+    col.prop(props, "text_size_mode", text="Mode")
+
+    if props.text_size_mode in ('FIXED', 'ADAPTIVE'):
+        col.prop(props, "text_size_fixed", text="Base Size")
+
+    if props.text_size_mode in ('PROPORTIONAL', 'ADAPTIVE'):
+        col.prop(props, "text_size_scale", text="Scale Factor")
+
+    layout.separator()
+    box = layout.box()
+    box.label(text="Visibility", icon='HIDE_OFF')
+
+    col = box.column(align=True)
+    col.prop(props, "text_max_distance", text="Max Distance")
+    col.prop(props, "text_depth_occlusion", text="Depth Occlusion")
+
+    layout.separator()
+    box = layout.box()
+    header_row = box.row()
+    header_row.prop(props, "text_filter_enabled", text="")
+    header_row.label(text="Attribute Filter", icon='FILTER')
+
+    if props.text_filter_enabled:
+        col = box.column(align=True)
+        col.prop(props, "text_filter_attribute", text="Attribute")
+        col.prop(props, "text_filter_operator", text="Operator")
+        col.prop(props, "text_filter_value", text="Value")
+
+    layout.separator()
+    box = layout.box()
+    box.label(text="Font", icon='OUTLINER_DATA_FONT')
+
+    col = box.column(align=True)
+    col.prop(props, "text_font_source", text="Source")
+
+    if props.text_font_source == 'SYSTEM':
+        col.prop(props, "text_font_system", text="Font")
+    else:
+        col.prop(props, "text_font_custom", text="")
+
+    layout.separator()
+    box = layout.box()
+    box.label(text="Appearance", icon='COLOR')
+
+    col = box.column(align=True)
+    col.prop(props, "text_color", text="Text Color")
+
+    col.separator()
+    col.prop(props, "text_background_enabled", text="Show Background")
+
+    if props.text_background_enabled:
+        col.prop(props, "text_background_color", text="Background")
+        col.prop(props, "text_background_alpha", text="Opacity", slider=True)
+
+
+class SCIGRAPHS_PT_visualization_appearance(_MeshRenderPanel, bpy.types.Panel):
     """Node and edge appearance settings."""
     bl_label = "Appearance"
-    bl_parent_id = "SCIGRAPHS_PT_visualization"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_order = 0
     
     def draw(self, context):
         layout = self.layout
@@ -82,47 +151,10 @@ class SCIGRAPHS_PT_visualization_appearance(bpy.types.Panel):
         row.operator("scigraphs.update_appearance", text="Update Appearance", icon='SHADING_RENDERED')
 
 
-class SCIGRAPHS_PT_visualization_scene(bpy.types.Panel):
-    """Rendering presets and lighting setup."""
-    bl_label = "Scene Setup"
-    bl_parent_id = "SCIGRAPHS_PT_visualization"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
-    
-    def draw(self, context):
-        layout = self.layout
-        props = context.scene.scigraphs
-        
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-        
-        box = layout.box()
-        box.label(text="Material Preset", icon='MATERIAL')
-        col = box.column(align=True)
-        col.prop(props, "rendering_preset", text="")
-        row = col.row()
-        row.scale_y = 1.3
-        row.operator("scigraphs.apply_rendering_preset", text="Apply Preset", icon='PLAY')
-        
-        layout.separator()
-        
-        box = layout.box()
-        box.label(text="Lighting", icon='LIGHT')
-        col = box.column(align=True)
-        col.prop(props, "lighting_setup", text="")
-        row = col.row()
-        row.scale_y = 1.3
-        row.operator("scigraphs.setup_lighting", text="Setup Lighting", icon='PLAY')
-
-
-class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
+class SCIGRAPHS_PT_visualization_edge_style(_MeshRenderPanel, bpy.types.Panel):
     """Edge style settings for curved, bundled, and styled edges."""
     bl_label = "Edge Style"
-    bl_parent_id = "SCIGRAPHS_PT_visualization"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_order = 1
     
     def draw(self, context):
         layout = self.layout
@@ -247,13 +279,10 @@ class SCIGRAPHS_PT_visualization_edge_style(bpy.types.Panel):
             info_box.label(text=f"Curve vertices: {obj['num_curve_verts']}")
 
 
-class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
+class SCIGRAPHS_PT_visualization_text(_MeshRenderPanel, bpy.types.Panel):
     """Text overlay settings for node labels."""
     bl_label = "Text Labels"
-    bl_parent_id = "SCIGRAPHS_PT_visualization"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_order = 2
     
     def draw_header(self, context):
         props = context.scene.scigraphs
@@ -272,87 +301,10 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
             row.alert = False
             row.label(text="Overlay active in compositor", icon='CHECKMARK')
         
-        box = layout.box()
-        box.label(text="Text Source", icon='TEXT')
-        
-        col = box.column(align=True)
-        col.prop(props, "text_source", text="Source")
-        
-        if props.text_source == 'ATTRIBUTE':
-            col.prop(props, "text_attribute", text="Attribute")
-            
-            col.separator()
-            col.label(text="Number Format:")
-            col.prop(props, "text_format_type", text="Type")
-            
-            if props.text_format_type in ('FLOAT', 'SCIENTIFIC', 'PERCENTAGE'):
-                col.prop(props, "text_float_decimals", text="Decimals")
-            
-            col.prop(props, "text_thousands_separator", text="Thousands Separator")
-            
-            row = col.row(align=True)
-            row.prop(props, "text_format_prefix", text="Prefix")
-            row.prop(props, "text_format_suffix", text="Suffix")
-        
+        draw_text_style(layout, props, obj)
         layout.separator()
-        box = layout.box()
-        box.label(text="Size Settings", icon='FIXED_SIZE')
-        
-        col = box.column(align=True)
-        col.prop(props, "text_size_mode", text="Mode")
-        
-        if props.text_size_mode in ('FIXED', 'ADAPTIVE'):
-            col.prop(props, "text_size_fixed", text="Base Size")
-        
-        if props.text_size_mode in ('PROPORTIONAL', 'ADAPTIVE'):
-            col.prop(props, "text_size_scale", text="Scale Factor")
-        
-        layout.separator()
-        box = layout.box()
-        box.label(text="Visibility", icon='HIDE_OFF')
-        
-        col = box.column(align=True)
-        col.prop(props, "text_max_distance", text="Max Distance")
-        col.prop(props, "text_depth_occlusion", text="Depth Occlusion")
-        col.prop(props, "text_declutter", text="Declutter")
-        
-        layout.separator()
-        box = layout.box()
-        header_row = box.row()
-        header_row.prop(props, "text_filter_enabled", text="")
-        header_row.label(text="Attribute Filter", icon='FILTER')
-        
-        if props.text_filter_enabled:
-            col = box.column(align=True)
-            col.prop(props, "text_filter_attribute", text="Attribute")
-            col.prop(props, "text_filter_operator", text="Operator")
-            col.prop(props, "text_filter_value", text="Value")
-        
-        layout.separator()
-        box = layout.box()
-        box.label(text="Font", icon='OUTLINER_DATA_FONT')
-        
-        col = box.column(align=True)
-        col.prop(props, "text_font_source", text="Source")
-        
-        if props.text_font_source == 'SYSTEM':
-            col.prop(props, "text_font_system", text="Font")
-        else:
-            col.prop(props, "text_font_custom", text="")
-        
-        layout.separator()
-        box = layout.box()
-        box.label(text="Appearance", icon='COLOR')
-        
-        col = box.column(align=True)
-        col.prop(props, "text_color", text="Text Color")
-        
-        col.separator()
-        col.prop(props, "text_background_enabled", text="Show Background")
-        
-        if props.text_background_enabled:
-            col.prop(props, "text_background_color", text="Background")
-            col.prop(props, "text_background_alpha", text="Opacity", slider=True)
+        row = layout.row()
+        row.prop(props, "text_declutter", text="Declutter")
         
         layout.separator()
         box = layout.box()
@@ -386,9 +338,7 @@ class SCIGRAPHS_PT_visualization_text(bpy.types.Panel):
 
 
 def register():
-    bpy.utils.register_class(SCIGRAPHS_PT_visualization)
     bpy.utils.register_class(SCIGRAPHS_PT_visualization_appearance)
-    bpy.utils.register_class(SCIGRAPHS_PT_visualization_scene)
     bpy.utils.register_class(SCIGRAPHS_PT_visualization_edge_style)
     bpy.utils.register_class(SCIGRAPHS_PT_visualization_text)
 
@@ -396,7 +346,5 @@ def register():
 def unregister():
     bpy.utils.unregister_class(SCIGRAPHS_PT_visualization_text)
     bpy.utils.unregister_class(SCIGRAPHS_PT_visualization_edge_style)
-    bpy.utils.unregister_class(SCIGRAPHS_PT_visualization_scene)
     bpy.utils.unregister_class(SCIGRAPHS_PT_visualization_appearance)
-    bpy.utils.unregister_class(SCIGRAPHS_PT_visualization)
 

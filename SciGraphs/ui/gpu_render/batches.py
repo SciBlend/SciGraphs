@@ -45,11 +45,17 @@ def structure_signature(obj, scene, st=None):
         len(mesh.vertices),
         len(mesh.edges),
         "is_intersection" in mesh.attributes,
+        round(float(obj.get("traversal_time", 0.0)), 4)
+        if "traversal_time" in obj else None,
         color_attr.name if color_attr else "",
         st.color_mode,
         st.attr_name,
         st.colormap,
         bool(st.reverse_colormap),
+        st.norm_mode,
+        round(float(st.norm_gamma), 4),
+        round(float(st.clip_low_pct), 3),
+        round(float(st.clip_high_pct), 3),
         tuple(st.node_color),
         bool(st.size_by_attr),
         round(float(st.size_max_mult), 3),
@@ -308,6 +314,8 @@ def edge_width_status(obj, scene, st=None):
         return True, "applied to tube radius"
     if reps.get("line_buckets"):
         return True, f"applied as {len(reps['line_buckets'])} width classes"
+    if reps.get("style") is not None:
+        return True, "applied per edge in the style shader"
     if reps.get("bundle") is not None:
         return False, "bundling draws its own edges"
     if entry.get("filter") is not None:
@@ -490,6 +498,32 @@ def drop_tree_cache(obj):
         del _TREE_CACHE[key]
 
 
+_EDGE_CACHE = {}
+_EDGE_CACHE_MAX = 4
+
+
+def cached_edges(obj):
+    """The (E, 2) edge array, read once per topology change."""
+    mesh = obj.data
+    shape = (len(mesh.vertices), len(mesh.edges))
+    key = obj.as_pointer()
+    hit = _EDGE_CACHE.get(key)
+    if hit is not None and hit[0] == shape:
+        return hit[1]
+    edges = geometry.extract_edges(mesh)
+    if len(_EDGE_CACHE) >= _EDGE_CACHE_MAX:
+        _EDGE_CACHE.pop(next(iter(_EDGE_CACHE)))
+    _EDGE_CACHE[key] = (shape, edges)
+    return edges
+
+
+def drop_geometry_cache(obj=None):
+    if obj is None:
+        _EDGE_CACHE.clear()
+    else:
+        _EDGE_CACHE.pop(obj.as_pointer(), None)
+
+
 def _bundle_vertex_shader_rep(scene, coords, logical, params, hierarchy, colors,
                               edge_color, edge_style, want_id, edge_norm=None,
                               st=None):
@@ -517,6 +551,128 @@ def _bundle_vertex_shader_rep(scene, coords, logical, params, hierarchy, colors,
     return bundle_gpu.build(mode, coords, logical, params, ctx=ctx,
                             node_colors=colors, edge_color=edge_color,
                             edge_widths=edge_norm)
+
+
+def _style_texture(values):
+    """RGBA32F texels tiled by row, laid out against ``shaders.STYLE_TEX_ROW``.
+    glsl/edge_style.glsl hardcodes the same row length."""
+    row = shaders.STYLE_TEX_ROW
+    n = values.shape[0]
+    rows = max(1, int(np.ceil(n / row)))
+    padded = np.zeros((rows * row, 4), dtype=np.float32)
+    padded[:n] = values
+    return gpu.types.GPUTexture(
+        (row, rows), format='RGBA32F',
+        data=gpu.types.Buffer('FLOAT', padded.size, padded.ravel()))
+
+
+def _style_parallel_offsets(edges, params):
+    """The signed shift tessellate applies before it picks a style. Only the
+    amount is packed: its direction follows the nodes, so the shader takes it."""
+    off = np.zeros(edges.shape[0], dtype=np.float32)
+    if not (params["auto_offset_parallel"] and params["parallel_offset"] > 0.0):
+        return off
+    from ...core.render.edge_styles import _parallel_offsets
+    rank, group = _parallel_offsets(edges, params)
+    base = params["parallel_offset"]
+    amount = -base * (group - 1) * 0.5 + rank * base
+    return np.where(group > 1, amount, 0.0).astype(np.float32)
+
+
+def _style_pass(edges, eids, params, style, wnorm, wmult, poff=None):
+    """One instanced draw: the per-edge texture plus a batch of a single edge's
+    sample parameters, which does not grow with the graph. Two texels an edge,
+    (a, b, edge id, parallel offset) then (line width 0..1, radius mult, -1)."""
+    e = edges.shape[0]
+    packed = np.zeros((e * 2, 4), dtype=np.float32)
+    packed[0::2, 0] = edges[:, 0]
+    packed[0::2, 1] = edges[:, 1]
+    packed[0::2, 2] = eids
+    if poff is not None:
+        packed[0::2, 3] = poff
+    packed[1::2, 0] = wnorm
+    packed[1::2, 1] = wmult
+    packed[1::2, 2] = -1.0
+    tex = _style_texture(packed)
+
+    spans = shaders.style_segments(params, style=style)
+    t = np.linspace(0.0, 1.0, spans + 1, dtype=np.float32)
+
+    fmt = gpu.types.GPUVertFormat()
+    fmt.attr_add(id="sample_t", comp_type='F32', len=1, fetch_mode='FLOAT')
+    pairs = np.empty(spans * 2, dtype=np.float32)
+    pairs[0::2], pairs[1::2] = t[:-1], t[1:]
+    vbo = gpu.types.GPUVertBuf(len=pairs.size, format=fmt)
+    vbo.attr_fill("sample_t", pairs)
+    line = gpu.types.GPUBatch(type='LINES', buf=vbo)
+
+    qfmt = gpu.types.GPUVertFormat()
+    qfmt.attr_add(id="seg", comp_type='F32', len=4, fetch_mode='FLOAT')
+    seg = np.empty((spans, 4, 4), dtype=np.float32)
+    seg[:, :, 0] = t[:-1, None]
+    seg[:, :, 1] = t[1:, None]
+    seg[:, :, 2] = dynamic._RIBBON_ENDSEL
+    seg[:, :, 3] = dynamic._RIBBON_SIDE
+    qvbo = gpu.types.GPUVertBuf(len=spans * 4, format=qfmt)
+    qvbo.attr_fill("seg", seg.reshape(-1, 4))
+    faces = (np.arange(spans, dtype=np.int32)[:, None, None] * 4
+             + dynamic._RIBBON_TRIS[None]).reshape(-1, 3)
+    ibo = gpu.types.GPUIndexBuf(type='TRIS',
+                                seq=np.ascontiguousarray(faces))
+    quads = gpu.types.GPUBatch(type='TRIS', buf=qvbo, elem=ibo)
+
+    return {"tex": tex, "line": line, "quad": quads, "instances": e,
+            "spans": spans,
+            "bytes": int(packed.nbytes + pairs.nbytes + seg.nbytes)}
+
+
+def _style_vertex_shader_rep(params, logical, animated, edge_radius,
+                             edge_widths=None, edge_norm=None):
+    """The six closed-form edge styles evaluated per vertex, or None.
+
+    Only on the animated path: re-tessellating every frame runs 83 ms (STRAIGHT)
+    to 418 ms (ARC) at 150k edges against a 41 ms budget at 24 fps, and off it
+    the CPU tessellation stays the reference. Self-loops are a second pass:
+    a circle around one node shares no formula with the others.
+    """
+    style = params["style_type"]
+    if not animated or style not in shaders.STYLE_ANIMATED:
+        return None
+    if shaders.get_style_line_shader() is None:
+        return None
+    if logical is None or logical.shape[0] == 0:
+        return None
+
+    e = logical.shape[0]
+    loops = logical[:, 0] == logical[:, 1]
+    plain = ~loops
+    ids = np.arange(e, dtype=np.float32)
+    wmult = np.ones(e, dtype=np.float32) if edge_widths is None \
+        else np.asarray(edge_widths, dtype=np.float32)
+    wnorm = np.zeros(e, dtype=np.float32) if edge_norm is None \
+        else np.asarray(edge_norm, dtype=np.float32)
+
+    try:
+        head = _style_pass(logical[plain], ids[plain], params, style,
+                           wnorm[plain], wmult[plain],
+                           poff=_style_parallel_offsets(
+                               logical[plain], params)) if plain.any() else None
+        loop = _style_pass(logical[loops], ids[loops], params, 'SELF_LOOP',
+                           wnorm[loops], wmult[loops]) if loops.any() else None
+    except Exception:  # noqa: BLE001 - texture limits, out of VRAM
+        return None
+    if head is None and loop is None:
+        return None
+
+    return {
+        "plain": head,
+        "loops": loop,
+        "style": style,
+        "params": params,
+        "radius": float(edge_radius),
+        "weighted": edge_norm is not None,
+        "bytes": sum(p["bytes"] for p in (head, loop) if p is not None),
+    }
 
 
 def _cluster_tree(mesh, scene, coords, edges, node_mask, colors, base_radius, st=None):
@@ -637,11 +793,11 @@ def build_bundle(obj, scene, st=None):
     num_verts = len(mesh.vertices)
 
     coords = geometry.extract_node_coords(mesh)
-    edges = geometry.extract_edges(mesh)
+    edges = cached_edges(obj)
     node_mask = geometry.extract_node_mask(mesh)
 
     values, vmin, vmax = read_value_channel(mesh, st.attr_name, num_verts)
-    norm = normalized_values(values, vmin, vmax, num_verts)
+    norm, norm_finite = normalized_values(values, vmin, vmax, num_verts)
     colors = compute_colors(mesh, num_verts, scene, values, vmin, vmax,
                             st=st)
 
@@ -670,6 +826,13 @@ def build_bundle(obj, scene, st=None):
         stride = int(np.ceil(point_idx.size / lod_max))
         point_idx = point_idx[::stride]
 
+    # Positions in a texture so a layout moves nodes without rebuilding. Decided
+    # here, since it changes which shader every representation asks for.
+    animated = bool(st.animate) \
+        and dynamic.eligible(obj, scene, st=st)[0]
+    pos_entry = dynamic.build(obj, coords) if animated else None
+    animated = pos_entry is not None
+
     vol = None
     vol_stats = None
     vol_mode = st.volume_mode
@@ -677,7 +840,8 @@ def build_bundle(obj, scene, st=None):
         weights = norm[point_idx] if (vol_mode == 'WEIGHTED'
                                       and norm is not None) else None
         vol, vol_data = volume.build(
-            scene, coords[point_idx], colors[point_idx], weights)
+            scene, coords[point_idx], colors[point_idx], weights,
+            animated=animated, idx=point_idx)
         if vol is not None:
             vol_stats = {
                 "shape": vol["shape"],
@@ -703,13 +867,6 @@ def build_bundle(obj, scene, st=None):
     coords_sub = coords[point_idx]
     colors_sub = colors[point_idx]
     norm_sub = norm[point_idx] if norm is not None else None
-
-    # Positions in a texture so a layout moves nodes without rebuilding. Decided
-    # here, since it changes which shader every representation asks for.
-    animated = bool(st.animate) \
-        and dynamic.eligible(obj, scene, st=st)[0]
-    pos_entry = dynamic.build(obj, coords) if animated else None
-    animated = pos_entry is not None
 
     # Edge-visible = curve point or visible node, so polylines survive whole.
     if node_mask is not None:
@@ -785,6 +942,7 @@ def build_bundle(obj, scene, st=None):
     styled = None
     styled_edge_count = 0
     bundle_vs = None
+    style_vs = None
     if edge_styles_gpu.enabled(scene, st) and edges is not None:
         recovered = edge_styles_gpu.recover_logical_edges(edges, node_mask)
         if recovered is not None:
@@ -814,11 +972,18 @@ def build_bundle(obj, scene, st=None):
                     if ewidth_mesh is not None else None
                 style_params = edge_styles_gpu.style_params(scene)
                 enorm_logical = enorm[mesh_ids] if enorm is not None else None
-                bundle_vs = _bundle_vertex_shader_rep(
-                    scene, coords, logical, edge_styles_gpu.bundle_params(scene),
-                    hierarchy, colors, edge_color, edge_style, want_id,
-                    edge_norm=enorm_logical, st=st)
-                if bundle_vs is None:
+                style_vs = _style_vertex_shader_rep(
+                    style_params, logical, animated, edge_radius,
+                    edge_widths=ewidth_logical, edge_norm=enorm_logical)
+                if style_vs is None:
+                    bundle_vs = _bundle_vertex_shader_rep(
+                        scene, coords, logical,
+                        edge_styles_gpu.bundle_params(scene),
+                        hierarchy, colors, edge_color, edge_style, want_id,
+                        edge_norm=enorm_logical, st=st)
+                if style_vs is None and bundle_vs is None:
+                    animated = False
+                    pos_entry = None
                     styled = edge_styles_gpu.tessellate(
                         coords, logical, style_params,
                         edge_widths=ewidth_logical, hierarchy=hierarchy,
@@ -873,7 +1038,12 @@ def build_bundle(obj, scene, st=None):
 
     reps["ribbon_id"] = None
     seg_geom = None
-    if bundle_vs is not None:
+    if style_vs is not None:
+        reps["style"] = style_vs
+        reps["ribbon"] = None
+        line_batch, line_shader = None, None
+        edge_count = styled_edge_count
+    elif bundle_vs is not None:
         # The curve lives in the shader: no segments to hand out.
         reps["bundle"] = bundle_vs
         reps["ribbon"] = None
@@ -1079,6 +1249,8 @@ def build_bundle(obj, scene, st=None):
         "edges": kept,
         "visible_count": int(point_idx.size),
         "edge_count": edge_count,
+        "unmeasured": (0 if norm_finite is None
+                       else int(norm_finite.size - norm_finite.sum())),
         "blocks": blocks,
         "coarse": coarse,
         # Tree plus the inputs to rebuild batches for any cut draw.py picks.

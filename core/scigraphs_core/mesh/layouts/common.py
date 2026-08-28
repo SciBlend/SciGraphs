@@ -9,6 +9,8 @@ import sys
 import math
 import cmath
 import json
+import inspect
+import random
 import tempfile
 from ...repro.determinism import get_layout_seed
 
@@ -39,6 +41,8 @@ except ImportError:
 _layout_rng = None
 
 def _get_layout_rng(seed=None):
+    """The shared layout RandomState. NetworkX takes it directly as ``seed=``,
+    so a layout never needs the global ``np.random``."""
     global _layout_rng
     if seed is not None:
         _layout_rng = np.random.RandomState(seed)
@@ -47,12 +51,38 @@ def _get_layout_rng(seed=None):
     return _layout_rng
 
 def _reset_layout_rng(seed=None):
-    """Reseed the layout RNG (call at the start of a layout)."""
+    """Reseed the layout RNG (call at the start of a layout). Also seeds the
+    stdlib ``random``, process-wide: igraph draws from it and takes no seed
+    argument, so that is the only way its layouts reproduce."""
     global _layout_rng
     if seed is None:
         seed = get_layout_seed()
     _layout_rng = np.random.RandomState(seed)
+    random.seed(seed)
     return _layout_rng
+
+_props_capable = {}
+
+def _accepts_props(fn):
+    """True when *fn* takes a ``props`` keyword."""
+    try:
+        cached = _props_capable[fn]
+    except KeyError:
+        try:
+            params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            cached = False
+        else:
+            cached = 'props' in params
+        _props_capable[fn] = cached
+    return cached
+
+def _call_with_props(fn, *args, props=None, **kwargs):
+    """Call *fn*, forwarding *props* only if its signature takes it, so a layout
+    that has not grown the parameter yet still runs."""
+    if props is not None and _accepts_props(fn):
+        kwargs['props'] = props
+    return fn(*args, **kwargs)
 
 try:
     import igraph as ig
@@ -61,16 +91,14 @@ except ImportError:
     IGRAPH_AVAILABLE = False
     print("Warning: python-igraph not available. Some fast layouts will be disabled.")
 
-def _log_layout(algorithm, num_nodes, num_edges, params=None, start_time=None, success=True, error=None, actual_algorithm=None):
+def _log_layout(algorithm, num_nodes, num_edges, params=None, start_time=None, success=True, error=None, actual_algorithm=None, missing_library=None):
     separator = "=" * 70
     print(f"\n{separator}")
 
+    print(f"Layout algorithm: {algorithm}")
     if actual_algorithm and actual_algorithm != algorithm:
-        print(f"Layout algorithm: {algorithm}")
         print(f"Fallback: using {actual_algorithm} instead")
-        print(f"   Reason: {algorithm} library not available")
-    else:
-        print(f"Layout algorithm: {algorithm}")
+        print(f"   Reason: {missing_library or 'required'} library not available")
 
     print(f"Graph: {num_nodes} nodes, {num_edges} edges")
 
@@ -101,11 +129,16 @@ def _log_layout(algorithm, num_nodes, num_edges, params=None, start_time=None, s
 # fa2 rarely has a 3.11 wheel; prefer igraph DrL when missing.
 FA2_AVAILABLE = False
 try:
-    from fa2 import ForceAtlas2
+    from fa2_modified import ForceAtlas2
     FA2_AVAILABLE = True
-    print("ForceAtlas2 available (optional)")
 except ImportError:
-    pass
+    try:
+        from fa2 import ForceAtlas2
+        FA2_AVAILABLE = True
+    except ImportError:
+        pass
+if FA2_AVAILABLE:
+    print("ForceAtlas2 available (optional)")
 
 GRAPHVIZ_AVAILABLE = False
 try:
@@ -115,11 +148,69 @@ try:
 except ImportError:
     pass
 
+_IGRAPH_FALLBACKS = {
+    'IGRAPH_FR': 'SPRING (2D)',
+    'IGRAPH_KK': 'SPRING (2D)',
+    'IGRAPH_DRL': 'RANDOM',
+    'IGRAPH_DRL_2D': 'RANDOM',
+    'IGRAPH_LGL': 'RANDOM',
+    'IGRAPH_DH': 'SPRING (3D)',
+    'IGRAPH_GRAPHOPT': 'SPRING (3D)',
+}
+
+def _resolve_fallback(algorithm):
+    """``(missing_library, substitute)`` when *algorithm* cannot run as asked,
+    ``(None, None)`` when it can. The Graphviz engines have no fallback: they
+    raise, which the dispatcher reports as a failure rather than as a layout."""
+    if algorithm == 'FORCEATLAS2':
+        if getattr(nx, "forceatlas2_layout", None) is not None:
+            return None, None
+        if FA2_AVAILABLE:
+            return "networkx >= 3.4", "FORCEATLAS2 (2D, fa2 package)"
+        return "networkx >= 3.4 or fa2", "SPRING (2D)"
+    if not IGRAPH_AVAILABLE and algorithm in _IGRAPH_FALLBACKS:
+        return "python-igraph", _IGRAPH_FALLBACKS[algorithm]
+    return None, None
+
+def _check_positions(pos, num_nodes, algorithm):
+    """Return *pos* as a finite ``(num_nodes, 3)`` float array, raising if it is
+    not: NaN, inf or a short array would go straight into vertex coordinates."""
+    arr = np.asarray(pos, dtype=np.float64)
+    if arr.shape != (num_nodes, 3):
+        raise ValueError("%s produced positions of shape %s, expected (%d, 3)"
+                         % (algorithm, arr.shape, num_nodes))
+    if not np.isfinite(arr).all():
+        raise ValueError("%s produced %d non-finite coordinate(s)"
+                         % (algorithm, int((~np.isfinite(arr)).sum())))
+    return arr
+
+def _edge_pairs_to_indices(edge_pairs, num_nodes, name):
+    """Validate caller-supplied edge pairs, or None on refusal. An index outside
+    the node range used to add nodes the mesh does not have."""
+    edge_indices = []
+    for pair in edge_pairs:
+        try:
+            src, tgt = (int(v) for v in pair)
+        except (TypeError, ValueError):
+            print("Layout unavailable: object %r has the malformed edge %r."
+                  % (name, pair))
+            return None
+        if not (0 <= src < num_nodes and 0 <= tgt < num_nodes):
+            print("Layout unavailable: object %r has the edge (%d, %d), outside "
+                  "its 0..%d nodes. Laying it out would add nodes the mesh does "
+                  "not have and silently drop or misplace positions."
+                  % (name, src, tgt, num_nodes - 1))
+            return None
+        edge_indices.append((src, tgt))
+    return edge_indices
+
 def _build_networkx_graph(obj, edge_pairs=None):
     """Build a NetworkX graph from object data, ``(None, 0)`` on refusal. *obj*
     needs ``num_nodes`` plus ``nodes_data``/``edges_data``; mesh-native objects
     instead pass ``mesh_edge_pairs(...)`` as *edge_pairs*, where None means "not
-    supplied" and is refused while ``[]`` means empty."""
+    supplied" and is refused while ``[]`` means empty. *edge_pairs* wins over
+    ``edges_data``, being the object's real topology. Data that cannot describe
+    exactly ``num_nodes`` nodes is refused, not turned into another graph."""
     if not NETWORKX_AVAILABLE:
         print("Layout unavailable: %s" % NETWORKX_REASON)
         return None, 0
@@ -127,7 +218,19 @@ def _build_networkx_graph(obj, edge_pairs=None):
     if not obj or "num_nodes" not in obj:
         return None, 0
 
-    num_nodes = obj["num_nodes"]
+    name = getattr(obj, "name", type(obj).__name__)
+
+    try:
+        num_nodes = int(obj["num_nodes"])
+    except (TypeError, ValueError):
+        print("Layout unavailable: object %r stores the non-numeric num_nodes %r."
+              % (name, obj["num_nodes"]))
+        return None, 0
+
+    if num_nodes < 0:
+        print("Layout unavailable: object %r stores num_nodes=%d; a node count "
+              "cannot be negative." % (name, num_nodes))
+        return None, 0
 
     if num_nodes == 0:
         return None, 0
@@ -136,36 +239,88 @@ def _build_networkx_graph(obj, edge_pairs=None):
     G.add_nodes_from(range(num_nodes))
 
     nodes_str = obj.get("nodes_data", "")
-    if nodes_str:
-        nodes_list = nodes_str.split(",")
-    else:
-        nodes_list = []
+    nodes_list = nodes_str.split(",") if nodes_str else []
+    if nodes_list and len(nodes_list) != num_nodes:
+        print("Layout unavailable: object %r stores %d 'nodes_data' identifiers "
+              "for %d nodes. A comma inside a node name splits into extra "
+              "identifiers and shifts every edge after it; quote it out of the "
+              "source or rename the node." % (name, len(nodes_list), num_nodes))
+        return None, 0
 
     edges_str = obj.get("edges_data", "")
-    if edges_str:
+
+    if edge_pairs is not None:
+        edge_indices = _edge_pairs_to_indices(edge_pairs, num_nodes, name)
+        if edge_indices is None:
+            return None, 0
+        if edges_str and len(edges_str.split(",")) // 2 != len(edge_indices):
+            print("Note: object %r also stores 'edges_data' describing %d edges; "
+                  "the caller's %d edge_pairs are the mesh's own topology and win."
+                  % (name, len(edges_str.split(",")) // 2, len(edge_indices)))
+    elif edges_str:
         edges_flat = edges_str.split(",")
-        edges_data = [(edges_flat[i], edges_flat[i+1]) for i in range(0, len(edges_flat), 2)]
+        if len(edges_flat) % 2:
+            print("Layout unavailable: object %r stores %d 'edges_data' "
+                  "identifiers, an odd number, so they do not pair into edges. "
+                  "A comma inside a node name does this."
+                  % (name, len(edges_flat)))
+            return None, 0
+        if not nodes_list:
+            print("Layout unavailable: object %r stores 'edges_data' but no "
+                  "'nodes_data', so its identifiers resolve to no node at all. "
+                  "Store the identifiers, or pass the topology as edge_pairs."
+                  % name)
+            return None, 0
 
         node_to_idx = {node: i for i, node in enumerate(nodes_list)}
 
         edge_indices = []
-        for src, tgt in edges_data:
+        unknown = 0
+        for i in range(0, len(edges_flat), 2):
+            src, tgt = edges_flat[i], edges_flat[i + 1]
             if src in node_to_idx and tgt in node_to_idx:
                 edge_indices.append((node_to_idx[src], node_to_idx[tgt]))
-    elif edge_pairs is not None:
-        edge_indices = list(edge_pairs)
+            else:
+                unknown += 1
+        if unknown:
+            print("Warning: object %r has %d 'edges_data' entries naming nodes "
+                  "absent from 'nodes_data'; they are dropped." % (name, unknown))
     else:
         print("Layout unavailable: object %r stores no 'edges_data' and the "
               "caller supplied no edge_pairs, so the graph's edges are unknown. "
               "Mesh-native graph objects keep their topology in mesh.edges; "
               "read it with core.mesh.mesh_utils.mesh_edge_pairs(obj, "
               "num_nodes) and pass the result as edge_pairs. Refusing rather "
-              "than laying out %d isolated nodes."
-              % (getattr(obj, "name", type(obj).__name__), num_nodes))
+              "than laying out %d isolated nodes." % (name, num_nodes))
         return None, 0
 
     G.add_edges_from(edge_indices)
     return G, num_nodes
+
+def _positive_prop(props, name, minimum=0.0):
+    """A property's value when it is above *minimum*, else None, for the layouts
+    that read None as "use your own default". Never hand None to one that
+    forwards it to igraph: igraph wants a real number."""
+    value = getattr(props, name, None)
+    if value is None or value <= minimum:
+        return None
+    return value
+
+def _graphopt_kwargs_from_props(props):
+    """Graphopt parameters from scene properties. A property left at its "auto"
+    zero is omitted, so :func:`_igraph_graphopt` keeps its own default; passing
+    None instead raises TypeError inside igraph."""
+    kwargs = {}
+    for keyword, prop_name in (('niter', 'igraph_graphopt_niter'),
+                               ('node_charge', 'igraph_graphopt_node_charge'),
+                               ('node_mass', 'igraph_graphopt_node_mass'),
+                               ('spring_length', 'igraph_graphopt_spring_length'),
+                               ('spring_constant', 'igraph_graphopt_spring_constant'),
+                               ('max_sa_movement', 'igraph_graphopt_max_sa_movement')):
+        value = _positive_prop(props, prop_name)
+        if value is not None:
+            kwargs[keyword] = value
+    return kwargs
 
 def _get_drl_kwargs_from_props(props):
     """DrL per-phase parameters from scene properties."""

@@ -6,6 +6,7 @@ class SCIGRAPHS_PT_analysis(bpy.types.Panel):
     """Main analysis panel."""
     bl_label = "Analysis"
     bl_parent_id = "SCIGRAPHS_PT_main"
+    bl_order = 3
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
@@ -114,33 +115,19 @@ class SCIGRAPHS_PT_analysis_community(bpy.types.Panel):
         row.operator("scigraphs.apply_clustering", text="Detect Communities", icon='PLAY')
 
 
-class SCIGRAPHS_PT_analysis_directed(bpy.types.Panel):
-    """Directed graph specific analysis."""
-    bl_label = "Directed Analysis"
-    bl_parent_id = "SCIGRAPHS_PT_analysis"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
-    
-    @classmethod
-    def poll(cls, context):
-        obj = context.active_object
-        return obj and obj.get("is_directed", False)
-    
-    def draw(self, context):
-        layout = self.layout
-        
-        box = layout.box()
-        box.label(text="Directed Graph Mode Active", icon='FORWARD')
+def _directed_poll(cls, context):
+    obj = context.active_object
+    return bool(obj and obj.get("is_directed", False))
 
 
 class SCIGRAPHS_PT_analysis_directed_centrality(bpy.types.Panel):
     """Directed centrality metrics."""
     bl_label = "Directed Centrality"
-    bl_parent_id = "SCIGRAPHS_PT_analysis_directed"
+    bl_parent_id = "SCIGRAPHS_PT_analysis"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
+    poll = classmethod(_directed_poll)
     
     def draw(self, context):
         layout = self.layout
@@ -177,10 +164,11 @@ class SCIGRAPHS_PT_analysis_directed_centrality(bpy.types.Panel):
 class SCIGRAPHS_PT_analysis_directed_structure(bpy.types.Panel):
     """Directed graph structure analysis."""
     bl_label = "Structure Analysis"
-    bl_parent_id = "SCIGRAPHS_PT_analysis_directed"
+    bl_parent_id = "SCIGRAPHS_PT_analysis"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
+    poll = classmethod(_directed_poll)
     
     def draw(self, context):
         layout = self.layout
@@ -226,10 +214,11 @@ class SCIGRAPHS_PT_analysis_directed_structure(bpy.types.Panel):
 class SCIGRAPHS_PT_analysis_directed_flow(bpy.types.Panel):
     """Directed graph flow analysis and animation."""
     bl_label = "Flow Analysis"
-    bl_parent_id = "SCIGRAPHS_PT_analysis_directed"
+    bl_parent_id = "SCIGRAPHS_PT_analysis"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
+    poll = classmethod(_directed_poll)
     
     def draw(self, context):
         layout = self.layout
@@ -351,7 +340,6 @@ def register():
     bpy.utils.register_class(SCIGRAPHS_PT_analysis)
     bpy.utils.register_class(SCIGRAPHS_PT_analysis_centrality)
     bpy.utils.register_class(SCIGRAPHS_PT_analysis_community)
-    bpy.utils.register_class(SCIGRAPHS_PT_analysis_directed)
     bpy.utils.register_class(SCIGRAPHS_PT_analysis_directed_centrality)
     bpy.utils.register_class(SCIGRAPHS_PT_analysis_directed_structure)
     bpy.utils.register_class(SCIGRAPHS_PT_analysis_directed_flow)
@@ -363,7 +351,6 @@ def unregister():
     bpy.utils.unregister_class(SCIGRAPHS_PT_analysis_directed_flow)
     bpy.utils.unregister_class(SCIGRAPHS_PT_analysis_directed_structure)
     bpy.utils.unregister_class(SCIGRAPHS_PT_analysis_directed_centrality)
-    bpy.utils.unregister_class(SCIGRAPHS_PT_analysis_directed)
     bpy.utils.unregister_class(SCIGRAPHS_PT_analysis_community)
     bpy.utils.unregister_class(SCIGRAPHS_PT_analysis_centrality)
     bpy.utils.unregister_class(SCIGRAPHS_PT_analysis)

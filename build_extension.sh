@@ -249,6 +249,19 @@ if [ -d "$INSTALL_DIR" ]; then
     rm -rf "$INSTALL_DIR"
 fi
 
+WHEEL_SITE_GLOB="$BLENDER_CONFIG_BASE/$BLENDER_VERSION/extensions/.local/lib/python*/site-packages"
+for site in $WHEEL_SITE_GLOB; do
+    [ -d "$site" ] || continue
+    for pkg in scigraphs_core scigraphs_engine scigraphs_utils; do
+        for stale in "$site/$pkg" "$site/$pkg".libs "$site/$pkg"-*.dist-info; do
+            if [ -e "$stale" ]; then
+                echo "  Dropping unpacked $(basename "$stale") so Blender reinstalls it"
+                rm -rf "$stale"
+            fi
+        done
+    done
+done
+
 mkdir -p "$INSTALL_DIR"
 unzip -q -o "$ZIP_FILE" -d "$INSTALL_DIR"
 

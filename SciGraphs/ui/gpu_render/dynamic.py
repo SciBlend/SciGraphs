@@ -24,20 +24,28 @@ _CACHE_MAX = 4
 _IDLE_TEX = None
 
 
+def _wants_arrows(obj, st):
+    directed = bool(obj.get("is_directed", False)) \
+        or bool(obj.get("od_directed", False))
+    return st.edge_arrows == 'ON' or (st.edge_arrows == 'AUTO' and directed)
+
+
 def eligible(obj, scene, st=None):
     """``(ok, why)``. Every rejection below is a stage that already consumed the
     coordinates on the CPU and cannot be told they moved."""
     st = _settings(scene, st)
     if "is_intersection" in obj.data.attributes:
         return False, "a curve point is not a node and has no position texel"
-    if edge_styles_gpu.enabled(scene):
-        return False, "styled edges are tessellated from the positions"
-    if st.volume_mode != 'OFF':
-        return False, "the density field is splatted from the positions"
+    if edge_styles_gpu.enabled(scene, st):
+        if scene.scigraphs.edge_style_type not in shaders.STYLE_ANIMATED:
+            return False, "bundled edges are routed from the positions"
+        if _wants_arrows(obj, st):
+            return False, ("an arrowhead points along the curve's last "
+                           "tessellated segment")
+    if st.volume_mode != 'OFF' and st.volume_when == 'HYBRID':
+        return False, "the crowded cut re-picks which nodes the batches hold"
     if bool(st.coarsen):
         return False, "a supernode sits at the centroid of its members"
-    if bool(st.adaptive):
-        return False, "the adaptive cut places stand-ins by position"
     if bool(st.use_blocks):
         return False, "blocks bin nodes by position and cull by block"
     if bool(st.render_id_pass):

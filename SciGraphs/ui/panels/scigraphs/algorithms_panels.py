@@ -6,6 +6,7 @@ class SCIGRAPHS_PT_algorithms(bpy.types.Panel):
     """Main panel for graph algorithms."""
     bl_label = "Graph Algorithms"
     bl_parent_id = "SCIGRAPHS_PT_main"
+    bl_order = 4
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
@@ -64,7 +65,7 @@ class SCIGRAPHS_PT_algorithms_traversal(bpy.types.Panel):
         row.scale_y = 1.3
         row.operator("scigraphs.animate_traversal", text="Animate Traversal", icon='PLAY')
         
-        if "traversal_max_order" in obj:
+        if obj is not None and "traversal_max_order" in obj:
             info = box.box()
             info.scale_y = 0.7
             col = info.column(align=True)

@@ -11,9 +11,11 @@ class SCIGRAPHS_OT_animate_layout(bpy.types.Operator):
     bl_label = "Animate Layout"
     bl_description = (
         "Run a force-directed layout that advances with the timeline, so "
-        "pressing Play shows the graph arranging itself. The trajectory is "
-        "recorded as it runs, so scrubbing back and rendering show exactly "
-        "what was watched"
+        "pressing Play shows the graph arranging itself. The first Record "
+        "Frames frames are stored, and within them scrubbing back and "
+        "rendering show exactly what was watched. Past that the simulation "
+        "keeps running unrecorded, so those frames do not scrub and do not "
+        "repeat. The force sliders retune it while it runs"
     )
 
     def execute(self, context):

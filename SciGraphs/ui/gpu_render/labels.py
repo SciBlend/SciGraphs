@@ -7,6 +7,8 @@ import gpu
 import numpy as np
 from gpu_extras.batch import batch_for_shader
 
+from ...core.render import lod
+
 from ...core.visualization import text_overlay as t_ov
 from .state import CACHE
 def _settings(scene, st=None):
@@ -52,6 +54,46 @@ def _settings_from_props(props):
 # A node's pixel depth is its own sphere's front, nearer than its center.
 _OCC_REL = 0.10
 _OCC_ABS = 0.2
+
+
+_PRIORITY_DISTANCE = 'DISTANCE'
+
+_PRIORITY_PROP = "scigraphs_preview_labels_priority"
+_PRIORITY_ATTR_PROP = "scigraphs_preview_labels_priority_attr"
+
+
+def priority_channel(scene):
+    """``(channel, attr_name)``, or ``("", "")`` to rank by camera distance."""
+    name = str(getattr(scene, _PRIORITY_PROP, "") or _PRIORITY_DISTANCE)
+    if name in (_PRIORITY_DISTANCE, 'NONE', ''):
+        return "", ""
+    return name, str(getattr(scene, _PRIORITY_ATTR_PROP, "") or "")
+
+
+def _rank(value):
+    """Channel values arrive normalized, but a NaN would still poison the sort."""
+    v = float(value)
+    return 0.0 if v != v else min(1.0, max(0.0, v))
+
+
+def node_priorities(obj, scene, count):
+    """Per-node importance in [0, 1], or None to fall back to distance.
+
+    Asked for on every frame, since the channel cache is keyed on topology and
+    not on the camera: only the first frame computes anything, and a heavy
+    channel stalls it exactly as it stalls the filter stack's first frame.
+    """
+    name, attr = priority_channel(scene)
+    if not name:
+        return None
+    from . import filters
+    try:
+        values, _lo, _hi, domain = filters.channel(obj, scene, name, attr)
+    except Exception:  # noqa: BLE001 - an unbuildable channel is not fatal here
+        return None
+    if values is None or domain != 'POINT' or len(values) < count:
+        return None
+    return values
 
 
 def collect_label_items(obj, scene, persp, width, height, dist_buf=None):
@@ -102,10 +144,15 @@ def collect_label_items(obj, scene, persp, width, height, dist_buf=None):
         near = dist_buf[iy, ix]
         occluded = near < (dist * (1.0 - _OCC_REL) - _OCC_ABS)
 
+    prio = node_priorities(obj, scene, n)
+
     nodes = []
+    prio_by_name = {}
     for i in range(n):
         if not visible[i] or occluded[i]:
             continue
+        if prio is not None:
+            prio_by_name[names[i]] = _rank(prio[i])
         nodes.append(t_ov.ProjectedNode(
             name=names[i], x=float(px[i]), y=float(py[i]),
             distance=float(dist[i]), visible=True, occluded=False,
@@ -124,11 +171,14 @@ def collect_label_items(obj, scene, persp, width, height, dist_buf=None):
             if node.name in vals:
                 texts[node.name] = t_ov.format_value(vals[node.name], settings)
 
+    scale = lod.px_scale(height)
     items = []
     for node in nodes:
         text = texts.get(node.name, node.name)
-        size = t_ov.calculate_text_size(node, settings, None)
-        items.append((text, node.x, node.y, size, node.distance))
+        size = max(1, int(round(t_ov.calculate_text_size(node, settings, None)
+                                * scale)))
+        items.append((text, node.x, node.y, size, node.distance,
+                      prio_by_name.get(node.name)))
     return items
 
 
@@ -200,14 +250,35 @@ def _candidates(x, y, size, tw, th):
     return base + ring2
 
 
+_ANCHORS_NEAR = 8
+_ANCHORS_ALL = 16
+
+
+def _anchor_budget(prio):
+    """How many spots a label may try. Under distance ranking, all of them.
+    Under a channel, a node the graph says little about is better left unlabeled
+    than parked on the outer ring, where it reads as naming its neighbor."""
+    if prio is None:
+        return _ANCHORS_ALL
+    return _ANCHORS_NEAR + int(round((_ANCHORS_ALL - _ANCHORS_NEAR) * prio))
+
+
+def _priority_key(m):
+    return (-(m[5] if m[5] is not None else 0.0), m[4], m[0])
+
+
 def _declutter(measured):
-    """Resolve overlaps, nearest label first, first free anchor wins. Returns
-    placed ``(text, bx, by, size, tw, th)``; no free anchor means no label."""
-    measured.sort(key=lambda m: (m[4], m[0]))
+    """Resolve overlaps, most important label first, first free anchor wins.
+    Returns placed ``(text, bx, by, size, tw, th)``; no free anchor means no
+    label."""
+    if any(m[5] is not None for m in measured):
+        measured.sort(key=_priority_key)
+    else:
+        measured.sort(key=lambda m: (m[4], m[0]))
     grid = {}
     placed = []
-    for text, x, y, size, _dist, tw, th in measured:
-        for bx, by in _candidates(x, y, size, tw, th):
+    for text, x, y, size, _dist, prio, tw, th in measured:
+        for bx, by in _candidates(x, y, size, tw, th)[:_anchor_budget(prio)]:
             rect = (bx - _PAD, by - _PAD, bx + tw + _PAD, by + th + _PAD)
             if _rect_free(grid, rect):
                 _rect_add(grid, rect)
@@ -234,16 +305,16 @@ def draw_label_items(items, scene, width, height, st=None):
     gpu.state.blend_set('ALPHA')
 
     measured = []
-    for text, x, y, size, dist in items:
+    for text, x, y, size, dist, prio in items:
         blf.size(fid, size)
         tw, th = blf.dimensions(fid, text)
-        measured.append((text, x, y, size, dist, tw, th))
+        measured.append((text, x, y, size, dist, prio, tw, th))
 
     if bool(st.labels_declutter):
         placed = _declutter(measured)
     else:
         placed = [(text, x - tw * 0.5, y + size * 0.4, size, tw, th)
-                  for text, x, y, size, _dist, tw, th in measured]
+                  for text, x, y, size, _dist, _prio, tw, th in measured]
 
     ortho = Matrix((
         (2.0 / width, 0.0, 0.0, -1.0),
@@ -284,3 +355,68 @@ def draw_label_items(items, scene, width, height, st=None):
                 blf.draw(fid, text)
 
     gpu.state.blend_set(prev_blend)
+
+
+_HANDLE = None
+
+
+def _overlay_callback():
+    """Labels last, after Blender's own overlay pass.
+
+    ``RenderEngine.view_draw`` runs before Blender draws its overlays, so
+    anything the engine puts on screen is covered by them. Measured: view_draw
+    then POST_PIXEL, with the overlays in between. Selecting the graph object
+    was enough to bury the text under its own vertices, which is exactly what
+    it looked like from outside.
+    """
+    import bpy
+    ctx = bpy.context
+    area = getattr(ctx, "area", None)
+    region = getattr(ctx, "region", None)
+    rv3d = getattr(ctx, "region_data", None)
+    scene = getattr(ctx, "scene", None)
+    if area is None or region is None or rv3d is None or scene is None:
+        return
+    if area.type != 'VIEW_3D' or getattr(scene.render, "engine", "") != 'SCIGRAPHS':
+        return
+    space = getattr(ctx, "space_data", None)
+    shading = getattr(space, "shading", None)
+    if shading is None or shading.type != 'RENDERED':
+        return
+    try:
+        if not labels_enabled(scene):
+            return
+        from .state import is_graph_object
+        w, h = region.width, region.height
+        dist_buf = None
+        props = getattr(scene, "scigraphs", None)
+        if props is not None and props.text_depth_occlusion:
+            fb = gpu.state.active_framebuffer_get()
+            depth01 = np.array(fb.read_depth(0, 0, w, h),
+                               dtype=np.float32).reshape(h, w)
+            from .engine import _linearize_depth
+            dist_buf = _linearize_depth(depth01, rv3d.window_matrix)
+        items = []
+        for obj in scene.objects:
+            if is_graph_object(obj) and not obj.hide_render:
+                items.extend(collect_label_items(
+                    obj, scene, rv3d.perspective_matrix, w, h, dist_buf))
+        draw_label_items(items, scene, w, h)
+    except Exception:  # noqa: BLE001 - an overlay must not break the viewport
+        pass
+
+
+def enable_overlay():
+    global _HANDLE
+    import bpy
+    if _HANDLE is None:
+        _HANDLE = bpy.types.SpaceView3D.draw_handler_add(
+            _overlay_callback, (), 'WINDOW', 'POST_PIXEL')
+
+
+def disable_overlay():
+    global _HANDLE
+    import bpy
+    if _HANDLE is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(_HANDLE, 'WINDOW')
+        _HANDLE = None

@@ -40,16 +40,28 @@ LAYOUT_PROPERTIES = {
 
     'fa2_barnes_hut_optimize': BoolProperty(
         name="Barnes-Hut Optimization",
-        description="Optimización Barnes-Hut (más rápido)",
+        description=(
+            "Approximate long-range repulsion with Graphviz's quadtree "
+            "instead of a coarse uniform grid. Only above 400 nodes, where "
+            "the exact all-pairs sum stops being the cheapest option, and "
+            "only with scigraphs-utils 0.2+; without it the grid runs and the "
+            "console says so. On a settled 2000-node graph the tree's force "
+            "error is 5% against the grid's 14%"
+        ),
         default=True,
     ),
 
     'fa2_barnes_hut_theta': FloatProperty(
         name="Barnes-Hut Theta",
-        description="Precisión Barnes-Hut (menor = más preciso, más lento)",
-        default=1.2,
-        min=0.5,
-        max=1.5,
+        description=(
+            "Opening angle: how far a cluster must be before the quadtree "
+            "treats it as one point. Lower is more accurate and slower. "
+            "Measured against exact all-pairs repulsion, 0.6 lands within 5% "
+            "in 2D and 20% in 3D, and 1.2 doubles both"
+        ),
+        default=0.6,
+        min=0.0,
+        max=2.0,
     ),
 
     'fa2_jitter_tolerance': FloatProperty(
@@ -68,6 +80,55 @@ LAYOUT_PROPERTIES = {
         max=2.0,
     ),
 
+    # --- Yifan Hu Parameters ---
+
+    'yh_initial_step': FloatProperty(
+        name="Initial Step Size",
+        description=(
+            "How far every node moves on the first iteration, as a fraction of "
+            "the optimal distance. Yifan Hu moves each node the same distance "
+            "along its own force, so this is the whole step and only it cools"
+        ),
+        default=0.15,
+        min=0.001,
+        max=1.0,
+    ),
+
+    'yh_step_ratio': FloatProperty(
+        name="Step Ratio",
+        description=(
+            "What the step is multiplied by each iteration. Together with the "
+            "convergence threshold this fixes the run length: the default 0.9 "
+            "takes 44 iterations to cross the factor of 100 between them"
+        ),
+        default=0.9,
+        min=0.05,
+        max=0.999,
+    ),
+
+    'yh_convergence': FloatProperty(
+        name="Convergence Threshold",
+        description=(
+            "The layout is done once the step falls below this fraction of the "
+            "optimal distance. Note this is the step, not Gephi's relative drop "
+            "in energy, so its numbers do not carry over"
+        ),
+        default=0.0015,
+        min=0.0,
+        max=0.1,
+        precision=5,
+    ),
+
+    'yh_adaptive_cooling': BoolProperty(
+        name="Adaptive Cooling",
+        description=(
+            "Let the step grow again, by 0.99/0.9, whenever the total force "
+            "drops more than 5% in one iteration. That is how a layout recovers "
+            "from cooling that ran ahead of it. Off leaves plain cooling"
+        ),
+        default=True,
+    ),
+
     # --- Fruchterman-Reingold (igraph) Parameters ---
     'igraph_fr_start_temp': FloatProperty(
         name="Start Temperature",
@@ -79,7 +140,7 @@ LAYOUT_PROPERTIES = {
 
     'igraph_fr_coolexp': FloatProperty(
         name="Cooling Exponent",
-        description="Exponente de enfriamiento",
+        description="No effect: igraph 0.8 dropped coolexp from layout_fruchterman_reingold",
         default=1.5,
         min=0.8,
         max=1.5,
@@ -87,7 +148,7 @@ LAYOUT_PROPERTIES = {
 
     'igraph_fr_maxdelta': FloatProperty(
         name="Max Delta",
-        description="Máximo desplazamiento por iteración",
+        description="No effect: igraph 0.8 dropped maxdelta from layout_fruchterman_reingold",
         default=0.0,  # 0 = auto
         min=0.0,
         max=10.0,
@@ -95,7 +156,7 @@ LAYOUT_PROPERTIES = {
 
     'igraph_fr_area': FloatProperty(
         name="Area",
-        description="Área de la disposición (0 = auto)",
+        description="No effect: igraph 0.8 dropped area from layout_fruchterman_reingold",
         default=0.0,
         min=0.0,
         max=10000.0,
@@ -103,7 +164,7 @@ LAYOUT_PROPERTIES = {
 
     'igraph_fr_repulserad': FloatProperty(
         name="Repulse Radius",
-        description="Radio de repulsión (0 = auto)",
+        description="No effect: igraph 0.8 dropped repulserad from layout_fruchterman_reingold",
         default=0.0,
         min=0.0,
         max=10000.0,
@@ -156,7 +217,7 @@ LAYOUT_PROPERTIES = {
     ),
     'igraph_drl_init_damping_mult': FloatProperty(
         name="Init Damping", description="Damping multiplier in init phase",
-        default=1.0, min=0.0, max=10.0, step=5,
+        default=1.0, min=0.0, max=1.5, step=5,
     ),
     # Phase 2: Liquid
     'igraph_drl_liquid_iterations': IntProperty(
@@ -173,7 +234,7 @@ LAYOUT_PROPERTIES = {
     ),
     'igraph_drl_liquid_damping_mult': FloatProperty(
         name="Liquid Damping", description="Damping multiplier in liquid phase",
-        default=1.0, min=0.0, max=10.0, step=5,
+        default=1.0, min=0.0, max=1.5, step=5,
     ),
     # Phase 3: Expansion
     'igraph_drl_expansion_iterations': IntProperty(
@@ -190,7 +251,7 @@ LAYOUT_PROPERTIES = {
     ),
     'igraph_drl_expansion_damping_mult': FloatProperty(
         name="Expansion Damping", description="Damping multiplier in expansion phase",
-        default=1.0, min=0.0, max=10.0, step=5,
+        default=1.0, min=0.0, max=1.5, step=5,
     ),
     # Phase 4: Cooldown
     'igraph_drl_cooldown_iterations': IntProperty(
@@ -207,7 +268,7 @@ LAYOUT_PROPERTIES = {
     ),
     'igraph_drl_cooldown_damping_mult': FloatProperty(
         name="Cooldown Damping", description="Damping multiplier in cooldown phase",
-        default=0.1, min=0.0, max=10.0, step=5,
+        default=0.1, min=0.0, max=1.5, step=5,
     ),
     # Phase 5: Crunch
     'igraph_drl_crunch_iterations': IntProperty(
@@ -224,7 +285,7 @@ LAYOUT_PROPERTIES = {
     ),
     'igraph_drl_crunch_damping_mult': FloatProperty(
         name="Crunch Damping", description="Damping multiplier in crunch phase",
-        default=0.25, min=0.0, max=10.0, step=5,
+        default=0.25, min=0.0, max=1.5, step=5,
     ),
     # Phase 6: Simmer
     'igraph_drl_simmer_iterations': IntProperty(
@@ -241,7 +302,7 @@ LAYOUT_PROPERTIES = {
     ),
     'igraph_drl_simmer_damping_mult': FloatProperty(
         name="Simmer Damping", description="Damping multiplier in simmer phase",
-        default=0.0, min=0.0, max=10.0, step=5,
+        default=0.0, min=0.0, max=1.5, step=5,
     ),
 
     # --- Yifan Hu / sfdp Parameters ---
@@ -283,7 +344,7 @@ LAYOUT_PROPERTIES = {
     ),
     'sfdp_maxiter': IntProperty(
         name="Max Iterations",
-        description="Maximum number of sfdp iterations. More = finer convergence",
+        description="Iteration cap for Graphviz FDP only. sfdp ignores it: its Graphviz build hard-codes 500",
         default=600, min=10, max=10000,
     ),
     'sfdp_smoothing': EnumProperty(
@@ -291,9 +352,9 @@ LAYOUT_PROPERTIES = {
         description="Post-processing smoothing method applied to final layout",
         items=[
             ('none', "None", "No smoothing"),
-            ('triangle', "Triangle", "Triangle smoothing (default, good quality)"),
+            ('triangle', "Triangle", "No effect: needs a triangulation library this Graphviz build lacks"),
             ('spring', "Spring", "Spring-based smoothing"),
-            ('rng', "RNG", "Relative neighborhood graph smoothing"),
+            ('rng', "RNG", "No effect: needs a triangulation library this Graphviz build lacks"),
             ('power_dist', "Power Distance", "Power distance smoothing"),
         ],
         default='spring',
@@ -303,10 +364,15 @@ LAYOUT_PROPERTIES = {
         description="Barnes-Hut quadtree scheme for force approximation",
         items=[
             ('normal', "Normal", "Standard quadtree (good quality)"),
-            ('fast', "Fast", "Faster but less accurate"),
-            ('none', "None", "No quadtree (exact, slow for large graphs)"),
+            ('fast', "Fast", "Faster but less accurate. On 34,722 nodes and "
+                             "519,260 edges it halved the layout, 25.7 s to 12.8 s"),
+            ('none', "None", "No quadtree. Exact and all-pairs: it did not finish "
+                             "in 15 minutes on a 34,722-node graph"),
+            ('AUTO', "Auto", "Fast above 10,000 nodes, Normal below, which is the "
+                             "switch Graphviz's own hybrid scheme makes and cannot "
+                             "be asked for through its attributes"),
         ],
-        default='normal',
+        default='AUTO',
     ),
     'sfdp_levels': IntProperty(
         name="Coarsening Levels",
@@ -320,10 +386,10 @@ LAYOUT_PROPERTIES = {
     ),
     'sfdp_overlap': EnumProperty(
         name="Overlap Removal",
-        description="Method to resolve overlapping nodes after layout",
+        description="How to resolve overlapping nodes. Voronoi is O(n^2.3) and is skipped above 500 nodes",
         items=[
             ('true', "Allow", "Allow overlaps (fastest)"),
-            ('prism', "Prism", "Prism algorithm (good balance)"),
+            ('prism', "Prism", "Unavailable in this build: Graphviz substitutes Voronoi, so this equals Allow"),
             ('scale', "Scale", "Scale up uniformly until no overlap"),
             ('false', "Voronoi", "Voronoi-based removal"),
         ],
@@ -331,7 +397,7 @@ LAYOUT_PROPERTIES = {
     ),
     'sfdp_overlap_scaling': FloatProperty(
         name="Overlap Scaling",
-        description="Scaling factor for overlap removal. Negative = more compact",
+        description="No effect: its only consumer is the prism path, which this Graphviz build lacks",
         default=-4.0, min=-10.0, max=10.0, step=10,
     ),
 
@@ -342,7 +408,7 @@ LAYOUT_PROPERTIES = {
         items=[
             ('2', "2D", "Compute a 2D Graphviz layout"),
             ('2Z', "2D + Z depth", "2D Graphviz XY + Z from graph structure"),
-            ('3', "3D native", "Compute a native 3D Graphviz layout when supported by the engine"),
+            ('3', "3D native", "Native 3D on neato and sfdp; the other engines get a Z derived from structure"),
         ],
         default='2',
     ),
@@ -353,7 +419,7 @@ LAYOUT_PROPERTIES = {
     ),
     'graphviz_extra_graph_attrs': StringProperty(
         name="Extra Graph Attrs",
-        description="Additional Graphviz graph attributes as key=value pairs separated by commas",
+        description="key=value pairs separated by commas, semicolons or newlines. Quote any value holding a comma, as in size=\"10,10\". These override the engine defaults",
         default="",
     ),
     'graphviz_node_attrs': StringProperty(
@@ -374,7 +440,7 @@ LAYOUT_PROPERTIES = {
             ('major', "Major", "Majorization mode"),
             ('KK', "Kamada-Kawai", "Kamada-Kawai mode"),
             ('hier', "Hierarchical", "Hierarchical mode"),
-            ('ipsep', "IPSep", "IP separation mode"),
+            ('ipsep', "IPSep", "Unavailable in this build: Graphviz warns and falls back to Stress"),
         ],
         default='DEFAULT',
     ),
@@ -386,7 +452,7 @@ LAYOUT_PROPERTIES = {
             ('shortpath', "Shortest Path", "Shortest-path distance model"),
             ('circuit', "Circuit", "Circuit resistance model"),
             ('subset', "Subset", "Subset distance model"),
-            ('mds', "MDS", "Multidimensional scaling model"),
+            ('mds', "MDS", "Needs edge len attributes, which SciGraphs never sets; reverts to Shortpath"),
         ],
         default='DEFAULT',
     ),
@@ -433,7 +499,7 @@ LAYOUT_PROPERTIES = {
     ),
     'graphviz_dot_splines': EnumProperty(
         name="Splines",
-        description="How dot routes edges",
+        description="Edge routing only. SciGraphs reads node coordinates, so this does not move nodes",
         items=[
             ('false', "False", "Straight edges"),
             ('true', "True", "Spline edges"),
@@ -461,7 +527,7 @@ LAYOUT_PROPERTIES = {
     ),
     'graphviz_osage_pack': BoolProperty(
         name="Pack",
-        description="Pack connected components or clusters for osage",
+        description="No effect: osage packs clusters, and SciGraphs sends none",
         default=True,
     ),
     'graphviz_osage_packmode': EnumProperty(

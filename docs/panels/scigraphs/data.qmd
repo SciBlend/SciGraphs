@@ -117,12 +117,10 @@ layout. This is the global-scale embedding used in the
 it with the checkbox in the subpanel header.
 :::
 
-Builds a sequence of graph snapshots from a time column and plays them back.
+Narrows the import to a slice of a time column. The graph that comes out is a
+single graph over the rows that survive, not a sequence.
 
 | Control | Description |
 | --- | --- |
 | **Time Column** | Column holding timestamps. |
-| **Aggregation** | How rows are grouped into snapshots; `Range` exposes **From** / **To** bounds. |
-| **Analyze Time Column** | Inspects the time column and prepares snapshot creation. |
-| **Create Temporal Graphs** | Builds the snapshot sequence (enabled after analysis). |
-| **Playback** | Transport controls (first, previous, play, next, last) plus **Refresh** and **Clear**. |
+| **Aggregation** | How rows are grouped; `Range` exposes **From** / **To** bounds. |

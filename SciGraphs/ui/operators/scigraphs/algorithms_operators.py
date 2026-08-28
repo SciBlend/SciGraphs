@@ -93,13 +93,18 @@ class SCIGRAPHS_OT_AnimateTraversal(bpy.types.Operator):
             actual_cycle_frames = timeline_length / num_cycles
             
             for cycle in range(num_cycles + 1):
-                frame_start = timeline_start + (cycle * actual_cycle_frames)
+                frame_start = int(round(timeline_start
+                                        + cycle * actual_cycle_frames))
+                frame_end = int(round(timeline_start
+                                      + (cycle + 1) * actual_cycle_frames)) - 1
+                if frame_end <= frame_start:
+                    frame_end = frame_start + 1
+
                 obj["traversal_time"] = 0.0
-                obj.keyframe_insert(data_path='["traversal_time"]', frame=int(frame_start))
-                
-                frame_end = timeline_start + ((cycle + 0.999) * actual_cycle_frames)
+                obj.keyframe_insert(data_path='["traversal_time"]', frame=frame_start)
+
                 obj["traversal_time"] = float(max_traversal_time)
-                obj.keyframe_insert(data_path='["traversal_time"]', frame=int(frame_end))
+                obj.keyframe_insert(data_path='["traversal_time"]', frame=frame_end)
             
             self.report({'INFO'}, f"{algo_name} animation: {num_cycles} cycles, {visited_count} nodes")
         else:

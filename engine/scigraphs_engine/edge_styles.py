@@ -112,7 +112,17 @@ def recover_logical_edges(edges, node_mask):
     return both[sel].astype(np.int32), rows[sel].astype(np.int32)
 
 
-def _perp_unit(d_unit):
+def _canonical_flip(edges):
+    """+1 where an edge is stored low index to high, -1 where reversed."""
+    return np.where(edges[:, 0] <= edges[:, 1], 1.0, -1.0)
+
+
+def _perp_unit(d_unit, flip=None):
+    """Perpendicular of the canonical direction. Taken from the stored one it
+    flips for (v, u) and cancels against the direction sign, drawing the
+    reciprocal edge on top of (u, v)."""
+    if flip is not None:
+        d_unit = d_unit * flip[:, None]
     perp = np.cross(d_unit, _Z_UP)
     ln = np.linalg.norm(perp, axis=1)
     vertical = ln < 1e-10
@@ -123,11 +133,14 @@ def _perp_unit(d_unit):
     return perp / ln[:, None]
 
 
-def _direction_sign(a, b, direction, edge_ids):
+def _direction_sign(a, b, direction, edge_ids, flip=None):
+    """Which side of ``_perp_unit``'s canonical perpendicular to bow towards."""
+    if flip is None:
+        flip = np.ones(a.shape[0])
     if direction == 'CLOCKWISE':
-        return np.ones(a.shape[0])
+        return flip
     if direction == 'COUNTER_CLOCKWISE':
-        return -np.ones(a.shape[0])
+        return -flip
     if direction == 'ALTERNATING':
         return np.where(edge_ids % 2 == 0, 1.0, -1.0)
     # AUTO: deterministic from endpoint positions.
@@ -163,11 +176,11 @@ def _bezier_quadratic(p0, c, p1, t):
         + (t**2)[None, :, None] * p1[:, None]
 
 
-def _curved_points(a, b, params, edge_ids, use_cubic, t):
+def _curved_points(a, b, params, edge_ids, use_cubic, t, flip=None):
     length = np.linalg.norm(b - a, axis=1)
     offs = length * params["curvature"] * 0.5
-    sign = _direction_sign(a, b, params["direction"], edge_ids)
-    perp = _perp_unit((b - a) / np.maximum(length, 1e-12)[:, None])
+    sign = _direction_sign(a, b, params["direction"], edge_ids, flip)
+    perp = _perp_unit((b - a) / np.maximum(length, 1e-12)[:, None], flip)
     perp = perp * (offs * sign)[:, None]
     if use_cubic:
         c1 = a + (b - a) * 0.25 + perp * 0.5
@@ -176,15 +189,15 @@ def _curved_points(a, b, params, edge_ids, use_cubic, t):
     return _bezier_quadratic(a, (a + b) * 0.5 + perp, b, t)
 
 
-def _arc_points(a, b, params, edge_ids, t):
+def _arc_points(a, b, params, edge_ids, t, flip=None):
     chord = np.linalg.norm(b - a, axis=1)
     sagitta = chord * params["curvature"] * 0.5
     flat = sagitta <= 1e-3
     radius = np.where(
         flat, 1.0, chord**2 / np.maximum(8.0 * sagitta, 1e-12) + sagitta / 2.0
     )
-    sign = _direction_sign(a, b, params["direction"], edge_ids)
-    perp = _perp_unit((b - a) / np.maximum(chord, 1e-12)[:, None])
+    sign = _direction_sign(a, b, params["direction"], edge_ids, flip)
+    perp = _perp_unit((b - a) / np.maximum(chord, 1e-12)[:, None], flip)
     perp = perp * sign[:, None]
     mid = (a + b) * 0.5
     center = mid - perp * (radius - sagitta)[:, None]
@@ -432,6 +445,8 @@ def tessellate(coords, edges, params, edge_widths=None, hierarchy=None,
         a = coords[plain[:, 0]].astype(np.float64)
         b = coords[plain[:, 1]].astype(np.float64)
 
+        flip = _canonical_flip(plain)
+
         if params["auto_offset_parallel"] and params["parallel_offset"] > 0.0:
             rank, group = _parallel_offsets(plain, params)
             multi = group > 1
@@ -440,7 +455,8 @@ def tessellate(coords, edges, params, edge_widths=None, hierarchy=None,
                 amount = (-base * (group - 1) * 0.5 + rank * base)
                 perp = _perp_unit(
                     (b - a) / np.maximum(
-                        np.linalg.norm(b - a, axis=1), 1e-12)[:, None]
+                        np.linalg.norm(b - a, axis=1), 1e-12)[:, None],
+                    flip,
                 )
                 shift = perp * np.where(multi, amount, 0.0)[:, None]
                 a = a + shift
@@ -455,14 +471,15 @@ def tessellate(coords, edges, params, edge_widths=None, hierarchy=None,
             a, b = a[order], b[order]
             plain, plain_ids = plain[order], plain_ids[order]
             plain_rows, w_plain = plain_rows[order], w_plain[order]
+            flip = flip[order]
 
         # CURVED rides a cubic; QUADRATIC and TAPERED ride a quadratic.
         if (style in ('CURVED', 'QUADRATIC', 'TAPERED')
                 and params["curvature"] >= 1e-3):
             pts = _curved_points(a, b, params, plain_ids,
-                                 style == 'CURVED', t)
+                                 style == 'CURVED', t, flip)
         elif style == 'ARC' and params["curvature"] >= 1e-3:
-            pts = _arc_points(a, b, params, plain_ids, t)
+            pts = _arc_points(a, b, params, plain_ids, t, flip)
         elif style == 'ORTHOGONAL':
             pts = _orthogonal_points(a, b, params)
             t = np.linspace(0.0, 1.0, pts.shape[1])
@@ -470,7 +487,7 @@ def tessellate(coords, edges, params, edge_widths=None, hierarchy=None,
             if plain.shape[0] <= BUNDLE_MAX_EDGES:
                 pts = _bundled_points(a, b, params, t)
             else:
-                pts = _curved_points(a, b, params, plain_ids, True, t)
+                pts = _curved_points(a, b, params, plain_ids, True, t, flip)
         elif heb:
             pts = _heb_points(a, b, plain[:, 0], plain[:, 1], hierarchy,
                               params, t.size)

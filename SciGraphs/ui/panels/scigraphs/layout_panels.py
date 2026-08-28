@@ -6,6 +6,7 @@ class SCIGRAPHS_PT_layout(bpy.types.Panel):
     """Main layout panel for graph positioning."""
     bl_label = "Layout & Positioning"
     bl_parent_id = "SCIGRAPHS_PT_main"
+    bl_order = 1
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
@@ -46,241 +47,138 @@ class SCIGRAPHS_PT_layout(bpy.types.Panel):
             box.label(text="Create a graph first in Data panel")
 
 
+_ALGO_DIMENSION = {
+        'GRID': '2D', 'SPRING': '2D', 'FORCEATLAS2': '2D',
+        'IGRAPH_DH': '2D', 'IGRAPH_GRAPHOPT': '2D',
+        'SUGIYAMA': '2D', 'CIRCULAR_HIERARCHY': '2D',
+        'RANDOM': '3D', 'SPHERE': '3D', 'SPIRAL_3D': '3D', 
+        'HELIX': '3D', 'CUBE': '3D',
+        'SPECTRAL_3D': '3D', 'MDS_3D': '3D', 'HIERARCHICAL_3D': '3D', 
+        'BIPARTITE_3D': '3D',
+        'YIFAN_HU': '3D', 'IGRAPH_DRL': '3D', 'IGRAPH_FR': '3D',
+        'IGRAPH_KK': '3D', 'IGRAPH_LGL': '2D', 'SPRING_3D': '3D',
+        'IGRAPH_DRL_2D': '2D',
+        'GRAPHVIZ_DOT': '2D', 'GRAPHVIZ_NEATO': '2D', 'GRAPHVIZ_FDP': '2D',
+        'GRAPHVIZ_SFDP': '2D', 'GRAPHVIZ_TWOPI': '2D', 'GRAPHVIZ_CIRCO': '2D',
+        'GRAPHVIZ_OSAGE': '2D', 'GRAPHVIZ_PATCHWORK': '2D',
+        }
+
+
+_ALGO_SPEED = {
+        'RANDOM': ('CHECKMARK', 'Instant'),
+        'GRID': ('CHECKMARK', 'Instant'),
+        'SPHERE': ('CHECKMARK', 'Instant'),
+        'SPIRAL_3D': ('CHECKMARK', 'Instant'),
+        'HELIX': ('CHECKMARK', 'Instant'),
+        'CUBE': ('CHECKMARK', 'Instant'),
+        'SPECTRAL_3D': ('TIME', 'Medium'),
+        'MDS_3D': ('TIME', 'Medium'),
+        'HIERARCHICAL_3D': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'BIPARTITE_3D': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'YIFAN_HU': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'IGRAPH_DRL': ('ERROR', 'Slow'),
+        'IGRAPH_FR': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'IGRAPH_KK': ('TIME', 'Medium'),
+        'IGRAPH_LGL': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'IGRAPH_DH': ('ERROR', 'Very Slow'),
+        'IGRAPH_GRAPHOPT': ('ERROR', 'Slow'),
+        'FORCEATLAS2': ('TIME', 'Medium'),
+        'SPRING': ('ERROR', 'Slow'),
+        'SPRING_3D': ('ERROR', 'Very Slow'),
+        'SUGIYAMA': ('TIME', 'Medium'),
+        'CIRCULAR_HIERARCHY': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_DOT': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_NEATO': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_FDP': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_SFDP': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_TWOPI': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_CIRCO': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_OSAGE': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        'GRAPHVIZ_PATCHWORK': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
+        }
+
+
+_ALGO_USE_CASE = {
+        'RANDOM': 'Quick test, initial positions',
+        'GRID': '2D regular arrangement',
+        'SPHERE': 'Spherical distribution',
+        'SPIRAL_3D': 'Temporal/sequential data',
+        'HELIX': 'DNA-like, paired data',
+        'CUBE': 'Bounded 3D space',
+        'SPECTRAL_3D': 'Global structure, clusters',
+        'MDS_3D': 'Distance preservation',
+        'HIERARCHICAL_3D': 'Tree-like structures',
+        'BIPARTITE_3D': 'Two-set graphs',
+        'YIFAN_HU': 'Large graphs, best quality',
+        'IGRAPH_DRL': 'Massive graphs (100k+)',
+        'IGRAPH_FR': 'General purpose',
+        'IGRAPH_KK': 'Reproducible layouts',
+        'IGRAPH_LGL': 'Very large sparse graphs',
+        'IGRAPH_DH': 'High quality optimization',
+        'IGRAPH_GRAPHOPT': 'Energy minimization',
+        'FORCEATLAS2': 'Gephi compatibility',
+        'SPRING': 'Classic 2D (slow)',
+        'SPRING_3D': 'Classic 3D (very slow)',
+        'SUGIYAMA': 'DAGs, workflows, processes',
+        'CIRCULAR_HIERARCHY': 'Hierarchies from roots',
+        'GRAPHVIZ_DOT': 'Hierarchical directed graphs',
+        'GRAPHVIZ_NEATO': 'General undirected graphs',
+        'GRAPHVIZ_FDP': 'Force-directed graphs',
+        'GRAPHVIZ_SFDP': 'Large force-directed graphs',
+        'GRAPHVIZ_TWOPI': 'Radial structures',
+        'GRAPHVIZ_CIRCO': 'Circular structures',
+        'GRAPHVIZ_OSAGE': 'Clustered graphs',
+        'GRAPHVIZ_PATCHWORK': 'Area-style layouts',
+        }
+
+
 class SCIGRAPHS_PT_layout_algorithm(bpy.types.Panel):
-    """Algorithm selection for graph layout."""
-    bl_label = "Algorithm Selection"
+    """Pick a layout, read what it costs, tune it, run it.
+
+    One panel instead of four. Selection, the scale slider, the per-algorithm
+    parameters and the Apply button were separate sub-panels, which split a
+    single decision across four collapsed boxes and made the order of the steps
+    invisible. Interactive Mode is gone: its three buttons already live in the
+    floating toolbar, the SciGraphs menu and the pie menu.
+    """
+
+    bl_label = "Algorithm"
     bl_parent_id = "SCIGRAPHS_PT_layout"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}
-    
+    bl_order = 0
+
+    _PARAMETERISED = frozenset((
+        'SPRING', 'SPRING_3D', 'FORCEATLAS2', 'IGRAPH_FR', 'IGRAPH_KK',
+        'IGRAPH_DRL', 'IGRAPH_DRL_2D', 'IGRAPH_LGL', 'IGRAPH_DH',
+        'IGRAPH_GRAPHOPT', 'YIFAN_HU', 'GRAPHVIZ_DOT', 'GRAPHVIZ_NEATO',
+        'GRAPHVIZ_FDP', 'GRAPHVIZ_SFDP', 'GRAPHVIZ_TWOPI',
+        'GRAPHVIZ_CIRCO', 'GRAPHVIZ_OSAGE', 'GRAPHVIZ_PATCHWORK',
+    ))
+
     def draw(self, context):
         layout = self.layout
         props = context.scene.scigraphs
-        
-        layout.label(text="Choose Layout Algorithm:", icon='SORTSIZE')
+        algo = props.layout_algorithm
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
         layout.prop(props, "layout_algorithm", text="")
-        
-        algo = props.layout_algorithm
-        box = layout.box()
-        box.label(text="Algorithm Info:", icon='INFO')
-        
-        dimensions = {
-            'GRID': '2D', 'SPRING': '2D', 'FORCEATLAS2': '2D',
-            'IGRAPH_DH': '2D', 'IGRAPH_GRAPHOPT': '2D',
-            'SUGIYAMA': '2D', 'CIRCULAR_HIERARCHY': '2D',
-            'RANDOM': '3D', 'SPHERE': '3D', 'SPIRAL_3D': '3D', 
-            'HELIX': '3D', 'CUBE': '3D',
-            'SPECTRAL_3D': '3D', 'MDS_3D': '3D', 'HIERARCHICAL_3D': '3D', 
-            'BIPARTITE_3D': '3D',
-            'YIFAN_HU': '3D', 'IGRAPH_DRL': '3D', 'IGRAPH_FR': '3D',
-            'IGRAPH_KK': '3D', 'IGRAPH_LGL': '3D', 'SPRING_3D': '3D',
-            'GRAPHVIZ_DOT': '2D', 'GRAPHVIZ_NEATO': '2D', 'GRAPHVIZ_FDP': '2D',
-            'GRAPHVIZ_SFDP': '2D', 'GRAPHVIZ_TWOPI': '2D', 'GRAPHVIZ_CIRCO': '2D',
-            'GRAPHVIZ_OSAGE': '2D', 'GRAPHVIZ_PATCHWORK': '2D',
-        }
-        
-        speed_icons = {
-            'RANDOM': ('CHECKMARK', 'Instant'),
-            'GRID': ('CHECKMARK', 'Instant'),
-            'SPHERE': ('CHECKMARK', 'Instant'),
-            'SPIRAL_3D': ('CHECKMARK', 'Instant'),
-            'HELIX': ('CHECKMARK', 'Instant'),
-            'CUBE': ('CHECKMARK', 'Instant'),
-            'SPECTRAL_3D': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'MDS_3D': ('TIME', 'Medium'),
-            'HIERARCHICAL_3D': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'BIPARTITE_3D': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'YIFAN_HU': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'IGRAPH_DRL': ('KEYTYPE_EXTREME_VEC', 'Very Fast'),
-            'IGRAPH_FR': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'IGRAPH_KK': ('TIME', 'Medium'),
-            'IGRAPH_LGL': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'IGRAPH_DH': ('TIME', 'Medium'),
-            'IGRAPH_GRAPHOPT': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'FORCEATLAS2': ('TIME', 'Medium'),
-            'SPRING': ('ERROR', 'Slow'),
-            'SPRING_3D': ('ERROR', 'Very Slow'),
-            'SUGIYAMA': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'CIRCULAR_HIERARCHY': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_DOT': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_NEATO': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_FDP': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_SFDP': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_TWOPI': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_CIRCO': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_OSAGE': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-            'GRAPHVIZ_PATCHWORK': ('KEYTYPE_KEYFRAME_VEC', 'Fast'),
-        }
-        
-        icon, speed_text = speed_icons.get(algo, ('QUESTION', 'Unknown'))
-        dimension = dimensions.get(algo, '?D')
-        
-        row = box.row(align=True)
-        row.label(text=f"{dimension}", icon='EMPTY_AXIS')
-        row.label(text=f"Speed: {speed_text}", icon=icon)
-        
-        use_cases = {
-            'RANDOM': 'Quick test, initial positions',
-            'GRID': '2D regular arrangement',
-            'SPHERE': 'Spherical distribution',
-            'SPIRAL_3D': 'Temporal/sequential data',
-            'HELIX': 'DNA-like, paired data',
-            'CUBE': 'Bounded 3D space',
-            'SPECTRAL_3D': 'Community detection',
-            'MDS_3D': 'Distance preservation',
-            'HIERARCHICAL_3D': 'Tree-like structures',
-            'BIPARTITE_3D': 'Two-set graphs',
-            'YIFAN_HU': 'Large graphs, best quality',
-            'IGRAPH_DRL': 'Massive graphs (100k+)',
-            'IGRAPH_FR': 'General purpose',
-            'IGRAPH_KK': 'Reproducible layouts',
-            'IGRAPH_LGL': 'Very large sparse graphs',
-            'IGRAPH_DH': 'High quality optimization',
-            'IGRAPH_GRAPHOPT': 'Energy minimization',
-            'FORCEATLAS2': 'Gephi compatibility',
-            'SPRING': 'Classic 2D (slow)',
-            'SPRING_3D': 'Classic 3D (very slow)',
-            'SUGIYAMA': 'DAGs, workflows, processes',
-            'CIRCULAR_HIERARCHY': 'Hierarchies from roots',
-            'GRAPHVIZ_DOT': 'Hierarchical directed graphs',
-            'GRAPHVIZ_NEATO': 'General undirected graphs',
-            'GRAPHVIZ_FDP': 'Force-directed graphs',
-            'GRAPHVIZ_SFDP': 'Large force-directed graphs',
-            'GRAPHVIZ_TWOPI': 'Radial structures',
-            'GRAPHVIZ_CIRCO': 'Circular structures',
-            'GRAPHVIZ_OSAGE': 'Clustered graphs',
-            'GRAPHVIZ_PATCHWORK': 'Area-style layouts',
-        }
-        
-        use_case = use_cases.get(algo, 'General purpose')
-        box.label(text=f"Best for: {use_case}", icon='INFO')
 
+        icon, speed = _ALGO_SPEED.get(algo, ('QUESTION', "Unknown"))
+        info = layout.row(align=True)
+        info.label(text=_ALGO_DIMENSION.get(algo, "?D"), icon='EMPTY_AXIS')
+        info.label(text=speed, icon=icon)
+        layout.label(text=_ALGO_USE_CASE.get(algo, "General purpose"),
+                     icon='INFO')
 
-class SCIGRAPHS_PT_layout_settings(bpy.types.Panel):
-    """Quick settings and one-click layout application."""
-    bl_label = "Quick Settings"
-    bl_parent_id = "SCIGRAPHS_PT_layout"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
-    
-    def draw(self, context):
-        layout = self.layout
-        props = context.scene.scigraphs
-        
-        layout.use_property_split = True
+        layout.separator()
         layout.prop(props, "layout_scale", text="Scale")
-        
-        layout.separator()
-        box = layout.box()
-        box.label(text="Calculate layout once:", icon='INFO')
-        row = box.row()
-        row.scale_y = 2.0
-        row.operator("scigraphs.apply_layout", text="Apply Layout Now", icon='PLAY')
 
-
-class SCIGRAPHS_PT_layout_interactive(bpy.types.Panel):
-    """Interactive Gephi-style layout execution (real-time animation)."""
-    bl_label = "Interactive Mode"
-    bl_parent_id = "SCIGRAPHS_PT_layout"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
-    
-    def draw_header(self, context):
-        self.layout.label(text="", icon='TIME')
-    
-    def draw(self, context):
-        layout = self.layout
-        props = context.scene.scigraphs
-        obj = context.active_object
-        scene = context.scene
-        
-        box = layout.box()
-        box.label(text="Real-time layout calculation (Gephi-style)", icon='INFO')
-        box.label(text="Computes layout iteratively over frames.")
-        box.label(text="You can stop anytime to inspect results.")
-        
-        layout.separator()
-        box = layout.box()
-        box.label(text="Timeline", icon='TIME')
-        num_frames = scene.frame_end - scene.frame_start + 1
-        box.label(text=f"Frames: {scene.frame_start} to {scene.frame_end} ({num_frames} total)")
-        
-        layout.separator()
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-        
-        col = layout.column(align=True)
-        col.prop(props, "iterations_per_frame", text="Iterations/Frame")
-        col.prop(props, "execution_speed", text="Speed (sec/frame)")
-        col.prop(props, "auto_stop_threshold", text="Auto-Stop Energy")
-        
-        layout.separator()
-        
-        row = layout.row(align=True)
-        row.prop(props, "update_viewport", text="Live Update", toggle=True, icon='RESTRICT_VIEW_OFF')
-        row.prop(props, "show_forces", text="Show Forces", toggle=True, icon='FORCE_FORCE')
-        
-        layout.separator()
-        row = layout.row(align=True)
-        row.scale_y = 1.5
-        row.operator("scigraphs.execute_layout_step", text="Start Execution", icon='PLAY')
-        row.operator("scigraphs.reset_layout", text="Reset", icon='FILE_REFRESH')
-        
-        row = layout.row()
-        row.operator("scigraphs.bake_animation", text="Bake to Animation", icon='REC')
-        
-        if obj and "layout_iteration" in obj:
-            box = layout.box()
-            box.label(text="Current Status", icon='INFO')
-            
-            iteration = obj["layout_iteration"]
-            col = box.column(align=True)
-            col.label(text=f"Iteration: {iteration}")
-            
-            if "layout_energy" in obj:
-                energy = obj["layout_energy"]
-                col.label(text=f"Energy: {energy:.4f}")
-                
-                if iteration > 1:
-                    prev_energy = obj.get("prev_energy", energy)
-                    if prev_energy > 0:
-                        change_pct = abs((energy - prev_energy) / prev_energy * 100)
-                        if change_pct < 1:
-                            col.label(text="Converging...", icon='CHECKMARK')
-                        else:
-                            col.label(text="Computing...", icon='TIME')
-
-
-class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
-    """Algorithm-specific parameters (dynamic based on selection)."""
-    bl_label = "Algorithm Parameters"
-    bl_parent_id = "SCIGRAPHS_PT_layout"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'DEFAULT_CLOSED'}
-    
-    @classmethod
-    def poll(cls, context):
-        """Only show panel for algorithms with custom parameters."""
-        props = context.scene.scigraphs
-        return props.layout_algorithm in [
-            'SPRING', 'SPRING_3D', 'FORCEATLAS2', 'IGRAPH_FR', 'IGRAPH_KK', 
-            'IGRAPH_DRL', 'IGRAPH_DRL_2D', 'IGRAPH_LGL', 'IGRAPH_DH', 'IGRAPH_GRAPHOPT',
-            'YIFAN_HU', 'GRAPHVIZ_DOT', 'GRAPHVIZ_NEATO', 'GRAPHVIZ_FDP',
-            'GRAPHVIZ_SFDP', 'GRAPHVIZ_TWOPI', 'GRAPHVIZ_CIRCO',
-            'GRAPHVIZ_OSAGE', 'GRAPHVIZ_PATCHWORK'
-        ]
-    
-    def draw(self, context):
-        props = context.scene.scigraphs
-        layout = self.layout
-        algo = props.layout_algorithm
-        
-        layout.use_property_split = True
-        layout.use_property_decorate = False
+        if algo in self._PARAMETERISED:
+            layout.separator()
         
         if algo in ['SPRING', 'SPRING_3D']:
             self._draw_spring(layout, props, algo)
@@ -303,6 +201,13 @@ class SCIGRAPHS_PT_layout_algorithm_params(bpy.types.Panel):
         elif algo.startswith('GRAPHVIZ_'):
             self._draw_graphviz(layout, props, algo)
     
+
+        layout.separator()
+        row = layout.row()
+        row.scale_y = 1.8
+        row.operator("scigraphs.apply_layout", text="Apply Layout Now",
+                     icon='PLAY')
+
     def _draw_spring(self, layout, props, algo):
         """Spring (NetworkX) parameters - only for SPRING and SPRING_3D."""
         dimension = "2D" if algo == 'SPRING' else "3D"
@@ -664,17 +569,11 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
 def register():
     bpy.utils.register_class(SCIGRAPHS_PT_layout)
     bpy.utils.register_class(SCIGRAPHS_PT_layout_algorithm)
-    bpy.utils.register_class(SCIGRAPHS_PT_layout_settings)
-    bpy.utils.register_class(SCIGRAPHS_PT_layout_algorithm_params)
-    bpy.utils.register_class(SCIGRAPHS_PT_layout_interactive)
     bpy.utils.register_class(SCIGRAPHS_PT_layout_splitter)
 
 
 def unregister():
     bpy.utils.unregister_class(SCIGRAPHS_PT_layout_splitter)
-    bpy.utils.unregister_class(SCIGRAPHS_PT_layout_interactive)
-    bpy.utils.unregister_class(SCIGRAPHS_PT_layout_algorithm_params)
-    bpy.utils.unregister_class(SCIGRAPHS_PT_layout_settings)
     bpy.utils.unregister_class(SCIGRAPHS_PT_layout_algorithm)
     bpy.utils.unregister_class(SCIGRAPHS_PT_layout)
 

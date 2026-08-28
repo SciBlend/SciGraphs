@@ -11,6 +11,8 @@ from .state import is_graph_object, tag_redraw
 
 _HEADLIGHT_DIR = (0.0, 0.0, 1.0)  # view space, toward the camera
 
+EDGE_XRAY = 0.0
+
 
 def _settings(scene, st=None):
     """22.9 us to build, ~0.05 us per read, so ~460 us saved per redraw."""
@@ -113,14 +115,45 @@ def get_cache_entry(obj, scene):
         # fallback has no "bundle" rep and rebuilds instead.
         entry["sig"] = sig
     if entry is None or entry.get("sig") != sig:
+        live = _live_coords(obj, entry)
         try:
             data = batches.build_bundle(obj, scene)
         except Exception:  # noqa: BLE001 - never let drawing crash the viewport
             return None
         data["sig"] = sig
+        _carry_live_coords(data, live)
         state.CACHE[key] = data
         entry = data
     return entry
+
+
+def _live_coords(obj, entry):
+    """The positions an animated layout holds in its texture, which a rebuild
+    would otherwise lose. Only while playback owns the object: any other time
+    the mesh is the truth and a stale copy would undo a real edit."""
+    if entry is None or entry.get("dynamic") is None:
+        return None
+    from . import playback
+    if not playback.is_running(obj):
+        return None
+    pending = entry.get("pending_coords")
+    return pending if pending is not None else entry.get("coords")
+
+
+def _carry_live_coords(data, live):
+    """A rebuild reads positions from the mesh, but an animated layout does not
+    write the mesh until it stops. So anything that moves the signature
+    mid-playback pinned the nodes to their mesh coordinates while the
+    simulation ran on, and the graph only snapped into place on Stop. A
+    keyframed traversal clock left over from an earlier traversal is enough to
+    move it, on every single frame."""
+    if live is None:
+        return
+    dyn = data.get("dynamic")
+    if dyn is None or live.shape[0] != dyn["count"]:
+        return
+    data["pending_coords"] = live
+    data["coords"] = live
 
 
 def invalidate(obj=None):
@@ -149,6 +182,7 @@ def refresh_positions(obj, coords=None):
     # during a render, and ``dynamic.texture`` swallowed that and froze the render.
     entry["pending_coords"] = coords
     entry["coords"] = coords
+    volume.refresh_field(entry.get("volume"), coords)
     tag_redraw()
     return True
 
@@ -158,8 +192,12 @@ def flush_positions(entry):
     pending = entry.get("pending_coords")
     if pending is None:
         return
-    entry["pending_coords"] = None
-    dynamic.refresh(entry.get("dynamic"), pending)
+    if dynamic.refresh(entry.get("dynamic"), pending):
+        entry["pending_coords"] = None
+        entry["upload_failed"] = False
+    else:
+        entry["upload_failed"] = True
+    volume.flush(entry.get("volume"))
 
 
 def invalidate_geometry(obj=None):
@@ -167,20 +205,24 @@ def invalidate_geometry(obj=None):
     centroids and edge lengths while the signature stays identical."""
     if obj is None:
         batches.clear_tree_cache()
+        batches.drop_geometry_cache()
         filters.drop_channel_cache()
         filter_gpu.drop_cache()
     else:
         batches.drop_tree_cache(obj)
+        batches.drop_geometry_cache(obj)
         filters.drop_channel_cache(obj)
         filter_gpu.drop_cache(obj)
     invalidate(obj)
 
 
-def _pixel_radius(obj, coords, base_radius, persp_mat, height):
-    """On-screen radius (px) of a typical node; ``persp_mat`` maps world to clip."""
-    if coords.shape[0] == 0 or persp_mat is None or not height:
+def _pixel_radius(obj, center, base_radius, persp_mat, height):
+    """On-screen radius (px) of a typical node; ``persp_mat`` maps world to clip.
+    *center* comes from :func:`_entry_center`, not from the coordinates, because
+    this runs per frame and the bounding box does not."""
+    if center is None or persp_mat is None or not height:
         return 999.0
-    center_world = obj.matrix_world @ _np_center(coords)
+    center_world = obj.matrix_world @ center
     persp = np.asarray(persp_mat, dtype=np.float64)
     p = np.array([center_world[0], center_world[1], center_world[2], 1.0])
     clip = persp @ p
@@ -199,7 +241,7 @@ def draw_graph_object(entry, scene, obj, modelview, proj, persp_mat, height,
     base_radius = float(st.impostor_radius)
     show_edges = bool(st.show_edges)
 
-    px = _pixel_radius(obj, entry["coords"], base_radius, persp_mat, height)
+    px = _pixel_radius(obj, _entry_center(entry), base_radius, persp_mat, height)
     scale = lod.px_scale(height)
     px_ref = px / scale
     edge_rscale = float(st.edge_radius_scale)
@@ -246,12 +288,25 @@ def draw_graph_object(entry, scene, obj, modelview, proj, persp_mat, height,
             or entry["reps"].get("arrow") is not None:
         lighting = compute_lighting(scene, view_matrix, st=st)
 
-    if show_edges and edge_rep != 'NONE':
+    blended = (show_edges and edge_rep not in ('NONE', 'RIBBON')
+               and bool(st.additive_edges))
+    if show_edges and edge_rep != 'NONE' and not blended:
         _draw_edges(entry, scene, edge_rep, modelview, proj, lighting,
                     px * edge_rscale, scale, st=st)
     if node_rep != 'HIDE':
         _draw_nodes(entry, scene, node_rep, modelview, proj, lighting,
                     px, scale, st=st)
+    if blended:
+        prev_mask = gpu.state.depth_mask_get()
+        gpu.state.depth_mask_set(False)
+        try:
+            _draw_edges(entry, scene, edge_rep, modelview, proj, lighting,
+                        px * edge_rscale, scale, st=st)
+        finally:
+            gpu.state.depth_mask_set(prev_mask)
+    if show_edges and edge_rep != 'NONE':
+        _draw_edges_xray(entry, scene, modelview, proj,
+                         px * edge_rscale, scale, st=st)
     if want_volume:
         entry["_volume_active"] = volume.draw(entry["volume"], scene,
                                               modelview, proj, st=st)
@@ -292,6 +347,8 @@ def _draw_level(level_entry, scene, modelview, proj, view_matrix,
     if node_rep != 'HIDE':
         _draw_nodes(level_entry, scene, node_rep, modelview, proj, lighting,
                     px_nodes, scale, st=st)
+    if show_edges and edge_rep != 'NONE':
+        _draw_edges_xray(level_entry, scene, modelview, proj, px_e, scale, st=st)
     return node_rep, edge_rep
 
 
@@ -339,14 +396,34 @@ def _adaptive_cut_entry(entry, scene, obj, proj, persp_mat, height, st=None):
         return None
 
     entry["_adaptive_px"] = _pixel_radius(
-        obj, coords, cached["radius_world"], persp_mat, height)
+        obj, _cached_center(entry, coords, "_cut_center"),
+        cached["radius_world"], persp_mat, height)
     return cached["entry"]
 
 
 def _np_center(coords):
     from mathutils import Vector
+    if coords is None or coords.shape[0] == 0:
+        return None
     c = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
     return Vector((float(c[0]), float(c[1]), float(c[2])))
+
+
+def _cached_center(store, coords, key="_center"):
+    """Cached bounding-box center, keyed on the coordinate array itself so a
+    swapped array recomputes and an animated frame that reuses one does not.
+    Uncached this walked every coordinate per frame: 41 ms at 1M nodes, against
+    0.9 ms for the draw it was sizing."""
+    cached = store.get(key)
+    if cached is not None and cached[0] is coords:
+        return cached[1]
+    center = _np_center(coords)
+    store[key] = (coords, center)
+    return center
+
+
+def _entry_center(entry):
+    return _cached_center(entry, entry.get("coords"))
 
 
 def _select_node_rep(scene, pixel_radius, st=None):
@@ -382,7 +459,9 @@ def _select_edge_rep(scene, pixel_radius, st=None):
 
 
 def _lighting_ubo(lighting, with_rim):
-    """A std140 LightRig buffer. Keep it referenced or it frees mid-draw."""
+    """A std140 LightRig buffer. Keep it referenced or it frees mid-draw.
+
+    Only key_col.w carries a value; the other four .w are padding."""
     rim = float(lighting["rim"]) if with_rim else 0.0
     kd = lighting["key_dir"]
     kc = lighting["key_col"]
@@ -551,13 +630,112 @@ def _draw_nodes(entry, scene, node_rep, modelview, proj, lighting=None,
     gpu.state.point_size_set(1.0)
 
 
+def _blend_edges(additive, xray=None):
+    """Blend state for one blended edge tier.
+
+    The x-ray pass forces ALPHA whatever the scene says. Dimming an additive
+    draw still *adds* light, and light added on top of an occluder reads as in
+    front of it, the opposite of what the pass is for.
+
+    Note what is deliberately absent. These tiers blend and still leave the
+    depth mask on, where ``_draw_nodes`` clears it for its DENSITY tier. The
+    mask is a real defect (additive is order-independent only while nothing
+    writes depth, so the first edge over a pixel hides every edge behind it),
+    but it is half of one. Edges draw *before* nodes, so clearing it here moves
+    the error instead of removing it: every node behind an edge starts painting
+    over that edge. Measured on a 180-node, 529-edge cluster, clearing it for
+    the additive tiers changed 1059 pixels, 939 of them a node erasing the edge
+    in front of it. Correct blended edges need the mask off *and* the blended
+    tiers drawn after the nodes, which is a reorder of ``draw_graph_object``."""
+    if xray is not None:
+        gpu.state.blend_set('ALPHA')
+    else:
+        gpu.state.blend_set('ADDITIVE' if additive else 'ALPHA')
+
+
+def _edge_color(st, xray=None):
+    """The scene edge color, its alpha scaled for the x-ray pass."""
+    c = tuple(st.edge_color)
+    if xray is None:
+        return c
+    return (c[0], c[1], c[2], c[3] * xray)
+
+
+def _draw_styled(entry, scene, data, edge_rep, modelview, proj, lighting,
+                 line_width, scale, st=None, xray=None):
+    """The six closed-form edge styles, one instance per edge over the position
+    texture. Self-loops are a second pass with their own style code and span
+    count, as ``tessellate`` gives them their own branch."""
+    from . import shaders as _sh
+    st = _settings(scene, st)
+    ribbon = edge_rep == 'RIBBON'
+    wide = bool(data["weighted"])
+    shader = _sh.get_style_ribbon_shader() if ribbon \
+        else _sh.get_style_line_shader(wide=wide)
+    if shader is None:
+        return False
+
+    light = None
+    if ribbon:
+        amount = float(np.clip(st.edge_taper_amount, 0.0, 1.0))
+        width = (data["radius"], 0.0)
+        end_taper = (1.0 - 0.9 * amount, st.edge_taper)
+        gpu.state.blend_set('NONE')
+        if lighting is None:
+            lighting = compute_lighting(scene, None, st=st)
+        light = _lighting_ubo(lighting, with_rim=False)
+    else:
+        end_taper = (1.0, 'NONE')
+        _blend_edges(bool(st.additive_edges), xray)
+        if wide:
+            width = _width_range(scene, line_width, scale, st=st)
+            entry["_width_range"] = (width[0], width[1], 0)
+        else:
+            width = (line_width, line_width)
+            gpu.state.line_width_set(line_width)
+
+    mvp = proj @ modelview
+    vp = gpu.state.viewport_get()
+    color = _edge_color(st, xray)
+    drew = False
+    for key, style in (("plain", data["style"]), ("loops", 'SELF_LOOP')):
+        sub = data.get(key)
+        if sub is None:
+            continue
+        ubo = _sh.style_uniform_block(data["params"], color, width=width,
+                                      end_taper=end_taper, style=style)
+        shader.bind()
+        shader.uniform_block("u_style", ubo)
+        shader.uniform_sampler("u_edge", sub["tex"])
+        dynamic.bind(shader, entry["dynamic"])
+        if ribbon:
+            shader.uniform_float("u_view", modelview)
+            shader.uniform_float("u_proj", proj)
+            shader.uniform_block("u_light", light)
+        else:
+            shader.uniform_float("u_mvp", mvp)
+            if wide:
+                shader.uniform_float("u_viewport", (float(vp[2]), float(vp[3])))
+        batch = sub["quad"] if (ribbon or wide) else sub["line"]
+        batch.draw_instanced(shader, instance_count=sub["instances"])
+        drew = True
+
+    if not (ribbon or wide):
+        gpu.state.line_width_set(1.0)
+    return drew
+
+
 def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
-                px=None, scale=1.0, st=None):
+                px=None, scale=1.0, st=None, xray=None):
+    """``xray`` is the opacity multiplier for the occluded-stretch pass, or None
+    for the ordinary draw. It only reaches the tiers whose color is a shader
+    uniform; see :func:`_draw_edges_xray`."""
     st = _settings(scene, st)
     reps = entry["reps"]
-    edge_color = tuple(st.edge_color)
+    edge_color = _edge_color(st, xray)
     edge_width = float(st.edge_width)
     additive = bool(st.additive_edges)
+    vertex_colored = bool(entry.get("line_vertex_color"))
 
     def _line_width():
         # AUTO matches the projected tube thickness, so LINE is a thin ribbon.
@@ -569,7 +747,7 @@ def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
     # and render get different `px`, so one scene sits on either side.
     ribbon_too_thin = (
         px is not None
-        and reps.get("line_buckets")
+        and (reps.get("line_buckets") or reps.get("style"))
         and float(px) < _RIBBON_MIN_PX
     )
     if ribbon_too_thin:
@@ -601,8 +779,13 @@ def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
         reps["ribbon"].draw(shader)
         drew_edges = True
 
-    if not drew_edges and reps.get("bundle") is not None:
-        gpu.state.blend_set('ADDITIVE' if additive else 'ALPHA')
+    if not drew_edges and reps.get("style") is not None:
+        drew_edges = _draw_styled(entry, scene, reps["style"], edge_rep,
+                                  modelview, proj, lighting, _line_width(),
+                                  scale, st=st, xray=xray)
+
+    if not drew_edges and reps.get("bundle") is not None and xray is None:
+        _blend_edges(additive, xray)
         gpu.state.line_width_set(_line_width())
         from . import bundle_gpu as _bundle
         bundle_data = reps["bundle"]
@@ -627,8 +810,9 @@ def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
             drew_edges = _bundle.draw(bundle_data, proj @ modelview, beta)
         gpu.state.line_width_set(1.0)
 
-    if not drew_edges and reps.get("line_buckets"):
-        gpu.state.blend_set('ADDITIVE' if additive else 'ALPHA')
+    if not drew_edges and reps.get("line_buckets") \
+            and not (xray is not None and vertex_colored):
+        _blend_edges(additive, xray)
         w_lo, w_hi = _width_range(scene, _line_width(), scale, st=st)
         entry["_width_range"] = (w_lo, w_hi, len(reps["line_buckets"]))
 
@@ -654,8 +838,9 @@ def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
         gpu.state.line_width_set(1.0)
         drew_edges = True
 
-    if not drew_edges and reps.get("line") is not None:
-        gpu.state.blend_set('ADDITIVE' if additive else 'ALPHA')
+    if not drew_edges and reps.get("line") is not None \
+            and not (xray is not None and vertex_colored):
+        _blend_edges(additive, xray)
         gpu.state.line_width_set(_line_width())
         shader = entry["line_shader"]
         shader.bind()
@@ -671,7 +856,7 @@ def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
         reps["line"].draw(shader)
         gpu.state.line_width_set(1.0)
 
-    if reps.get("arrow") is not None:
+    if reps.get("arrow") is not None and xray is None:
         gpu.state.blend_set('NONE')
         from . import shaders as _sh
         flat = bool(reps.get("arrow_flat"))
@@ -699,6 +884,44 @@ def _draw_edges(entry, scene, edge_rep, modelview, proj, lighting=None,
                     shader.uniform_block("u_toon", tbuf)
             _bind_pos(shader, entry)
             reps["arrow"].draw(shader)
+
+
+def _draw_edges_xray(entry, scene, modelview, proj, px, scale, st=None):
+    """Redraw the stretches that lost the depth test, dimmed instead of gone.
+
+    An edge that dives behind a cluster otherwise just stops and reappears
+    somewhere else, and nothing tells the viewer the two stubs are one edge. It
+    also makes two edges crossing in projection identical to two edges that
+    meet. A faint hidden stretch restores both: you can trace an edge through a
+    cluster, and a crossing reads as over-and-under.
+
+    ``GREATER`` passes exactly where the edge is behind what is already in the
+    depth buffer, which is exactly the hidden stretch. It has to run after
+    ``_draw_nodes``, because the nodes are the geometry doing the occluding.
+
+    Two things this is not. With depth writes off and no sorting, the dim
+    fragments accumulate in draw order, so hidden edges get darker where they
+    pile up: it reads as density, not as correct transparency. And the pass
+    always draws the LINE tier, so a hidden tube comes back as a hairline ghost
+    rather than a dim tube, because the impostor writes alpha 1.0 and has no
+    uniform to dim.
+
+    Bundled edges and vertex-colored lines are skipped for the same reason; see
+    :func:`_draw_edges`."""
+    st = _settings(scene, st)
+    alpha = float(getattr(st, "edge_xray", EDGE_XRAY))
+    prev_test = gpu.state.depth_test_get()
+    if alpha <= 0.0 or prev_test == 'NONE':
+        return
+    prev_mask = gpu.state.depth_mask_get()
+    gpu.state.depth_test_set('GREATER')
+    gpu.state.depth_mask_set(False)
+    try:
+        _draw_edges(entry, scene, 'LINE', modelview, proj, None, px, scale,
+                    st=st, xray=min(max(alpha, 0.0), 1.0))
+    finally:
+        gpu.state.depth_test_set(prev_test)
+        gpu.state.depth_mask_set(prev_mask)
 
 
 def draw_blocks(entry, scene, obj, modelview, proj, persp_mat, height, st=None):
@@ -763,7 +986,7 @@ def draw_blocks(entry, scene, obj, modelview, proj, persp_mat, height, st=None):
     entry["_blocks_drawn"] = int(visible_idx.size)
 
     base_radius = float(st.impostor_radius)
-    px_ref = _pixel_radius(obj, entry["coords"], base_radius,
+    px_ref = _pixel_radius(obj, _entry_center(entry), base_radius,
                            persp_mat, height) / max(scale, 1e-9)
     _maybe_draw_volume(entry, scene, modelview, proj,
                        _select_node_rep(scene, px_ref, st=st), st=st)
@@ -884,6 +1107,93 @@ def disable_preview():
     tag_redraw()
 
 
+_SYNCING = False
+
+
+@persistent
+def _sync_display_to_render(scene, _depsgraph=None):
+    """Point the display path at whatever the render engine needs.
+
+    Persistent because opening a .blend clears every handler that is not, and
+    without it the sync worked until the first file load and then silently
+    stopped, leaving the mesh drawn as bounds under EEVEE.
+
+    There used to be a second switch in the sidebar for this, which meant two
+    controls for one decision: leave it on GPU under EEVEE and the final render
+    is empty, because the Geometry Nodes modifier is the thing EEVEE can see.
+    depsgraph_update_post fires on a render-engine change, which is the only
+    notification Blender offers for it.
+
+    The guard is not cosmetic: assigning the property runs
+    apply_display_engine, which writes the preview flag and a modifier, and
+    each of those schedules another depsgraph update.
+    """
+    global _SYNCING
+    if _SYNCING or scene is None:
+        return
+    want = ('GPU' if getattr(scene.render, "engine", "") == 'SCIGRAPHS'
+            else 'GEOMETRY_NODES')
+    if getattr(scene, "scigraphs_display_engine", want) == want:
+        return
+    _SYNCING = True
+    try:
+        scene.scigraphs_display_engine = want
+    finally:
+        _SYNCING = False
+
+
+
+def ensure_display_sync(add):
+    handlers = bpy.app.handlers.depsgraph_update_post
+    present = _sync_display_to_render in handlers
+    if add and not present:
+        handlers.append(_sync_display_to_render)
+    elif not add and present:
+        handlers.remove(_sync_display_to_render)
+
+
+@persistent
+def _on_frame_change(scene):
+    """Colours baked from a mesh attribute go stale when something animates it.
+
+    Nothing else notices. The batch signature carries the attribute's *name*,
+    not its values, and fingerprinting the values costs 56 ms at 262k nodes,
+    far too much to pay on every draw. A frame change is the only moment they
+    can have moved, so the cost is paid there and only for objects something
+    actually animates.
+
+    Not gated on the colour mode. It was, and that made the whole thing a no-op
+    for anyone who had not switched to Attribute + Colormap by hand, which is
+    not the default: the colours only refreshed when some other setting forced
+    a rebuild.
+    """
+    if not state.ENABLED or not state.CACHE:
+        return
+    for obj in scene.objects:
+        if not is_graph_object(obj):
+            continue
+        if "traversal_time" in obj:
+            continue
+        if obj.animation_data is None:
+            continue
+        try:
+            from . import playback
+            if playback.is_running(obj):
+                continue
+        except Exception:  # noqa: BLE001 - a handler must not break playback
+            pass
+        invalidate(obj)
+
+
+def ensure_frame_handler(add):
+    handlers = bpy.app.handlers.frame_change_post
+    present = _on_frame_change in handlers
+    if add and not present:
+        handlers.append(_on_frame_change)
+    elif not add and present:
+        handlers.remove(_on_frame_change)
+
+
 @persistent
 def _on_load_post(*_args):
     scene = getattr(bpy.context, "scene", None)
@@ -913,6 +1223,8 @@ def _depsgraph_update_handler(scene, depsgraph):
             continue
         if update.is_updated_geometry or update.is_updated_transform:
             original = id_data.original
+            if update.is_updated_geometry:
+                batches.drop_geometry_cache(original)
             # A bundle reading positions from a texture absorbs this. The branch
             # below drops batches, tree and channels: over 1 s/frame at 2M nodes.
             if refresh_positions(original):

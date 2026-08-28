@@ -15,7 +15,7 @@ class SCIGRAPHS_RENDER_PT_toon(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = 'render'
-    bl_parent_id = "SCIGRAPHS_RENDER_PT_engine"
+    bl_order = 7
     COMPAT_ENGINES = {'SCIGRAPHS'}
 
     @classmethod

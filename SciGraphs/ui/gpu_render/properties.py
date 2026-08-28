@@ -17,6 +17,20 @@ def _on_setting_update(self, context):
     tag_redraw()
 
 
+def _volume_show_get(self):
+    return self.scigraphs_preview_volume_mode != 'OFF'
+
+
+def _volume_show_set(self, value):
+    if value:
+        self.scigraphs_preview_volume_mode = (
+            self.scigraphs_preview_volume_last or 'COUNT')
+        return
+    if self.scigraphs_preview_volume_mode != 'OFF':
+        self.scigraphs_preview_volume_last = self.scigraphs_preview_volume_mode
+    self.scigraphs_preview_volume_mode = 'OFF'
+
+
 def _on_rebuild_update(self, context):
     draw.invalidate()
 
@@ -76,7 +90,42 @@ class SCIGRAPHS_PG_filter_slot(bpy.types.PropertyGroup):
     )
 
 
+ANIMATABLE_ITEMS = [
+    ('FORCEATLAS2', "ForceAtlas2", "Gephi's model: linear attraction, mass-weighted repulsion, adaptive speed"),
+    ('SPRING', "Spring (2D)", "Fruchterman-Reingold, flat"),
+    ('SPRING_3D', "Spring (3D)", "Fruchterman-Reingold in three dimensions"),
+    ('IGRAPH_FR', "Fruchterman-Reingold", "The same model, entered from the igraph menu entry"),
+]
+
+
+def _assert_animatable_in_sync():
+    """A model added to playback and not here would be silently unreachable."""
+    try:
+        from .playback import ITERATIVE_MODELS
+    except Exception:  # noqa: BLE001 - registration must not depend on it
+        return
+    listed = {item[0] for item in ANIMATABLE_ITEMS}
+    missing = set(ITERATIVE_MODELS) - listed
+    extra = listed - set(ITERATIVE_MODELS)
+    if missing or extra:
+        print(f"  Animated Layout menu is out of step with the force models: "
+              f"missing {sorted(missing)}, unreachable {sorted(extra)}")
+
+
+LABEL_PRIORITY_ITEMS = [
+    ('DISTANCE', "Camera Distance",
+     "Nearest to the camera wins, which is what the code did before there was "
+     "a choice"),
+]
+try:
+    from . import filters as _filters
+    LABEL_PRIORITY_ITEMS.extend(_filters.CHANNEL_ITEMS)
+except Exception:  # noqa: BLE001 - the menu must exist regardless
+    pass
+
+
 def register_properties():
+    _assert_animatable_in_sync()
     # Before the scene properties: the collection needs its type to exist.
     bpy.utils.register_class(SCIGRAPHS_PG_filter_slot)
 
@@ -127,6 +176,120 @@ def register_properties():
             "difference is imperceptible and the CPU path is used regardless"
         ),
         default=True,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_animate_algorithm = bpy.props.EnumProperty(
+        name="Algorithm",
+        description=(
+            "Which force model the animation simulates. Only the algorithms "
+            "with an iterative form appear here: the rest compute a final "
+            "layout in one shot and have no intermediate states to show"
+        ),
+        items=ANIMATABLE_ITEMS,
+        default='FORCEATLAS2',
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_repulsion = bpy.props.EnumProperty(
+        name="Repulsion",
+        description=(
+            "How the long-range repulsion is approximated above a few hundred "
+            "nodes. Below that it is computed exactly either way"
+        ),
+        items=[
+            ('GRID', "Uniform grid",
+             "One monopole per occupied cell of a fixed 8x8x8 grid. Cheap and "
+             "stale: the cell count never changes, so nodes per cell grow with "
+             "the graph and the error grows with them, reaching 39% on a "
+             "settled hundred-thousand-node layout"),
+            ('TREE', "Barnes-Hut tree",
+             "Graphviz's own quadtree, subdividing where the nodes are. Needs "
+             "scigraphs-utils 0.2 or newer; without it the grid is used and "
+             "nothing complains"),
+        ],
+        default='GRID',
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_theta = bpy.props.FloatProperty(
+        name="Theta",
+        description=(
+            "Barnes-Hut opening angle. A cell is used whole when it is this "
+            "much narrower than its distance, so smaller is more accurate and "
+            "slower. Measured against exact all-pairs, 0.6 lands within 5% in "
+            "2D and 20% in 3D, and 1.2 roughly doubles both"
+        ),
+        default=0.6, min=0.0, max=4.0,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_grid_show = bpy.props.BoolProperty(
+        name="Show Layout Grid",
+        description=(
+            "Draw the spatial structure the running simulation reads its "
+            "repulsion off. It is a uniform grid, not a tree: the cell count is "
+            "fixed, so the nodes per cell grow with the graph, and seeing which "
+            "cell has swallowed the layout is the point"
+        ),
+        default=False,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_grid_mode = bpy.props.EnumProperty(
+        name="Structure",
+        description="Which of the two the overlay draws",
+        items=[
+            ('FAR', "Far field", "The coarse monopole grid, one box per occupied cell"),
+            ('NEAR', "Near field", "The bin grid behind the neighbor list. GPU only: the numpy path asks a kd-tree instead, and a kd-tree has no boxes"),
+            ('BOTH', "Both", "The coarse grid and the bins together"),
+            ('TREE', "Barnes-Hut tree",
+             "Graphviz's quadtree, subdividing where the nodes are. With "
+             "Repulsion set to the tree these are the cells the forces came "
+             "from; with it on the grid they are a preview of what the tree "
+             "would do, not what ran"),
+        ],
+        default='FAR',
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_tree_depth = bpy.props.IntProperty(
+        name="Tree Depth",
+        description=(
+            "How far down the quadtree the overlay draws. Graphviz splits until "
+            "a leaf holds one point, so the deepest cells are far under a pixel "
+            "and the whole thing reads as a flat mesh; stopping earlier is what "
+            "makes the nesting visible. Does not change the forces"
+        ),
+        default=6, min=1, max=12,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_grid_color = bpy.props.FloatVectorProperty(
+        name="Grid Color", description="Color of an empty or barely used cell",
+        subtype='COLOR', size=4, min=0.0, max=1.0,
+        default=(0.25, 0.7, 1.0, 0.35),
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_grid_hot = bpy.props.FloatVectorProperty(
+        name="Crowded Color",
+        description="Color a cell reaches when it holds the most nodes",
+        subtype='COLOR', size=4, min=0.0, max=1.0,
+        default=(1.0, 0.25, 0.1, 0.9),
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_grid_by_count = bpy.props.BoolProperty(
+        name="Color by Occupancy",
+        description=(
+            "Shade each cell between the two colors by how many nodes it holds, "
+            "on a log scale. Occupancy spans four orders of magnitude on a "
+            "settled graph, and a linear ramp shows one hot box and nothing else"
+        ),
+        default=True,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_grid_width = bpy.props.FloatProperty(
+        name="Line Width",
+        description=(
+            "Cell edge thickness in pixels. Widened in the shader, so it means "
+            "the same on both backends; the GPU state call this replaces is "
+            "capped at 10 px by the OpenGL driver"
+        ),
+        default=1.5, min=0.5, max=20.0,
+        update=_on_setting_update,
     )
     S.scigraphs_preview_animate_steps = bpy.props.IntProperty(
         name="Iterations / Frame",
@@ -136,15 +299,19 @@ def register_properties():
             "frames but moves further between them"
         ),
         default=1, min=1, max=50,
+        update=_on_setting_update,
     )
     S.scigraphs_preview_animate_max_frames = bpy.props.IntProperty(
         name="Record Frames",
         description=(
-            "How many frames of the layout to record. Past it, playback holds "
-            "the last frame; the trajectory is kept in memory so a scrub or a "
-            "second play shows exactly what was watched"
+            "How many frames of the layout to record. Within it the trajectory "
+            "is kept in memory, so a scrub or a second play shows exactly what "
+            "was watched. Past it the simulation keeps running but nothing is "
+            "stored, so those frames neither scrub nor render the same way "
+            "twice"
         ),
         default=250, min=2, max=2000,
+        update=_on_setting_update,
     )
     S.scigraphs_preview_node_size = bpy.props.FloatProperty(
         name="Point Size", description="Size of node points in pixels",
@@ -230,6 +397,14 @@ def register_properties():
             "points so distant graphs read as a continuous density cloud"
         ),
         default=True, update=_on_setting_update,
+    )
+    S.scigraphs_preview_volume_last = bpy.props.StringProperty(
+        name="Last Density Field", default='COUNT', options={'HIDDEN'},
+    )
+    S.scigraphs_preview_volume_show = bpy.props.BoolProperty(
+        name="Density Cloud",
+        description="Draw the density cloud. The field itself is chosen below",
+        get=_volume_show_get, set=_volume_show_set,
     )
     S.scigraphs_preview_volume_mode = bpy.props.EnumProperty(
         name="Density Cloud",
@@ -663,6 +838,41 @@ def register_properties():
     S.scigraphs_preview_reverse_colormap = bpy.props.BoolProperty(
         name="Reverse Colormap", default=False, update=_on_rebuild_update,
     )
+    from scigraphs_core.coloring.colormaps import (
+        DEFAULT_NORM_MODE, norm_mode_items_for_enum)
+    S.scigraphs_preview_norm_mode = bpy.props.EnumProperty(
+        name="Normalization",
+        description=(
+            "How attribute values are mapped onto the colormap. Degree, "
+            "betweenness and PageRank are heavy-tailed: under Linear most of "
+            "the graph shares the bottom few percent of the ramp"
+        ),
+        items=norm_mode_items_for_enum(),
+        default=DEFAULT_NORM_MODE, update=_on_rebuild_update,
+    )
+    S.scigraphs_preview_norm_gamma = bpy.props.FloatProperty(
+        name="Gamma",
+        description=(
+            "Bend the normalized value before the colormap reads it. Above 1 "
+            "gives the low end more of the ramp, below 1 the high end"
+        ),
+        default=1.0, min=0.05, max=20.0, update=_on_rebuild_update,
+    )
+    S.scigraphs_preview_clip_low_pct = bpy.props.FloatProperty(
+        name="Clip Low",
+        description=(
+            "Percentile taken as the bottom of the range. A single outlier "
+            "otherwise sets an end of the ramp on its own"
+        ),
+        default=0.0, min=0.0, max=100.0, subtype='PERCENTAGE',
+        update=_on_rebuild_update,
+    )
+    S.scigraphs_preview_clip_high_pct = bpy.props.FloatProperty(
+        name="Clip High",
+        description="Percentile taken as the top of the range",
+        default=100.0, min=0.0, max=100.0, subtype='PERCENTAGE',
+        update=_on_rebuild_update,
+    )
     S.scigraphs_preview_size_by_attr = bpy.props.BoolProperty(
         name="Size by Attribute",
         description="Scale node size by the selected scalar attribute",
@@ -765,6 +975,92 @@ def register_properties():
         ),
         default=True, update=_on_setting_update,
     )
+    S.scigraphs_preview_labels_priority = bpy.props.EnumProperty(
+        name="Label Priority",
+        description=(
+            "Which labels win a contested spot. Distance keeps the ones nearest "
+            "the camera; any other channel keeps the ones that matter, which on "
+            "a large graph is rarely the same set"
+        ),
+        items=LABEL_PRIORITY_ITEMS, default='DISTANCE',
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_labels_priority_attr = bpy.props.StringProperty(
+        name="Priority Attribute",
+        description="Which scalar attribute, when the priority channel is one",
+        default="", update=_on_setting_update,
+    )
+
+    S.scigraphs_preview_legend = bpy.props.BoolProperty(
+        name="Color Key",
+        description=(
+            "Draw the colormap's scale into the image. A figure whose colors "
+            "carry a value and whose scale is missing cannot be read, and the "
+            "key names the normalization too, since a log ramp with linear "
+            "ticks is a lie"
+        ),
+        default=False, update=_on_setting_update,
+    )
+    S.scigraphs_preview_legend_anchor = bpy.props.EnumProperty(
+        name="Key Corner",
+        description="Which corner the key sits in",
+        items=[('BOTTOM_RIGHT', "Bottom Right", ""),
+               ('BOTTOM_LEFT', "Bottom Left", ""),
+               ('TOP_RIGHT', "Top Right", ""),
+               ('TOP_LEFT', "Top Left", "")],
+        default='BOTTOM_RIGHT', update=_on_setting_update,
+    )
+    S.scigraphs_preview_legend_orient = bpy.props.EnumProperty(
+        name="Key Layout",
+        description="Which way the color bar lies",
+        items=[('VERTICAL', "Vertical", "Tall bar, labels down the side"),
+               ('HORIZONTAL', "Horizontal", "Wide bar, labels underneath. "
+                                            "Costs height, which a wide figure "
+                                            "has less of to spare")],
+        default='VERTICAL', update=_on_setting_update,
+    )
+    S.scigraphs_preview_legend_x = bpy.props.FloatProperty(
+        name="Key X",
+        description="Shift from the chosen corner, in reference pixels at 1080p",
+        default=0.0, soft_min=-960.0, soft_max=960.0,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_legend_y = bpy.props.FloatProperty(
+        name="Key Y",
+        description="Shift from the chosen corner, in reference pixels at 1080p",
+        default=0.0, soft_min=-540.0, soft_max=540.0,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_legend_scale = bpy.props.FloatProperty(
+        name="Key Size",
+        description=(
+            "Multiplies the whole key. It already tracks the resolution, so "
+            "this is taste, or a floor for renders below 1080p where the "
+            "reference sizes land too small to read"
+        ),
+        default=1.0, min=0.2, max=6.0, soft_min=0.5, soft_max=3.0,
+        update=_on_setting_update,
+    )
+    S.scigraphs_preview_legend_box = bpy.props.BoolProperty(
+        name="Key Backdrop",
+        description=(
+            "Panel and frame behind the key. Off leaves the text and bar over "
+            "the image, which reads better on a plain background and worse on "
+            "a busy one"
+        ),
+        default=True, update=_on_setting_update,
+    )
+    S.scigraphs_preview_edge_xray = bpy.props.FloatProperty(
+        name="Occluded Edges",
+        description=(
+            "Redraw the hidden stretch of an edge at this opacity, so an edge "
+            "diving behind a cluster stays traceable and a crossing reads as "
+            "over-and-under. Drawn without depth sorting, so it reads as "
+            "density rather than as correct transparency"
+        ),
+        default=0.0, min=0.0, max=1.0, subtype='FACTOR',
+        update=_on_setting_update,
+    )
     S.scigraphs_preview_dof_highlights = bpy.props.FloatProperty(
         name="Bokeh Highlights",
         description=(
@@ -843,6 +1139,8 @@ _PROP_NAMES = (
     "scigraphs_preview_backbone_attr",
     "scigraphs_preview_density_fallback",
     "scigraphs_preview_volume_mode",
+    "scigraphs_preview_volume_last",
+    "scigraphs_preview_volume_show",
     "scigraphs_preview_volume_when",
     "scigraphs_preview_volume_res",
     "scigraphs_preview_volume_smooth",
@@ -882,6 +1180,10 @@ _PROP_NAMES = (
     "scigraphs_preview_attr_name",
     "scigraphs_preview_colormap",
     "scigraphs_preview_reverse_colormap",
+    "scigraphs_preview_norm_mode",
+    "scigraphs_preview_norm_gamma",
+    "scigraphs_preview_clip_low_pct",
+    "scigraphs_preview_clip_high_pct",
     "scigraphs_preview_size_by_attr",
     "scigraphs_preview_size_max_mult",
     "scigraphs_preview_show_edges",
@@ -900,6 +1202,16 @@ _PROP_NAMES = (
     "scigraphs_preview_render_id_pass",
     "scigraphs_preview_render_labels",
     "scigraphs_preview_labels_declutter",
+    "scigraphs_preview_legend",
+    "scigraphs_preview_legend_anchor",
+    "scigraphs_preview_legend_box",
+    "scigraphs_preview_legend_orient",
+    "scigraphs_preview_legend_scale",
+    "scigraphs_preview_legend_x",
+    "scigraphs_preview_legend_y",
+    "scigraphs_preview_edge_xray",
+    "scigraphs_preview_labels_priority_attr",
+    "scigraphs_preview_labels_priority",
     "scigraphs_preview_dof_highlights",
     "scigraphs_preview_render_bg",
     "scigraphs_preview_use_scene_lights",

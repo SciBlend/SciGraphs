@@ -72,24 +72,6 @@ class SCIGRAPHS_MT_viewport_topology(bpy.types.Menu):
         layout.operator("scigraphs.remove_dual_graph", icon='X')
 
 
-class SCIGRAPHS_MT_viewport_temporal(bpy.types.Menu):
-    """Temporal graph playback controls."""
-    bl_idname = "SCIGRAPHS_MT_viewport_temporal"
-    bl_label = "Temporal"
-
-    def draw(self, context):
-        layout = self.layout
-        row = layout.row(align=True)
-        row.operator("scigraphs.temporal_first", text="", icon='REW')
-        row.operator("scigraphs.temporal_previous", text="", icon='PREV_KEYFRAME')
-        row.operator("scigraphs.temporal_play", text="", icon='PLAY')
-        row.operator("scigraphs.temporal_next", text="", icon='NEXT_KEYFRAME')
-        row.operator("scigraphs.temporal_last", text="", icon='FF')
-        layout.separator()
-        layout.operator("scigraphs.temporal_refresh", icon='FILE_REFRESH')
-        layout.operator("scigraphs.temporal_clear", icon='X')
-
-
 class SCIGRAPHS_MT_viewport_osmnx(bpy.types.Menu):
     """OSMnx operations on active network."""
     bl_idname = "SCIGRAPHS_MT_viewport_osmnx"
@@ -245,23 +227,16 @@ class SCIGRAPHS_MT_viewport(bpy.types.Menu):
     bl_label = "SciGraphs"
 
     def draw(self, context):
+        """Only the toolbars for now.
+
+        The other eleven submenus were a third path to work already reachable
+        from the sidebar panels and the pie menu, and a header menu is the
+        worst of the three: it is the one place a reader cannot see what is
+        available without opening it. The submenu classes stay registered, so
+        putting an entry back is one line.
+        """
         layout = self.layout
         layout.menu("SCIGRAPHS_MT_viewport_toolbars", icon='GIZMO')
-        layout.separator()
-        layout.menu("SCIGRAPHS_MT_viewport_tools", icon='TOOL_SETTINGS')
-        layout.menu("SCIGRAPHS_MT_viewport_pie", icon='MESH_CIRCLE')
-        layout.separator()
-        layout.menu("SCIGRAPHS_MT_viewport_layout", icon='NODETREE')
-        layout.menu("SCIGRAPHS_MT_viewport_visualization", icon='SHADING_RENDERED')
-        layout.menu("SCIGRAPHS_MT_viewport_analysis", icon='OUTLINER_DATA_GP_LAYER')
-        layout.menu("SCIGRAPHS_MT_viewport_topology", icon='SURFACE_DATA')
-        layout.menu("SCIGRAPHS_MT_viewport_temporal", icon='TIME')
-        layout.separator()
-        layout.menu("SCIGRAPHS_MT_viewport_osmnx", icon='WORLD')
-        layout.menu("SCIGRAPHS_MT_viewport_osmnx_elevation", icon='EMPTY_SINGLE_ARROW')
-        layout.separator()
-        layout.menu("SCIGRAPHS_MT_viewport_export", icon='EXPORT')
-        layout.menu("SCIGRAPHS_MT_viewport_repro", icon='FILE_CACHE')
 
 
 def _draw_scigraphs_menu(self, context):
@@ -274,7 +249,6 @@ _MENU_CLASSES = [
     SCIGRAPHS_MT_viewport_visualization,
     SCIGRAPHS_MT_viewport_analysis,
     SCIGRAPHS_MT_viewport_topology,
-    SCIGRAPHS_MT_viewport_temporal,
     SCIGRAPHS_MT_viewport_osmnx,
     SCIGRAPHS_MT_viewport_osmnx_elevation,
     SCIGRAPHS_MT_viewport_export,

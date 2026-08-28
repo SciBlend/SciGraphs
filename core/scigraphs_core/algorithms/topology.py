@@ -478,31 +478,86 @@ def compute_tutte_layout(graph_data, scale=5.0):
         }
 
 
+_CROSSING_BLOCK = 1 << 14
+
+
 def detect_edge_crossings_3d(vertices, edges, tolerance=1e-6):
-    """Find edges that cross in 3D by testing every pair of segments, quadratic
-    in the edge count. ``tolerance`` is the distance in scene units below which
-    two segments cross; edges sharing a vertex are skipped."""
+    """Find edges that cross in 3D. ``tolerance`` is the distance in scene units
+    below which two segments cross; edges sharing a vertex are skipped.
+
+    Exactly the pairs the old all-pairs loop returned, in the same order, but a
+    sorted sweep of the edge bounding boxes along one axis plus a box test on
+    the other two only compares segments that can be close: O(E log E + C) for
+    C box-overlapping pairs instead of E**2/2. A 40x40 grid drawn as a grid,
+    3,120 edges and no crossings, goes 25.0 s -> 0.004 s.
+
+    The floor is the answer, not the search: a drawing packed into a fixed box
+    has Theta(E**2) crossings on its own, so the worst cases stay quadratic.
+    5,991 edges at random positions in a 10-unit cube have 19,379 crossings and
+    take 1.5 s, down from 112.8 s."""
+    verts = np.asarray(vertices, dtype=float)
+    ends = np.asarray(edges, dtype=np.int64).reshape(-1, 2)
+    num_edges = len(ends)
+    if num_edges < 2:
+        return {'has_crossings': False, 'num_crossings': 0, 'crossing_pairs': []}
+
+    tail = verts[ends[:, 0]]
+    head = verts[ends[:, 1]]
+    lo = np.minimum(tail, head) - 0.5 * tolerance
+    hi = np.maximum(tail, head) + 0.5 * tolerance
+
+    extent = (hi - lo).mean(axis=0)
+    span = hi.max(axis=0) - lo.min(axis=0)
+    axis = int(np.argmin(extent / np.maximum(span, np.finfo(float).tiny)))
+    others = [k for k in range(3) if k != axis]
+
+    order = np.argsort(lo[:, axis], kind='stable')
+    lo = np.ascontiguousarray(lo[order].T)
+    hi = np.ascontiguousarray(hi[order].T)
+    tail = np.ascontiguousarray(tail[order])
+    head = np.ascontiguousarray(head[order])
+    ends = np.ascontiguousarray(ends[order].T)
+
+    stop = np.searchsorted(lo[axis], hi[axis], side='right')
+    counts = np.maximum(stop - np.arange(num_edges) - 1, 0)
+    offsets = np.concatenate(([0], np.cumsum(counts)))
+
+    found = []
+    first = 0
+    while first < num_edges:
+        last = int(np.searchsorted(offsets, offsets[first] + _CROSSING_BLOCK))
+        last = min(max(last, first + 1), num_edges)
+        block = counts[first:last]
+        base = np.repeat(np.cumsum(block) - block, block)
+        a = np.repeat(np.arange(first, last, dtype=np.int64), block)
+        b = a + 1 + (np.arange(len(base), dtype=np.int64) - base)
+        first = last
+
+        for k in others:
+            klo, khi = lo[k], hi[k]
+            keep = np.flatnonzero((klo[a] <= khi[b]) & (klo[b] <= khi[a]))
+            a, b = a[keep], b[keep]
+
+        a0, a1 = ends[0][a], ends[1][a]
+        b0, b1 = ends[0][b], ends[1][b]
+        keep = np.flatnonzero((a0 != b0) & (a0 != b1) & (a1 != b0) & (a1 != b1))
+        if not len(keep):
+            continue
+        a, b = a[keep], b[keep]
+
+        hit = _segments_intersect_3d(tail[a], head[a], tail[b], head[b], tolerance)
+        if hit.any():
+            found.append(np.stack([order[a[hit]], order[b[hit]]], axis=1))
+
     crossing_pairs = []
-    
-    num_edges = len(edges)
-    
-    for i in range(num_edges):
-        e1_start, e1_end = edges[i]
-        p1 = np.array(vertices[e1_start])
-        p2 = np.array(vertices[e1_end])
-        
-        for j in range(i + 1, num_edges):
-            e2_start, e2_end = edges[j]
-            
-            if e1_start in (e2_start, e2_end) or e1_end in (e2_start, e2_end):
-                continue
+    if found:
+        hits = np.concatenate(found)
+        left = hits.min(axis=1)
+        right = hits.max(axis=1)
+        by_index = np.lexsort((right, left))
+        for i, j in zip(left[by_index].tolist(), right[by_index].tolist()):
+            crossing_pairs.append((tuple(edges[i]), tuple(edges[j])))
 
-            p3 = np.array(vertices[e2_start])
-            p4 = np.array(vertices[e2_end])
-
-            if _segments_intersect_3d(p1, p2, p3, p4, tolerance):
-                crossing_pairs.append(((e1_start, e1_end), (e2_start, e2_end)))
-    
     return {
         'has_crossings': len(crossing_pairs) > 0,
         'num_crossings': len(crossing_pairs),
@@ -511,33 +566,31 @@ def detect_edge_crossings_3d(vertices, edges, tolerance=1e-6):
 
 
 def _segments_intersect_3d(p1, p2, p3, p4, tolerance=1e-6):
-    """True when two 3D segments pass within ``tolerance``, from the closest
-    point on each infinite line. Parallel lines always return False, so a
-    genuine overlap along the same line is missed."""
+    """True where two 3D segments pass within ``tolerance``, from the closest
+    point on each infinite line. Takes (N, 3) arrays and answers all N pairs at
+    once. Parallel lines always return False, so a genuine overlap along the
+    same line is missed."""
     d1 = p2 - p1
     d2 = p4 - p3
     d3 = p1 - p3
-    
-    a = np.dot(d1, d1)
-    b = np.dot(d1, d2)
-    c = np.dot(d2, d2)
-    d = np.dot(d1, d3)
-    e = np.dot(d2, d3)
-    
-    denom = a * c - b * b
-    
-    if abs(denom) < 1e-10:
-        return False
 
+    a = np.einsum('ij,ij->i', d1, d1)
+    b = np.einsum('ij,ij->i', d1, d2)
+    c = np.einsum('ij,ij->i', d2, d2)
+    d = np.einsum('ij,ij->i', d1, d3)
+    e = np.einsum('ij,ij->i', d2, d3)
+
+    denom = a * c - b * b
+
+    close = np.abs(denom) >= 1e-10
+    denom = np.where(close, denom, 1.0)
     s = (b * e - c * d) / denom
     t = (a * e - b * d) / denom
 
-    if s < 0 or s > 1 or t < 0 or t > 1:
-        return False
+    close &= (s >= 0) & (s <= 1) & (t >= 0) & (t <= 1)
 
-    closest1 = p1 + s * d1
-    closest2 = p3 + t * d2
-
-    distance = np.linalg.norm(closest1 - closest2)
-    
-    return distance < tolerance
+    sel = np.flatnonzero(close)
+    gap = ((p1[sel] + s[sel, None] * d1[sel])
+           - (p3[sel] + t[sel, None] * d2[sel]))
+    close[sel] = np.sqrt(np.einsum('ij,ij->i', gap, gap)) < tolerance
+    return close

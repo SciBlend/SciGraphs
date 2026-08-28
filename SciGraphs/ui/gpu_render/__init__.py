@@ -2,7 +2,8 @@
 
 import bpy
 
-from . import draw, dynamic, engine, host, operators, panel, picking, playback, properties, visibility
+from . import (draw, dynamic, engine, host, hover, labels, legend, operators,
+               panel, picking, playback, properties, visibility)
 from .attributes import compute_visible_mask, write_visibility_attribute
 from .toon import panel as toon_panel
 from .draw import (
@@ -36,7 +37,7 @@ _CLASSES = [
     operators.SCIGRAPHS_OT_reset_animation,
     operators.SCIGRAPHS_OT_set_edge_attr,
     operators.SCIGRAPHS_OT_bake_edge_channel,
-    picking.SCIGRAPHS_OT_pick_node,
+    hover.SCIGRAPHS_OT_node_hover,
     operators.SCIGRAPHS_OT_set_preview_attr,
     operators.SCIGRAPHS_OT_filter_add,
     operators.SCIGRAPHS_OT_filter_remove,
@@ -46,8 +47,19 @@ _CLASSES = [
     visibility.SCIGRAPHS_OT_measure_visibility,
     visibility.SCIGRAPHS_OT_refine_cut,
     visibility.SCIGRAPHS_OT_benchmark_visibility,
-    panel.SCIGRAPHS_PT_gpu_preview,
+    panel.SCIGRAPHS_PT_gpu_animation,
+    panel.SCIGRAPHS_PT_gpu_structure,
+    panel.SCIGRAPHS_PT_gpu_filters,
+    panel.SCIGRAPHS_PT_gpu_simplify,
+    panel.SCIGRAPHS_PT_gpu_performance,
     panel.SCIGRAPHS_RENDER_PT_engine,
+    panel.SCIGRAPHS_RENDER_PT_nodes,
+    panel.SCIGRAPHS_RENDER_PT_edges,
+    panel.SCIGRAPHS_RENDER_PT_edge_width,
+    panel.SCIGRAPHS_RENDER_PT_edge_shape,
+    panel.SCIGRAPHS_RENDER_PT_density,
+    panel.SCIGRAPHS_RENDER_PT_labels,
+    panel.SCIGRAPHS_RENDER_PT_legend,
     panel.SCIGRAPHS_RENDER_PT_lighting,
     # After their parent, since a child cannot register before its bl_parent_id.
     *toon_panel.CLASSES,
@@ -57,6 +69,13 @@ _CLASSES = [
 _PANEL_EXCLUDE = {
     "RENDER_PT_eevee_next_sampling",
     "RENDER_PT_freestyle",
+    "RENDER_PT_simplify",
+    "RENDER_PT_simplify_greasepencil",
+    "RENDER_PT_simplify_render",
+    "RENDER_PT_simplify_viewport",
+    "RENDER_PT_gpencil",
+    "RENDER_PT_grease_pencil_render",
+    "RENDER_PT_grease_pencil_viewport",
 }
 
 # Wanted despite not advertising BLENDER_RENDER: DoF lives on the camera panel.
@@ -92,6 +111,12 @@ def register():
     if draw._on_load_post not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(draw._on_load_post)
 
+    legend.enable_overlay()
+    labels.enable_overlay()
+    draw.ensure_display_sync(True)
+    draw.ensure_frame_handler(True)
+    hover.start_watch()
+
     # GPU is the default engine, so imported graphs draw on it straight away.
     scene = getattr(bpy.context, "scene", None)
     if scene is not None and bool(preview_prop(scene, "enabled", True)):
@@ -103,6 +128,11 @@ def unregister():
         bpy.app.handlers.load_post.remove(draw._on_load_post)
     # Trajectories are dropped, not saved: unregistering must not edit the scene.
     playback.unregister_handler()
+    draw.ensure_display_sync(False)
+    draw.ensure_frame_handler(False)
+    hover.unregister_hover()
+    legend.disable_overlay()
+    labels.disable_overlay()
     disable_preview()
 
     engine_id = engine.SciGraphsRenderEngine.bl_idname

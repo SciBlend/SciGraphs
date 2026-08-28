@@ -1,16 +1,17 @@
-# Click to inspect: the nearest node within a pixel radius.
-
-import bpy
 import numpy as np
 
-from .attributes import read_attribute_values, scalar_attr_items
-from .state import is_enabled, is_graph_object
 
 
-def pick_nearest_node(context, obj, mouse_x, mouse_y, radius_px=20.0):
-    """Node index, or None when nothing is inside ``radius_px``."""
-    region = context.region
-    rv3d = context.region_data
+def pick_nearest_node(context, obj, mouse_x, mouse_y, radius_px=20.0,
+                      region=None, rv3d=None):
+    """Node index, or None when nothing is inside ``radius_px``.
+
+    ``region``/``rv3d`` are explicit for callers that are not running in the
+    region they mean. A modal operator started from a timer has neither on its
+    context, and reading them off it there silently picks nothing.
+    """
+    region = region if region is not None else getattr(context, "region", None)
+    rv3d = rv3d if rv3d is not None else getattr(context, "region_data", None)
     if region is None or rv3d is None:
         return None
 
@@ -48,47 +49,3 @@ def pick_nearest_node(context, obj, mouse_x, mouse_y, radius_px=20.0):
     if dist2[nearest] > radius_px * radius_px:
         return None
     return nearest
-
-
-class SCIGRAPHS_OT_pick_node(bpy.types.Operator):
-    bl_idname = "scigraphs.pick_node"
-    bl_label = "Pick Node"
-    bl_description = "Click the nearest node to read its index and attributes (Esc/right-click to stop)"
-
-    def modal(self, context, event):
-        if event.type in {'RIGHTMOUSE', 'ESC'}:
-            context.workspace.status_text_set(None)
-            return {'CANCELLED'}
-
-        if event.type != 'LEFTMOUSE' or event.value != 'PRESS':
-            return {'PASS_THROUGH'}
-        if context.area is None or context.area.type != 'VIEW_3D':
-            return {'PASS_THROUGH'}
-        obj = context.active_object
-        if not is_graph_object(obj):
-            return {'RUNNING_MODAL'}
-        idx = pick_nearest_node(
-            context, obj,
-            event.mouse_region_x, event.mouse_region_y,
-        )
-        if idx is None:
-            self.report({'INFO'}, "No node under cursor")
-            return {'RUNNING_MODAL'}
-
-        obj["scigraphs_preview_picked"] = idx
-        attr_bits = []
-        for name, *_ in scalar_attr_items(obj)[:4]:
-            vals = read_attribute_values(obj.data, name)
-            if vals.size > idx:
-                attr_bits.append(f"{name}={vals[idx]:.3g}")
-        extra = ("  |  " + ", ".join(attr_bits)) if attr_bits else ""
-        self.report({'INFO'}, f"Node #{idx}{extra}")
-        return {'RUNNING_MODAL'}
-
-    def invoke(self, context, event):
-        if not is_enabled():
-            self.report({'WARNING'}, "Enable the GPU preview first")
-            return {'CANCELLED'}
-        context.workspace.status_text_set("Pick Node: click nodes  |  Esc/Right-click to stop")
-        context.window_manager.modal_handler_add(self)
-        return {'RUNNING_MODAL'}

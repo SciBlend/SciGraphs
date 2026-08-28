@@ -6,6 +6,7 @@ class SCIGRAPHS_PT_export(bpy.types.Panel):
     """Main export and tools panel."""
     bl_label = "Export & Tools"
     bl_parent_id = "SCIGRAPHS_PT_main"
+    bl_order = 5
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_options = {'DEFAULT_CLOSED'}

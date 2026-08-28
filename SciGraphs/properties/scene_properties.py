@@ -30,6 +30,21 @@ def _feat_type_items(self, context):
     return items
 
 
+def _retune_running_layout(self, context):
+    """Push a force slider into a running GPU preview animation.
+
+    The frame handler already diffs these every frame, so this only matters
+    while the timeline is paused: without it a slider dragged at a standstill
+    does nothing until the next frame. ``apply_scene_params`` returns on an
+    empty playback table, so with nothing running this is a dict lookup.
+    """
+    try:
+        from ..ui.gpu_render.playback import apply_scene_params
+        apply_scene_params(context.scene)
+    except Exception:  # noqa: BLE001 - never break the properties UI
+        pass
+
+
 class CSVColumnItem(bpy.types.PropertyGroup):
     """Property group to store information about a CSV column."""
     name: StringProperty(name="Column Name")
@@ -405,19 +420,19 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('HELIX', "Helix (3D)", "Double helix pattern like DNA structure (instant)"),
             ('CUBE', "Cube (3D)", "Distribute nodes in and on a cube (instant)"),
             
-            ('SPECTRAL_3D', "Spectral (3D)", "Use graph Laplacian eigenvectors for 3D positioning (fast)"),
+            ('SPECTRAL_3D', "Spectral (3D)", "Graph Laplacian eigenvectors. Solved per connected component"),
             ('MDS_3D', "MDS (3D)", "Multidimensional scaling using shortest path distances (medium)"),
             ('HIERARCHICAL_3D', "Hierarchical (3D)", "Tree-like hierarchy in layers (fast)"),
             ('BIPARTITE_3D', "Bipartite (3D)", "Two parallel planes for bipartite graphs (fast)"),
             
             # The 2D/3D in each label was measured, not read off the docs.
             ('FORCEATLAS2', "ForceAtlas2 (3D)", "Gephi's algorithm (Jacomy et al. 2014), via networkx (medium)"),
-            ('YIFAN_HU', "Yifan Hu (2D + Z)", "Planar force-directed placement with a synthesized Z axis, via scigraphs-utils"),
+            ('YIFAN_HU', "Yifan Hu", "Multilevel force-directed placement via scigraphs-utils. The Dimensions setting picks flat, flat with a synthesized Z, or native 3D"),
             ('IGRAPH_DRL', "DrL (3D - igraph)", "Distributed Recursive Layout for huge graphs 100k+ (very fast)"),
             ('IGRAPH_FR', "Fruchterman-Reingold (3D - igraph)", "Classic force-directed in 3D (fast)"),
             ('IGRAPH_KK', "Kamada-Kawai (3D - igraph)", "Deterministic 3D layout, reproducible (medium)"),
             ('IGRAPH_LGL', "LGL (2D - igraph)", "Large Graph Layout, optimized for massive graphs (fast)"),
-            ('SPRING_3D', "Spring (3D - NetworkX)", "Force-directed 3D layout via NetworkX (fast: 81 ms on 240 nodes)"),
+            ('SPRING_3D', "Spring (3D - NetworkX)", "Force-directed 3D layout via NetworkX. Quadratic: unusable past a few thousand nodes"),
 
             ('GRAPHVIZ_DOT', "Graphviz Dot (2D)", "Hierarchical layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_NEATO', "Graphviz Neato (2D)", "Spring model layout via bundled scigraphs-utils"),
@@ -428,7 +443,7 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
             ('GRAPHVIZ_OSAGE', "Graphviz Osage (2D)", "Cluster layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_PATCHWORK', "Graphviz Patchwork (2D)", "Patchwork layout via bundled scigraphs-utils"),
             
-            ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Hierarchical DAG layout, minimizes crossings (fast)"),
+            ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Layered DAG drawing with heuristic crossing reduction. Slower than the force layouts"),
             ('CIRCULAR_HIERARCHY', "Circular Hierarchy (2D - Directed)", "Concentric circles from roots (fast)"),
         ],
         # Not Yifan Hu: it aborts Blender outright on a few hundred nodes.
@@ -438,10 +453,16 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
 
     iterations: IntProperty(
         name="Iterations",
-        description="Number of iterations for layout simulation",
-        default=50,
+        description=(
+            "Iterations of the layout simulation. 50 was never enough: measured "
+            "on a 32x32 grid, graph-distance correlation is 0.37 at 50 against "
+            "0.86 at 200, and a force layout that stops early reads as a "
+            "different graph rather than as a rougher one. Raise it when the "
+            "log says the layout is still moving"
+        ),
+        default=200,
         min=1,
-        max=1000,
+        max=2000,
         options=set(),
     )
     
@@ -461,6 +482,7 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         min=0.1,
         max=100.0,
         options=set(),
+        update=_retune_running_layout,
     )
     
     repulsion_strength: FloatProperty(
@@ -469,6 +491,7 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=1.0,
         min=0.0,
         max=10.0,
+        update=_retune_running_layout,
     )
     
     attraction_strength: FloatProperty(
@@ -477,6 +500,7 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=1.0,
         min=0.0,
         max=10.0,
+        update=_retune_running_layout,
     )
     
     gravity_strength: FloatProperty(
@@ -485,6 +509,7 @@ class SciGraphsProperties(bpy.types.PropertyGroup):
         default=0.1,
         min=0.0,
         max=5.0,
+        update=_retune_running_layout,
     )
     
     cooling_factor: FloatProperty(

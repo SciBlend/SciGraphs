@@ -17,7 +17,9 @@ TEX_ROW = shaders.POS_TEX_ROW
 # 64 is a wavefront on AMD and two warps on NVIDIA.
 GROUP = 64
 
-_MAX_EXACT_INDEX = 1 << 24
+_MAX_EXACT_INDEX = 1 << 23
+
+_OFFSET_SPLIT = 1 << 12
 
 
 def available():
@@ -41,8 +43,8 @@ def build_adjacency(edges, num_nodes):
         return None
     if num_nodes >= _MAX_EXACT_INDEX:
         raise ValueError(
-            f"{num_nodes} nodes exceeds the {_MAX_EXACT_INDEX} that a float32 "
-            "index can address exactly")
+            f"{num_nodes} nodes exceeds the {_MAX_EXACT_INDEX} a float32 texel "
+            "decodes exactly; the layout would read the wrong neighbours")
 
     # Both directions: the force is symmetric and each endpoint must see it.
     both = np.concatenate([edges, edges[:, ::-1]], axis=0)
@@ -54,8 +56,9 @@ def build_adjacency(edges, num_nodes):
     starts = np.concatenate([[0], np.cumsum(degree)[:-1]])
 
     offsets = np.zeros((num_nodes, 4), dtype=np.float32)
-    offsets[:, 0] = starts
+    offsets[:, 0] = starts % _OFFSET_SPLIT
     offsets[:, 1] = degree
+    offsets[:, 2] = starts // _OFFSET_SPLIT
     nbrs = np.zeros((dst.size, 4), dtype=np.float32)
     nbrs[:, 0] = dst
 
@@ -91,14 +94,15 @@ void main()
   vec3 force = vec3(0.0);
 
   // Attraction: walk this node's slice of the CSR and sum the pulls. Linear in
-  // the separation (ForceAtlas2), divided by the source mass when the outbound
-  // distribution is on -- the same two lines as the numpy reference.
+  // the separation (ForceAtlas2), divided by the pair's mean mass so the pull is
+  // equal and opposite -- the same two lines as the numpy reference.
   vec4 off = imageLoad(adj_off, scig_texel(i));
-  int start = int(off.x + 0.5);
+  int start = int(off.x + 0.5) + int(off.z + 0.5) * {_OFFSET_SPLIT};
   int deg = int(off.y + 0.5);
   for (int e = 0; e < deg; ++e) {{
     int j = int(imageLoad(adj_nbr, scig_texel(start + e)).x + 0.5);
-    vec3 q = imageLoad(pos_img, scig_texel(j)).xyz;
+    vec4 o = imageLoad(pos_img, scig_texel(j));
+    vec3 q = o.xyz;
     vec3 d = q - p;
     float len = length(d);
     float factor = u_attraction;
@@ -107,7 +111,7 @@ void main()
     }} else if (u_model == 2) {{   // LinLog: log(1 + d)
       factor *= log(1.0 + len) / max(len, 1e-9);
     }}
-    if (u_model != 1) {{ factor /= max(m, 1e-9); }}
+    if (u_model != 1) {{ factor /= max(0.5 * (m + o.w), 1e-9); }}
     force += d * factor;
   }}
 
@@ -196,7 +200,10 @@ def _force_shader():
     return _SHADER
 
 
-MODEL_CODES = {'FA2': 0, 'FR': 1, 'LINLOG': 2}
+MODEL_CODES = {'FA2': 0, 'FR': 1, 'LINLOG': 2, 'YIFAN_HU': 1}
+
+INT_FA2 = 0
+INT_YIFAN_HU = 1
 
 
 def build_near(near_idx):
@@ -554,27 +561,37 @@ void main()
   }}
   if (u_dims < 3) {{ force.z = 0.0; }}
 
-  // ForceAtlas2's per-node step, damped by how much this node reversed
-  // direction since the previous force. That damping is what stops a node
-  // pulled by two neighbors at once from oscillating.
   vec3 prev = imageLoad(prev_img, t).xyz;
   float swing = length(force - prev);
-  float factor = u_speed / (1.0 + u_speed * sqrt(swing));
-  vec3 disp = force * factor;
+  float flen = length(force);
+  vec3 disp;
 
-  // No node moves more than one optimal distance in a step.
-  float n = length(disp);
-  if (n > u_cap) {{ disp *= u_cap / n; }}
+  if (u_integrator == 1) {{
+    // Yifan Hu: every node travels u_step, along its own force. The distance
+    // is global and only it cools, so there is no per-node damping and no cap
+    // -- the cap is what the step size already is.
+    disp = force * (u_step / max(flen, 1e-12));
+  }} else {{
+    // ForceAtlas2's per-node step, damped by how much this node reversed
+    // direction since the previous force. That damping is what stops a node
+    // pulled by two neighbors at once from oscillating.
+    float factor = u_speed / (1.0 + u_speed * sqrt(swing));
+    disp = force * factor;
+    // No node moves more than one optimal distance in a step.
+    float n = length(disp);
+    if (n > u_cap) {{ disp *= u_cap / n; }}
+  }}
 
   vec3 np_ = p + disp;
   if (u_dims < 3) {{ np_.z = 0.0; }}
   imageStore(pos_out, t, vec4(np_, m));
   imageStore(prev_out, t, vec4(force, 0.0));
   // Everything the global reduction needs, per node: the two mass-weighted sums
-  // ForceAtlas2's adaptive speed is a ratio of, and the displacement the caller
-  // reports as "how much did it move".
+  // ForceAtlas2's adaptive speed is a ratio of, the displacement the caller
+  // reports as "how much did it move", and the force norm Yifan Hu's step rule
+  // compares against the previous iteration's.
   float traction = length(0.5 * (force + prev));
-  imageStore(step_img, t, vec4(m * swing, m * traction, length(disp), 0.0));
+  imageStore(step_img, t, vec4(m * swing, m * traction, length(disp), flen));
 }}
 """
 
@@ -593,14 +610,14 @@ void main()
   int lane = int(gl_GlobalInvocationID.x);
   if (lane >= {REDUCE_LANES}) {{ return; }}
   vec3 psum = vec3(0.0);
-  vec3 ssum = vec3(0.0);
+  vec4 ssum = vec4(0.0);
   for (int i = lane; i < u_count; i += {REDUCE_LANES}) {{
     ivec2 t = scig_texel(i);
     psum += imageLoad(pos_img, t).xyz;
-    ssum += imageLoad(step_img, t).xyz;
+    ssum += imageLoad(step_img, t);
   }}
   imageStore(part_pos, scig_texel(lane), vec4(psum, 0.0));
-  imageStore(part_step, scig_texel(lane), vec4(ssum, 0.0));
+  imageStore(part_step, scig_texel(lane), ssum);
 }}
 """
 
@@ -659,9 +676,11 @@ def _integrate_shader():
         info.push_constant('INT', "u_count")
         info.push_constant('INT', "u_strong_gravity")
         info.push_constant('INT', "u_dims")
+        info.push_constant('INT', "u_integrator")
         info.push_constant('FLOAT', "u_gravity")
         info.push_constant('FLOAT', "u_speed")
         info.push_constant('FLOAT', "u_cap")
+        info.push_constant('FLOAT', "u_step")
         info.push_constant('VEC3', "u_center")
         info.compute_source(_INTEGRATE_SRC)
         _INT_SHADER = gpu.shader.create_from_info(info)
@@ -679,7 +698,11 @@ def _blank(count):
 
 class GpuSim:
     """Positions live on the GPU and stay there. One step is two dispatches, with
-    two of every texture, since an invocation cannot read what another writes."""
+    two of every texture, since an invocation cannot read what another writes.
+
+    ``params`` is re-read on every dispatch, so :meth:`set_params` retunes a
+    running simulation; masses ride in the position texture's .w, so a change
+    to those goes through :meth:`set_state` instead."""
 
     def __init__(self, coords, edges, mass, k, params):
         self.n = int(coords.shape[0])
@@ -703,6 +726,32 @@ class GpuSim:
         self.moved = 0.0
         self.center = np.zeros(3, dtype=np.float32)
 
+    def set_params(self, params):
+        """Merge new force parameters in. ``k`` is also the integrator's step
+        cap, which is a uniform rather than a dict entry, so it is mirrored."""
+        self.params.update(params)
+        self.jitter_tolerance = float(
+            self.params.get("jitter_tolerance", self.jitter_tolerance))
+        if "k" in params:
+            self.k = float(params["k"])
+
+    def set_state(self, coords, mass, reset=True):
+        """Re-upload positions and masses. With ``reset`` the previous force
+        and the adaptive speed go too, so the next step starts as if this were
+        the first; without it only the textures change. Either way the bins and
+        the neighbor list are dropped, since they described the old positions.
+        """
+        self.pos_a = build_nodes(coords, mass)
+        self.pos_b = _blank(self.n)
+        if reset:
+            self.prev_a = _blank(self.n)
+            self.prev_b = _blank(self.n)
+            self.speed = 1.0
+            self.moved = 0.0
+            self.step_tex = _blank(self.n)
+        self.near, self.near_k = None, 0
+        self.bins = None
+
     def reduce(self):
         """Centroid, adaptive speed and movement: 2 x 256 texels back, always."""
         shader = _reduce_shader()
@@ -717,10 +766,11 @@ class GpuSim:
         gpu.compute.dispatch(shader, (REDUCE_LANES + GROUP - 1) // GROUP, 1, 1)
 
         psum = np.asarray(self.part_pos.read()).reshape(-1, 4)[:REDUCE_LANES, :3]
-        ssum = np.asarray(self.part_step.read()).reshape(-1, 4)[:REDUCE_LANES, :3]
+        ssum = np.asarray(self.part_step.read()).reshape(-1, 4)[:REDUCE_LANES]
         self.center = (psum.sum(axis=0) / max(self.n, 1)).astype(np.float32)
-        total_swing, total_traction, moved = ssum.sum(axis=0)
+        total_swing, total_traction, moved, fnorm = ssum.sum(axis=0)
         self.moved = float(moved)
+        self.fnorm = float(fnorm)
 
         # ForceAtlas2's rule, clamped to 50% per step against oscillation.
         if total_swing > 0.0:
@@ -730,13 +780,15 @@ class GpuSim:
         self.speed = float(np.clip(self.speed, 1e-4, 10.0))
         return True
 
-    def advance(self, cells, cell_of, gravity, strong_gravity=False, dims=3):
+    def advance(self, cells, cell_of, gravity, strong_gravity=False, dims=3,
+                integrator=0, yh_step=0.0):
         """One step, centroid and speed from :meth:`reduce`. The first iteration
         has no previous force to swing against and keeps the starting speed."""
         if not self.reduce():
             return False
         return self.step(cells, cell_of, self.center, self.speed, gravity,
-                         strong_gravity=strong_gravity, dims=dims)
+                         strong_gravity=strong_gravity, dims=dims,
+                         integrator=integrator, yh_step=yh_step)
 
     def set_near(self, near_idx):
         if near_idx is None:
@@ -766,7 +818,7 @@ class GpuSim:
         return np.asarray(self.pos_a.read()).reshape(-1, 4)[:self.n, :3].copy()
 
     def step(self, cells, cell_of, center, speed, gravity, strong_gravity=False,
-             dims=3):
+             dims=3, integrator=0, yh_step=0.0):
         fshader = _force_shader()
         ishader = _integrate_shader()
         if fshader is None or ishader is None:
@@ -789,9 +841,11 @@ class GpuSim:
         ishader.uniform_int("u_count", self.n)
         ishader.uniform_int("u_strong_gravity", 1 if strong_gravity else 0)
         ishader.uniform_int("u_dims", int(dims))
+        ishader.uniform_int("u_integrator", int(integrator))
         ishader.uniform_float("u_gravity", float(gravity))
         ishader.uniform_float("u_speed", float(speed))
         ishader.uniform_float("u_cap", float(self.k))
+        ishader.uniform_float("u_step", float(yh_step))
         ishader.uniform_float("u_center", tuple(float(c) for c in center))
         gpu.compute.dispatch(ishader, (self.n + GROUP - 1) // GROUP, 1, 1)
 

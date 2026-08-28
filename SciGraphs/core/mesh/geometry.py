@@ -251,66 +251,45 @@ def create_graph_object(graph_data, is_directed=False, selected_attributes=None,
     
     mesh_start = time.time()
     mesh = bpy.data.meshes.new(name="SciGraph_Mesh")
-    bm = bmesh.new()
-    
-    bm.verts.ensure_lookup_table()
-    verts = []
-    for i in range(num_nodes):
-        pos = initial_positions[i]
-        v = bm.verts.new(pos)
-        verts.append(v)
-    
-    bm.verts.ensure_lookup_table()
-    bm.verts.index_update()
+    mesh.vertices.add(num_nodes)
+    mesh.vertices.foreach_set(
+        "co", np.ascontiguousarray(initial_positions, dtype=np.float32).ravel())
     log(f"  Vertices created in {time.time() - mesh_start:.2f}s")
     
     edges_start = time.time()
     
     node_to_idx = {node: i for i, node in enumerate(graph_data.nodes)}
     
-    edge_df_indices = []
-    
-    created_edges = set()
-    
     num_edges = len(graph_data.edges)
-    batch_size = 10000
-    edges_created = 0
-    
-    self_loops_skipped = 0
-    
-    for edge_idx, (src, tgt) in enumerate(graph_data.edges):
-        if src in node_to_idx and tgt in node_to_idx:
-            src_idx = node_to_idx[src]
-            tgt_idx = node_to_idx[tgt]
-            
-            if remove_self_loops and src_idx == tgt_idx:
-                self_loops_skipped += 1
-                continue
-            
-            if src_idx < len(verts) and tgt_idx < len(verts):
-                edge_key = (min(src_idx, tgt_idx), max(src_idx, tgt_idx))
-                
-                if edge_key not in created_edges:
-                    try:
-                        bm.edges.new([verts[src_idx], verts[tgt_idx]])
-                        created_edges.add(edge_key)
-                        edge_df_indices.append(edge_idx)
-                        edges_created += 1
-                    except ValueError:
-                        pass
-        
-        if (edge_idx + 1) % batch_size == 0:
-            progress = (edge_idx + 1) / num_edges * 100
-            log(f"  Creating edges: {progress:.0f}% ({edge_idx + 1:,}/{num_edges:,})")
-    
+    src_idx = np.fromiter((node_to_idx.get(s, -1) for s, _ in graph_data.edges),
+                          dtype=np.int64, count=num_edges)
+    tgt_idx = np.fromiter((node_to_idx.get(t, -1) for _, t in graph_data.edges),
+                          dtype=np.int64, count=num_edges)
+
+    known = (src_idx >= 0) & (tgt_idx >= 0)
+    loops = known & (src_idx == tgt_idx)
+    self_loops_skipped = int(loops.sum()) if remove_self_loops else 0
+    keep = known & ~loops if remove_self_loops else known
+
+    original = np.flatnonzero(keep)
+    lo = np.minimum(src_idx[keep], tgt_idx[keep])
+    hi = np.maximum(src_idx[keep], tgt_idx[keep])
+    _, first = np.unique(lo * np.int64(num_nodes) + hi, return_index=True)
+    first.sort()
+
+    edge_df_indices = original[first].tolist()
+    edges_created = int(first.size)
+    pairs = np.empty((edges_created, 2), dtype=np.int32)
+    pairs[:, 0] = lo[first]
+    pairs[:, 1] = hi[first]
+
+    mesh.edges.add(edges_created)
+    mesh.edges.foreach_set("vertices", pairs.ravel())
+    mesh.update()
+
     log(f"  {edges_created:,} edges created in {time.time() - edges_start:.2f}s")
     if self_loops_skipped > 0:
         log(f"  {self_loops_skipped:,} self-loops removed")
-    
-    convert_start = time.time()
-    bm.to_mesh(mesh)
-    bm.free()
-    log(f"  Mesh conversion in {time.time() - convert_start:.2f}s")
     
     obj_start = time.time()
     obj = bpy.data.objects.new("SciGraph_Object", mesh)

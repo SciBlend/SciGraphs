@@ -7,6 +7,7 @@ import numpy as np
 from gpu_extras.batch import batch_for_shader
 
 from . import dynamic, filter_gpu, labels, shaders
+from ...core.render import lod
 from .draw import draw_blocks, draw_graph_object, get_cache_entry
 from .state import is_graph_object
 def _settings(scene, st=None):
@@ -79,7 +80,8 @@ def _downsample_color(color, s):
 
 
 def _gpu_resolve(texture, sx, sy, s):
-    """Box-filter on the GPU, or None. 32F, since 8-bit would round back."""
+    """Box-filter on the GPU, or None. 32F, since 8-bit would round back. The
+    uncached fallback; _render_beauty goes through _RENDER_FBO instead."""
     from . import shaders
 
     sh = shaders.get_resolve_shader()
@@ -98,6 +100,7 @@ def _gpu_resolve(texture, sx, sy, s):
             sh.bind()
             sh.uniform_sampler("src", texture)
             sh.uniform_int("u_s", int(s))
+            sh.uniform_int("u_premul", 0)
             batch.draw(sh)
             gpu.state.blend_set(prev_blend)
             return np.array(fb.read_color(0, 0, sx, sy, 4, 0, 'FLOAT'),
@@ -277,6 +280,23 @@ def _gpu_depth_of_field(color, depth01, proj, cam, scene, sx, sy, seeds=4,
     return (acc / max(1, seeds)).astype(np.float32)
 
 
+def _composite_legend(scene, sx, sy, color, st=None):
+    """The color key over the finished frame. After labels and after DoF: it is
+    an annotation on the figure, not part of the scene, so nothing may blur or
+    occlude it."""
+    from . import legend
+    objs = _graph_objects(scene)
+    if not objs:
+        return color
+    spec = legend.spec_from_scene(scene, objs[0], st=st)
+    if spec is None:
+        return color
+    try:
+        return legend.composite(scene, sx, sy, spec, color)
+    except Exception:  # noqa: BLE001 - an annotation must never lose the render
+        return color
+
+
 def _composite_labels(scene, persp, sx, sy, dist_buf, color):
     items = []
     for obj in _graph_objects(scene):
@@ -308,6 +328,45 @@ def _composite_labels(scene, persp, sx, sy, dist_buf, color):
 _VIEW_FBO = {"size": None, "color": None, "depth": None, "fb": None,
              "blur": None, "blur_fb": None}
 
+_RENDER_FBO = {"owner": None, "rsize": None, "size": None}
+
+
+def _render_fbo(owner, rsx, rsy, sx, sy):
+    """Cached targets and readback buffers for one beauty pass. Allocating these
+    per call cost 10.54 ms against 4.68 (offscreen, batch, Buffer and the numpy
+    copy together), and a fresh read Buffer costs 83.4 ms against 16.2 reused."""
+    c = _RENDER_FBO
+    if c["owner"] != owner:
+        c.pop("quad_resolve", None)
+        c.pop("quad_depth", None)
+    if c["owner"] != owner or c["rsize"] != (rsx, rsy):
+        c["color"] = gpu.types.GPUTexture((rsx, rsy), format='RGBA8')
+        c["depth"] = gpu.types.GPUTexture((rsx, rsy),
+                                          format='DEPTH_COMPONENT32F')
+        c["fb"] = gpu.types.GPUFrameBuffer(depth_slot=c["depth"],
+                                           color_slots=c["color"])
+        c["rsize"] = (rsx, rsy)
+    if c["owner"] != owner or c["size"] != (sx, sy):
+        c["res_tex"] = gpu.types.GPUTexture((sx, sy), format='RGBA32F')
+        c["res_fb"] = gpu.types.GPUFrameBuffer(color_slots=c["res_tex"])
+        c["dep_tex"] = gpu.types.GPUTexture((sx, sy), format='RG32F')
+        c["dep_fb"] = gpu.types.GPUFrameBuffer(color_slots=c["dep_tex"])
+        c["color_buf"] = gpu.types.Buffer('FLOAT', (sy, sx, 4))
+        c["depth_buf"] = gpu.types.Buffer('FLOAT', (sy, sx, 2))
+        c["size"] = (sx, sy)
+    c["owner"] = owner
+    return c
+
+
+def _quad_batch(cache, key, shader):
+    """One full-screen TRI_FAN per shader, kept for the life of the cache."""
+    batch = cache.get(key)
+    if batch is None:
+        batch = batch_for_shader(
+            shader, 'TRI_FAN', {"pos": ((-1, -1), (1, -1), (1, 1), (-1, 1))})
+        cache[key] = batch
+    return batch
+
 
 def _get_view_fbo(rw, rh):
     if _VIEW_FBO["size"] != (rw, rh):
@@ -321,6 +380,18 @@ def _get_view_fbo(rw, rh):
                          fb=fb, blur=blur_tex, blur_fb=blur_fb)
     return (_VIEW_FBO["color"], _VIEW_FBO["depth"], _VIEW_FBO["fb"],
             _VIEW_FBO["blur"], _VIEW_FBO["blur_fb"])
+
+
+def _draw_grid(scene, obj, view, proj, viewport):
+    """The layout grid overlay, in the object's own space like the graph."""
+    if not bool(getattr(scene, "scigraphs_preview_grid_show", False)):
+        return
+    from . import grid_overlay
+    with gpu.matrix.push_pop():
+        with gpu.matrix.push_pop_projection():
+            gpu.matrix.load_projection_matrix(proj)
+            gpu.matrix.load_matrix(view @ obj.matrix_world)
+            grid_overlay.draw(scene, viewport, obj=obj)
 
 
 def _background_color(scene, st=None):
@@ -341,7 +412,7 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
     def update_render_passes(self, scene=None, renderlayer=None):
         self.register_pass(scene, renderlayer, "Combined", 4, "RGBA", 'COLOR')
         self.register_pass(scene, renderlayer, "Depth", 1, "Z", 'VALUE')
-        self.register_pass(scene, renderlayer, "NodeID", 4, "RGBA", 'COLOR')
+        self.register_pass(scene, renderlayer, "NodeID", 4, "XYZW", 'VECTOR')
         self.register_pass(scene, renderlayer, "Overdraw", 1, "X", 'VALUE')
 
 
@@ -380,13 +451,110 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
         return view, proj, persp
 
     def _render_beauty(self, depsgraph, scene, sx, sy, st=None):
-        """Combined as (color, linear_depth), supersampled then averaged down."""
+        """Combined as (color, linear_depth), supersampled then reduced on the GPU.
+
+        Both returned arrays are VIEWS into the cached readback buffers, valid
+        until the next beauty pass. render() feeds them straight to _store,
+        whose foreach_set copies. Anything that keeps one across frames must
+        copy it first, or it will quietly show the following frame.
+        """
         st = _settings(scene, st)
         mats = self._camera_matrices(depsgraph, scene, sx, sy)
         if mats is None:
             self.report({'WARNING'}, "SciGraphs: no active camera")
             return None, None
         view, proj, persp = mats
+        bg = _background_color(scene)
+        s = _aa_factor(scene, sx, sy)
+        rsx, rsy = sx * s, sy * s
+
+        depth_test = bool(st.depth_test)
+        cam = scene.camera
+        dof_on = (cam is not None and cam.type == 'CAMERA'
+                  and _dof_params(cam, sx) is not None)
+        labels_on = labels.labels_enabled(scene, st=st)
+
+        from . import shaders
+        res_sh = shaders.get_resolve_shader()
+        dep_sh = shaders.get_depth_resolve_shader()
+        if res_sh is None or dep_sh is None:
+            return self._render_beauty_numpy(depsgraph, scene, sx, sy, st=st)
+
+        premul = not (dof_on or labels_on)
+
+        c = _render_fbo(self.as_pointer(), rsx, rsy, sx, sy)
+        fb = c["fb"]
+
+        def _draw_all():
+            for obj in _graph_objects(scene):
+                entry = get_cache_entry(obj, scene)
+                if entry is None:
+                    continue
+                self._draw_object(entry, scene, obj, view, proj, persp, rsy)
+                _draw_grid(scene, obj, view, proj, (rsx, rsy))
+
+        with fb.bind():
+            fb.clear(color=bg, depth=1.0)
+            gpu.state.depth_test_set('LESS_EQUAL')
+            gpu.state.depth_mask_set(True)
+            _draw_all()
+            gpu.state.depth_mask_set(False)
+            gpu.state.depth_test_set('NONE')
+            if not depth_test:
+                fb.clear(color=bg)
+                _draw_all()
+
+        prev_blend = gpu.state.blend_get()
+        gpu.state.blend_set('NONE')
+        gpu.state.depth_test_set('NONE')
+        gpu.state.depth_mask_set(False)
+
+        with c["res_fb"].bind():
+            res_sh.bind()
+            res_sh.uniform_sampler("src", c["color"])
+            res_sh.uniform_int("u_s", int(s))
+            res_sh.uniform_int("u_premul", 1 if premul else 0)
+            _quad_batch(c, "quad_resolve", res_sh).draw(res_sh)
+            gpu.state.active_framebuffer_get().read_color(
+                0, 0, sx, sy, 4, 0, 'FLOAT', data=c["color_buf"])
+
+        with c["dep_fb"].bind():
+            dep_sh.bind()
+            dep_sh.uniform_sampler("src", c["depth"])
+            dep_sh.uniform_int("u_s", int(s))
+            dep_sh.uniform_float("u_a", float(proj[2][2]))
+            dep_sh.uniform_float("u_b", float(proj[2][3]))
+            _quad_batch(c, "quad_depth", dep_sh).draw(dep_sh)
+            gpu.state.active_framebuffer_get().read_color(
+                0, 0, sx, sy, 2, 0, 'FLOAT', data=c["depth_buf"])
+        gpu.state.blend_set(prev_blend)
+
+        color = np.asarray(c["color_buf"])
+        dep = np.asarray(c["depth_buf"])
+        linear = dep[..., 0]
+
+        if dof_on:
+            color = _gpu_depth_of_field(
+                color, np.ascontiguousarray(dep[..., 1]), proj, cam, scene,
+                sx, sy)
+
+        # After DoF, so labels stay crisp; occlusion comes from the depth.
+        if labels_on:
+            color = _composite_labels(scene, persp, sx, sy, dep[..., 0], color)
+        color = _composite_legend(scene, sx, sy, color, st=st)
+
+        if not premul:
+            color = np.ascontiguousarray(color, dtype=np.float32)
+            np.clip(color, 0.0, None, out=color)
+            color[..., :3] *= color[..., 3:4]
+
+        return color, linear
+
+    def _render_beauty_numpy(self, depsgraph, scene, sx, sy, st=None):
+        """The pre-GPU-resolve path, kept for backends that reject either resolve
+        shader. Reads the supersampled buffers back whole and reduces in numpy."""
+        st = _settings(scene, st)
+        view, proj, persp = self._camera_matrices(depsgraph, scene, sx, sy)
         bg = _background_color(scene)
         s = _aa_factor(scene, sx, sy)
         rsx, rsy = sx * s, sy * s
@@ -402,12 +570,12 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
                 if entry is None:
                     continue
                 self._draw_object(entry, scene, obj, view, proj, persp, rsy)
+                _draw_grid(scene, obj, view, proj, (rsx, rsy))
 
         offscreen = gpu.types.GPUOffScreen(rsx, rsy)
         try:
             with offscreen.bind():
                 fb = gpu.state.active_framebuffer_get()
-
                 # Depth Test off draws the graph see-through.
                 fb.clear(color=bg, depth=1.0)
                 if depth_test:
@@ -445,10 +613,9 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
         if dof_on:
             color = _gpu_depth_of_field(color, depth_min, proj, cam, scene,
                                         sx, sy)
-
-        # After DoF, so labels stay crisp; occlusion comes from the depth.
         if labels.labels_enabled(scene, st=st):
             color = _composite_labels(scene, persp, sx, sy, linear, color)
+        color = _composite_legend(scene, sx, sy, color, st=st)
 
         # Blender stores Combined premultiplied and this path is straight alpha,
         # so associate here or transparency shows halos in the compositor.
@@ -458,16 +625,31 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
 
         return color, linear
 
-    def _render_id(self, depsgraph, scene, sx, sy):
+    def _render_id(self, depsgraph, scene, sx, sy, st=None):
+        """Encoded ids, byte for byte as the shader wrote them.
+
+        The buffer is RGBA8 -- GPUOffScreen's default -- so it is read as UBYTE.
+        Asking for 'FLOAT' made the driver expand 4 bytes per pixel into 4
+        floats on the way out: 13.4 ms against 2.7 at 1080p, 141.3 against 13.4
+        at 4K, for pixels that only ever hold 256 distinct values.
+        """
+        st = _settings(scene, st)
         mats = self._camera_matrices(depsgraph, scene, sx, sy)
         if mats is None:
             return None
-        view, proj, _persp = mats
+        view, proj, persp = mats
         from . import shaders
+        from .draw import _entry_center, _pixel_radius, _select_edge_rep
 
         id_shader = shaders.get_sphere_id_shader()
-        if id_shader is None:
+        edge_id_shader = shaders.get_ribbon_id_shader()
+        if id_shader is None and edge_id_shader is None:
             return None
+
+        show_edges = bool(st.show_edges)
+        scale = lod.px_scale(sy)
+        edge_rscale = float(st.edge_radius_scale)
+        base_radius = float(st.impostor_radius)
 
         offscreen = gpu.types.GPUOffScreen(sx, sy)
         try:
@@ -478,36 +660,62 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
                 gpu.state.depth_mask_set(True)
                 for obj in _graph_objects(scene):
                     entry = get_cache_entry(obj, scene)
-                    if entry is None or entry["reps"].get("sphere_id") is None:
+                    if entry is None:
+                        continue
+                    measured = entry.get("_cut_entry") \
+                        if entry.get("_adaptive_active") else None
+                    measured = (measured or {}).get("entry") or entry
+                    node_batch = measured["reps"].get("sphere_id")
+
+                    px = _pixel_radius(obj, _entry_center(entry), base_radius,
+                                       persp, sy)
+                    edge_rep = _select_edge_rep(scene, px * edge_rscale / scale,
+                                                st=st)
+                    edge_batch = measured["reps"].get("ribbon_id") \
+                        if show_edges and edge_rep == 'RIBBON' else None
+
+                    passes = [(sh, b) for sh, b
+                              in ((id_shader, node_batch),
+                                  (edge_id_shader, edge_batch))
+                              if sh is not None and b is not None]
+                    if not passes:
                         continue
                     with gpu.matrix.push_pop(), gpu.matrix.push_pop_projection():
                         gpu.matrix.load_matrix(view @ obj.matrix_world)
                         gpu.matrix.load_projection_matrix(proj)
                         modelview = gpu.matrix.get_model_view_matrix()
                         projm = gpu.matrix.get_projection_matrix()
-                        id_shader.bind()
-                        id_shader.uniform_float("u_view", modelview)
-                        id_shader.uniform_float("u_proj", projm)
-                        entry["reps"]["sphere_id"].draw(id_shader)
+                        for shader, batch in passes:
+                            shader.bind()
+                            shader.uniform_float("u_view", modelview)
+                            shader.uniform_float("u_proj", projm)
+                            batch.draw(shader)
                 gpu.state.depth_test_set('NONE')
                 gpu.state.depth_mask_set(False)
-                idbuf = np.array(fb.read_color(0, 0, sx, sy, 4, 0, 'FLOAT'),
-                                 dtype=np.float32).reshape(sy, sx, 4)
+                idbuf = np.asarray(
+                    fb.read_color(0, 0, sx, sy, 4, 0, 'UBYTE')).astype(
+                        np.float32)
         finally:
             offscreen.free()
         return idbuf
 
     def _render_overdraw(self, depsgraph, scene, sx, sy):
-        """Edge segments per pixel, additive into a float buffer; count in R."""
+        """Edge segments per pixel, additive into a float buffer; count in R.
+
+        One channel, not four. The pass wrote RGBA32F and read all four back
+        only to return ``buf[..., 0]``, so three quarters of the transfer was
+        discarded on the next line: 9.5 ms against 2.5 at 1080p, and 134.7
+        against 8.2 at 4K, where four channels cross the ~64 MB readback cliff.
+        """
         mats = self._camera_matrices(depsgraph, scene, sx, sy)
         if mats is None:
             return None
         view, proj, _persp = mats
 
-        offscreen = gpu.types.GPUOffScreen(sx, sy, format='RGBA32F')
+        tex = gpu.types.GPUTexture((sx, sy), format='R32F')
+        fb = gpu.types.GPUFrameBuffer(color_slots=tex)
         try:
-            with offscreen.bind():
-                fb = gpu.state.active_framebuffer_get()
+            with fb.bind():
                 fb.clear(color=(0.0, 0.0, 0.0, 0.0))
                 prev_blend = gpu.state.blend_get()
                 gpu.state.blend_set('ADDITIVE')
@@ -558,11 +766,11 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
                                                  (1.0, 1.0, 1.0, 1.0))
                         entry["reps"]["line"].draw(shader)
                 gpu.state.blend_set(prev_blend)
-                buf = np.array(fb.read_color(0, 0, sx, sy, 4, 0, 'FLOAT'),
-                               dtype=np.float32).reshape(sy, sx, 4)
+                buf = np.array(fb.read_color(0, 0, sx, sy, 1, 0, 'FLOAT'),
+                               dtype=np.float32).reshape(sy, sx)
         finally:
-            offscreen.free()
-        return buf[..., 0]
+            del fb, tex
+        return buf
 
     @staticmethod
     def _draw_object(entry, scene, obj, view, proj, persp, height):
@@ -632,6 +840,10 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
                         draw_graph_object(entry, scene, obj, modelview, projm,
                                           persp, region.height,
                                           view_matrix=rv3d.view_matrix)
+                    if bool(getattr(scene, "scigraphs_preview_grid_show", False)):
+                        from . import grid_overlay
+                        grid_overlay.draw(scene, (region.width, region.height),
+                                          obj=obj)
 
         gpu.state.depth_test_set('NONE')
         gpu.state.depth_mask_set(False)
@@ -648,7 +860,21 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
             depth01 = np.array(fb.read_depth(0, 0, w, h),
                                dtype=np.float32).reshape(h, w)
             dist_buf = _linearize_depth(depth01, rv3d.window_matrix)
-        self._draw_view_labels(scene, region, rv3d, dist_buf)
+
+    def _draw_view_legend(self, scene, region, st=None):
+        """The key, in pixel space over the region. Same spec the F12 path
+        composites, so the viewport is what the render will be."""
+        from . import legend
+        objs = _graph_objects(scene)
+        if not objs:
+            return
+        spec = legend.spec_from_scene(scene, objs[0], st=st)
+        if spec is None:
+            return
+        try:
+            legend.draw(scene, region.width, region.height, spec)
+        except Exception:  # noqa: BLE001 - an overlay must not break the draw
+            pass
 
     def _draw_view_labels(self, scene, region, rv3d, dist_buf):
         w, h = region.width, region.height
@@ -764,4 +990,4 @@ class SciGraphsRenderEngine(bpy.types.RenderEngine):
                     depth01 = np.array(fb.read_depth(0, 0, rw, rh),
                                        dtype=np.float32).reshape(rh, rw)
                 dist_buf = _linearize_depth(depth01, proj)
-            self._draw_view_labels(scene, region, rv3d, dist_buf)
+    

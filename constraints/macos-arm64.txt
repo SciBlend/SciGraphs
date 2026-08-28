@@ -18,7 +18,7 @@ networkx==3.6
 python-igraph==0.11.9
 
 # Native Graphviz/Yifan Hu layout backend (platform-specific)
-scigraphs-utils==0.1.1
+scigraphs-utils==0.2.0
 
 # Geospatial data support (universal)
 geopy==2.4.1

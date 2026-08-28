@@ -17,6 +17,27 @@ except ImportError:
                        "extra to enable centrality, clustering, traversal and "
                        "flow analysis")
 
+try:
+    import igraph as ig
+    IGRAPH_AVAILABLE = True
+    IGRAPH_REASON = None
+except ImportError:
+    ig = None
+    IGRAPH_AVAILABLE = False
+    IGRAPH_REASON = ("python-igraph is not installed; betweenness, closeness, "
+                     "clustering, modularity and community detection fall back "
+                     "to the networkx implementations, 13x to 200x slower")
+
+try:
+    import rustworkx as rx
+    RUSTWORKX_AVAILABLE = True
+    RUSTWORKX_REASON = None
+except ImportError:
+    rx = None
+    RUSTWORKX_AVAILABLE = False
+    RUSTWORKX_REASON = ("rustworkx is not installed; eigenvector centrality "
+                        "falls back to the networkx power iteration, 33x slower")
+
 # Fixed seed for the randomized community algorithms; see _seeded_igraph.
 COMMUNITY_SEED = 20240517
 
@@ -27,6 +48,82 @@ def _networkx_missing(feature, empty=None):
     mesh attribute, since a wrong-length write corrupts the mesh."""
     log(f"{feature} unavailable: {NETWORKX_REASON}")
     return empty
+
+
+def _to_igraph(G, directed=False):
+    """Mirror a networkx graph whose nodes are 0..n-1 into igraph.
+
+    igraph vertex i is then networkx node i, so no index mapping is needed on
+    the way back; every caller here builds G with ``add_nodes_from(range(n))``."""
+    return ig.Graph(n=G.number_of_nodes(), edges=list(G.edges()),
+                    directed=directed)
+
+
+def _igraph_betweenness(G, directed=False):
+    """Betweenness on networkx's normalized scale, computed by igraph.
+
+    igraph returns raw path counts, networkx divides by (n-1)(n-2), halved for
+    an undirected graph because it counts each pair once. Agrees with
+    nx.betweenness_centrality to 7e-18 and is 23x faster at n=3000."""
+    n = G.number_of_nodes()
+    if n <= 2:
+        return np.zeros(n)
+    raw = np.asarray(_to_igraph(G, directed).betweenness(), dtype=float)
+    denom = float((n - 1) * (n - 2))
+    if not directed:
+        denom /= 2.0
+    return raw / denom
+
+
+def _igraph_closeness(G):
+    """Wasserman-Faust closeness, computed by igraph. 14x faster at n=10000.
+
+    igraph normalizes inside each component and leaves an isolated vertex NaN;
+    networkx additionally weights by the component's share of the graph and
+    calls an isolated node 0.0. Both corrections here, so the two agree to
+    6e-17 on disconnected graphs as well."""
+    n = G.number_of_nodes()
+    g = _to_igraph(G)
+    vals = np.asarray(g.closeness(mode="all", normalized=True), dtype=float)
+    vals = np.nan_to_num(vals, nan=0.0)
+    if n > 1:
+        membership = np.asarray(g.connected_components().membership)
+        sizes = np.bincount(membership)
+        vals = vals * (sizes[membership] - 1) / (n - 1)
+    return vals
+
+
+def _igraph_clustering(G):
+    """Local clustering coefficient per node, computed by igraph. 11x faster at
+    n=100000, agreeing with nx.clustering to 7e-18.
+
+    simplify() first: networkx ignores self-loops and parallel edges while
+    igraph counts both into the degree, which lowers every coefficient around
+    them. ``mode="zero"`` is what networkx reports for degree < 2."""
+    g = _to_igraph(G)
+    g.simplify(multiple=True, loops=True)
+    return np.asarray(g.transitivity_local_undirected(mode="zero"), dtype=float)
+
+
+def _rustworkx_eigenvector(G):
+    """Eigenvector centrality by rustworkx, L2-normalized as networkx does.
+    Agrees to 1e-16 on a connected graph and is 33x faster at n=30000.
+
+    Self-loops are kept: networkx counts one for an undirected loop, and
+    dropping them moves the answer by 7e-2 on karate.
+
+    On a disconnected graph the two power iterations stop at different vectors,
+    up to 7e-2 apart. Neither is wrong: the measure is undefined there, both
+    land about that far from the dominant eigenvector, and networkx's own exact
+    solver refuses such graphs outright."""
+    n = G.number_of_nodes()
+    g = rx.PyGraph(multigraph=False)
+    g.add_nodes_from(range(n))
+    g.add_edges_from([(int(u), int(v), 1.0) for u, v in G.edges()])
+    scores = dict(rx.eigenvector_centrality(g, max_iter=1000).items())
+    vals = np.array([scores.get(i, 0.0) for i in range(n)], dtype=float)
+    norm = np.linalg.norm(vals)
+    return vals / norm if norm else vals
 
 def calculate_centrality(graph_data, method='degree'):
     """One centrality value per node by degree, betweenness, closeness or
@@ -50,10 +147,24 @@ def calculate_centrality(graph_data, method='degree'):
     if method == 'degree':
         centrality = nx.degree_centrality(G)
     elif method == 'betweenness':
+        if IGRAPH_AVAILABLE:
+            return _igraph_betweenness(G).tolist()
+        log(f"Betweenness: {IGRAPH_REASON}")
         centrality = nx.betweenness_centrality(G)
     elif method == 'closeness':
+        if IGRAPH_AVAILABLE:
+            return _igraph_closeness(G).tolist()
+        log(f"Closeness: {IGRAPH_REASON}")
         centrality = nx.closeness_centrality(G)
     elif method == 'eigenvector':
+        if RUSTWORKX_AVAILABLE:
+            try:
+                return _rustworkx_eigenvector(G).tolist()
+            except Exception as e:
+                print(f"rustworkx eigenvector centrality failed ({e}); "
+                      "retrying with networkx.")
+        else:
+            log(f"Eigenvector centrality: {RUSTWORKX_REASON}")
         try:
             centrality = nx.eigenvector_centrality(G, max_iter=1000)
         except nx.PowerIterationFailedConvergence:
@@ -84,9 +195,13 @@ def calculate_clustering(graph_data):
             edge_indices.append((node_to_idx[src], node_to_idx[tgt]))
     
     G.add_edges_from(edge_indices)
-    
+
+    if IGRAPH_AVAILABLE:
+        return _igraph_clustering(G).tolist()
+
+    log(f"Clustering coefficient: {IGRAPH_REASON}")
     clustering = nx.clustering(G)
-    
+
     return [clustering[i] for i in range(len(graph_data.nodes))]
 
 def _build_edge_list(graph_data):
@@ -166,7 +281,9 @@ def communities_from_edges(edges_int, num_nodes, algorithm='rn', timeout=300,
                            seed=COMMUNITY_SEED):
     """A contiguous community id per node, or None if every backend failed.
     ``edges_int`` is (u, v) pairs with 0 <= u, v < num_nodes; kept separate from
-    ``detect_communities`` so callers holding an edge list skip graph_data."""
+    ``detect_communities`` so callers holding an edge list skip graph_data.
+    Backends in order: pySurprise's *algorithm*, then igraph Leiden, then the
+    networkx greedy modularity that only an install without igraph reaches."""
     if not edges_int or num_nodes <= 0:
         return [0] * max(num_nodes, 0)
 
@@ -202,7 +319,19 @@ def communities_from_edges(edges_int, num_nodes, algorithm='rn', timeout=300,
             remap = {old: new for new, old in enumerate(unique_ids)}
             return [remap[c] for c in cluster_ids]
         except Exception as e:
-            print(f"pySurprise {algorithm} failed: {e}; falling back to networkx")
+            print(f"pySurprise {algorithm} failed: {e}; trying the next backend")
+
+    if IGRAPH_AVAILABLE:
+        try:
+            g = ig.Graph(n=num_nodes, edges=edges_int, directed=False)
+            with _seeded_igraph(seed):
+                clusters = g.community_leiden(objective_function="modularity",
+                                              n_iterations=10)
+            unique_ids = sorted(set(clusters.membership))
+            remap = {old: new for new, old in enumerate(unique_ids)}
+            return [remap[c] for c in clusters.membership]
+        except Exception as e:
+            print(f"igraph Leiden failed: {e}; trying the next backend")
 
     if not NETWORKX_AVAILABLE:
         # Last backend: None is the documented "everything failed" answer.
@@ -287,7 +416,11 @@ def apply_advanced_clustering(graph_data, algorithm='rn', resolution=1.0, seed=0
     communities_list = list(communities_sets.values())
 
     if len(communities_list) > 0 and len(G.edges()) > 0:
-        modularity = nx.algorithms.community.modularity(G, communities_list, resolution=resolution)
+        if IGRAPH_AVAILABLE:
+            modularity = _to_igraph(G).modularity(cluster_ids,
+                                                  resolution=resolution)
+        else:
+            modularity = nx.algorithms.community.modularity(G, communities_list, resolution=resolution)
     else:
         modularity = 0.0
 
@@ -297,8 +430,11 @@ def apply_advanced_clustering(graph_data, algorithm='rn', resolution=1.0, seed=0
         cluster_sizes_dict[cid] = cluster_sizes_dict.get(cid, 0) + 1
     cluster_sizes = [cluster_sizes_dict[cid] for cid in cluster_ids]
 
-    local_clustering = nx.clustering(G)
-    clustering_coefficients = [local_clustering.get(i, 0.0) for i in range(num_nodes)]
+    if IGRAPH_AVAILABLE:
+        clustering_coefficients = _igraph_clustering(G).tolist()
+    else:
+        local_clustering = nx.clustering(G)
+        clustering_coefficients = [local_clustering.get(i, 0.0) for i in range(num_nodes)]
 
     return {
         'cluster_ids': cluster_ids,
@@ -426,7 +562,12 @@ def analyze_flow_structure(graph_data):
 
     intermediaries = [n for n in G.nodes() if G.in_degree(n) > 0 and G.out_degree(n) > 0]
 
-    betweenness = nx.betweenness_centrality(G)
+    if IGRAPH_AVAILABLE:
+        values = _igraph_betweenness(G, directed=True)
+        betweenness = {i: float(v) for i, v in enumerate(values)}
+    else:
+        log(f"Flow structure betweenness: {IGRAPH_REASON}")
+        betweenness = nx.betweenness_centrality(G)
 
     sorted_betweenness = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
     top_bottlenecks = [node for node, score in sorted_betweenness[:10] if score > 0]

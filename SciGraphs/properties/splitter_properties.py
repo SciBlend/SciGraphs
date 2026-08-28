@@ -85,7 +85,7 @@ SPLITTER_PROPERTIES = {
 
     'splitter_community_resolution': FloatProperty(
         name="Resolution",
-        description="Resolution parameter for community detection (higher = more communities)",
+        description="Resolution for Leiden and Louvain (higher = more communities). The pySurprise algorithms ignore it",
         default=1.0,
         min=0.1,
         max=5.0,
@@ -93,7 +93,7 @@ SPLITTER_PROPERTIES = {
 
     'splitter_preserve_xy': BoolProperty(
         name="Preserve XY Positions",
-        description="Keep original X and Y positions, only modify Z",
+        description="Keep original X and Y. When off, each layer is respread on its own disc with its hub at the centre",
         default=True,
     ),
 

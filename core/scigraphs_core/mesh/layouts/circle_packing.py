@@ -1,44 +1,290 @@
 """Circle-packing layout algorithms."""
 
+from collections import deque
+
 from .common import *
 from .basic import _random_layout
 
+try:
+    from scipy.spatial import cKDTree
+except ImportError:
+    cKDTree = None
+
+_MAX_RADIUS_SPREAD = 1e3
+
 def _store_radii_as_mesh_attribute(obj, radii):
-    """Write packing radii to a ``circle_radius`` point attribute, padding short
-    lists with the mean radius."""
-    if obj is None or obj.data is None:
+    """Store one packing radius per node under ``obj["circle_radius"]``, padding
+    a short list with the mean radius. Turning that into a mesh point attribute
+    is the add-on's job; this package never touches ``obj.data``."""
+    if obj is None:
         return
 
-    mesh = obj.data
-    attr_name = "circle_radius"
+    try:
+        num_verts = int(obj["num_nodes"])
+    except (KeyError, IndexError, TypeError, ValueError):
+        return
 
-    if attr_name in mesh.attributes:
-        mesh.attributes.remove(mesh.attributes[attr_name])
-
-    num_verts = len(mesh.vertices)
     num_radii = len(radii)
 
     if num_radii < num_verts:
-        avg_radius = np.mean(radii) if num_radii > 0 else 0.1
-        extended_radii = list(radii) + [avg_radius] * (num_verts - num_radii)
+        avg_radius = float(np.mean(radii)) if num_radii > 0 else 0.1
+        extended_radii = [float(r) for r in radii] + [avg_radius] * (num_verts - num_radii)
     else:
-        extended_radii = list(radii[:num_verts])
+        extended_radii = [float(r) for r in radii[:num_verts]]
 
-    attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
-    attr.data.foreach_set("value", extended_radii)
+    obj["circle_radius"] = extended_radii
+    print(f"  Radii stored under 'circle_radius' for {num_verts} nodes")
 
-    mesh.update()
-    print(f"  Mesh attribute 'circle_radius' created on {num_verts} vertices")
+def _face_key(face):
+    """Canonical rotation of a cyclic index sequence, for comparing faces."""
+    face = list(face)
+    if not face:
+        return ()
+    start = face.index(min(face))
+    return tuple(face[start:] + face[:start])
+
+def _planar_triangulation(G, node_to_idx):
+    """Complete a planar graph to a triangulated disk and return
+    ``(triangles, outer_face)`` as index tuples, or None when that is not
+    possible. Edges are only ever added, so every edge of *G* survives into the
+    triangulation and can therefore reach exact tangency."""
+    if nx is None:
+        return None
+
+    try:
+        from networkx.algorithms.planar_drawing import triangulate_embedding
+    except ImportError:
+        return None
+
+    simple = nx.Graph()
+    simple.add_nodes_from(G.nodes())
+    simple.add_edges_from((u, v) for u, v in G.edges() if u != v)
+
+    is_planar, embedding = nx.check_planarity(simple)
+    if not is_planar:
+        return None
+
+    embedding, outer_face = triangulate_embedding(embedding, False)
+
+    faces = []
+    visited_half_edges = set()
+    for v in embedding:
+        for w in embedding.neighbors_cw_order(v):
+            if (v, w) in visited_half_edges:
+                continue
+            faces.append(embedding.traverse_face(v, w, mark_half_edges=visited_half_edges))
+
+    faces = [tuple(node_to_idx[n] for n in f) for f in faces if len(f) >= 3]
+    if not faces:
+        return None
+
+    outer_idx = tuple(node_to_idx[n] for n in outer_face)
+    outer_keys = {_face_key(outer_idx), _face_key(outer_idx[::-1])}
+    which = next((i for i, f in enumerate(faces) if _face_key(f) in outer_keys), None)
+    if which is None:
+        which = max(range(len(faces)), key=lambda i: len(faces[i]))
+
+    triangles = [f for i, f in enumerate(faces) if i != which]
+    if not triangles or any(len(f) != 3 for f in triangles):
+        return None
+
+    return triangles, faces[which]
+
+def _packing_angle(r_i, r_j, r_k):
+    """Angle at vertex i in the triangle of mutually tangent circles (i, j, k)."""
+    a = r_i + r_j
+    b = r_i + r_k
+    c = r_j + r_k
+
+    denom = 2.0 * a * b
+    if denom < 1e-12:
+        return math.pi / 3.0
+
+    cos_val = (a*a + b*b - c*c) / denom
+    cos_val = max(-1.0, min(1.0, cos_val))
+    return math.acos(cos_val)
+
+def _packing_aims(triangles_at_vertex, boundary):
+    """Target angle sum per vertex: 2*pi inside, and on the boundary a share of
+    the (B-2)*pi that a convex polygon has, split in proportion to the face count
+    and capped at pi. Discrete Gauss-Bonnet makes the two halves add up exactly,
+    and a convex outer polygon over locally flat interiors is what keeps the
+    laid-out packing embedded."""
+    aims = np.full(len(triangles_at_vertex), 2.0 * math.pi)
+
+    boundary_list = sorted(boundary)
+    counts = [len(triangles_at_vertex[i]) for i in boundary_list]
+    total = (len(boundary_list) - 2.0) * math.pi
+    if len(boundary_list) < 3 or total <= 0.0 or sum(counts) == 0:
+        return aims
+
+    lo, hi = 0.0, math.pi
+    for _ in range(60):
+        c = 0.5 * (lo + hi)
+        if sum(min(c * k, math.pi) for k in counts) < total:
+            lo = c
+        else:
+            hi = c
+
+    c = 0.5 * (lo + hi)
+    for i, k in zip(boundary_list, counts):
+        aims[i] = min(c * k, math.pi)
+    return aims
+
+def _solve_packing_radii(triangles_at_vertex, aims, free, max_iterations, tolerance=1e-9):
+    """Collins-Stephenson radius solver. Each sweep replaces a vertex's flower by
+    a uniform-neighbour flower carrying the same angle sum, then rescales the
+    centre radius so that flower closes on the vertex's aim. Jacobi rather than
+    Gauss-Seidel, so a sweep is one vectorised pass over the corners.
+    Returns ``(radii, max_error, sweeps)``."""
+    num_nodes = len(triangles_at_vertex)
+    radii = np.ones(num_nodes, dtype=float)
+
+    corners = [(i, v, w) for i, pairs in enumerate(triangles_at_vertex) for v, w in pairs]
+    free_mask = np.zeros(num_nodes, dtype=bool)
+    free_mask[list(free)] = True
+    if not corners or not free_mask.any():
+        return radii, 0.0, 0
+
+    centre, left, right = (np.array(col, dtype=int) for col in zip(*corners))
+    counts = np.maximum(np.bincount(centre, minlength=num_nodes), 1).astype(float)
+    delta = np.sin(np.minimum(aims / (2.0 * counts), 0.5 * math.pi))
+
+    max_error = 0.0
+    sweeps = 0
+
+    for sweeps in range(1, max_iterations + 1):
+        a = radii[centre] + radii[left]
+        b = radii[centre] + radii[right]
+        c = radii[left] + radii[right]
+        denom = np.maximum(2.0 * a * b, 1e-12)
+        angles = np.arccos(np.clip((a*a + b*b - c*c) / denom, -1.0, 1.0))
+        angle_sum = np.bincount(centre, weights=angles, minlength=num_nodes)
+
+        max_error = float(np.abs(angle_sum - aims)[free_mask].max())
+        if max_error < tolerance:
+            break
+
+        beta = np.minimum(np.sin(angle_sum / (2.0 * counts)), 1.0 - 1e-12)
+        uniform_neighbour = beta * radii / (1.0 - beta)
+        updated = np.maximum(1e-12, uniform_neighbour * (1.0 - delta) / delta)
+        radii = np.where(free_mask, updated, radii)
+
+        mean = radii.mean()
+        if mean > 0.0:
+            radii /= mean
+
+    return radii, max_error, sweeps
+
+def _lay_out_packing(triangles, radii, num_nodes):
+    """Place centres by walking the triangulation's dual, each new circle
+    tangent to the two already placed. Returns ``(positions, placed)``."""
+    # (u, v) -> w: w lies left of u->v; consistent winding keeps this stable.
+    half_edge_map = {}
+    for a, b, c in triangles:
+        half_edge_map[(a, b)] = c
+        half_edge_map[(b, c)] = a
+        half_edge_map[(c, a)] = b
+
+    centres = {}
+    placed = np.zeros(num_nodes, dtype=bool)
+
+    a0, b0, c0 = triangles[0]
+    centres[a0] = 0j
+    centres[b0] = complex(radii[a0] + radii[b0], 0.0)
+    centres[c0] = cmath.rect(radii[a0] + radii[c0],
+                             _packing_angle(radii[a0], radii[b0], radii[c0]))
+    placed[a0] = placed[b0] = placed[c0] = True
+
+    edge_queue = deque([(b0, a0), (c0, b0), (a0, c0)])
+    processed_edges = set()
+
+    while edge_queue:
+        a, b = edge_queue.popleft()
+
+        if (a, b) in processed_edges:
+            continue
+        processed_edges.add((a, b))
+
+        c = half_edge_map.get((a, b))
+        if c is None:
+            continue
+
+        if not placed[c]:
+            d_ac = radii[a] + radii[c]
+            d_bc = radii[b] + radii[c]
+
+            # Measure a to b, not r_a + r_b: rounding drift must not break closure.
+            vec_ab = centres[b] - centres[a]
+            dist_ab = abs(vec_ab)
+
+            if dist_ab > 1e-12:
+                denom = 2.0 * d_ac * dist_ab
+                if denom < 1e-12:
+                    theta = math.pi / 3.0
+                else:
+                    cos_val = (d_ac * d_ac + dist_ab * dist_ab - d_bc * d_bc) / denom
+                    cos_val = max(-1.0, min(1.0, cos_val))
+                    theta = math.acos(cos_val)
+
+                centres[c] = centres[a] + cmath.rect(d_ac, cmath.phase(vec_ab) + theta)
+                placed[c] = True
+
+        if placed[c]:
+            edge_queue.append((c, b))
+            edge_queue.append((a, c))
+
+    positions = np.zeros((num_nodes, 2), dtype=float)
+    for i, z in centres.items():
+        positions[i] = (z.real, z.imag)
+
+    return positions, placed
+
+def _refine_tangency(positions, radii, edges, iterations, learning_rate=0.1):
+    """Gradient descent pulling *edges* back to tangency, for the rounding the
+    placement walk accumulates. Runs on the triangulation's edges: chasing the
+    graph's edges alone would pull the packing apart along the chords."""
+    if iterations <= 0 or len(edges) == 0:
+        return positions
+
+    ui, vi = edges[:, 0], edges[:, 1]
+    target = radii[ui] + radii[vi]
+
+    for _ in range(iterations):
+        diff = positions[ui] - positions[vi]
+        dist = np.linalg.norm(diff, axis=1)
+        alive = dist > 1e-12
+        if not alive.any():
+            break
+
+        error = np.zeros_like(dist)
+        error[alive] = dist[alive] - target[alive]
+        if np.abs(error).max() < 1e-9:
+            break
+
+        step = np.zeros_like(diff)
+        step[alive] = (error[alive] / dist[alive])[:, None] * diff[alive]
+
+        gradients = np.zeros_like(positions)
+        np.add.at(gradients, ui, step)
+        np.add.at(gradients, vi, -step)
+
+        grad_norm = np.linalg.norm(gradients)
+        if grad_norm < 1e-12:
+            break
+
+        # Damped by the gradient norm, so one bad node cannot dominate.
+        positions -= learning_rate * gradients / (1.0 + 0.1 * grad_norm)
+
+    return positions
 
 def _circle_packing_layout(G, iterations=500, scale=5.0):
-    """Circle packing by Collins-Stephenson (Koebe's theorem), returning
-    ``(positions, radii)`` with Z = 0. Koebe needs a maximal planar triangulation,
-    so Delaunay completes the graph; a non-planar one goes force-directed."""
+    """Circle packing by Collins-Stephenson (Koebe-Andreev-Thurston), returning
+    ``(positions, radii)`` with Z = 0. Koebe needs a triangulated disk, so the
+    planar embedding is completed to one and every graph edge ends up tangent.
+    A non-planar graph, or a complex whose Euclidean packing crowds past double
+    precision, goes force-directed instead."""
     import time
-    import math
-    import cmath
-    from collections import deque
-    from scipy.spatial import Delaunay
 
     start = time.time()
 
@@ -56,359 +302,63 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         r = scale * 0.25
         return np.array([[-r, 0.0, 0.0], [r, 0.0, 0.0]]), np.array([r, r])
 
-    if num_nodes < 3:
-        return _circle_packing_force_directed(G, iterations, scale)
-
     nodes_list = list(G.nodes())
     node_to_idx = {n: i for i, n in enumerate(nodes_list)}
-    idx_to_node = {i: n for n, i in node_to_idx.items()}
 
-    is_planar, embedding = nx.check_planarity(G)
-
-    if not is_planar:
-        print("  Graph is NOT planar - using force-directed fallback")
+    completed = _planar_triangulation(G, node_to_idx)
+    if completed is None:
+        print("  No triangulated disk available (non-planar) - force-directed fallback")
         return _circle_packing_force_directed(G, iterations, scale)
 
-    all_faces = []
-    visited_half_edges = set()
-
-    for start_node in embedding:
-        for neighbor in embedding.neighbors_cw_order(start_node):
-            if (start_node, neighbor) in visited_half_edges:
-                continue
-
-            face = []
-            current = start_node
-            next_node = neighbor
-
-            for _ in range(num_nodes + 10):
-                face.append(current)
-                visited_half_edges.add((current, next_node))
-
-                neighbors_cw = list(embedding.neighbors_cw_order(next_node))
-                if current not in neighbors_cw:
-                    break
-
-                idx = neighbors_cw.index(current)
-                prev_idx = (idx - 1) % len(neighbors_cw)
-                new_next = neighbors_cw[prev_idx]
-
-                current = next_node
-                next_node = new_next
-
-                if current == start_node and next_node == neighbor:
-                    break
-
-            if len(face) >= 3:
-                all_faces.append(face)
-
-    faces_idx = []
-    for face in all_faces:
-        face_idx = tuple(node_to_idx[n] for n in face if n in node_to_idx)
-        if len(face_idx) >= 3:
-            faces_idx.append(face_idx)
-
-    outer_face = max(faces_idx, key=len) if faces_idx else ()
-
-    internal_faces = [f for f in faces_idx if f != outer_face]
-    non_triangular = [f for f in internal_faces if len(f) != 3]
-
-    use_graph_faces = len(non_triangular) == 0 and len(internal_faces) > 0
-
-    if use_graph_faces:
-        print(f"  Graph is already triangulated: {len(internal_faces)} triangular faces")
-        triangles = [tuple(f) for f in internal_faces if len(f) == 3]
-        boundary_nodes = set(outer_face)
-
-        # The orientation test below needs coordinates, not just faces.
-        try:
-            init_pos = nx.planar_layout(G)
-        except:
-            init_pos = nx.spring_layout(G, seed=42)
-        points = np.array([init_pos[n] for n in nodes_list])
-
-    else:
-        print(f"  Graph has {len(non_triangular)} non-triangular faces - using Delaunay")
-
-        try:
-            init_pos = nx.planar_layout(G)
-        except:
-            init_pos = nx.spring_layout(G, seed=42, iterations=100)
-
-        points = np.array([init_pos[n] for n in nodes_list])
-        tri = Delaunay(points)
-
-        triangles = [tuple(simplex) for simplex in tri.simplices]
-        boundary_nodes = set(np.unique(tri.convex_hull))
-
-    # Boundary radii fixed; internal seek angle sum 2*pi, above it = too small.
-    internal_nodes = [i for i in range(num_nodes) if i not in boundary_nodes]
-    nodes_to_update = internal_nodes.copy()
-
-    print(f"  Internal vertices: {len(internal_nodes)}, Boundary: {len(boundary_nodes)}")
-    print(f"  Boundary nodes (fixed): {list(boundary_nodes)[:5]}...")
-    print(f"  Total triangles: {len(triangles)}")
+    triangles, outer_face = completed
+    boundary_nodes = set(outer_face)
 
     triangles_at_vertex = [[] for _ in range(num_nodes)]
-    for triangle in triangles:
-        u, v, w = triangle[0], triangle[1], triangle[2]
-        triangles_at_vertex[u].append((v, w))
-        triangles_at_vertex[v].append((u, w))
-        triangles_at_vertex[w].append((u, v))
+    for a, b, c in triangles:
+        triangles_at_vertex[a].append((b, c))
+        triangles_at_vertex[b].append((c, a))
+        triangles_at_vertex[c].append((a, b))
 
-    int_degrees = [len(triangles_at_vertex[i]) for i in internal_nodes]
-    if int_degrees:
-        print(f"  Internal node degrees: min={min(int_degrees)}, max={max(int_degrees)}, avg={sum(int_degrees)/len(int_degrees):.1f}")
+    print(f"  Triangulated disk: {len(triangles)} faces, "
+          f"{num_nodes - len(boundary_nodes)} interior, {len(boundary_nodes)} boundary")
 
-    def angle_at_vertex(r_i, r_j, r_k):
-        """Angle at vertex i in triangle (i,j,k) with tangent circles."""
-        a = r_i + r_j
-        b = r_i + r_k
-        c = r_j + r_k
+    aims = _packing_aims(triangles_at_vertex, boundary_nodes)
+    all_free = [i for i in range(num_nodes) if triangles_at_vertex[i]]
+    interior_free = [i for i in all_free if i not in boundary_nodes]
 
-        denom = 2.0 * a * b
-        if denom < 1e-12:
-            return math.pi / 3.0
+    tolerance = 1e-9
+    radius_sweeps = max(int(iterations), 1) * 20
 
-        cos_val = (a*a + b*b - c*c) / denom
-        cos_val = max(-1.0, min(1.0, cos_val))
-        return math.acos(cos_val)
+    radii, max_error, sweeps = _solve_packing_radii(
+        triangles_at_vertex, aims, all_free, radius_sweeps, tolerance)
+    spread = float(radii.max() / max(radii.min(), 1e-300))
 
-    radii = np.ones(num_nodes, dtype=float)
+    embedded = max_error < tolerance and spread <= _MAX_RADIUS_SPREAD
+    if embedded:
+        print(f"  Radii converged in {sweeps} sweeps, spread={spread:.4g}")
+    else:
+        print(f"  Convex boundary crowds (error={max_error:.3e}, spread={spread:.4g}) "
+              f"- pinning the boundary radii instead")
+        radii, max_error, sweeps = _solve_packing_radii(
+            triangles_at_vertex, aims, interior_free, radius_sweeps, tolerance)
+        spread = float(radii.max() / max(radii.min(), 1e-300))
+        print(f"  Pinned-boundary radii after {sweeps} sweeps: "
+              f"error={max_error:.3e}, spread={spread:.4g}")
 
-    # More triangles at a node, smaller radius; six is the equilateral case.
-    for i in internal_nodes:
-        k = len(triangles_at_vertex[i])
-        if k > 0:
-            radii[i] = 1.0 / (1.0 + 0.1 * max(0, k - 6))
+    positions, placed = _lay_out_packing(triangles, radii, num_nodes)
 
-    print(f"  Initial radii range: {radii.min():.4f} to {radii.max():.4f}")
+    unplaced = int((~placed).sum())
+    if unplaced:
+        print(f"  Warning: {unplaced} nodes unreachable in the placement walk")
+        positions[~placed] = _get_layout_rng().uniform(-scale, scale, (unplaced, 2))
 
-    tolerance = 1e-6
-    actual_iterations = max(iterations, 1000)
+    tri_edges = set()
+    for a, b, c in triangles:
+        for x, y in ((a, b), (b, c), (c, a)):
+            tri_edges.add((x, y) if x < y else (y, x))
+    tri_edges = np.array(sorted(tri_edges), dtype=int)
 
-    print(f"  Computing radii (max {actual_iterations} iterations)...")
-
-    for it in range(actual_iterations):
-        max_error = 0.0
-        worst_node = -1
-        new_radii = radii.copy()
-
-        for i in nodes_to_update:
-            neighbors_pairs = triangles_at_vertex[i]
-            k = len(neighbors_pairs)
-
-            if k == 0:
-                continue
-
-            angle_sum = 0.0
-            for v, w in neighbors_pairs:
-                angle = angle_at_vertex(radii[i], radii[v], radii[w])
-                angle_sum += angle
-
-            target = 2.0 * math.pi
-
-            error = abs(angle_sum - target)
-            if error > max_error:
-                max_error = error
-                worst_node = i
-
-            # Stephenson's update, damped harder while the error is large.
-            if angle_sum > 1e-9:
-                ratio = angle_sum / target
-                if error > 1.0:
-                    damping = 0.7
-                elif error > 0.1:
-                    damping = 0.5
-                else:
-                    damping = 0.3
-                new_radii[i] = radii[i] * (1.0 - damping + damping * ratio)
-                # Wide bounds: Apollonian packings reach ratios near 1000:1.
-                new_radii[i] = max(1e-6, min(1e6, new_radii[i]))
-
-        radii = new_radii
-
-        if it % 200 == 0:
-            at_lower = sum(1 for r in radii if r <= 1e-5)
-            at_upper = sum(1 for r in radii if r >= 1e5)
-            bounds_info = f", at_bounds={at_lower}L/{at_upper}U" if (at_lower + at_upper) > 0 else ""
-            print(f"  Iter {it}: error={max_error:.4f}, radii=[{radii.min():.2e}, {radii.max():.2e}]{bounds_info}")
-
-        if max_error < tolerance:
-            print(f"  Radii converged at iteration {it}, error={max_error:.2e}")
-            break
-
-    if it == actual_iterations - 1 and max_error > tolerance:
-        print(f"  Warning: iteration limit reached, final error={max_error:.4f}")
-        for i in internal_nodes:
-            pairs = triangles_at_vertex[i]
-            if pairs:
-                angles = [angle_at_vertex(radii[i], radii[v], radii[w]) for v, w in pairs]
-                node_error = abs(sum(angles) - 2.0 * math.pi)
-                if node_error > 0.1:
-                    print(f"    Node {i}: {len(pairs)} triangles, sum={sum(angles):.4f}, error={node_error:.4f}")
-
-    radii = radii / radii.mean()
-
-    def is_ccw(a, b, c):
-        """True when triangle a->b->c winds counter-clockwise."""
-        A, B, C = points[a], points[b], points[c]
-        return (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]) > 0
-
-    # (u, v) -> w: w lies left of u->v; consistent winding keeps this stable.
-    half_edge_map = {}
-
-    for triangle in triangles:
-        u, v, w = triangle[0], triangle[1], triangle[2]
-
-        if not is_ccw(u, v, w):
-            u, v, w = u, w, v
-
-        half_edge_map[(u, v)] = w
-        half_edge_map[(v, w)] = u
-        half_edge_map[(w, u)] = v
-
-    positions_complex = {}
-    placed = [False] * num_nodes
-
-    first_edge = next(iter(half_edge_map.keys()))
-    u, v = first_edge
-    w = half_edge_map[(u, v)]
-
-    positions_complex[u] = 0j
-    placed[u] = True
-
-    positions_complex[v] = complex(radii[u] + radii[v], 0)
-    placed[v] = True
-
-    angle_u = angle_at_vertex(radii[u], radii[v], radii[w])
-    positions_complex[w] = cmath.rect(radii[u] + radii[w], angle_u)
-    placed[w] = True
-
-    # Seed edges reversed: the adjacent triangle sits on the other side.
-    edge_queue = deque()
-    edge_queue.append((v, u))
-    edge_queue.append((w, v))
-    edge_queue.append((u, w))
-
-    processed_edges = set()
-
-    while edge_queue:
-        a, b = edge_queue.popleft()
-
-        if (a, b) in processed_edges:
-            continue
-        processed_edges.add((a, b))
-
-        if (a, b) not in half_edge_map:
-            continue  # Convex hull boundary edge
-
-        c = half_edge_map[(a, b)]
-
-        if placed[c]:
-            continue
-
-        r_a, r_b, r_c = radii[a], radii[b], radii[c]
-        d_ac = r_a + r_c
-        d_bc = r_b + r_c
-
-        # Measure a to b, not r_a + r_b: rounding drift must not break closure.
-        vec_ab = positions_complex[b] - positions_complex[a]
-        dist_ab = abs(vec_ab)
-
-        if dist_ab < 1e-10:
-            continue
-
-        denom = 2.0 * d_ac * dist_ab
-        if denom < 1e-12:
-            theta = math.pi / 3.0
-        else:
-            cos_val = (d_ac * d_ac + dist_ab * dist_ab - d_bc * d_bc) / denom
-            cos_val = max(-1.0, min(1.0, cos_val))
-            theta = math.acos(cos_val)
-
-        base_angle = cmath.phase(vec_ab)
-
-        new_pos = positions_complex[a] + cmath.rect(d_ac, base_angle + theta)
-        positions_complex[c] = new_pos
-        placed[c] = True
-
-        edge_queue.append((b, c))
-        edge_queue.append((c, a))
-
-    # Scatter anything the walk missed. A valid Delaunay leaves nothing here.
-    for i in range(num_nodes):
-        if not placed[i]:
-            positions_complex[i] = complex(
-                np.random.uniform(-scale, scale),
-                np.random.uniform(-scale, scale)
-            )
-            placed[i] = True
-
-    positions = np.zeros((num_nodes, 2), dtype=float)
-    for i in range(num_nodes):
-        p = positions_complex.get(i, 0j)
-        positions[i] = [p.real, p.imag]
-
-    # The walk accumulates rounding error; descent restores true tangency.
-    edges_idx = [(node_to_idx[u], node_to_idx[v]) for u, v in G.edges()]
-
-    def compute_tangency_error(pos, rad, edges):
-        total_err = 0.0
-        max_err = 0.0
-        for ui, vi in edges:
-            dist = np.linalg.norm(pos[ui] - pos[vi])
-            target = rad[ui] + rad[vi]
-            err = abs(dist - target)
-            total_err += err * err
-            max_err = max(max_err, err)
-        return total_err, max_err
-
-    initial_error, initial_max = compute_tangency_error(positions, radii, edges_idx)
-
-    if initial_max > 0.01:
-        print(f"  Refining positions (initial tangency error: {initial_max:.4f})...")
-
-        learning_rate = 0.1
-        refinement_iters = 200
-
-        for ref_it in range(refinement_iters):
-            gradients = np.zeros_like(positions)
-
-            for ui, vi in edges_idx:
-                diff = positions[ui] - positions[vi]
-                dist = np.linalg.norm(diff)
-                if dist < 1e-10:
-                    continue
-
-                target = radii[ui] + radii[vi]
-                error = dist - target
-
-                direction = diff / dist
-                grad = error * direction
-
-                gradients[ui] += grad
-                gradients[vi] -= grad
-
-            grad_norm = np.linalg.norm(gradients)
-            if grad_norm > 1e-10:
-                # Damped by the gradient norm, so one bad node cannot dominate.
-                step = learning_rate * gradients / (1.0 + 0.1 * grad_norm)
-                positions -= step
-
-            _, current_max = compute_tangency_error(positions, radii, edges_idx)
-            if current_max < 0.01:
-                print(f"  Position refinement converged at iteration {ref_it}")
-                break
-
-            if ref_it > 0 and ref_it % 50 == 0:
-                learning_rate *= 0.8
-
-        _, final_max = compute_tangency_error(positions, radii, edges_idx)
-        if final_max < initial_max:
-            print(f"  Position refinement: {initial_max:.4f} -> {final_max:.4f}")
-        else:
-            print(f"  Position refinement did not improve (kept original)")
+    positions = _refine_tangency(positions, radii, tri_edges, max(int(iterations), 1))
 
     center = positions.mean(axis=0)
     positions -= center
@@ -420,102 +370,147 @@ def _circle_packing_layout(G, iterations=500, scale=5.0):
         radii *= scale_factor
 
     # Report against the original graph's edges, not the triangulated ones.
-    max_error = 0.0
+    max_tangency_error = 0.0
     for u, v in G.edges():
+        if u == v:
+            continue
         ui, vi = node_to_idx[u], node_to_idx[v]
         dist = np.linalg.norm(positions[ui] - positions[vi])
-        target = radii[ui] + radii[vi]
-        error = abs(dist - target)
-        max_error = max(max_error, error)
+        error = abs(dist - (radii[ui] + radii[vi]))
+        max_tangency_error = max(max_tangency_error, error)
 
     positions_3d = np.zeros((num_nodes, 3))
     positions_3d[:, :2] = positions
 
     elapsed = time.time() - start
     print(f"  Circle Packing completed in {elapsed:.2f}s")
-    print(f"  Radii range: {radii.min():.4f} to {radii.max():.4f}")
-    print(f"  Final max tangency error: {max_error:.4f}")
+    print(f"  Radii range: {radii.min():.4g} to {radii.max():.4g}")
+    print(f"  Final max tangency error: {max_tangency_error:.3e}")
+    if not embedded:
+        print("  Circles may overlap: the boundary was pinned, so the packing "
+              "condition holds only at interior vertices")
 
     return positions_3d, radii
 
+def _close_pairs(positions, cutoff):
+    """Index pairs closer than *cutoff*, through a k-d tree when SciPy is here."""
+    if cKDTree is not None:
+        return cKDTree(positions).query_pairs(cutoff, output_type='ndarray')
+
+    n = len(positions)
+    diff = positions[:, None, :] - positions[None, :, :]
+    dist = np.linalg.norm(diff, axis=-1)
+    ui, vi = np.triu_indices(n, 1)
+    keep = dist[ui, vi] < cutoff
+    return np.column_stack((ui[keep], vi[keep]))
+
 def _circle_packing_force_directed(G, iterations=500, scale=5.0):
-    """Circle packing by force simulation for graphs Collins-Stephenson cannot
-    take: adjacent circles pull to tangency, overlaps push apart."""
+    """Circle packing by force relaxation, for the graphs Collins-Stephenson
+    cannot take: adjacent circles are pulled toward tangency and every
+    overlapping pair is pushed apart, but neither is guaranteed to be reached,
+    so expect residual overlap and tangency error."""
     import time
-    import math
 
     start = time.time()
     num_nodes = len(G.nodes())
+    nodes_list = list(G.nodes())
+    node_to_idx = {n: i for i, n in enumerate(nodes_list)}
+    rng = _get_layout_rng()
 
-    degrees = np.array([G.degree(n) for n in G.nodes()], dtype=float)
+    degrees = np.array([G.degree(n) for n in nodes_list], dtype=float)
     max_degree = max(degrees.max(), 1.0)
 
     radii = 0.3 + 0.7 * (degrees / max_degree)
-    radii = radii * scale * 0.1
+    frame = scale * 0.45
+    radii *= math.sqrt(0.35 * frame * frame / float(np.sum(radii * radii)))
 
-    pos_dict = nx.spring_layout(G, dim=2, scale=scale * 0.3, iterations=50)
-    nodes_list = list(G.nodes())
-    positions = np.array([pos_dict[n] for n in nodes_list])
+    seed_iterations = max(10, min(50, 20000 // max(num_nodes, 1)))
+    pos_dict = nx.spring_layout(G, dim=2, scale=frame, iterations=seed_iterations,
+                                seed=get_layout_seed())
+    positions = np.array([pos_dict[n] for n in nodes_list], dtype=float)
 
-    node_to_idx = {n: i for i, n in enumerate(nodes_list)}
-    adj_set = [set() for _ in range(num_nodes)]
-    for u, v in G.edges():
-        ui, vi = node_to_idx[u], node_to_idx[v]
-        adj_set[ui].add(vi)
-        adj_set[vi].add(ui)
+    edges = np.array([(node_to_idx[u], node_to_idx[v]) for u, v in G.edges()
+                      if u != v], dtype=int).reshape(-1, 2)
+    edge_keys = np.sort(np.minimum(edges[:, 0], edges[:, 1]) * num_nodes
+                        + np.maximum(edges[:, 0], edges[:, 1]))
 
     temperature = scale * 0.2
     cooling_rate = 0.98
+    cutoff = 2.2 * float(radii.max())
 
-    for it in range(iterations):
+    for _ in range(iterations):
         forces = np.zeros((num_nodes, 2))
 
-        for i in range(num_nodes):
-            for j in adj_set[i]:
-                delta = positions[j] - positions[i]
-                dist = np.linalg.norm(delta)
+        if len(edges):
+            delta = positions[edges[:, 1]] - positions[edges[:, 0]]
+            dist = np.linalg.norm(delta, axis=1)
+            weak = dist < 1e-6
+            if weak.any():
+                delta[weak] = rng.rand(int(weak.sum()), 2) - 0.5
+                dist[weak] = np.linalg.norm(delta[weak], axis=1)
+            target = radii[edges[:, 0]] + radii[edges[:, 1]]
+            pull = ((dist - target) * 0.3 / dist)[:, None] * delta
+            np.add.at(forces, edges[:, 0], pull)
+            np.add.at(forces, edges[:, 1], -pull)
 
-                if dist < 1e-6:
-                    delta = np.random.rand(2) - 0.5
-                    dist = np.linalg.norm(delta)
+        pairs = _close_pairs(positions, cutoff)
+        if len(pairs):
+            ui, vi = pairs[:, 0], pairs[:, 1]
+            delta = positions[vi] - positions[ui]
+            dist = np.linalg.norm(delta, axis=1)
+            weak = dist < 1e-6
+            if weak.any():
+                delta[weak] = rng.rand(int(weak.sum()), 2) - 0.5
+                dist[weak] = np.linalg.norm(delta[weak], axis=1)
 
-                target_dist = radii[i] + radii[j]
-
-                diff = dist - target_dist
-                force_mag = diff * 0.3
-                forces[i] += force_mag * (delta / dist)
+            sums = radii[ui] + radii[vi]
+            unit = delta / dist[:, None]
 
             # Overlap is pushed apart whether or not the pair shares an edge.
-            for j in range(num_nodes):
-                if i == j:
-                    continue
+            overlapping = dist < sums
+            push = np.zeros_like(delta)
+            push[overlapping] = ((sums - dist)[overlapping] * 0.5)[:, None] * unit[overlapping]
 
-                delta = positions[j] - positions[i]
-                dist = np.linalg.norm(delta)
+            keys = np.minimum(ui, vi) * num_nodes + np.maximum(ui, vi)
+            idx = np.flatnonzero(~overlapping & ~np.isin(keys, edge_keys))
+            repulsion = 0.1 * sums[idx] / (dist[idx] * dist[idx] + 0.1)
+            push[idx] = repulsion[:, None] * unit[idx]
 
-                if dist < 1e-6:
-                    delta = np.random.rand(2) - 0.5
-                    dist = np.linalg.norm(delta)
+            np.add.at(forces, ui, -push)
+            np.add.at(forces, vi, push)
 
-                min_dist = radii[i] + radii[j]
-
-                if dist < min_dist:
-                    overlap = min_dist - dist
-                    forces[i] -= overlap * 0.5 * (delta / dist)
-                elif j not in adj_set[i]:
-                    repulsion = 0.1 * (radii[i] + radii[j]) / (dist * dist + 0.1)
-                    forces[i] -= repulsion * (delta / dist)
-
-        for i in range(num_nodes):
-            force_mag = np.linalg.norm(forces[i])
-            if force_mag > temperature:
-                forces[i] = forces[i] / force_mag * temperature
-            positions[i] += forces[i]
+        magnitude = np.linalg.norm(forces, axis=1)
+        hot = magnitude > temperature
+        if hot.any():
+            forces[hot] *= (temperature / magnitude[hot])[:, None]
+        positions += forces
 
         temperature *= cooling_rate
 
         if temperature < 1e-4:
             break
+
+    for _ in range(max(int(iterations) // 2, 10)):
+        pairs = _close_pairs(positions, cutoff)
+        if not len(pairs):
+            break
+
+        ui, vi = pairs[:, 0], pairs[:, 1]
+        delta = positions[vi] - positions[ui]
+        dist = np.linalg.norm(delta, axis=1)
+        weak = dist < 1e-6
+        if weak.any():
+            delta[weak] = rng.rand(int(weak.sum()), 2) - 0.5
+            dist[weak] = np.linalg.norm(delta[weak], axis=1)
+
+        sums = radii[ui] + radii[vi]
+        hit = np.flatnonzero(dist < sums)
+        if not len(hit):
+            break
+
+        shift = ((sums[hit] - dist[hit]) * 0.55 / dist[hit])[:, None] * delta[hit]
+        np.add.at(positions, ui[hit], -shift)
+        np.add.at(positions, vi[hit], shift)
 
     center = positions.mean(axis=0)
     positions -= center
@@ -528,6 +523,8 @@ def _circle_packing_force_directed(G, iterations=500, scale=5.0):
 
     max_error = 0.0
     for u, v in G.edges():
+        if u == v:
+            continue
         ui, vi = node_to_idx[u], node_to_idx[v]
         dist = np.linalg.norm(positions[ui] - positions[vi])
         target = radii[ui] + radii[vi]

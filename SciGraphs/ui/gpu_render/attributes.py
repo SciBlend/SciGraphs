@@ -76,11 +76,43 @@ def edge_scalar_attr_items(obj):
 
 
 def normalized_values(values, vmin, vmax, num_verts):
+    """``(norm, finite)`` over ``[vmin, vmax]``, ``(None, None)`` with no channel.
+
+    Non-finite samples come back as 0.0, never NaN. ``_radii_for`` multiplies
+    this array in and ``volume.build`` weighs its density field by it, so one
+    unmeasured node in a partially populated attribute was enough to give that
+    node a quad of undefined size. ``finite`` comes back too, so a caller that
+    wants to drop those nodes rather than draw them at the base radius can,
+    without reconstructing the mask from the numbers.
+    """
     if values is None:
-        return None
+        return None, None
+    finite = np.isfinite(values)
     if vmax > vmin:
-        return (values - vmin) / (vmax - vmin)
-    return np.zeros(num_verts, dtype=np.float32)
+        norm = (values - vmin) / (vmax - vmin)
+    else:
+        norm = np.zeros(num_verts, dtype=np.float32)
+    return np.where(finite, norm, 0.0).astype(np.float32), finite
+
+
+_SRGB_KNEE = 0.04045
+
+
+def srgb_to_linear(rgb):
+    """Inverse sRGB transfer, piecewise rather than a 2.2 gamma. The two agree
+    to a hundredth above the knee and are a factor apart below it, and below it
+    is where a colormap's dark end sits."""
+    a = np.asarray(rgb, dtype=np.float32)
+    curve = np.power((np.maximum(a, 0.0) + 0.055) / 1.055, 2.4)
+    return np.where(a <= _SRGB_KNEE, a / 12.92, curve).astype(np.float32)
+
+
+def linearize_rgba(rgba):
+    """Colormap RGBA into the scene-linear space the passes are in. Alpha is
+    coverage, never a color, so the transfer must not touch it."""
+    out = np.array(rgba, dtype=np.float32).reshape(-1, 4)
+    out[:, :3] = srgb_to_linear(out[:, :3])
+    return out
 
 
 def compute_colors(mesh, num_verts, scene, values, vmin, vmax, st=None):
@@ -92,11 +124,20 @@ def compute_colors(mesh, num_verts, scene, values, vmin, vmax, st=None):
     if mode == 'ATTRIBUTE' and values is not None:
         cmap = st.colormap
         if colormap_exists(cmap):
+            clip_low = float(st.clip_low_pct)
+            clip_high = float(st.clip_high_pct)
+            clipping = clip_low > 0.0 or clip_high < 100.0
             rgba = values_to_rgba(
-                values, cmap_name=cmap, vmin=vmin, vmax=vmax,
+                values, cmap_name=cmap,
+                vmin=None if clipping else vmin,
+                vmax=None if clipping else vmax,
                 reverse=bool(st.reverse_colormap),
+                norm_mode=st.norm_mode,
+                gamma=float(st.norm_gamma),
+                clip_low_pct=clip_low,
+                clip_high_pct=clip_high,
             )
-            return np.asarray(rgba, dtype=np.float32).reshape(-1, 4)
+            return linearize_rgba(rgba)
 
     if mode in ('VERTEX', 'ATTRIBUTE'):
         color_attr = active_point_color_attribute(mesh)

@@ -27,12 +27,22 @@ def value_channel(values, num_vertices=None):
 
 def size_normalized(values, vmin, vmax, num_vertices):
     """Affine map onto [0, 1] over the caller's ``vmin``/``vmax``. A constant
-    becomes zeros, and nothing is clipped."""
+    becomes zeros, and nothing is clipped. Non-finite samples come back as 0.0.
+
+    ``_ch_attr`` is the one producer that hands back its own native range, so
+    its values skip ``channel_normalized`` in ``channel_values`` and reach
+    ``slot_mask`` raw. NaN is false against both ends of a clause, so an
+    unmeasured node used to vanish from an ordinary slot and *appear* in an
+    inverted one -- alone among the channels, the rest of which sort those
+    nodes to the bottom. The host's ``normalized_values`` maps the same array
+    the same way and multiplies it into a node radius."""
     if values is None:
         return None
     if vmax > vmin:
-        return (values - vmin) / (vmax - vmin)
-    return np.zeros(num_vertices, dtype=np.float32)
+        norm = (values - vmin) / (vmax - vmin)
+    else:
+        norm = np.zeros(num_vertices, dtype=np.float32)
+    return np.where(np.isfinite(values), norm, 0.0).astype(np.float32)
 
 
 def channel_normalized(values):

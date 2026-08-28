@@ -60,7 +60,7 @@ class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
             ('HELIX', "Helix (3D)", "Double helix pattern like DNA structure (instant)"),
             ('CUBE', "Cube (3D)", "Distribute nodes in and on a cube (instant)"),
 
-            ('SPECTRAL_3D', "Spectral (3D)", "Use graph Laplacian eigenvectors for 3D positioning (fast)"),
+            ('SPECTRAL_3D', "Spectral (3D)", "Graph Laplacian eigenvectors. Solved per connected component"),
             ('MDS_3D', "MDS (3D)", "Multidimensional scaling using shortest path distances (medium)"),
             ('HIERARCHICAL_3D', "Hierarchical (3D)", "Tree-like hierarchy in layers (fast)"),
             ('BIPARTITE_3D', "Bipartite (3D)", "Two parallel planes for bipartite graphs (fast)"),
@@ -69,7 +69,7 @@ class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
             ('IGRAPH_DRL', "DrL (3D - igraph)", "Distributed Recursive Layout for huge graphs 100k+ (very fast)"),
             ('IGRAPH_FR', "Fruchterman-Reingold (3D - igraph)", "Classic force-directed in 3D (fast)"),
             ('IGRAPH_KK', "Kamada-Kawai (3D - igraph)", "Deterministic 3D layout, reproducible (medium)"),
-            ('IGRAPH_LGL', "LGL (3D - igraph)", "Large Graph Layout, optimized for massive graphs (fast)"),
+            ('IGRAPH_LGL', "LGL (2D - igraph)", "Large Graph Layout, planar output, optimized for massive graphs"),
             ('SPRING_3D', "Spring (3D - NetworkX)", "Force-directed 3D layout (very slow)"),
 
             ('GRAPHVIZ_DOT', "Graphviz Dot (2D)", "Hierarchical layout via bundled scigraphs-utils"),
@@ -81,7 +81,7 @@ class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
             ('GRAPHVIZ_OSAGE', "Graphviz Osage (2D)", "Cluster layout via bundled scigraphs-utils"),
             ('GRAPHVIZ_PATCHWORK', "Graphviz Patchwork (2D)", "Patchwork layout via bundled scigraphs-utils"),
 
-            ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Hierarchical DAG layout, minimizes crossings (fast)"),
+            ('SUGIYAMA', "Sugiyama/Layered (2D - Directed)", "Layered DAG drawing with heuristic crossing reduction. Slower than the force layouts"),
             ('CIRCULAR_HIERARCHY', "Circular Hierarchy (2D - Directed)", "Concentric circles from roots (fast)"),
         ],
         default='YIFAN_HU',

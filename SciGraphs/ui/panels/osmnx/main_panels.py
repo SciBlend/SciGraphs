@@ -474,6 +474,8 @@ class SCIGRAPHS_PT_osmnx_statistics(bpy.types.Panel):
         col.prop(props, "osmnx_centrality_weighted")
         col.prop(props, "osmnx_centrality_fast")
         col.operator("scigraphs.osmnx_centrality", text="Compute Centrality", icon='PLAY')
+        col.operator("scigraphs.osmnx_attr_to_colors",
+                     text="Attribute to Colors", icon='BRUSH_DATA')
 
         layout.separator()
         box = layout.box()
@@ -750,6 +752,8 @@ class SCIGRAPHS_PT_osmnx_elevation(bpy.types.Panel):
                 text="Remove",
                 icon='X',
             )
+            tbox.operator("scigraphs.osmnx_remove_terrain",
+                          text="Remove (terrain selected)", icon='X')
 
         # --- 5. Basemap texture for the terrain mesh (optional) -------------
         if terrain_name and terrain_name in bpy.data.objects:
