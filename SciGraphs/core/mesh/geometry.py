@@ -5,6 +5,7 @@ import bmesh
 import numpy as np
 import pandas as pd
 from scigraphs_core.logger import log
+from scigraphs_core.mesh.mesh_utils import expand_node_values_to_mesh
 from scigraphs_core.repro.determinism import get_geometry_seed
 
 
@@ -965,7 +966,57 @@ def update_node_positions_from_property(obj):
             vert.co = positions[i]
     
     obj.data.update()
-    
+
+
+def store_packing_radii(obj):
+    """Write ``obj["circle_radius"]`` onto a POINT float attribute of the same
+    name. Returns the values written, or None.
+
+    A packing's radii are its result, not decoration: they run 30:1 on a small
+    lattice. The layout package computes them and stops there, since it never
+    touches ``obj.data``, so until this step every node keeps the base radius
+    and the packing looks like any other planar layout.
+    """
+    radii = obj.get("circle_radius")
+    if radii is None or not obj.data.vertices:
+        return None
+
+    mesh = obj.data
+    values = np.asarray(
+        expand_node_values_to_mesh(obj, list(radii), default_value=0.0),
+        dtype=np.float32)
+    if "circle_radius" not in mesh.attributes:
+        mesh.attributes.new(name="circle_radius", type='FLOAT', domain='POINT')
+    mesh.attributes["circle_radius"].data.foreach_set("value", values)
+    mesh.update()
+    return values
+
+
+def packing_tangency(obj, radii):
+    """Median gap between adjacent circles, relative to the radii they should
+    sum to. Zero is a tangent packing; None when there are no edges.
+
+    Measured rather than assumed. The layout drops to force relaxation on a
+    non-planar graph, and that path sizes circles by node degree, which is
+    bounded at 3.3:1 and tangent to nothing. Reporting a packing there sends
+    you hunting for a render bug that is not one.
+    """
+    mesh = obj.data
+    if not mesh.edges or radii is None:
+        return None
+
+    verts = np.empty(len(mesh.edges) * 2, dtype=np.int32)
+    mesh.edges.foreach_get("vertices", verts)
+    verts = verts.reshape(-1, 2)
+    co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+
+    dist = np.linalg.norm(co[verts[:, 0]] - co[verts[:, 1]], axis=1)
+    want = radii[verts[:, 0]] + radii[verts[:, 1]]
+    return float(np.median(np.abs(dist - want) / np.maximum(want, 1e-30)))
+
+
 def rebuild_edges(obj):
     """Rebuild edges from ``edges_data`` after a position update. A no-op for mesh-native objects, which carry no ``edges_data``: there the mesh edges are the topology, and rebuilding would drop an edge style's vertices."""
     if "edges_data" not in obj:

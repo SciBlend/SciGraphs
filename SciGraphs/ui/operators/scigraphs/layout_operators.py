@@ -319,9 +319,62 @@ class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
         
         geometry.update_node_positions_from_property(obj)
         geometry.rebuild_edges(obj)
-        
-        self.report({'INFO'}, f"Layout '{self.algorithm}' applied")
+
+        # After rebuild_edges, which replaces the mesh on an edges_data object.
+        values = (geometry.store_packing_radii(obj)
+                  if self.algorithm == 'CIRCLE_PACKING' else None)
+        note = ""
+        if values is not None:
+            note = (self._show_packing_radii(context.scene, values)
+                    + self._packing_note(obj, values))
+
+        self.report({'INFO'}, f"Layout '{self.algorithm}' applied{note}")
         return {'FINISHED'}
+
+    @staticmethod
+    def _show_packing_radii(scene, values):
+        """Draw the nodes at the radii the packing just produced, and say so.
+
+        The preview sizes a node as ``base * (1 + norm * (mult - 1))`` over the
+        attribute's own range. That is affine, not proportional, so it only
+        reproduces the packing for one choice of the two: ``mult = hi / lo``
+        cancels the constant term and ``base = lo`` fixes the scale. ``mult``
+        stops at 32, so a wider spread than that draws the large circles short
+        of tangency rather than silently claiming to be exact.
+
+        Size gets its own attribute here rather than the shared one, which color
+        and the filters also read. Sharing it meant that coloring the packing by
+        anything at all resized the circles by that instead, and the tangency
+        the layout had just solved for went with it.
+        """
+        if not hasattr(scene, "scigraphs_preview_size_attr_name"):
+            return ""
+        scene.scigraphs_preview_size_attr_name = "circle_radius"
+        scene.scigraphs_preview_size_by_attr = True
+
+        lo, hi = float(np.min(values)), float(np.max(values))
+        if lo <= 0.0 or hi <= lo:
+            return ", sized by circle_radius"
+
+        scene.scigraphs_preview_impostor_radius = lo
+        scene.scigraphs_preview_size_max_mult = hi / lo
+        # Relative, since the property stores a 32-bit float and reading it back
+        # differs from the double by more than any absolute epsilon worth using.
+        if scene.scigraphs_preview_size_max_mult < (hi / lo) * (1.0 - 1e-4):
+            return (f", radii clamped: spread is {hi / lo:.0f}x, over the size "
+                    f"multiplier's ceiling")
+        return ""
+
+    @staticmethod
+    def _packing_note(obj, values):
+        """What the run actually produced, measured on the mesh."""
+        err = geometry.packing_tangency(obj, values)
+        if err is None:
+            return ""
+        if err < 0.01:
+            return ", circles tangent"
+        return (f", NOT a packing: this graph is not planar, so the layout fell "
+                f"back to force relaxation ({err * 100:.0f}% median gap)")
 
 
 SCIGRAPHS_OT_ApplyLayout.__annotations__.update(OPERATOR_LAYOUT_PROPERTIES)

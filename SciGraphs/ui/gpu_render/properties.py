@@ -878,10 +878,18 @@ def register_properties():
         description="Scale node size by the selected scalar attribute",
         default=False, update=_on_rebuild_update,
     )
+    S.scigraphs_preview_size_attr_name = bpy.props.StringProperty(
+        name="Size Attribute",
+        description="Scalar POINT attribute driving node size. Empty follows the "
+                    "Attribute above, which is what color and the filters read",
+        default="", update=_on_rebuild_update,
+    )
     S.scigraphs_preview_size_max_mult = bpy.props.FloatProperty(
         name="Max Size Multiplier",
         description="Size multiplier for the highest attribute value",
-        default=4.0, min=1.0, max=32.0, update=_on_rebuild_update,
+        # 1000 to match the radius spread a circle packing accepts. At 32 a
+        # 2000-node packing was compressed tenfold and stopped looking tangent.
+        default=4.0, min=1.0, max=1000.0, update=_on_rebuild_update,
     )
     S.scigraphs_preview_show_edges = bpy.props.BoolProperty(
         name="Show Edges", description="Draw graph edges",
@@ -1185,6 +1193,7 @@ _PROP_NAMES = (
     "scigraphs_preview_clip_low_pct",
     "scigraphs_preview_clip_high_pct",
     "scigraphs_preview_size_by_attr",
+    "scigraphs_preview_size_attr_name",
     "scigraphs_preview_size_max_mult",
     "scigraphs_preview_show_edges",
     "scigraphs_preview_edge_color",

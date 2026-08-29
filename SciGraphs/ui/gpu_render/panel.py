@@ -717,6 +717,11 @@ class SCIGRAPHS_RENDER_PT_nodes(_Render, bpy.types.Panel):
         if scene.scigraphs_preview_size_by_attr:
             if scene.scigraphs_preview_color_mode != 'ATTRIBUTE':
                 _draw_attr_row(col, scene)
+            col.prop(scene, "scigraphs_preview_size_attr_name",
+                     text="Size Attribute")
+            if not scene.scigraphs_preview_size_attr_name:
+                col.label(text="Empty: size follows the Attribute above",
+                          icon='INFO')
             col.prop(scene, "scigraphs_preview_size_max_mult",
                      text="Max Multiplier")
 

@@ -50,6 +50,7 @@ def structure_signature(obj, scene, st=None):
         color_attr.name if color_attr else "",
         st.color_mode,
         st.attr_name,
+        getattr(st, "size_attr_name", ""),
         st.colormap,
         bool(st.reverse_colormap),
         st.norm_mode,
@@ -798,6 +799,16 @@ def build_bundle(obj, scene, st=None):
 
     values, vmin, vmax = read_value_channel(mesh, st.attr_name, num_verts)
     norm, norm_finite = normalized_values(values, vmin, vmax, num_verts)
+
+    # Size reads its own attribute when one is named. One channel used to feed
+    # both, so coloring a circle packing by node_id resized every circle by node
+    # index and the tangency went with it.
+    size_attr = getattr(st, "size_attr_name", "") or st.attr_name
+    if size_attr == st.attr_name:
+        size_norm = norm
+    else:
+        svalues, svmin, svmax = read_value_channel(mesh, size_attr, num_verts)
+        size_norm, _ = normalized_values(svalues, svmin, svmax, num_verts)
     colors = compute_colors(mesh, num_verts, scene, values, vmin, vmax,
                             st=st)
 
@@ -866,7 +877,8 @@ def build_bundle(obj, scene, st=None):
 
     coords_sub = coords[point_idx]
     colors_sub = colors[point_idx]
-    norm_sub = norm[point_idx] if norm is not None else None
+    # Sizes only; color travels in colors_sub.
+    norm_sub = size_norm[point_idx] if size_norm is not None else None
 
     # Edge-visible = curve point or visible node, so polylines survive whole.
     if node_mask is not None:
@@ -1147,8 +1159,8 @@ def build_bundle(obj, scene, st=None):
     if want_arrows:
         # Target-node radius so the tip rests on the sphere surface.
         node_r = np.full(num_verts, base_radius, dtype=np.float32)
-        if size_by_attr and norm is not None:
-            node_r *= 1.0 + norm * (size_max_mult - 1.0)
+        if size_by_attr and size_norm is not None:
+            node_r *= 1.0 + size_norm * (size_max_mult - 1.0)
 
         anchor = direction = eradii = target = None
         # The clamp is a tube constraint (a cone stays wider than what it caps);
