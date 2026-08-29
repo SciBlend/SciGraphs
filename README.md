@@ -24,7 +24,7 @@ SciGraphs supports two complementary domains:
 By unifying network analysis and visualization within Blender, SciGraphs enables reproducible 3D visualizations that extend network-geometry communication beyond the constraints of traditional 2D canvases.
 
 ![The SciGraphs render engine in the Blender viewport](./images/viewport_facebook_egos.png)
-> ***facebook-egos, 4,039 nodes and 88,234 edges,** drawn by the SciGraphs render engine in the viewport, colored by community with viridis. The color key, the graph readout and the floating toolbar are viewport overlays.*
+> ***facebook-egos, 4,039 nodes and 88,234 edges,** drawn by the SciGraphs render engine in the viewport, colored by community.*
 
 ## Install
 
