@@ -28,7 +28,17 @@ By unifying network analysis and visualization within Blender, SciGraphs enables
 
 ## Install
 
-### Manual Installation from GitHub Release
+### From the Blender Extensions platform
+
+[![Get it on Blender Extensions](https://img.shields.io/badge/Get%20it%20on-Blender%20Extensions-EA7600?style=for-the-badge&logo=blender&logoColor=white)](https://extensions.blender.org/add-ons/scigraphs/)
+
+The shortest route, and the one that keeps itself updated. In Blender, open
+**Edit > Preferences > Get Extensions**, search for *SciGraphs* and install it.
+Later versions arrive through that same panel.
+
+### From a GitHub release
+
+For a specific build, or one newer than the platform is serving:
 
 1. Download the platform zip above for your system
 2. Open Blender > Edit > Preferences > Add-ons
