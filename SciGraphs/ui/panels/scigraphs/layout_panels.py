@@ -478,6 +478,51 @@ class SCIGRAPHS_PT_layout_algorithm(bpy.types.Panel):
         col.prop(props, "graphviz_edge_attrs")
 
 
+class SCIGRAPHS_PT_layout_animation(bpy.types.Panel):
+    """Motion for an existing graph: baked from the layout, or loaded."""
+
+    bl_label = "Animation"
+    bl_parent_id = "SCIGRAPHS_PT_layout"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == 'MESH' and "num_nodes" in obj
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.scigraphs
+        obj = context.active_object
+
+        keys = getattr(obj.data, "shape_keys", None)
+        stored = [k for k in (keys.key_blocks if keys else [])
+                  if k.name.startswith("sg_stage_")]
+        if stored:
+            row = layout.row()
+            row.label(text=f"{len(stored)} stages stored", icon='SHAPEKEY_DATA')
+            row.operator("scigraphs.clear_animation", text="", icon='X')
+
+        box = layout.box()
+        box.label(text="Bake from Layout", icon='MOD_PARTICLES')
+        col = box.column(align=True)
+        col.prop(props, "animation_stages", text="Stages")
+        col.prop(props, "animation_iterations", text="Iterations / Stage")
+        op = box.operator("scigraphs.bake_animation", icon='REC')
+        op.stages = props.animation_stages
+        op.iterations_per_stage = props.animation_iterations
+
+        box = layout.box()
+        box.label(text="Import Trajectory", icon='IMPORT')
+        box.prop(props, "animation_filepath", text="")
+        box.operator("scigraphs.import_animation", icon='FILE_TICK')
+        col = box.column(align=True)
+        col.scale_y = 0.7
+        col.label(text="CSV: stage, node, x, y, z", icon='INFO')
+        col.label(text="One row per node per stage, not per frame.")
+
+
 class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
     """Network Splitter 3D - Split layouts into Z-layers."""
     bl_label = "Network Splitter 3D"
@@ -569,11 +614,13 @@ class SCIGRAPHS_PT_layout_splitter(bpy.types.Panel):
 def register():
     bpy.utils.register_class(SCIGRAPHS_PT_layout)
     bpy.utils.register_class(SCIGRAPHS_PT_layout_algorithm)
+    bpy.utils.register_class(SCIGRAPHS_PT_layout_animation)
     bpy.utils.register_class(SCIGRAPHS_PT_layout_splitter)
 
 
 def unregister():
     bpy.utils.unregister_class(SCIGRAPHS_PT_layout_splitter)
+    bpy.utils.unregister_class(SCIGRAPHS_PT_layout_animation)
     bpy.utils.unregister_class(SCIGRAPHS_PT_layout_algorithm)
     bpy.utils.unregister_class(SCIGRAPHS_PT_layout)
 

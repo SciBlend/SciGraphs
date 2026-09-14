@@ -50,6 +50,7 @@ Thumbs.db
 
 # Cursor
 .cursor/
+.claude/
 papers/
 venv_benchmark/
 cache/
@@ -79,3 +80,8 @@ LAYOUT_AUDIT.md
 RENDER_AUDIT.md
 RESUMEN_RENDER.md
 tests/golden/baseline_pre_render_work/
+anims/
+deck/
+media/
+scripts/
+realtime_demos/

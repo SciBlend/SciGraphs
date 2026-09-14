@@ -70,6 +70,29 @@ def _mesh_native_topology(obj, nodes_list):
     return nodes, edges
 
 
+WEIGHT_ATTRIBUTES = ("weight", "length", "edge_weight", "edge_length", "cost")
+
+
+def edge_weights_from_mesh(obj, edge_count):
+    """The mesh's per-edge weights, or None when it carries none."""
+    mesh = getattr(obj, "data", None)
+    attributes = getattr(mesh, "attributes", None)
+    if attributes is None or edge_count <= 0:
+        return None
+
+    for name in WEIGHT_ATTRIBUTES:
+        attr = attributes.get(name)
+        if attr is None or getattr(attr, "domain", "") != 'EDGE':
+            continue
+        try:
+            values = [item.value for item in attr.data]
+        except (AttributeError, RuntimeError, TypeError):
+            continue
+        if len(values) == edge_count:
+            return [float(v) for v in values]
+    return None
+
+
 def parse_graph_data(obj):
     """Parse graph topology from an object, falling back to the mesh edges."""
     nodes_str = obj.get("nodes_data", "")
@@ -78,12 +101,24 @@ def parse_graph_data(obj):
     edges_str = obj.get("edges_data", "")
     if not edges_str:
         nodes, edges = _mesh_native_topology(obj, nodes)
-        return GraphData(nodes, edges, None)
+        data = GraphData(nodes, edges, None)
+        _attach_weights(obj, data)
+        return data
 
     edges_flat = edges_str.split(",")
     edges = [(edges_flat[i], edges_flat[i + 1]) for i in range(0, len(edges_flat), 2)]
 
-    return GraphData(nodes, edges, None)
+    data = GraphData(nodes, edges, None)
+    _attach_weights(obj, data)
+    return data
+
+
+def _attach_weights(obj, data):
+    """Set `edge_weights` when the mesh has them, leave it unset otherwise."""
+    weights = edge_weights_from_mesh(obj, len(data.edges))
+    if weights is not None:
+        data.edge_weights = weights
+    return data
 
 
 def parse_graph_data_filtered(obj):

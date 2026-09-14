@@ -533,60 +533,102 @@ class SCIGRAPHS_OT_ResetLayout(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def bake_layout_animation(obj, scene, stages=24, iterations_per_stage=1,
+                          algorithm=None, scale=None):
+    """Run the layout in stages and store them as shape keys.
+
+    Returns `(stage_count, mean_step)`. A mean step of 0 means the layout did
+    not move, which happens when `apply_graph_layout` ignores `iterations`.
+
+    Shape keys rather than keyframes on `node_positions`: Blender evaluates
+    them before the modifier stack, they cost one curve per stage instead of
+    three per node, and they need no handler or open window.
+    
+    """
+    from ....api import anim as sg_anim
+
+    props = scene.scigraphs
+    algorithm = algorithm or props.layout_algorithm
+    scale = props.layout_scale if scale is None else scale
+    edge_pairs = layout_edge_pairs(obj)
+
+    def positions():
+        count = len(obj.data.vertices)
+        flat = np.empty(count * 3, dtype=np.float64)
+        obj.data.vertices.foreach_get("co", flat)
+        return flat.reshape(count, 3)
+
+    poses = [positions().copy()]
+    for _ in range(max(1, int(stages)) - 1):
+        layout.apply_graph_layout(
+            obj,
+            algorithm=algorithm,
+            iterations=max(1, int(iterations_per_stage)),
+            scale=scale,
+            edge_pairs=edge_pairs,
+        )
+        geometry.update_node_positions_from_property(obj)
+        poses.append(positions().copy())
+
+    steps = [float(np.linalg.norm(b - a, axis=1).mean())
+             for a, b in zip(poses, poses[1:])]
+    mean_step = float(np.mean(steps)) if steps else 0.0
+
+    first, last = scene.frame_start, scene.frame_end
+    span = max(last - first, 1)
+    keys = [(first + int(round(i * span / max(len(poses) - 1, 1))), pose)
+            for i, pose in enumerate(poses)]
+    sg_anim.positions(obj, keys)
+    return len(poses), mean_step
+
+
 class SCIGRAPHS_OT_BakeAnimation(bpy.types.Operator):
     bl_idname = "scigraphs.bake_animation"
     bl_label = "Bake Animation"
-    bl_description = "Create an animation of the layout simulation (automatic)"
-    
-    _timer = None
-    _frame = 0
-    _max_frames = 100
-    
-    def modal(self, context, event):
-        if event.type == 'TIMER':
-            obj = context.active_object
-            props = context.scene.scigraphs
-            
-            if self._frame >= self._max_frames:
-                self.cancel(context)
-                self.report({'INFO'}, "Animation baked")
-                return {'FINISHED'}
-            
-            layout.apply_graph_layout(
-                obj,
-                algorithm=props.layout_algorithm,
-                iterations=1,
-                scale=props.layout_scale,
-                # Without the edges the bake is just isolated points drifting.
-                edge_pairs=layout_edge_pairs(obj),
-            )
-            
-            geometry.update_node_positions_from_property(obj)
-            
-            obj.keyframe_insert(data_path='["node_positions"]', frame=self._frame)
-            
-            self._frame += 1
-            context.scene.frame_set(self._frame)
-        
-        return {'RUNNING_MODAL'}
-    
+    bl_description = ("Bake the layout simulation into shape keys across the "
+                      "scene's frame range")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    stages: bpy.props.IntProperty(
+        name="Stages",
+        description="Poses to store. The animation interpolates between them, "
+                    "so this is not the frame count",
+        default=24, min=2, soft_max=120,
+    )
+
+    iterations_per_stage: bpy.props.IntProperty(
+        name="Iterations per Stage",
+        description="Layout iterations run between one stored pose and the next",
+        default=1, min=1, soft_max=50,
+    )
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and "num_nodes" in obj
+
     def execute(self, context):
         obj = context.active_object
-        
-        if not obj or "num_nodes" not in obj:
+        if obj is None or "num_nodes" not in obj:
             self.report({'ERROR'}, "No graph object selected")
             return {'CANCELLED'}
-        
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, window=context.window)
-        wm.modal_handler_add(self)
-        
-        self._frame = 0
-        return {'RUNNING_MODAL'}
-    
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
+
+        count, mean_step = bake_layout_animation(
+            obj, context.scene,
+            stages=self.stages,
+            iterations_per_stage=self.iterations_per_stage)
+
+        if mean_step <= 1e-9:
+            self.report(
+                {'WARNING'},
+                f"{count} stages baked but the layout did not move "
+                f"(mean step {mean_step:.2e}) - this algorithm may ignore the "
+                f"iteration count")
+            return {'FINISHED'}
+
+        self.report({'INFO'},
+                    f"Baked {count} stages, mean step {mean_step:.4f}")
+        return {'FINISHED'}
 
 
 class SCIGRAPHS_OT_NetworkSplitter3D(bpy.types.Operator):
@@ -682,6 +724,9 @@ def register():
     bpy.utils.register_class(SCIGRAPHS_OT_ExecuteLayoutStep)
     bpy.utils.register_class(SCIGRAPHS_OT_ResetLayout)
     bpy.utils.register_class(SCIGRAPHS_OT_BakeAnimation)
+    bpy.utils.register_class(SCIGRAPHS_OT_ImportAnimation)
+    bpy.utils.register_class(SCIGRAPHS_OT_ImportGraphAnimation)
+    bpy.utils.register_class(SCIGRAPHS_OT_ClearAnimation)
     bpy.utils.register_class(SCIGRAPHS_OT_NetworkSplitter3D)
     bpy.utils.register_class(SCIGRAPHS_OT_ResetSplitter)
 
@@ -689,8 +734,315 @@ def register():
 def unregister():
     bpy.utils.unregister_class(SCIGRAPHS_OT_ResetSplitter)
     bpy.utils.unregister_class(SCIGRAPHS_OT_NetworkSplitter3D)
+    bpy.utils.unregister_class(SCIGRAPHS_OT_ClearAnimation)
+    bpy.utils.unregister_class(SCIGRAPHS_OT_ImportGraphAnimation)
+    bpy.utils.unregister_class(SCIGRAPHS_OT_ImportAnimation)
     bpy.utils.unregister_class(SCIGRAPHS_OT_BakeAnimation)
     bpy.utils.unregister_class(SCIGRAPHS_OT_ResetLayout)
     bpy.utils.unregister_class(SCIGRAPHS_OT_ExecuteLayoutStep)
     bpy.utils.unregister_class(SCIGRAPHS_OT_ApplyLayout)
 
+
+
+class SCIGRAPHS_OT_ImportAnimation(bpy.types.Operator):
+    """Load node positions over time from a CSV and store them as shape keys.
+
+    One row per node per stage, not per frame:
+
+        stage,node,x,y,z
+        0,0,-2.0,0.0,0.0
+        1,0,-2.0,0.0,0.0
+
+    `node` is a vertex index or a node name. A stage that misses a node is an
+    error. Optional `frame` and `size` columns pin the stage to a frame and
+    multiply the node radius.
+    
+    """
+
+    bl_idname = "scigraphs.import_animation"
+    bl_label = "Import Trajectory"
+    bl_description = ("Load a CSV of node positions over time onto the active "
+                      "graph as shape keys")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == 'MESH' and "num_nodes" in obj
+
+    def execute(self, context):
+        import csv
+        import os
+        from collections import defaultdict
+
+        from ....api import anim as sg_anim
+
+        obj = context.active_object
+        props = context.scene.scigraphs
+        path = bpy.path.abspath(props.animation_filepath or "")
+        if not path or not os.path.isfile(path):
+            self.report({'ERROR'}, "No trajectory file set")
+            return {'CANCELLED'}
+
+        by_stage = defaultdict(dict)
+        frames = {}
+        try:
+            with open(path, newline="") as handle:
+                reader = csv.DictReader(handle)
+                missing = {"stage", "node", "x", "y", "z"} - set(
+                    reader.fieldnames or ())
+                if missing:
+                    self.report({'ERROR'},
+                                f"{os.path.basename(path)} is missing "
+                                f"column(s): {sorted(missing)}")
+                    return {'CANCELLED'}
+                from ....core.mesh.geometry import node_names
+                by_name = {n: i for i, n in enumerate(node_names(obj))}
+
+                sizes = {}
+                for row in reader:
+                    stage = int(float(row["stage"]))
+                    raw = (row["node"] or "").strip()
+                    try:
+                        node = int(float(raw))
+                    except ValueError:
+                        if raw not in by_name:
+                            self.report(
+                                {'ERROR'},
+                                f"node {raw!r} is not in this graph; the file "
+                                f"names nodes but the object does not know "
+                                f"that name")
+                            return {'CANCELLED'}
+                        node = by_name[raw]
+                    by_stage[stage][node] = (
+                        float(row["x"]), float(row["y"]), float(row["z"]))
+                    if row.get("size") not in (None, ""):
+                        sizes.setdefault(stage, {})[node] = float(row["size"])
+                    if row.get("frame") not in (None, ""):
+                        frames[stage] = int(float(row["frame"]))
+        except (OSError, ValueError, KeyError) as exc:
+            self.report({'ERROR'}, f"Could not read trajectory: {exc}")
+            return {'CANCELLED'}
+
+        count = len(obj.data.vertices)
+        poses = []
+        for stage in sorted(by_stage):
+            nodes = by_stage[stage]
+            if set(nodes) != set(range(count)):
+                short = sorted(set(range(count)) - set(nodes))[:5]
+                self.report(
+                    {'ERROR'},
+                    f"Stage {stage} covers {len(nodes)} of {count} vertices "
+                    f"(missing {short}{'...' if len(short) == 5 else ''}); a "
+                    f"shape key needs every vertex, not most of them")
+                return {'CANCELLED'}
+            poses.append(np.array([nodes[i] for i in range(count)],
+                                  dtype=np.float64))
+
+        if len(poses) < 2:
+            self.report({'ERROR'},
+                        f"{len(poses)} stage(s) found; an animation needs at "
+                        f"least two")
+            return {'CANCELLED'}
+
+        scene = context.scene
+        first, last = scene.frame_start, scene.frame_end
+        span = max(last - first, 1)
+        keys = []
+        for index, pose in enumerate(poses):
+            stage = sorted(by_stage)[index]
+            frame = frames.get(
+                stage, first + int(round(index * span / (len(poses) - 1))))
+            keys.append((frame, pose))
+
+        sg_anim.ensure_handler()
+        sg_anim.positions(obj, keys)
+
+        if sizes:
+            ordered = sorted(by_stage)
+            short = [s for s in ordered if set(sizes.get(s, {})) != set(range(count))]
+            if short:
+                self.report({'ERROR'},
+                            f"stages {short[:5]} have an incomplete 'size' "
+                            f"column while others have one")
+                return {'CANCELLED'}
+            from ....core.mesh.geometry import NODE_SCALE_ATTRIBUTE
+            sg_anim.attribute(
+                obj, NODE_SCALE_ATTRIBUTE,
+                [(frame, [sizes[stage][i] for i in range(count)])
+                 for (frame, _), stage in zip(keys, ordered)])
+
+        moved = max(float(np.abs(b - a).max())
+                    for a, b in zip(poses, poses[1:]))
+        if moved <= 1e-9:
+            self.report({'WARNING'},
+                        f"{len(poses)} stages loaded but no node moves between "
+                        f"them - the trajectory is a single repeated pose")
+            return {'FINISHED'}
+
+        self.report({'INFO'},
+                    f"Loaded {len(poses)} stages over frames "
+                    f"{keys[0][0]}-{keys[-1][0]}, largest move {moved:.3f}")
+        return {'FINISHED'}
+
+
+class SCIGRAPHS_OT_ClearAnimation(bpy.types.Operator):
+    bl_idname = "scigraphs.clear_animation"
+    bl_label = "Clear Animation"
+    bl_description = "Remove the shape keys and attribute keys this graph carries"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == 'MESH'
+
+    def execute(self, context):
+        from ....api import anim as sg_anim
+        sg_anim.clear(context.active_object)
+        self.report({'INFO'}, "Animation cleared")
+        return {'FINISHED'}
+
+
+class SCIGRAPHS_OT_ImportGraphAnimation(bpy.types.Operator):
+    """Build a graph and its animation from one `.sgraphs` file.
+
+    `edge` rows give the topology, `pos` rows the motion, and the `meta`
+    header says what wrote the file and how big it should be. Nodes are named,
+    so the file is not tied to one object's vertex order.
+
+    See `core.data_io.graph_animation` for the format.
+    
+    """
+
+    bl_idname = "scigraphs.import_graph_animation"
+    bl_label = "Import Graph + Motion"
+    bl_description = ("Create a graph and its node animation from a single "
+                      "file that carries both")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        import os
+
+        import networkx as nx
+
+        from ....api import anim as sg_anim
+        from ....core.city2graph import morphology
+        from ....core.data_io import graph_animation as ga
+
+        props = context.scene.scigraphs
+        path = bpy.path.abspath(getattr(props, "graph_animation_filepath", ""))
+        if not path or not os.path.isfile(path):
+            self.report({'ERROR'}, "No graph animation file set")
+            return {'CANCELLED'}
+
+        try:
+            data = ga.read(path)
+        except ga.GraphAnimationError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        except OSError as exc:
+            self.report({'ERROR'}, f"Could not read the file: {exc}")
+            return {'CANCELLED'}
+
+        choice = getattr(props, "graph_animation_direction", 'FILE')
+        if choice == 'DIRECTED':
+            directed = True
+        elif choice == 'UNDIRECTED':
+            directed = False
+        else:
+            directed = (data.meta.get("directed", "").lower() == "true")
+        graph = nx.DiGraph() if directed else nx.Graph()
+        first = data.stages[0]
+        for node in data.nodes:
+            graph.add_node(node, pos=tuple(first[node]),
+                           **data.node_attrs.get(node, {}))
+        for source, target, attrs in data.edges:
+            graph.add_edge(source, target, **attrs)
+
+        name = os.path.splitext(os.path.basename(path))[0]
+        obj = morphology.create_graph_from_networkx(graph, name=name,
+                                                    use_positions=True)
+        if obj is None:
+            self.report({'ERROR'}, "The graph could not be created")
+            return {'CANCELLED'}
+
+        context.view_layer.objects.active = obj
+        obj.select_set(True)
+
+        verts = obj.data.vertices
+        if len(verts) != len(data.nodes):
+            self.report({'ERROR'},
+                        f"{len(data.nodes)} nodes in the file but "
+                        f"{len(verts)} vertices in the mesh")
+            return {'CANCELLED'}
+
+        drift = max(
+            max(abs(a - b) for a, b in zip(verts[i].co, first[node]))
+            for i, node in enumerate(data.nodes))
+        if drift > 1e-4:
+            self.report({'ERROR'},
+                        f"the mesh does not sit where the file's first stage "
+                        f"puts it (off by {drift:.4f}); the node order cannot "
+                        f"be trusted, so the animation is not applied")
+            return {'CANCELLED'}
+
+        from ....core.mesh.geometry import NODE_NAMES_KEY
+        obj[NODE_NAMES_KEY] = ",".join(str(n) for n in data.nodes)
+
+        for name in {k for attrs in data.node_attrs.values() for k in attrs}:
+            values = [data.node_attrs.get(n, {}).get(name) for n in data.nodes]
+            if any(v is None for v in values):
+                continue
+            numeric = all(isinstance(v, (int, float)) for v in values)
+            if not numeric:
+                continue
+            kind = ('INT' if all(isinstance(v, int) for v in values)
+                    else 'FLOAT')
+            layer = obj.data.attributes.get(name)
+            if layer is None:
+                layer = obj.data.attributes.new(name, kind, 'POINT')
+            for i, value in enumerate(values):
+                layer.data[i].value = value
+
+        keys = []
+        for stage, frame in zip(data.stages,
+                                data.frames_over(context.scene.frame_start,
+                                                 context.scene.frame_end)):
+            keys.append((frame, np.array([stage[n] for n in data.nodes],
+                                         dtype=np.float64)))
+
+        sg_anim.ensure_handler()
+        sg_anim.positions(obj, keys)
+
+        if data.sizes is not None:
+            from ....core.mesh.geometry import NODE_SCALE_ATTRIBUTE
+            sg_anim.attribute(
+                obj, NODE_SCALE_ATTRIBUTE,
+                [(frame, [sizes[n] for n in data.nodes])
+                 for (frame, _), sizes in zip(keys, data.sizes)])
+
+        try:
+            bpy.ops.scigraphs.setup_visualization()
+        except RuntimeError:
+            pass
+
+        moved = max(float(np.abs(b - a).max())
+                    for a, b in zip([k[1] for k in keys],
+                                    [k[1] for k in keys[1:]]))
+        if moved <= 1e-9:
+            self.report({'WARNING'},
+                        f"{len(keys)} stages loaded but nothing moves between "
+                        f"them")
+            return {'FINISHED'}
+
+        made_by = data.meta.get("generator", "an unknown version")
+        if data.meta.get("format", "").endswith("/0"):
+            self.report({'WARNING'},
+                        f"{os.path.basename(path)} has no header: it predates "
+                        f"the format and cannot be version-checked")
+        self.report({'INFO'},
+                    f"{len(data.nodes)} nodes, {len(data.edges)} edges, "
+                    f"{len(keys)} stages over frames "
+                    f"{keys[0][0]}-{keys[-1][0]} - written by {made_by}")
+        return {'FINISHED'}

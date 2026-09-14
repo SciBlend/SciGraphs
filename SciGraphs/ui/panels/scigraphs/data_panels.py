@@ -321,6 +321,30 @@ class SCIGRAPHS_PT_data(bpy.types.Panel):
         sec_box.label(text="Only SELECT queries allowed", icon='LOCKED')
 
 
+class SCIGRAPHS_PT_data_animated(bpy.types.Panel):
+    """Import a graph and its movement from one file."""
+
+    bl_label = "Graph + Motion"
+    bl_parent_id = "SCIGRAPHS_PT_data"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.scigraphs
+
+        layout.prop(props, "graph_animation_filepath", text="")
+        layout.prop(props, "graph_animation_direction", text="Direction")
+        layout.operator("scigraphs.import_graph_animation", icon='IMPORT')
+
+        col = layout.column(align=True)
+        col.scale_y = 0.7
+        col.label(text="record,source,target,stage,frame,x,y,z", icon='INFO')
+        col.label(text="edge rows connect; pos rows move.")
+        col.label(text="Nodes are named, so order cannot drift.")
+
+
 class SCIGRAPHS_PT_data_geospatial(bpy.types.Panel):
     """Geospatial options for geographic data."""
     bl_label = "Geospatial Options"
@@ -458,6 +482,7 @@ class SCIGRAPHS_PT_data_temporal(bpy.types.Panel):
 
 def register():
     bpy.utils.register_class(SCIGRAPHS_PT_data)
+    bpy.utils.register_class(SCIGRAPHS_PT_data_animated)
     bpy.utils.register_class(SCIGRAPHS_PT_data_geospatial)
     bpy.utils.register_class(SCIGRAPHS_PT_data_temporal)
 
@@ -465,5 +490,6 @@ def register():
 def unregister():
     bpy.utils.unregister_class(SCIGRAPHS_PT_data_temporal)
     bpy.utils.unregister_class(SCIGRAPHS_PT_data_geospatial)
+    bpy.utils.unregister_class(SCIGRAPHS_PT_data_animated)
     bpy.utils.unregister_class(SCIGRAPHS_PT_data)
 

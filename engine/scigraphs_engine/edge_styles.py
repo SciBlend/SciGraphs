@@ -117,18 +117,43 @@ def _canonical_flip(edges):
     return np.where(edges[:, 0] <= edges[:, 1], 1.0, -1.0)
 
 
-def _perp_unit(d_unit, flip=None):
+def drawing_normal(points, flatness=0.02):
+    """The normal of the plane a layout lies in, or None when it is truly 3D."""
+    pts = np.asarray(points, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[0] < 3:
+        return None
+    centred = pts - pts.mean(axis=0)
+    scale = np.abs(centred).max()
+    if scale <= 0:
+        return None
+    try:
+        _u, s, vh = np.linalg.svd(centred / scale, full_matrices=False)
+    except np.linalg.LinAlgError:
+        return None
+    if s[0] <= 0 or s[-1] / s[0] > flatness:
+        return None
+    return vh[-1] / max(np.linalg.norm(vh[-1]), 1e-12)
+
+
+def _perp_unit(d_unit, flip=None, normal=None):
     """Perpendicular of the canonical direction. Taken from the stored one it
     flips for (v, u) and cancels against the direction sign, drawing the
-    reciprocal edge on top of (u, v)."""
+    reciprocal edge on top of (u, v).
+    """
     if flip is not None:
         d_unit = d_unit * flip[:, None]
-    perp = np.cross(d_unit, _Z_UP)
+    axis = _Z_UP if normal is None else np.asarray(normal, dtype=float)
+    perp = np.cross(d_unit, axis)
     ln = np.linalg.norm(perp, axis=1)
-    vertical = ln < 1e-10
-    if vertical.any():
-        perp[vertical] = np.cross(d_unit[vertical], _X_AXIS)
+    degenerate = ln < 1e-10
+    if degenerate.any():
+        fallback = _X_AXIS if normal is None else _Z_UP
+        perp[degenerate] = np.cross(d_unit[degenerate], fallback)
         ln = np.linalg.norm(perp, axis=1)
+        still = ln < 1e-10
+        if still.any():
+            perp[still] = np.cross(d_unit[still], _X_AXIS)
+            ln = np.linalg.norm(perp, axis=1)
     ln = np.maximum(ln, 1e-12)
     return perp / ln[:, None]
 
@@ -176,11 +201,13 @@ def _bezier_quadratic(p0, c, p1, t):
         + (t**2)[None, :, None] * p1[:, None]
 
 
-def _curved_points(a, b, params, edge_ids, use_cubic, t, flip=None):
+def _curved_points(a, b, params, edge_ids, use_cubic, t, flip=None,
+                   normal=None):
     length = np.linalg.norm(b - a, axis=1)
     offs = length * params["curvature"] * 0.5
     sign = _direction_sign(a, b, params["direction"], edge_ids, flip)
-    perp = _perp_unit((b - a) / np.maximum(length, 1e-12)[:, None], flip)
+    perp = _perp_unit((b - a) / np.maximum(length, 1e-12)[:, None], flip,
+                      normal=normal)
     perp = perp * (offs * sign)[:, None]
     if use_cubic:
         c1 = a + (b - a) * 0.25 + perp * 0.5
@@ -189,7 +216,7 @@ def _curved_points(a, b, params, edge_ids, use_cubic, t, flip=None):
     return _bezier_quadratic(a, (a + b) * 0.5 + perp, b, t)
 
 
-def _arc_points(a, b, params, edge_ids, t, flip=None):
+def _arc_points(a, b, params, edge_ids, t, flip=None, normal=None):
     chord = np.linalg.norm(b - a, axis=1)
     sagitta = chord * params["curvature"] * 0.5
     flat = sagitta <= 1e-3
@@ -197,7 +224,8 @@ def _arc_points(a, b, params, edge_ids, t, flip=None):
         flat, 1.0, chord**2 / np.maximum(8.0 * sagitta, 1e-12) + sagitta / 2.0
     )
     sign = _direction_sign(a, b, params["direction"], edge_ids, flip)
-    perp = _perp_unit((b - a) / np.maximum(chord, 1e-12)[:, None], flip)
+    perp = _perp_unit((b - a) / np.maximum(chord, 1e-12)[:, None], flip,
+                      normal=normal)
     perp = perp * sign[:, None]
     mid = (a + b) * 0.5
     center = mid - perp * (radius - sagitta)[:, None]
@@ -473,13 +501,15 @@ def tessellate(coords, edges, params, edge_widths=None, hierarchy=None,
             plain_rows, w_plain = plain_rows[order], w_plain[order]
             flip = flip[order]
 
+        plane = drawing_normal(coords)
+
         # CURVED rides a cubic; QUADRATIC and TAPERED ride a quadratic.
         if (style in ('CURVED', 'QUADRATIC', 'TAPERED')
                 and params["curvature"] >= 1e-3):
             pts = _curved_points(a, b, params, plain_ids,
-                                 style == 'CURVED', t, flip)
+                                 style == 'CURVED', t, flip, normal=plane)
         elif style == 'ARC' and params["curvature"] >= 1e-3:
-            pts = _arc_points(a, b, params, plain_ids, t, flip)
+            pts = _arc_points(a, b, params, plain_ids, t, flip, normal=plane)
         elif style == 'ORTHOGONAL':
             pts = _orthogonal_points(a, b, params)
             t = np.linspace(0.0, 1.0, pts.shape[1])
@@ -487,7 +517,14 @@ def tessellate(coords, edges, params, edge_widths=None, hierarchy=None,
             if plain.shape[0] <= BUNDLE_MAX_EDGES:
                 pts = _bundled_points(a, b, params, t)
             else:
-                pts = _curved_points(a, b, params, plain_ids, True, t, flip)
+                import warnings
+                warnings.warn(
+                    f"BUNDLED: {plain.shape[0]} edges exceeds "
+                    f"BUNDLE_MAX_EDGES={BUNDLE_MAX_EDGES}; drawing cubic "
+                    f"Bezier curves instead of bundles",
+                    RuntimeWarning, stacklevel=2)
+                pts = _curved_points(a, b, params, plain_ids, True, t, flip,
+                                     normal=plane)
         elif heb:
             pts = _heb_points(a, b, plain[:, 0], plain[:, 1], hierarchy,
                               params, t.size)

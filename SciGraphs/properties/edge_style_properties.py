@@ -559,6 +559,61 @@ EDGE_STYLE_PROPERTIES = {
         update=_gpu_style_refresh,
     ),
 
+
+    'graph_animation_filepath': StringProperty(
+        name="Graph + Motion File",
+        description=(
+            "A .sgraphs file: topology, movement and appearance in one place. "
+            "'edge' rows say what connects to what, 'pos' rows say where each "
+            "node is at each stage, and a 'meta' header records the SciGraphs "
+            "version that wrote it. Nodes are named, not numbered, so the "
+            "file is not tied to one object's vertex order"),
+        default="",
+        subtype='FILE_PATH',
+    ),
+    'graph_animation_direction': EnumProperty(
+        name="Direction",
+        description=(
+            "Whether the edge rows are read as directed. 'From File' uses the "
+            "'meta,directed,...' field the file carries; the other two "
+            "override it, which is what you want when the file was exported "
+            "from a graph that lost its direction upstream"),
+        items=[
+            ('FILE', "From File", "Use what the file says; undirected if it "
+                                  "says nothing"),
+            ('DIRECTED', "Directed", "Read source to target, whatever the "
+                                     "file says"),
+            ('UNDIRECTED', "Undirected", "Ignore direction, whatever the file "
+                                         "says"),
+        ],
+        default='FILE',
+    ),
+    'animation_filepath': StringProperty(
+        name="Trajectory File",
+        description=(
+            "CSV of node positions over time. One row per node per stage, "
+            "columns stage,node,x,y,z. Stages, not frames: the animation "
+            "interpolates between them, so three stages of five nodes is "
+            "fifteen rows and gives a whole timeline"),
+        subtype='FILE_PATH',
+    ),
+
+    'animation_stages': IntProperty(
+        name="Stages",
+        description=(
+            "Poses to store when baking from the layout. Not the frame count: "
+            "each stage becomes one shape key and Blender interpolates between "
+            "them, so the cost is one animation channel per stage whatever the "
+            "graph's size"),
+        default=24, min=2, soft_max=120,
+    ),
+
+    'animation_iterations': IntProperty(
+        name="Iterations per Stage",
+        description="Layout iterations run between one stored pose and the next",
+        default=1, min=1, soft_max=50,
+    ),
+
     # --- NODE ATTRIBUTE IMPORT ----------------------------------------------
 
     'node_attr_filepath': StringProperty(

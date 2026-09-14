@@ -116,15 +116,14 @@ EDGE_RATIO_MIN = 0.05
 
 
 def node_cloud(obj):
-    """Node positions in object space as `(positions, source)`, preferring
-    `node_positions`, else `is_intersection` (OSMnx street meshes), else all vertices.
-    """
+    """Node positions in object space as `(positions, source)`."""
     import numpy as np
 
     positions = obj.get("node_positions")
     if positions is not None and len(positions) >= 3:
-        return (np.asarray(list(positions), dtype=np.float32).reshape(-1, 3),
-                "node_positions")
+        stored = np.asarray(list(positions), dtype=np.float32).reshape(-1, 3)
+        if len(stored) != len(obj.data.vertices):
+            return stored, "node_positions"
 
     coords = np.empty(len(obj.data.vertices) * 3, dtype=np.float32)
     obj.data.vertices.foreach_get("co", coords)

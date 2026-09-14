@@ -157,7 +157,7 @@ def _build_node_shape_switch(nodes, links, base_x: float, base_y: float,
     shape_switch.label = "Node Shape"
     shape_switch.data_type = 'GEOMETRY'
     shape_switch.location = (base_x + 240, base_y - 200)
-    while len(shape_switch.inputs) < 6:
+    while len(shape_switch.index_switch_items) < 5:
         shape_switch.index_switch_items.new()
     shape_switch.inputs['Index'].default_value = max(0, min(4, int(shape_index)))
 
@@ -658,17 +658,58 @@ def _strip_custom_attributes_from_geo(nodes, links, geo_socket, mesh, base_locat
     return current
 
 
+FILTER_PASS_ATTRIBUTE = "sg_filter_pass"
+
+EDGE_DIRECTION_ATTRIBUTE = "sg_edge_dir"
+
+NODE_SCALE_ATTRIBUTE = "node_scale"
+EDGE_SCALE_ATTRIBUTE = "edge_scale"
+
+
+def _scale_from_attribute(nodes, links, name, location):
+    """A float socket: the named attribute where it is positive, else 1.0."""
+    x, y = location
+
+    read = nodes.new('GeometryNodeInputNamedAttribute')
+    read.data_type = 'FLOAT'
+    read.inputs['Name'].default_value = name
+    read.location = (x, y)
+
+    positive = nodes.new('FunctionNodeCompare')
+    positive.data_type = 'FLOAT'
+    positive.operation = 'GREATER_THAN'
+    positive.inputs['B'].default_value = 0.0
+    positive.location = (x + 170, y)
+    links.new(read.outputs['Attribute'], positive.inputs['A'])
+
+    switch = nodes.new('GeometryNodeSwitch')
+    switch.input_type = 'FLOAT'
+    switch.location = (x + 340, y)
+    links.new(positive.outputs['Result'], switch.inputs['Switch'])
+    switch.inputs['False'].default_value = 1.0
+    links.new(read.outputs['Attribute'], switch.inputs['True'])
+
+    return switch.outputs['Output']
+
+
 def _promote_edge_attributes_to_point(nodes, links, geo_socket, mesh):
     """Re-domain EDGE attributes to POINT so they survive Mesh-to-Curve, via an InputNamedAttribute / StoreNamedAttribute pair each. Returns the resulting socket."""
     _BUILTIN_EDGE = {'.edge_verts', 'sharp_edge', 'crease_edge', 'material_index'}
+
+    _EDGE_ONLY = set(EDGE_SPAN_ATTRIBUTES) | {EDGE_DIRECTION_ATTRIBUTE}
 
     edge_attrs = [
         (attr.name, attr.data_type)
         for attr in mesh.attributes
         if attr.domain == 'EDGE'
         and attr.name not in _BUILTIN_EDGE
+        and attr.name not in _EDGE_ONLY
         and not attr.name.startswith('.')
     ]
+
+    if not any(name == EDGE_SCALE_ATTRIBUTE for name, _ in edge_attrs):
+        if EDGE_SCALE_ATTRIBUTE not in mesh.attributes:
+            edge_attrs.append((EDGE_SCALE_ATTRIBUTE, 'FLOAT'))
 
     if not edge_attrs:
         return geo_socket
@@ -750,7 +791,22 @@ def _get_slot0_material(obj):
     return None
 
 
-def setup_geometry_nodes_visualization(obj, selection_attr=None):
+def _resolve_filter_attr(obj, selection_attr):
+    """The point attribute that decides what is drawn, from the UI filter."""
+    if selection_attr:
+        return selection_attr
+    viz = getattr(bpy.context.scene, "scigraphs_viz", None)
+    if viz is None or not getattr(viz, "enable_filtering", False):
+        return None
+    name = getattr(viz, "filter_attribute", 'NONE')
+    if not name or name == 'NONE':
+        return None
+    if name not in obj.data.attributes:
+        return None
+    return name
+
+
+def _setup_simple_visualization(obj, selection_attr=None):
     """Build the SciGraphs_Viz tree: glyphs on the vertices, tubes on the edges.
 
     Idempotent. On an OSMnx graph glyphs go only on ``is_intersection=1``
@@ -761,11 +817,13 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     ``scigraphs_node_size``, ``scigraphs_node_shade_smooth``,
     ``scigraphs_edge_thickness``, ``scigraphs_edge_resolution``,
     ``scigraphs_edge_profile``."""
+    selection_attr = _resolve_filter_attr(obj, selection_attr)
+
     mod = obj.modifiers.get("SciGraphs_Viz")
-    
+
     if mod is None:
         mod = obj.modifiers.new(name="SciGraphs_Viz", type='NODES')
-    
+
     if mod.node_group is not None:
         node_group = mod.node_group
         node_group.nodes.clear()
@@ -815,6 +873,10 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     instance_on_points.location = (-200, 200)
     links.new(mesh_to_points.outputs['Points'], instance_on_points.inputs['Points'])
     links.new(node_glyph_socket, instance_on_points.inputs['Instance'])
+
+    links.new(
+        _scale_from_attribute(nodes, links, NODE_SCALE_ATTRIBUTE, (-1000, 300)),
+        instance_on_points.inputs['Scale'])
     
     selection_socket = None
     if is_osmnx or has_intersection_attr:
@@ -911,6 +973,12 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
     curve_to_mesh.location = (-200, -300)
     links.new(mesh_to_curve.outputs['Curve'], curve_to_mesh.inputs['Curve'])
     links.new(edge_profile_node.outputs['Curve'], curve_to_mesh.inputs['Profile Curve'])
+
+    if 'Scale' in curve_to_mesh.inputs:
+        links.new(
+            _scale_from_attribute(nodes, links, EDGE_SCALE_ATTRIBUTE,
+                                  (-1000, -500)),
+            curve_to_mesh.inputs['Scale'])
     
     edge_geo_output = _strip_custom_attributes_from_geo(
         nodes, links, curve_to_mesh.outputs['Mesh'], obj.data, (100, -300)
@@ -932,6 +1000,404 @@ def setup_geometry_nodes_visualization(obj, selection_attr=None):
         set_material.inputs['Material'].default_value = existing_material
 
     links.new(set_material.outputs['Geometry'], group_output.inputs['Geometry'])
+
+    arrange_node_tree(node_group, bands=branch_membership(node_group))
+    frame_node_tree(node_group)
+
+
+def seed_interactive_sockets(obj, mod, selection_attr=None):
+    """Write the modifier's socket values from what the object measured."""
+    if mod is None or mod.node_group is None:
+        return {}
+
+    mesh = getattr(obj, "data", None)
+    attrs = mesh.attributes if mesh is not None else {}
+
+    wanted = {
+        "Node Scale": float(obj.get("scigraphs_node_size", DEFAULT_NODE_SIZE)),
+        "Node Resolution": int(obj.get("scigraphs_node_resolution",
+                                       DEFAULT_NODE_RESOLUTION)),
+        "Node Shape": int(obj.get("scigraphs_node_shape_index",
+                                  DEFAULT_NODE_SHAPE_INDEX)),
+        "Edge Thickness": float(obj.get("scigraphs_edge_thickness",
+                                        DEFAULT_EDGE_THICKNESS)),
+        "Edge Resolution": max(3, int(obj.get("scigraphs_edge_resolution",
+                                              DEFAULT_EDGE_RESOLUTION))),
+        "Node Attr Name": (NODE_SCALE_ATTRIBUTE
+                           if NODE_SCALE_ATTRIBUTE in attrs else ""),
+        "Node Attr Mult": 1.0,
+        "Edge Attr Name": (EDGE_SCALE_ATTRIBUTE
+                           if EDGE_SCALE_ATTRIBUTE in attrs else ""),
+        "Edge Attr Mult": 1.0,
+        "Show Arrows": bool(obj.get("is_directed", False)),
+        "Arrow Size": float(obj.get("scigraphs_edge_thickness",
+                                    DEFAULT_EDGE_THICKNESS)) * 3.0,
+        "Arrow Position": 0.72,
+        "Arrow Resolution": 8,
+        "Arrow Sharpness": 2.5,
+    }
+
+    if selection_attr:
+        wanted.update({"Filter Enable": True, "Filter Attr": selection_attr,
+                       "Filter Min": 0.5, "Filter Max": 1e9})
+    else:
+        wanted.update({"Filter Enable": False, "Filter Attr": ""})
+
+    node_group = mod.node_group
+    written = {}
+    for item in node_group.interface.items_tree:
+        if getattr(item, "in_out", None) != 'INPUT':
+            continue
+        if item.name not in wanted:
+            continue
+        value = wanted[item.name]
+        try:
+            item.default_value = value
+            written[item.name] = value
+        except (TypeError, AttributeError):
+            continue
+        try:
+            mod[item.identifier] = value
+        except (TypeError, KeyError):
+            pass
+
+    show_viewport = mod.show_viewport
+    show_render = mod.show_render
+    obj.modifiers.remove(mod)
+    mod = obj.modifiers.new(name="SciGraphs_Viz", type='NODES')
+    mod.node_group = node_group
+    mod.show_viewport = show_viewport
+    mod.show_render = show_render
+
+    obj["scigraphs_interactive_viz"] = True
+    return written
+
+
+def setup_geometry_nodes_visualization(obj, selection_attr=None,
+                                       interactive=True):
+    """Build the drawing. The interactive tree by default."""
+    if not interactive:
+        return _setup_simple_visualization(obj, selection_attr=selection_attr)
+
+    selection_attr = _resolve_filter_attr(obj, selection_attr)
+
+    store_edge_spans(obj)
+
+    setup_interactive_geometry_nodes(obj)
+    seed_interactive_sockets(obj, obj.modifiers.get("SciGraphs_Viz"),
+                             selection_attr=selection_attr)
+    return obj.modifiers.get("SciGraphs_Viz")
+
+
+
+
+def _estimated_height(node):
+    """How tall the node draws, in node-editor units."""
+    height = getattr(node, "dimensions", None)
+    if height is not None and height.y > 1.0:
+        return float(height.y)
+
+    sockets = sum(1 for s in node.inputs if s.enabled and not s.hide)
+    sockets += sum(1 for s in node.outputs if s.enabled and not s.hide)
+    dropdowns = sum(
+        1 for prop in node.bl_rna.properties
+        if prop.type == 'ENUM' and not prop.is_readonly
+        and prop.identifier not in {"bl_static_type", "bl_description"})
+    return 36.0 + 24.0 * sockets + 22.0 * dropdowns
+
+
+def arrange_node_tree(node_group, column_gap=70.0, row_gap=36.0,
+                      passes=4, bands=None, band_gap=140.0):
+    """Lay the tree out left to right, one column per depth, no overlaps."""
+    nodes = [n for n in node_group.nodes if n.bl_idname != 'NodeFrame']
+    if not nodes:
+        return 0
+
+    upstream = {n: set() for n in nodes}
+    for link in node_group.links:
+        a, b = link.from_node, link.to_node
+        if a in upstream and b in upstream and a != b:
+            upstream[b].add(a)
+
+    depth = {n: 0 for n in nodes}
+    for _ in range(len(nodes)):
+        changed = False
+        for node in nodes:
+            if not upstream[node]:
+                continue
+            want = max(depth[u] for u in upstream[node]) + 1
+            if want > depth[node]:
+                depth[node] = want
+                changed = True
+        if not changed:
+            break
+
+    last = max(depth.values())
+    for node in nodes:
+        if node.bl_idname == 'NodeGroupOutput':
+            depth[node] = last + 1
+        elif node.bl_idname == 'NodeGroupInput':
+            depth[node] = 0
+
+    columns = {}
+    for node in nodes:
+        columns.setdefault(depth[node], []).append(node)
+
+    x, xs = 0.0, {}
+    for index in sorted(columns):
+        xs[index] = x
+        x += max(float(n.width) for n in columns[index]) + column_gap
+
+    bands = bands or {}
+    order_names = list(BAND_ORDER) + [None]
+    rank = {label: i for i, label in enumerate(order_names)}
+
+    def band_of(node):
+        return bands.get(node) if bands.get(node) in rank else None
+
+    heights = {n: _estimated_height(n) for n in nodes}
+
+    stripe = {}
+    for label in order_names:
+        tallest = 0.0
+        for index, group in columns.items():
+            members = [n for n in group if band_of(n) == label]
+            if not members:
+                continue
+            tallest = max(tallest,
+                          sum(heights[n] for n in members)
+                          + row_gap * (len(members) - 1))
+        if tallest:
+            stripe[label] = tallest
+
+    top, tops = 0.0, {}
+    for label in order_names:
+        if label not in stripe:
+            continue
+        tops[label] = top
+        top -= stripe[label] + band_gap
+
+    centres = {}
+
+    def place():
+        for index, group in columns.items():
+            per_band = {}
+            for node in group:
+                per_band.setdefault(band_of(node), []).append(node)
+            for label, members in per_band.items():
+                used = (sum(heights[n] for n in members)
+                        + row_gap * (len(members) - 1))
+                y = tops[label] - (stripe[label] - used) / 2.0
+                for node in members:
+                    node.location = (xs[index], y)
+                    centres[node] = y - heights[node] / 2.0
+                    y -= heights[node] + row_gap
+
+    def key(node):
+        feeders = [centres[u] for u in upstream[node] if u in centres]
+        return -sum(feeders) / len(feeders) if feeders else 0.0
+
+    place()
+    for _ in range(passes):
+        for index in columns:
+            columns[index].sort(key=lambda n: (rank[band_of(n)], key(n)))
+        place()
+
+    return len(nodes)
+
+
+
+_FRAME_COLOURS = {
+    "Nodes": (0.22, 0.34, 0.28),
+    "Edges": (0.20, 0.28, 0.38),
+    "Arrows": (0.36, 0.28, 0.20),
+    "Shared": (0.28, 0.26, 0.32),
+}
+
+
+def _ancestors(node, upstream, stop):
+    """Everything that feeds `node`, not crossing into `stop`."""
+    seen, stack = set(), [node]
+    while stack:
+        current = stack.pop()
+        if current in seen or current in stop:
+            continue
+        seen.add(current)
+        stack.extend(upstream.get(current, ()))
+    return seen
+
+
+BAND_ORDER = ("Shared", "Nodes", "Edges", "Arrows")
+
+
+def branch_membership(node_group):
+    """`{node: band}`, which block of the drawing each node belongs to."""
+    joins = [n for n in node_group.nodes
+             if n.bl_idname == 'GeometryNodeJoinGeometry']
+    if not joins:
+        return {}
+    join = max(joins, key=lambda n: n.location.x)
+
+    upstream = {}
+    for link in node_group.links:
+        upstream.setdefault(link.to_node, set()).add(link.from_node)
+
+    ends = {n for n in node_group.nodes
+            if n.bl_idname in {'NodeGroupInput', 'NodeGroupOutput'}}
+
+    branches, counts = [], {}
+    for link in node_group.links:
+        if link.to_node != join:
+            continue
+        members = _ancestors(link.from_node, upstream, ends)
+        kinds = {n.bl_idname for n in members}
+        if 'FunctionNodeAlignEulerToVector' in kinds:
+            label = "Arrows"
+        elif 'GeometryNodeCurveToMesh' in kinds:
+            label = "Edges"
+        else:
+            label = "Nodes"
+        branches.append((label, members))
+        for node in members:
+            counts[node] = counts.get(node, 0) + 1
+
+    bands = {}
+    for label, members in branches:
+        for node in members:
+            bands[node] = "Shared" if counts[node] > 1 else label
+    return bands
+
+
+def frame_node_tree(node_group):
+    """Box the tree into Shared / Nodes / Edges / Arrows."""
+    for node in list(node_group.nodes):
+        if node.bl_idname == 'NodeFrame':
+            node_group.nodes.remove(node)
+    for node in node_group.nodes:
+        node.parent = None
+
+    bands = branch_membership(node_group)
+    if not bands:
+        return {}
+
+    groups = {}
+    for node, label in bands.items():
+        groups.setdefault(label, []).append(node)
+
+    made = {}
+    for label in BAND_ORDER:
+        members = [n for n in groups.get(label, ())
+                   if n.bl_idname != 'NodeFrame']
+        if not members:
+            continue
+        frame = node_group.nodes.new('NodeFrame')
+        frame.label = label
+        frame.shrink = True
+        frame.location = (0.0, 0.0)
+        frame.use_custom_color = True
+        frame.color = _FRAME_COLOURS.get(label, (0.28, 0.26, 0.32))
+        for node in members:
+            node.parent = frame
+        made[label] = len(members)
+    return made
+
+
+
+EDGE_SPAN_ATTRIBUTES = ("sg_edge_u0", "sg_edge_u1")
+
+
+def store_edge_spans(obj):
+    """Write each mesh edge's fraction span within its logical edge."""
+    mesh = getattr(obj, "data", None)
+    if mesh is None or not len(mesh.edges):
+        return 0
+
+    count = len(mesh.edges)
+    verts = [tuple(e.vertices) for e in mesh.edges]
+
+    marker = mesh.attributes.get("is_intersection")
+    if marker is not None and marker.domain == 'POINT':
+        real = {i for i, d in enumerate(marker.data) if int(d.value) == 1}
+    else:
+        real = set(range(len(mesh.vertices)))
+
+    adjacency = {}
+    for index, (a, b) in enumerate(verts):
+        adjacency.setdefault(a, []).append((index, b))
+        adjacency.setdefault(b, []).append((index, a))
+
+    def passes_through(vertex):
+        """An interior point of a chain: not a node, and exactly two ways out."""
+        return vertex not in real and len(adjacency.get(vertex, ())) == 2
+
+    positions = [v.co.copy() for v in mesh.vertices]
+
+    def length(index):
+        a, b = verts[index]
+        return (positions[a] - positions[b]).length
+
+    u0 = [0.0] * count
+    u1 = [1.0] * count
+    seen = set()
+    chains = 0
+
+    for start in range(count):
+        if start in seen:
+            continue
+
+        chain = [start]
+        seen.add(start)
+
+        for end in (0, 1):
+            current, vertex = start, verts[start][end]
+            while passes_through(vertex):
+                nxt = next((e for e, _ in adjacency[vertex] if e != current), None)
+                if nxt is None or nxt in seen:
+                    break
+                seen.add(nxt)
+                chain.append(nxt) if end else chain.insert(0, nxt)
+                a, b = verts[nxt]
+                current, vertex = nxt, (b if a == vertex else a)
+
+        chains += 1
+        spans = [length(e) for e in chain]
+        total = sum(spans) or 1.0
+        running = 0.0
+        for edge, span in zip(chain, spans):
+            u0[edge] = running / total
+            running += span
+            u1[edge] = running / total
+        u1[chain[-1]] = 1.0
+
+    for name, values in zip(EDGE_SPAN_ATTRIBUTES, (u0, u1)):
+        layer = mesh.attributes.get(name)
+        if layer is not None and (layer.domain != 'EDGE'
+                                  or layer.data_type != 'FLOAT'):
+            mesh.attributes.remove(layer)
+            layer = None
+        if layer is None:
+            layer = mesh.attributes.new(name, 'FLOAT', 'EDGE')
+        layer.data.foreach_set("value", values)
+
+    mesh.update()
+    return chains
+
+
+
+NODE_NAMES_KEY = "node_names"
+
+
+def node_names(obj):
+    """The logical nodes' names, in vertex order, or indices when there are none."""
+    stored = str(obj.get(NODE_NAMES_KEY, "") or "")
+    names = [n for n in stored.split(",") if n]
+    mesh = getattr(obj, "data", None)
+    verts = len(getattr(mesh, "vertices", ()) or ())
+    count = int(obj.get("num_nodes", verts) or verts)
+    if names and len(names) == count:
+        return names
+    return [str(i) for i in range(count)]
+
 
 def fix_node_names(obj):
     """Give the primitives of an older tree their SciGraphs_ names."""
@@ -1632,6 +2098,11 @@ def set_nodes_modifier_input(mod, identifier, value):
     inputs = getattr(props, "inputs", None) if props is not None else None
     if inputs is not None:
         try:
+            inputs[identifier]["value"] = value
+            return True
+        except (KeyError, TypeError, AttributeError, IndexError):
+            pass
+        try:
             inputs[identifier] = value
             return True
         except (KeyError, TypeError, AttributeError):
@@ -1679,9 +2150,17 @@ def update_geometry_nodes_parameters(obj):
         "Filter Attr": props.filter_attribute if props.filter_attribute != 'NONE' else "",
     }
     
+    attempted = landed = 0
     for socket_name, value in param_values.items():
         if socket_name in socket_map:
-            set_nodes_modifier_input(mod, socket_map[socket_name], value)
+            attempted += 1
+            landed += bool(set_nodes_modifier_input(
+                mod, socket_map[socket_name], value))
+
+    if attempted and not landed:
+        log(f"SciGraphs: none of {attempted} viz parameters reached "
+            f"{obj.name}'s modifier. The socket-write spelling does not "
+            f"match this Blender build")
 
     if obj.data:
         obj.data.update()
@@ -1751,6 +2230,16 @@ def setup_interactive_geometry_nodes(obj):
     s = node_group.interface.new_socket("Arrow Size", in_out='INPUT', socket_type='NodeSocketFloat')
     s.default_value = 0.15
     
+    s = node_group.interface.new_socket("Arrow Resolution", in_out='INPUT', socket_type='NodeSocketInt')
+    s.default_value = 8
+    s.min_value = 3
+    s.max_value = 64
+
+    s = node_group.interface.new_socket("Arrow Sharpness", in_out='INPUT', socket_type='NodeSocketFloat')
+    s.default_value = 2.5
+    s.min_value = 0.5
+    s.max_value = 12.0
+
     s = node_group.interface.new_socket("Arrow Position", in_out='INPUT', socket_type='NodeSocketFloat')
     s.default_value = 0.7
     s.min_value = 0.0
@@ -1830,7 +2319,7 @@ def setup_interactive_geometry_nodes(obj):
     shape_switch.data_type = 'GEOMETRY'
     shape_switch.location = (-600, 0)
 
-    while len(shape_switch.inputs) < 6:
+    while len(shape_switch.index_switch_items) < 5:
         shape_switch.index_switch_items.new()
 
     links.new(group_in.outputs['Node Shape'], shape_switch.inputs['Index'])
@@ -1949,8 +2438,35 @@ def setup_interactive_geometry_nodes(obj):
     links.new(instance_on_points.outputs['Instances'], realize_nodes.inputs['Geometry'])
     
     
+    store_pass = nodes.new('GeometryNodeStoreNamedAttribute')
+    store_pass.data_type = 'FLOAT'
+    store_pass.domain = 'POINT'
+    store_pass.location = (-1500, -420)
+    store_pass.inputs['Name'].default_value = FILTER_PASS_ATTRIBUTE
+    links.new(prepared_geo, store_pass.inputs['Geometry'])
+    links.new(filter_switch.outputs['Output'], store_pass.inputs['Value'])
+
+    read_pass = nodes.new('GeometryNodeInputNamedAttribute')
+    read_pass.data_type = 'FLOAT'
+    read_pass.location = (-1380, -300)
+    read_pass.inputs['Name'].default_value = FILTER_PASS_ATTRIBUTE
+
+    edge_below = nodes.new('FunctionNodeCompare')
+    edge_below.data_type = 'FLOAT'
+    edge_below.operation = 'LESS_THAN'
+    edge_below.inputs['B'].default_value = 0.999
+    edge_below.location = (-1260, -300)
+    links.new(read_pass.outputs['Attribute'], edge_below.inputs['A'])
+
+    drop_edges = nodes.new('GeometryNodeDeleteGeometry')
+    drop_edges.domain = 'EDGE'
+    drop_edges.location = (-1160, -480)
+    links.new(store_pass.outputs['Geometry'], drop_edges.inputs['Geometry'])
+    links.new(edge_below.outputs['Result'], drop_edges.inputs['Selection'])
+    edge_input_geo = drop_edges.outputs['Geometry']
+
     edge_geo = _split_edges_for_individual_curves(
-        nodes, links, prepared_geo, (-1100, -500), mesh=obj.data
+        nodes, links, edge_input_geo, (-1100, -500), mesh=obj.data
     )
 
     mesh_to_curve = nodes.new('GeometryNodeMeshToCurve')
@@ -2008,35 +2524,183 @@ def setup_interactive_geometry_nodes(obj):
     curve_to_mesh.location = (300, -500)
     links.new(set_radius.outputs['Curve'], curve_to_mesh.inputs['Curve'])
     links.new(curve_circle.outputs['Curve'], curve_to_mesh.inputs['Profile Curve'])
+
+    if 'Scale' in curve_to_mesh.inputs:
+        links.new(final_edge_thick.outputs['Value'],
+                  curve_to_mesh.inputs['Scale'])
+        set_radius.inputs['Radius'].default_value = 1.0
+        for link in list(links):
+            if (link.to_node == set_radius
+                    and link.to_socket.name == 'Radius'):
+                links.remove(link)
     
     
-    sample_curve = nodes.new('GeometryNodeSampleCurve')
-    sample_curve.mode = 'FACTOR'
-    sample_curve.location = (100, -900)
-    links.new(mesh_to_curve.outputs['Curve'], sample_curve.inputs['Curves'])
-    links.new(group_in.outputs['Arrow Position'], sample_curve.inputs['Factor'])
-    
+    edge_verts = nodes.new('GeometryNodeInputMeshEdgeVertices')
+    edge_verts.location = (100, -820)
+
+    edge_dir = nodes.new('ShaderNodeVectorMath')
+    edge_dir.operation = 'SUBTRACT'
+    edge_dir.location = (280, -820)
+    links.new(edge_verts.outputs['Position 2'], edge_dir.inputs[0])
+    links.new(edge_verts.outputs['Position 1'], edge_dir.inputs[1])
+
+    span0 = nodes.new('GeometryNodeInputNamedAttribute')
+    span0.data_type = 'FLOAT'
+    span0.inputs['Name'].default_value = EDGE_SPAN_ATTRIBUTES[0]
+    span0.location = (100, -940)
+
+    span1 = nodes.new('GeometryNodeInputNamedAttribute')
+    span1.data_type = 'FLOAT'
+    span1.inputs['Name'].default_value = EDGE_SPAN_ATTRIBUTES[1]
+    span1.location = (100, -1060)
+
+    usable = nodes.new('FunctionNodeCompare')
+    usable.data_type = 'FLOAT'
+    usable.operation = 'GREATER_THAN'
+    usable.location = (620, -880)
+    links.new(span1.outputs['Attribute'], usable.inputs['A'])
+    links.new(span0.outputs['Attribute'], usable.inputs['B'])
+
+    spans_ok = nodes.new('FunctionNodeBooleanMath')
+    spans_ok.operation = 'AND'
+    spans_ok.location = (780, -880)
+    links.new(span1.outputs['Exists'], spans_ok.inputs[0])
+    links.new(usable.outputs['Result'], spans_ok.inputs[1])
+
+    clamped = nodes.new('ShaderNodeClamp')
+    clamped.location = (280, -940)
+    clamped.inputs['Min'].default_value = 0.0
+    clamped.inputs['Max'].default_value = 0.999999
+    links.new(group_in.outputs['Arrow Position'], clamped.inputs['Value'])
+
+    after_start = nodes.new('FunctionNodeCompare')
+    after_start.data_type = 'FLOAT'
+    after_start.operation = 'GREATER_EQUAL'
+    after_start.location = (460, -940)
+    links.new(clamped.outputs['Result'], after_start.inputs['A'])
+    links.new(span0.outputs['Attribute'], after_start.inputs['B'])
+
+    before_end = nodes.new('FunctionNodeCompare')
+    before_end.data_type = 'FLOAT'
+    before_end.operation = 'LESS_THAN'
+    before_end.location = (460, -1060)
+    links.new(clamped.outputs['Result'], before_end.inputs['A'])
+    links.new(span1.outputs['Attribute'], before_end.inputs['B'])
+
+    in_span = nodes.new('FunctionNodeBooleanMath')
+    in_span.operation = 'AND'
+    in_span.location = (620, -1000)
+    links.new(after_start.outputs['Result'], in_span.inputs[0])
+    links.new(before_end.outputs['Result'], in_span.inputs[1])
+
+    offset = nodes.new('ShaderNodeMath')
+    offset.operation = 'SUBTRACT'
+    offset.location = (620, -1140)
+    links.new(clamped.outputs['Result'], offset.inputs[0])
+    links.new(span0.outputs['Attribute'], offset.inputs[1])
+
+    width = nodes.new('ShaderNodeMath')
+    width.operation = 'SUBTRACT'
+    width.location = (620, -1260)
+    links.new(span1.outputs['Attribute'], width.inputs[0])
+    links.new(span0.outputs['Attribute'], width.inputs[1])
+
+    local = nodes.new('ShaderNodeMath')
+    local.operation = 'DIVIDE'
+    local.use_clamp = True
+    local.location = (780, -1200)
+    links.new(offset.outputs['Value'], local.inputs[0])
+    links.new(width.outputs['Value'], local.inputs[1])
+
+    factor = nodes.new('GeometryNodeSwitch')
+    factor.input_type = 'FLOAT'
+    factor.location = (940, -1140)
+    links.new(spans_ok.outputs['Boolean'], factor.inputs['Switch'])
+    links.new(group_in.outputs['Arrow Position'], factor.inputs['False'])
+    links.new(local.outputs['Value'], factor.inputs['True'])
+
+    along = nodes.new('ShaderNodeVectorMath')
+    along.operation = 'MULTIPLY_ADD'
+    along.location = (1100, -820)
+    links.new(edge_dir.outputs['Vector'], along.inputs[0])
+    links.new(factor.outputs['Output'], along.inputs[1])
+    links.new(edge_verts.outputs['Position 1'], along.inputs[2])
+
+    store_dir = nodes.new('GeometryNodeStoreNamedAttribute')
+    store_dir.data_type = 'FLOAT_VECTOR'
+    store_dir.domain = 'EDGE'
+    store_dir.location = (460, -700)
+    store_dir.inputs['Name'].default_value = EDGE_DIRECTION_ATTRIBUTE
+    links.new(edge_input_geo, store_dir.inputs['Geometry'])
+    links.new(edge_dir.outputs['Vector'], store_dir.inputs['Value'])
+
+    real_node = nodes.new('GeometryNodeInputNamedAttribute')
+    real_node.data_type = 'INT'
+    real_node.inputs['Name'].default_value = "is_intersection"
+    real_node.location = (100, -700)
+
+    at_target = nodes.new('GeometryNodeSampleIndex')
+    at_target.data_type = 'INT'
+    at_target.domain = 'POINT'
+    at_target.location = (280, -640)
+    links.new(edge_input_geo, at_target.inputs['Geometry'])
+    links.new(real_node.outputs['Attribute'], at_target.inputs['Value'])
+    links.new(edge_verts.outputs['Vertex Index 2'], at_target.inputs['Index'])
+
+    ends_at_node = nodes.new('FunctionNodeCompare')
+    ends_at_node.data_type = 'INT'
+    ends_at_node.operation = 'EQUAL'
+    ends_at_node.inputs['B'].default_value = 1
+    ends_at_node.location = (460, -640)
+    links.new(at_target.outputs['Value'], ends_at_node.inputs['A'])
+
+    one_per_edge = nodes.new('GeometryNodeSwitch')
+    one_per_edge.input_type = 'BOOLEAN'
+    one_per_edge.location = (620, -640)
+    one_per_edge.inputs['False'].default_value = True
+    links.new(real_node.outputs['Exists'], one_per_edge.inputs['Switch'])
+    links.new(ends_at_node.outputs['Result'], one_per_edge.inputs['True'])
+
+    carries = nodes.new('GeometryNodeSwitch')
+    carries.input_type = 'BOOLEAN'
+    carries.location = (940, -700)
+    links.new(spans_ok.outputs['Boolean'], carries.inputs['Switch'])
+    links.new(one_per_edge.outputs['Output'], carries.inputs['False'])
+    links.new(in_span.outputs['Boolean'], carries.inputs['True'])
+
+    arrow_points = nodes.new('GeometryNodeMeshToPoints')
+    arrow_points.mode = 'EDGES'
+    arrow_points.location = (800, -800)
+    links.new(store_dir.outputs['Geometry'], arrow_points.inputs['Mesh'])
+    links.new(along.outputs['Vector'], arrow_points.inputs['Position'])
+    links.new(carries.outputs['Output'], arrow_points.inputs['Selection'])
+
+    read_dir = nodes.new('GeometryNodeInputNamedAttribute')
+    read_dir.data_type = 'FLOAT_VECTOR'
+    read_dir.location = (640, -1000)
+    read_dir.inputs['Name'].default_value = EDGE_DIRECTION_ATTRIBUTE
+
     arrow_cone = nodes.new('GeometryNodeMeshCone')
     arrow_cone.location = (100, -1100)
-    arrow_cone.inputs['Radius Bottom'].default_value = 0.5
     arrow_cone.inputs['Radius Top'].default_value = 0.0
-    arrow_cone.inputs['Depth'].default_value = 1.0
-    arrow_cone.inputs['Vertices'].default_value = 8
+    links.new(group_in.outputs['Arrow Resolution'], arrow_cone.inputs['Vertices'])
     links.new(group_in.outputs['Arrow Size'], arrow_cone.inputs['Radius Bottom'])
-    
+
+    arrow_len = nodes.new('ShaderNodeMath')
+    arrow_len.operation = 'MULTIPLY'
+    arrow_len.location = (280, -1100)
+    links.new(group_in.outputs['Arrow Size'], arrow_len.inputs[0])
+    links.new(group_in.outputs['Arrow Sharpness'], arrow_len.inputs[1])
+    links.new(arrow_len.outputs['Value'], arrow_cone.inputs['Depth'])
+
     align_euler = nodes.new('FunctionNodeAlignEulerToVector')
     align_euler.axis = 'Z'
-    align_euler.location = (300, -950)
-    links.new(sample_curve.outputs['Tangent'], align_euler.inputs['Vector'])
-    
-    curve_to_points = nodes.new('GeometryNodeCurveToPoints')
-    curve_to_points.mode = 'EVALUATED'
-    curve_to_points.location = (300, -800)
-    links.new(mesh_to_curve.outputs['Curve'], curve_to_points.inputs['Curve'])
-    
+    align_euler.location = (640, -950)
+    links.new(read_dir.outputs['Attribute'], align_euler.inputs['Vector'])
+
     instance_arrows = nodes.new('GeometryNodeInstanceOnPoints')
-    instance_arrows.location = (500, -900)
-    links.new(curve_to_points.outputs['Points'], instance_arrows.inputs['Points'])
+    instance_arrows.location = (820, -900)
+    links.new(arrow_points.outputs['Points'], instance_arrows.inputs['Points'])
     links.new(arrow_cone.outputs['Mesh'], instance_arrows.inputs['Instance'])
     links.new(align_euler.outputs['Rotation'], instance_arrows.inputs['Rotation'])
     links.new(group_in.outputs['Show Arrows'], instance_arrows.inputs['Selection'])
@@ -2059,13 +2723,34 @@ def setup_interactive_geometry_nodes(obj):
     links.new(edge_geo_output, join_geo.inputs['Geometry'])
     links.new(arrow_geo_output, join_geo.inputs['Geometry'])
     
-    links.new(join_geo.outputs['Geometry'], group_out.inputs['Geometry'])
-    
-    log("Interactive Geometry Nodes visualization set up successfully")
-    
+    set_material = nodes.new('GeometryNodeSetMaterial')
+    set_material.location = (group_out.location.x - 200, group_out.location.y)
+    links.new(join_geo.outputs['Geometry'], set_material.inputs['Geometry'])
+
+    existing_material = _get_slot0_material(obj)
+    if existing_material is not None:
+        set_material.inputs['Material'].default_value = existing_material
+
+    links.new(set_material.outputs['Geometry'], group_out.inputs['Geometry'])
+
+    arrange_node_tree(node_group, bands=branch_membership(node_group))
+    frame_node_tree(node_group)
+
+    seeded = 0
+    for item in node_group.interface.items_tree:
+        if item.item_type != 'SOCKET' or item.in_out != 'INPUT':
+            continue
+        default = getattr(item, "default_value", None)
+        if default is None:
+            continue
+        seeded += bool(set_nodes_modifier_input(mod, item.identifier, default))
+
+    log(f"Interactive Geometry Nodes visualization set up successfully "
+        f"({seeded} socket defaults seeded)")
+
     if bpy.context.scene.get('scigraphs_viz'):
         update_geometry_nodes_parameters(obj)
-    
+
     return mod
 
 
@@ -2241,6 +2926,98 @@ def _set_edge_attrs(edge, edge_key, edge_layers, edge_attrs):
             edge[layer] = values_map[edge_key]
 
 
+
+
+def _match_point_count(p0, p1, points, target):
+    """`points` resampled to exactly `target` interior points, shape kept."""
+    if len(points) == target:
+        return points
+    if target <= 0:
+        return []
+
+    chain = [np.asarray(p0, dtype=np.float64)]
+    chain.extend(np.asarray(q, dtype=np.float64) for q in points)
+    chain.append(np.asarray(p1, dtype=np.float64))
+    chain = np.array(chain)
+
+    steps = np.linalg.norm(np.diff(chain, axis=0), axis=1)
+    walked = np.concatenate([[0.0], np.cumsum(steps)])
+    total = walked[-1]
+    if total <= 1e-12:
+        return [chain[0].copy() for _ in range(target)]
+
+    wanted = np.linspace(0.0, total, target + 2)[1:-1]
+    return [np.array([np.interp(w, walked, chain[:, axis])
+                      for axis in range(3)]) for w in wanted]
+
+
+def _build_styled_bmesh(node_positions, original_edges, style_params,
+                        parallel_groups, saved_point_attrs, saved_edge_attrs,
+                        reference_counts=None):
+    """The styled geometry for one set of node positions."""
+    bm = bmesh.new()
+
+    is_intersection_layer = bm.verts.layers.int.new("is_intersection")
+    vert_layers, edge_layers = _create_bmesh_layers(bm, saved_point_attrs,
+                                                   saved_edge_attrs)
+
+    new_verts = []
+    for new_idx, pos in enumerate(node_positions):
+        vert = bm.verts.new(pos)
+        vert[is_intersection_layer] = 1
+        for attr_name, layer in vert_layers.items():
+            values_list = saved_point_attrs[attr_name][1]
+            if new_idx < len(values_list):
+                vert[layer] = values_list[new_idx]
+        new_verts.append(vert)
+
+    bm.verts.ensure_lookup_table()
+
+    counts = []
+    if style_params['style_type'] == 'BUNDLED':
+        _apply_bundled_edges(bm, new_verts, original_edges, node_positions,
+                             style_params, is_intersection_layer,
+                             edge_layers, saved_edge_attrs)
+    else:
+        _apply_styled_edges(bm, new_verts, original_edges, node_positions,
+                            style_params, parallel_groups,
+                            is_intersection_layer, edge_layers,
+                            saved_edge_attrs, reference_counts, counts)
+    return bm, counts
+
+
+def _stage_poses(mesh, node_indices):
+    """`([name], [frame], [[node position]])` for the stored animation stages."""
+    keys = getattr(mesh, "shape_keys", None)
+    blocks = [k for k in (keys.key_blocks if keys else ())
+              if k.name.startswith("sg_stage_")]
+    if not blocks:
+        return [], [], []
+
+    action = keys.animation_data.action if keys.animation_data else None
+    curves = {}
+    if action is not None:
+        if getattr(action, "layers", None):
+            for layer in action.layers:
+                for strip in layer.strips:
+                    for bag in getattr(strip, "channelbags", []):
+                        curves.update({fc.data_path: fc for fc in bag.fcurves})
+        else:
+            curves.update({fc.data_path: fc for fc in action.fcurves})
+
+    frames = []
+    for block in blocks:
+        curve = curves.get(block.path_from_id("value"))
+        if curve is None or not curve.keyframe_points:
+            return [], [], []
+        frames.append(int(round(max(curve.keyframe_points,
+                                    key=lambda kp: kp.co[1]).co[0])))
+
+    poses = [[np.array(block.data[i].co) for i in node_indices]
+             for block in blocks]
+    return [b.name for b in blocks], frames, poses
+
+
 def apply_edge_style_to_graph(obj, style_params: dict = None):
     """Restyle a graph's edges by rebuilding its mesh geometry, saving every custom vertex and edge attribute and putting them back. ``style_params`` falls back to the scene properties when None."""
     from scigraphs_core.mesh import edge_styles
@@ -2282,6 +3059,10 @@ def apply_edge_style_to_graph(obj, style_params: dict = None):
     num_nodes = len(node_positions)
     log(f"Processing {num_nodes} graph nodes")
 
+    stage_names, stage_frames, stage_poses = _stage_poses(mesh, node_indices)
+    if stage_poses:
+        log(f"  Carrying {len(stage_poses)} animation stages through the restyle")
+
     saved_point_attrs, saved_edge_attrs = _save_custom_attributes(
         mesh, node_indices, has_intersection_attr
     )
@@ -2320,32 +3101,9 @@ def apply_edge_style_to_graph(obj, style_params: dict = None):
     else:
         parallel_groups = {}
 
-    bm = bmesh.new()
-
-    is_intersection_layer = bm.verts.layers.int.new("is_intersection")
-    vert_layers, edge_layers = _create_bmesh_layers(bm, saved_point_attrs, saved_edge_attrs)
-
-    new_verts = []
-    for new_idx, pos in enumerate(node_positions):
-        v = bm.verts.new(pos)
-        v[is_intersection_layer] = 1
-        for attr_name, layer in vert_layers.items():
-            values_list = saved_point_attrs[attr_name][1]
-            if new_idx < len(values_list):
-                v[layer] = values_list[new_idx]
-        new_verts.append(v)
-
-    bm.verts.ensure_lookup_table()
-
-    if style_params['style_type'] == 'BUNDLED':
-        _apply_bundled_edges(bm, new_verts, original_edges, node_positions,
-                            style_params, is_intersection_layer,
-                            edge_layers, saved_edge_attrs)
-    else:
-        _apply_styled_edges(bm, new_verts, original_edges, node_positions,
-                           style_params, parallel_groups, is_intersection_layer,
-                           edge_layers, saved_edge_attrs)
-
+    bm, edge_point_counts = _build_styled_bmesh(
+        node_positions, original_edges, style_params, parallel_groups,
+        saved_point_attrs, saved_edge_attrs)
     bm.to_mesh(mesh)
     bm.free()
 
@@ -2356,6 +3114,36 @@ def apply_edge_style_to_graph(obj, style_params: dict = None):
     obj["num_curve_verts"] = len(mesh.vertices) - num_nodes
 
     mesh.update()
+
+    if stage_poses:
+        restyled = []
+        for poses in stage_poses:
+            stage_bm, _ = _build_styled_bmesh(
+                poses, original_edges, style_params, parallel_groups,
+                saved_point_attrs, saved_edge_attrs,
+                reference_counts=edge_point_counts)
+            stage_bm.verts.ensure_lookup_table()
+            coords = np.array([v.co[:] for v in stage_bm.verts],
+                              dtype=np.float64)
+            stage_bm.free()
+            if len(coords) != len(mesh.vertices):
+                log(f"  WARNING: a restyled stage has {len(coords)} vertices "
+                    f"against the mesh's {len(mesh.vertices)}; dropping the "
+                    f"animation rather than storing a mismatched pose")
+                restyled = []
+                break
+            restyled.append(coords)
+
+        if restyled:
+            try:
+                from ...api import anim as _anim
+                _anim.clear(obj)
+                _anim.ensure_handler()
+                _anim.positions(obj, list(zip(stage_frames, restyled)))
+                log(f"  Restored {len(restyled)} stages over frames "
+                    f"{stage_frames[0]}-{stage_frames[-1]}")
+            except Exception as exc:  # noqa: BLE001
+                log(f"  WARNING: could not restore the animation: {exc}")
 
     _rebuild_visualization_if_present(obj)
 
@@ -2395,18 +3183,16 @@ def _rebuild_visualization_if_present(obj):
 
     tree_name = mod.node_group.name
 
-    if tree_name.startswith("SciGraphs_Interactive"):
-        setup_interactive_geometry_nodes(obj)
-        log("  Rebuilt interactive GN tree (attribute stripping updated)")
-    else:
-        setup_geometry_nodes_visualization(obj)
-        log("  Rebuilt simple GN tree (attribute stripping updated)")
+    setup_geometry_nodes_visualization(
+        obj, interactive=tree_name.startswith("SciGraphs_Interactive"))
+    log(f"  Rebuilt GN tree ({tree_name})")
 
     _notify_viz_rebuild(obj)
 
 
 def _apply_styled_edges(bm, verts, edges, positions, params, parallel_groups,
-                        is_int_layer, edge_layers, saved_edge_attrs):
+                        is_int_layer, edge_layers, saved_edge_attrs,
+                        reference_counts=None, collected=None):
     from scigraphs_core.mesh import edge_styles as es
 
     style_type = params['style_type']
@@ -2440,6 +3226,12 @@ def _apply_styled_edges(bm, verts, edges, positions, params, parallel_groups,
             orthogonal_style=orthogonal_style,
             self_loop_radius=self_loop_radius
         )
+
+        if reference_counts is not None and edge_idx < len(reference_counts):
+            intermediate_points = _match_point_count(
+                p0, p1, intermediate_points, reference_counts[edge_idx])
+        if collected is not None:
+            collected.append(len(intermediate_points))
 
         if intermediate_points:
             prev_vert = verts[src_idx]

@@ -355,7 +355,8 @@ class SCIGRAPHS_OT_color_set_attribute(bpy.types.Operator):
         except TypeError:
             pass
 
-        fn.update_property_range(props, obj, target)
+        if getattr(props, "auto_range", True):
+            fn.update_property_range(props, obj, target)
 
         ok, message = fn.apply_coloring(context)
         if not ok:

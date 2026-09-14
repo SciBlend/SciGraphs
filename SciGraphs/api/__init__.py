@@ -1,11 +1,6 @@
-"""Scripting API: drive SciGraphs from Python (`from SciGraphs import api as sg`).
+"""Scripting API: drive SciGraphs from Python (`from SciGraphs import api as sg`)."""
 
-Submodules are `graphs`, `preview`, `render`, `context`, and `thin`. Registered
-state goes through `bpy.ops`, since a direct PropertyGroup write can miss the
-registered add-on.
-"""
-
-_MODULES = ("context", "graphs", "preview", "render", "thin")
+_MODULES = ("anim", "context", "graphs", "preview", "render", "thin")
 
 __all__ = list(_MODULES)
 

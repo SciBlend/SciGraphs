@@ -42,6 +42,11 @@ def _on_file_loaded(dummy):
     from .core.osmnx.graph_cache import restore_all_graphs_from_cache
     restore_all_graphs_from_cache()
 
+    from .api import anim as _anim
+    _anim.ensure_handler()
+    for obj in bpy.context.scene.objects:
+        _anim.apply_frame(obj, bpy.context.scene.frame_current)
+
 
 def register():
     """Register all addon classes."""
@@ -51,6 +56,9 @@ def register():
 
     if _on_file_loaded not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_on_file_loaded)
+
+    from .api import anim as _anim
+    _anim.ensure_handler()
 
 def unregister():
     """Unregister all addon classes."""
@@ -67,6 +75,9 @@ def unregister():
 
     if _on_file_loaded in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_on_file_loaded)
+
+    from .api import anim as _anim
+    _anim.remove_handler()
 
 if __name__ == "__main__":
     register()

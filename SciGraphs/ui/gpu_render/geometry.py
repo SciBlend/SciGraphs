@@ -6,9 +6,58 @@ import numpy as np
 def extract_node_coords(mesh):
     """(N, 3) float32 node positions, in object space."""
     num_verts = len(mesh.vertices)
+    mixed = shape_key_mix(mesh)
+    if mixed is not None:
+        return mixed
     coords = np.empty(num_verts * 3, dtype=np.float32)
     mesh.vertices.foreach_get("co", coords)
     return coords.reshape(num_verts, 3)
+
+
+def shape_key_mix(mesh):
+    """Vertex positions after relative shape keys, or None when there are none."""
+    keys = getattr(mesh, "shape_keys", None)
+    if keys is None or not getattr(keys, "key_blocks", None):
+        return None
+    blocks = list(keys.key_blocks)
+    if len(blocks) < 2:
+        return None
+
+    num_verts = len(mesh.vertices)
+    reference = keys.reference_key or blocks[0]
+    base = np.empty(num_verts * 3, dtype=np.float32)
+    try:
+        reference.data.foreach_get("co", base)
+    except (RuntimeError, TypeError, ValueError):
+        return None
+    base = base.reshape(num_verts, 3)
+
+    if not getattr(keys, "use_relative", True):
+        return base
+
+    result = base.copy()
+    scratch = np.empty(num_verts * 3, dtype=np.float32)
+    for block in blocks:
+        if block == reference:
+            continue
+        value = float(block.value)
+        if value == 0.0:
+            continue
+        try:
+            block.data.foreach_get("co", scratch)
+        except (RuntimeError, TypeError, ValueError):
+            continue
+        result += value * (scratch.reshape(num_verts, 3) - base)
+    return result
+
+
+def shape_key_signature(mesh):
+    """A cheap fingerprint of the current deformation, for the batch cache."""
+    keys = getattr(mesh, "shape_keys", None)
+    if keys is None or not getattr(keys, "key_blocks", None):
+        return None
+    return tuple(round(float(block.value), 5)
+                 for block in keys.key_blocks)
 
 
 def extract_node_mask(mesh):

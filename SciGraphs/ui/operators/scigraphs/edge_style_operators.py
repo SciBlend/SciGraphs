@@ -34,16 +34,32 @@ class SCIGRAPHS_OT_ApplyEdgeStyle(bpy.types.Operator):
     def execute(self, context):
         obj = context.active_object
         props = context.scene.scigraphs
-        
+
+        keys = getattr(obj.data, "shape_keys", None)
+        stages = [k for k in (keys.key_blocks if keys else ())
+                  if k.name.startswith("sg_stage_")]
+
         style_params = edge_styles.get_style_params_from_props(props)
         success = geometry.apply_edge_style_to_graph(obj, style_params)
 
         if success:
             self.report({'INFO'}, f"Applied '{props.edge_style_type}' edge style")
+            if stages:
+                self.report({'WARNING'},
+                            f"the {len(stages)} animation stages did not "
+                            f"survive the rebuild: restyling recomputes every "
+                            f"vertex, and the stored poses were for the old "
+                            f"mesh. Re-import the .sgraphs to get them back")
 
             mod = obj.modifiers.get("SciGraphs_Viz")
             if mod:
                 obj.data.update()
+                try:
+                    bpy.ops.scigraphs.setup_visualization(target='FULL')
+                except RuntimeError as exc:  # noqa: BLE001
+                    self.report({'WARNING'},
+                                f"could not rebuild the drawing: {exc}")
+                geometry.store_edge_spans(obj)
                 for area in context.screen.areas:
                     if area.type == 'VIEW_3D':
                         area.tag_redraw()

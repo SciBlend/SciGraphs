@@ -538,6 +538,11 @@ def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osm
     obj["is_directed"] = bool(G.is_directed())
     obj["node_positions"] = [c for p in node_positions for c in p]
     obj["nodes_data"] = ",".join(str(i) for i in range(verts_created))
+
+    ordered = [n for n, _ in sorted(node_to_idx.items(), key=lambda kv: kv[1])]
+    obj["node_names"] = ",".join(
+        str(n) if "," not in str(n) else str(i)
+        for i, n in enumerate(ordered))
     edges_flat = []
     for src_idx, tgt_idx in created_edges:
         edges_flat.append(str(src_idx))

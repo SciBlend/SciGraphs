@@ -42,6 +42,7 @@ def structure_signature(obj, scene, st=None):
     st = _settings(scene, st)
     return (
         obj.name,
+        geometry.shape_key_signature(mesh),
         len(mesh.vertices),
         len(mesh.edges),
         "is_intersection" in mesh.attributes,
