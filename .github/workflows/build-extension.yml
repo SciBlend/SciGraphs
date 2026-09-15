@@ -93,15 +93,18 @@ jobs:
           # A platform zip that still carries Graphviz would be rejected, and a
           # full zip that lost it would silently ship without the layouts.
           for zip in dist-platform/*.zip; do
-            if unzip -l "$zip" | grep -q scigraphs_utils; then
+            listing=$(unzip -l "$zip")
+            manifest=$(unzip -p "$zip" blender_manifest.toml)
+            if grep -q scigraphs_utils <<<"$listing"; then
               echo "FAIL: $zip still bundles scigraphs-utils"; status=1
             fi
-            if unzip -p "$zip" blender_manifest.toml | grep -qi graphviz; then
+            if grep -qi graphviz <<<"$manifest"; then
               echo "FAIL: $zip manifest still references Graphviz"; status=1
             fi
           done
           for zip in dist/*.zip; do
-            if ! unzip -l "$zip" | grep -q scigraphs_utils; then
+            listing=$(unzip -l "$zip")
+            if ! grep -q scigraphs_utils <<<"$listing"; then
               echo "FAIL: $zip is missing scigraphs-utils"; status=1
             fi
           done
@@ -110,6 +113,7 @@ jobs:
           # nothing else may be: an unreferenced wheel is flagged on review.
           for zip in dist/*.zip dist-platform/*.zip; do
             declared=$(unzip -p "$zip" blender_manifest.toml \
+              | sed -n '/^\[build.generated\]/,$p' \
               | grep -oP '\./wheels/\K[^"]+\.whl' | sort)
             present=$(unzip -l "$zip" | grep -oP 'wheels/\K[^ ]+\.whl' | sort)
             if [ "$declared" != "$present" ]; then
