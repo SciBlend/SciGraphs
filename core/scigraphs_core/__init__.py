@@ -38,7 +38,7 @@ _LAZY = {
 
 __all__ = list(_LAZY)
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 
 def __getattr__(name):
