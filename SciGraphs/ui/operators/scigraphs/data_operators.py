@@ -6,6 +6,7 @@ from scigraphs_core import graph, layout as graph_layout
 from ....core import importer, geometry
 from scigraphs_core.mesh.mesh_utils import layout_edge_pairs
 from ...view_utils import focus_graph_in_top_view
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 
 
 class SCIGRAPHS_AutoLayoutOnImport:
@@ -486,7 +487,7 @@ class SCIGRAPHS_OT_SetupVisualization(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_ImportOSMGraph(bpy.types.Operator):
+class SCIGRAPHS_OT_ImportOSMGraph(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.import_osm_graph"
     bl_label = "Import OSM Graph"
     bl_description = "Download and import street network from OpenStreetMap"
@@ -701,7 +702,19 @@ class SCIGRAPHS_OT_DownloadGlobeTexture(bpy.types.Operator):
         if props.globe_theme_api == 'NONE':
             self.report({'WARNING'}, "Select a globe theme first")
             return {'CANCELLED'}
-        
+
+        # Procedural themes and a cached file need no network, so this cannot be
+        # a poll: only refuse when we would actually have to fetch something.
+        from ....preferences import get_preferences
+        prefs = get_preferences()
+        provider = prefs.globe_texture_provider if prefs else 'NASA'
+        procedural = (provider == 'PROCEDURAL' or props.globe_theme_api
+                      in ['URBAN_DARK', 'TOPOGRAPHIC_SHADED', 'DATA_OVERLAY'])
+        if not procedural and not texture_api.is_texture_cached(
+                props.globe_theme_api, props.globe_texture_resolution,
+                provider.lower()) and refuse_offline(self):
+            return {'CANCELLED'}
+
         self.report({'INFO'}, f"Downloading {props.globe_theme_api} texture ({props.globe_texture_resolution})...")
         
         texture_path = texture_api.download_texture(

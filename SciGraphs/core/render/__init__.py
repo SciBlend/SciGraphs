@@ -21,6 +21,12 @@ def _locate_engine():
     except ModuleNotFoundError:
         pass
 
+    if _os.environ.get("SCIGRAPHS_DEV_CHECKOUT") != "1":
+        raise ModuleNotFoundError(
+            "scigraphs_engine is not importable. In an installed extension it "
+            "ships as a wheel listed in blender_manifest.toml; reinstall the "
+            "extension. To run from a checkout, set SCIGRAPHS_DEV_CHECKOUT=1.")
+
     here = _os.path.dirname(_os.path.abspath(__file__))
     addon_root = _os.path.dirname(_os.path.dirname(here))
     repo_root = _os.path.dirname(addon_root)

@@ -1,5 +1,6 @@
 import bpy
 from bpy.props import StringProperty
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 
 
 def _overture_api_key():
@@ -22,7 +23,7 @@ def _flatten_result_objects(result):
     return objects
 
 
-class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
+class SCIGRAPHS_OT_C2G_LoadOverture(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.c2g_load_overture"
     bl_label = "Get as Polygons"
     bl_description = (
@@ -74,7 +75,7 @@ class SCIGRAPHS_OT_C2G_LoadOverture(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_C2G_LoadOverturePoints(bpy.types.Operator):
+class SCIGRAPHS_OT_C2G_LoadOverturePoints(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.c2g_load_overture_points"
     bl_label = "Get as Points"
     bl_description = (
@@ -383,7 +384,7 @@ class SCIGRAPHS_OT_C2G_GeocodeBoundaries(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_C2G_LoadOverturePlaceName(bpy.types.Operator):
+class SCIGRAPHS_OT_C2G_LoadOverturePlaceName(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.c2g_load_overture_place"
     bl_label = "Download via Place Name"
     bl_description = "Download Overture Maps data using city2graph CLI with place name geocoding"

@@ -1,4 +1,5 @@
 import bpy
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 import os
 from bpy.props import StringProperty, IntProperty, FloatProperty, BoolProperty, EnumProperty
 from scigraphs_core import osmnx_analysis
@@ -65,7 +66,7 @@ class SCIGRAPHS_OT_AddElevationsRaster(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_AddElevationsAPI(bpy.types.Operator):
+class SCIGRAPHS_OT_AddElevationsAPI(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_add_elevations_api"
     bl_label = "Add Elevations from API"
     bl_description = "Query node elevations from Open-Elevation API (free, no key required)"
@@ -74,7 +75,7 @@ class SCIGRAPHS_OT_AddElevationsAPI(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        return obj and obj.get("is_osmnx", False)
+        return online_ok() and obj and obj.get("is_osmnx", False)
     
     def execute(self, context):
         props = context.scene.scigraphs
@@ -331,7 +332,7 @@ class SCIGRAPHS_OT_ImportTerrain(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_ImportTerrainAPI(bpy.types.Operator):
+class SCIGRAPHS_OT_ImportTerrainAPI(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_import_terrain_api"
     bl_label = "Import DEM from API"
     bl_description = "Fetch elevation from API, apply to network, and optionally show terrain"
@@ -372,7 +373,7 @@ class SCIGRAPHS_OT_ImportTerrainAPI(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        return obj and obj.get("is_osmnx", False)
+        return online_ok() and obj and obj.get("is_osmnx", False)
     
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self, width=350)
@@ -975,7 +976,7 @@ class SCIGRAPHS_OT_ImportDEMRawMesh(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_DownloadDEM(bpy.types.Operator):
+class SCIGRAPHS_OT_DownloadDEM(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.download_dem"
     bl_label = "Download DEM"
     bl_description = "Download elevation data from OpenTopography API"
@@ -1032,7 +1033,7 @@ class SCIGRAPHS_OT_DownloadDEM(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        return obj and obj.get("is_osmnx", False)
+        return online_ok() and obj and obj.get("is_osmnx", False)
     
     def invoke(self, context, event):
         from ....preferences import get_preferences
@@ -1323,6 +1324,10 @@ class SCIGRAPHS_OT_GetElevationData(bpy.types.Operator):
             obj.pop(slot, None)
 
         source = props.osmnx_dem_source
+
+        # LOCAL_GEOTIFF reads a file and works offline, so this cannot be a poll.
+        if source != 'LOCAL_GEOTIFF' and refuse_offline(self):
+            return {'CANCELLED'}
 
         if source == 'OPENTOPOGRAPHY':
             from ....preferences import get_preferences
@@ -1707,7 +1712,7 @@ def _ensure_basemap_material(terrain_obj, image_path, attribution):
     return mat
 
 
-class SCIGRAPHS_OT_FetchBasemap(bpy.types.Operator):
+class SCIGRAPHS_OT_FetchBasemap(OnlineOperator, bpy.types.Operator):
 
     bl_idname = "scigraphs.osmnx_fetch_basemap"
     bl_label = "Fetch & Apply Basemap"
@@ -1720,7 +1725,7 @@ class SCIGRAPHS_OT_FetchBasemap(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        if not obj or not obj.get("is_osmnx", False):
+        if not online_ok() or not obj or not obj.get("is_osmnx", False):
             return False
         return _resolve_terrain_object(obj) is not None
 

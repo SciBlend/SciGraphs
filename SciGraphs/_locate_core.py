@@ -14,6 +14,12 @@ def locate():
     except ModuleNotFoundError:
         pass
 
+    if os.environ.get("SCIGRAPHS_DEV_CHECKOUT") != "1":
+        raise ModuleNotFoundError(
+            "scigraphs_core is not installed. In an installed extension it "
+            "ships as a wheel; rebuild with ./build_extension.sh. To run from "
+            "a checkout instead, set SCIGRAPHS_DEV_CHECKOUT=1.")
+
     here = os.path.dirname(os.path.abspath(__file__))     # <add-on>
     repo_root = os.path.dirname(here)
     checkout = os.path.join(repo_root, "core")
@@ -25,6 +31,4 @@ def locate():
 
     raise ModuleNotFoundError(
         "scigraphs_core is not installed and no checkout copy was found "
-        f"(looked for {os.path.join(checkout, 'scigraphs_core')}). Install it "
-        "with `pip install scigraphs-core`, or rebuild the extension with "
-        "./build_extension.sh, whose manifest ships the wheel.")
+        f"(looked for {os.path.join(checkout, 'scigraphs_core')}).")

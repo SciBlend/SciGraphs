@@ -1,16 +1,3 @@
-bl_info = {
-    "name": "SciGraphs",
-    "author": "José Marín",
-    "version": (1, 1, 0),
-    "blender": (5, 1, 0),
-    "location": "3D View > Sidebar > SciGraphs",
-    "description": "Create, visualize and analyze graphs from data.",
-    "warning": "",
-    "doc_url": "",
-    "category": "3D View",
-}
-
-
 # scigraphs_core is a separate distribution: a wheel in the normal case, and
 # <repo>/core in a checkout. Put it within reach before any submodule imports.
 from . import _locate_core as _locate_core_module

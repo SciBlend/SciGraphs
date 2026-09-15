@@ -22,7 +22,7 @@ _download() {
 		platform_args+=(--platform "${tag}")
 	done
 	${PIP} download -r "${constraints}" --dest "${dest_dir}" --only-binary=:all: \
-		--python-version=${PYVER} "${platform_args[@]}" || true
+		--python-version=${PYVER} "${platform_args[@]}"
 }
 
 echo "Downloading Linux x64 wheels (manylinux_2_28 + manylinux_2_17)..."
@@ -42,7 +42,7 @@ _download constraints/macos-arm64.txt ./wheels \
 MYSQL_REQ=$(grep -iE '^mysql-connector-python==' constraints/linux-x64.txt | head -n1)
 echo "Downloading pure-python mysql-connector-python wheel (${MYSQL_REQ})..."
 ${PIP} download "${MYSQL_REQ}" --dest ./wheels --only-binary=:all: \
-	--no-deps --implementation py --python-version=${PYVER} --abi none --platform any || true
+	--no-deps --implementation py --python-version=${PYVER} --abi none --platform any
 
 echo "Cleaning up unwanted wheels..."
 find ./wheels -type f -name 'numpy-*.whl' -print -delete || true
@@ -78,7 +78,28 @@ assert_no_pycache() {
 # wheel covers every platform above. The guard is for a partial checkout, where
 # build_extension.sh drops the manifest line. Always rebuilt: a stale wheel
 # imports fine and nobody notices.
-if [ -d engine ]; then
+
+if [ "${SCIGRAPHS_RELEASE:-0}" = "1" ]; then
+	echo "Release build: fetching scigraphs wheels from PyPI instead of building"
+	for pair in "engine:scigraphs-engine" "core:scigraphs-core"; do
+		dir="${pair%%:*}"
+		dist="${pair##*:}"
+		want=$(sed -n 's/^version *= *"\(.*\)"/\1/p' "./${dir}/pyproject.toml" | head -1)
+		if [ -z "$want" ]; then
+			echo "ERROR: no version in ./${dir}/pyproject.toml" >&2
+			exit 1
+		fi
+		echo "  ${dist}==${want}"
+		find ./wheels -type f -name "${dist//-/_}-*.whl" -delete || true
+		${PIP} download "${dist}==${want}" --no-deps --only-binary=:all: \
+			--dest ./wheels || {
+			echo "ERROR: ${dist}==${want} is not on PyPI." >&2
+			echo "       Tag and publish it first, or build without" >&2
+			echo "       SCIGRAPHS_RELEASE for a local development build." >&2
+			exit 1
+		}
+	done
+elif [ -d engine ]; then
 	echo "Building scigraphs-engine wheel from engine/..."
 	find ./wheels -type f -name 'scigraphs_engine-*.whl' -delete || true
 	clean_pycache ./engine
@@ -90,7 +111,7 @@ fi
 
 # The same for the analysis half. core/ is in every checkout that has the
 # add-on; the guard is kept so a partial one fails the same way, not a new way.
-if [ -d core ]; then
+if [ "${SCIGRAPHS_RELEASE:-0}" != "1" ] && [ -d core ]; then
 	echo "Building scigraphs-core wheel from core/..."
 	find ./wheels -type f -name 'scigraphs_core-*.whl' -delete || true
 	clean_pycache ./core
@@ -99,6 +120,21 @@ if [ -d core ]; then
 fi
 
 TOTAL_WHEELS=$(find ./wheels -type f -name '*.whl' | wc -l)
+
+MISSING=0
+while IFS= read -r wheel; do
+	if [ ! -f "./wheels/${wheel}" ]; then
+		echo "MISSING: ${wheel}" >&2
+		MISSING=$((MISSING + 1))
+	fi
+done < <(grep -oP '\./wheels/\K[^"]+\.whl' blender_manifest.toml)
+
+if [ "$MISSING" -gt 0 ]; then
+	echo "" >&2
+	echo "${MISSING} wheel(s) the manifest declares were not downloaded." >&2
+	exit 1
+fi
+
 echo ""
 echo "✓ Total wheels: $TOTAL_WHEELS"
 echo "Wheel download complete!"

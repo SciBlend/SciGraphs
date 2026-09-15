@@ -299,6 +299,13 @@ class SCIGRAPHS_OT_ApplyLayout(bpy.types.Operator):
             self.report({'ERROR'}, "No graph object selected")
             return {'CANCELLED'}
 
+        from ....utils.dependencies import (GRAPHVIZ_ALGORITHMS,
+                                            GRAPHVIZ_MISSING_MESSAGE,
+                                            graphviz_available)
+        if self.algorithm in GRAPHVIZ_ALGORITHMS and not graphviz_available():
+            self.report({'ERROR'}, GRAPHVIZ_MISSING_MESSAGE)
+            return {'CANCELLED'}
+
         self._sync_layout_parameters_to_scene(props)
         
         success = layout.apply_graph_layout(

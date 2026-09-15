@@ -6,24 +6,28 @@ import math
 from typing import Optional, Tuple, Dict, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TEXTURE_CACHE_DIR = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    ".naturalearth_cache",
-    "textures"
-)
+def _texture_cache_dir():
+    """Texture cache, outside the add-on directory."""
+    from ...utils.online import user_dir
+    return user_dir("naturalearth_cache", "textures")
+
+
+TEXTURE_CACHE_DIR = _texture_cache_dir()
 
 
 def get_preferences():
-    """Return the addon preferences, or None outside Blender."""
+    """Return the addon preferences, or None outside Blender.
+
+    Looked up through the package the add-on is installed as. Installed from
+    the extensions platform that is `bl_ext.blender_org.scigraphs`, so the
+    literal "SciGraphs" never matched and every preference here was silently
+    ignored.
+    """
     try:
-        import bpy
-        addon = bpy.context.preferences.addons.get("SciGraphs")
-        if addon:
-            return addon.preferences
-    except:
-        pass
-    return None
+        from ...preferences import get_preferences as _prefs
+        return _prefs()
+    except Exception:
+        return None
 
 
 def get_cache_filepath(theme: str, resolution: str, provider: str = "default") -> str:
@@ -49,6 +53,14 @@ def _make_request(url: str, headers: dict = None, timeout: int = 60) -> bytes:
     
     request = urllib.request.Request(url, headers=headers)
     
+    # Nothing reaches the network while the user has Blender
+    # set to work offline.
+    from ...utils.online import online_ok
+    if not online_ok():
+        raise PermissionError(
+            "Blender is set to work offline; enable "
+            "Preferences > System > Network > Allow Online "
+            "Access to use this")
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.read()
 

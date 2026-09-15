@@ -459,9 +459,21 @@ def probe_elevation_api(api="open-elevation", timeout=10.0):
     started = time.time()
     try:
         if api == "opentopodata":
+            from ..utils.online import online_ok
+            if not online_ok():
+                raise PermissionError(
+                    "Blender is set to work offline; enable "
+                    "Preferences > System > Network > Allow Online "
+                    "Access to use this")
             response = requests.get("https://api.opentopodata.org/v1/srtm30m",
                                     params={"locations": "0,0"}, timeout=timeout)
         else:
+            from ..utils.online import online_ok
+            if not online_ok():
+                raise PermissionError(
+                    "Blender is set to work offline; enable "
+                    "Preferences > System > Network > Allow Online "
+                    "Access to use this")
             response = requests.post("https://api.open-elevation.com/api/v1/lookup",
                                      json={"locations": [{"latitude": 0, "longitude": 0}]},
                                      timeout=timeout)

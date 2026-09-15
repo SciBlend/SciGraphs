@@ -148,6 +148,12 @@ def _fetch_open_elevation(coords, batch_size=100, pause=0.05, max_retries=2, max
         
         for retry in range(max_retries + 1):
             try:
+                from ...utils.online import online_ok
+                if not online_ok():
+                    raise PermissionError(
+                        "Blender is set to work offline; enable "
+                        "Preferences > System > Network > Allow Online "
+                        "Access to use this")
                 response = requests.post(url, json={'locations': batch}, timeout=30)
                 
                 if response.status_code == 200:
@@ -246,6 +252,12 @@ def _fetch_opentopodata(coords, batch_size=100, pause=0.2, max_retries=2, max_wo
         
         for retry in range(max_retries + 1):
             try:
+                from ...utils.online import online_ok
+                if not online_ok():
+                    raise PermissionError(
+                        "Blender is set to work offline; enable "
+                        "Preferences > System > Network > Allow Online "
+                        "Access to use this")
                 response = requests.get(f"{url}?locations={locations}", timeout=30)
                 
                 if response.status_code == 200:

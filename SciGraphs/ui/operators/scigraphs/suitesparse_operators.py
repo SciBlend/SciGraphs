@@ -2,9 +2,10 @@
 
 import bpy
 from ...view_utils import focus_graph_in_top_view
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 
 
-class SCIGRAPHS_OT_DownloadSuiteSparse(bpy.types.Operator):
+class SCIGRAPHS_OT_DownloadSuiteSparse(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.download_suitesparse"
     bl_label = "Download & Import"
     bl_description = "Download matrix from SuiteSparse Matrix Collection and create graph"

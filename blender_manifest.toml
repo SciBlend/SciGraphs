@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "scigraphs"
-version = "1.1.0"
+version = "1.2.0"
 name = "SciGraphs"
 tagline = "Graph Visualization and Analysis within Blender"
 maintainer = "José Marín <jose.marin-farina@uv.es>"
@@ -13,15 +13,14 @@ platforms = [
 	"macos-arm64",
 ]
 tags = [
-  	"Import-Export",
-    "3D View",
+    "Import-Export",
     "Node"
 ]
 blender_version_min = "5.1.0"
 license = [
   "SPDX:GPL-3.0-or-later"
 ]
-copyright =[
+copyright = [
 	"2024-2026 José Marín"
 ]
 
@@ -44,8 +43,8 @@ wheels = [
   "./wheels/scigraphs_utils-0.2.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
   "./wheels/scigraphs_utils-0.2.0-cp313-cp313-win_amd64.whl",
   "./wheels/scigraphs_utils-0.2.0-cp313-cp313-macosx_11_0_arm64.whl",
-  "./wheels/scigraphs_engine-0.2.0-py3-none-any.whl",
-  "./wheels/scigraphs_core-0.3.0-py3-none-any.whl",
+  "./wheels/scigraphs_engine-0.2.1-py3-none-any.whl",
+  "./wheels/scigraphs_core-0.3.1-py3-none-any.whl",
 
 
   # OSMnx and HTTP dependencies (universal)
@@ -137,7 +136,7 @@ wheels = [
   "./wheels/rustworkx-0.17.1-cp39-abi3-macosx_11_0_arm64.whl",
   
   # DuckDB for GTFS and transportation analysis (platform-specific)
-  "./wheels/duckdb-1.2.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+  "./wheels/duckdb-1.5.2-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
   "./wheels/duckdb-1.5.2-cp313-cp313-win_amd64.whl",
   "./wheels/duckdb-1.5.2-cp313-cp313-macosx_11_0_arm64.whl",
   
@@ -156,3 +155,4 @@ wheels = [
 # Geocoding via Nominatim API, Natural Earth data downloads, and SQL database access
 [permissions]
 network = "Geocoding, maps, OSM networks, SQL databases"
+files = "Import and export graphs, and cache downloaded map data"

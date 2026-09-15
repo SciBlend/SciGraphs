@@ -167,6 +167,14 @@ class SCIGRAPHS_PT_layout_algorithm(bpy.types.Panel):
 
         layout.prop(props, "layout_algorithm", text="")
 
+        from ....utils.dependencies import GRAPHVIZ_ALGORITHMS, graphviz_available
+        if algo in GRAPHVIZ_ALGORITHMS and not graphviz_available():
+            warning = layout.column(align=True)
+            warning.label(text="Needs scigraphs-utils, not in this build",
+                          icon='ERROR')
+            warning.label(text="Get the full build from GitHub releases")
+            layout.separator()
+
         icon, speed = _ALGO_SPEED.get(algo, ('QUESTION', "Unknown"))
         info = layout.row(align=True)
         info.label(text=_ALGO_DIMENSION.get(algo, "?D"), icon='EMPTY_AXIS')

@@ -1,4 +1,5 @@
 import bpy
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 from bpy.props import StringProperty, FloatProperty, BoolProperty, EnumProperty
 from scigraphs_core import osmnx_analysis
 from .utils import (
@@ -748,7 +749,7 @@ class SCIGRAPHS_OT_LargestComponent(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_GeocodeAddress(bpy.types.Operator):
+class SCIGRAPHS_OT_GeocodeAddress(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_geocode"
     bl_label = "Geocode Address"
     bl_description = "Convert address to latitude/longitude coordinates"

@@ -6,12 +6,13 @@ from typing import Tuple, List, Dict, Optional
 import os
 import json
 
-GEOCODE_CACHE_FILE = os.path.join(
-    os.path.dirname(__file__), 
-    "..", 
-    "..", 
-    ".geocode_cache.json"
-)
+def _geocode_cache_file():
+    """Where the geocode cache lives, outside the add-on directory."""
+    from ...utils.online import user_dir
+    return user_dir("geocode_cache.json")
+
+
+GEOCODE_CACHE_FILE = _geocode_cache_file()
 
 def load_geocode_cache() -> Dict[str, Tuple[float, float]]:
     """Load cached geocoded coordinates from file."""
@@ -694,7 +695,8 @@ def _compute_land_ocean_attribute(globe_obj: bpy.types.Object, radius: float, ma
     
     print(f"    Loading {feature_type} data ({quality} quality, {map_resolution} scale)...")
     
-    cache_dir = os.path.join(os.path.dirname(__file__), '..', '.naturalearth_cache')
+    from ...utils.online import user_dir
+    cache_dir = user_dir("naturalearth_cache")
     cache_file = os.path.join(cache_dir, f'{dataset_name}.shp')
     
     world = None
@@ -725,6 +727,12 @@ def _compute_land_ocean_attribute(globe_obj: bpy.types.Object, radius: float, ma
             )
             
             print(f"    Downloading from: {url}")
+            from ...utils.online import online_ok
+            if not online_ok():
+                raise PermissionError(
+                    "Blender is set to work offline; enable "
+                    "Preferences > System > Network > Allow Online "
+                    "Access to use this")
             with urllib.request.urlopen(req) as response, open(zip_path, 'wb') as out_file:
                 out_file.write(response.read())
             

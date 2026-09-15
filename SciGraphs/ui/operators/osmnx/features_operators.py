@@ -3,6 +3,7 @@ from bpy.props import StringProperty, EnumProperty, FloatProperty, IntProperty, 
 
 from scigraphs_core.feature_tags import FEATURE_TYPE_ITEMS, tags_from_preset
 from ....core.mesh.geo_mesh import create_feature_mesh_from_gdf as _create_feature_mesh_from_gdf
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 
 
 def _overture_api_key():
@@ -57,7 +58,7 @@ def _download_overture_from_bbox(context, bbox, feature_type, custom_tags, opera
     return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
+class SCIGRAPHS_OT_FeaturesFromPlace(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_features_place"
     bl_label = "Features from Place"
     bl_description = "Download buildings/POIs from a named place"
@@ -179,7 +180,7 @@ class SCIGRAPHS_OT_FeaturesFromPlace(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
 
-class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
+class SCIGRAPHS_OT_FeaturesFromPoint(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_features_point"
     bl_label = "Features from Point"
     bl_description = "Download features within distance of a point"
@@ -316,7 +317,7 @@ class SCIGRAPHS_OT_FeaturesFromPoint(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
 
-class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
+class SCIGRAPHS_OT_FeaturesFromBBox(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_features_bbox"
     bl_label = "Features from BBox"
     bl_description = "Download features within a bounding box"
@@ -400,7 +401,7 @@ class SCIGRAPHS_OT_FeaturesFromBBox(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
+class SCIGRAPHS_OT_FeaturesFromAddress(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_features_address"
     bl_label = "Features from Address"
     bl_description = "Download features within a radius of a geocoded address"
@@ -483,7 +484,7 @@ class SCIGRAPHS_OT_FeaturesFromAddress(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
+class SCIGRAPHS_OT_FeaturesFromPolygon(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_features_polygon"
     bl_label = "Features from Polygon"
     bl_description = "Download features inside a Blender mesh polygon (vertices as lon/lat)"
@@ -499,7 +500,7 @@ class SCIGRAPHS_OT_FeaturesFromPolygon(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.active_object is not None
+        return online_ok() and context.active_object is not None
 
     def invoke(self, context, event):
         props = context.scene.scigraphs

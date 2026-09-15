@@ -1,8 +1,9 @@
 import bpy
 from bpy.props import StringProperty, FloatProperty, IntProperty
+from ....utils.online import OnlineOperator, online_ok, refuse_offline
 
 
-class SCIGRAPHS_OT_GeocodeToGDF(bpy.types.Operator):
+class SCIGRAPHS_OT_GeocodeToGDF(OnlineOperator, bpy.types.Operator):
     bl_idname = "scigraphs.osmnx_geocode_to_gdf"
     bl_label = "Geocode to GeoDataFrame"
     bl_description = "Geocode a query and get geometry as GeoDataFrame"

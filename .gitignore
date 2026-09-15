@@ -22,6 +22,7 @@ wheels/**/*.whl
 
 # Build
 dist/
+dist-platform/
 build/
 build_temp/
 *.zip
@@ -85,3 +86,5 @@ deck/
 media/
 scripts/
 realtime_demos/
+bcon.sh
+CHANGELOG.md

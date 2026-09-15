@@ -24,10 +24,13 @@ SKIP_INSTALL=false
 # useful for checking that the guarded imports still hold. --private and
 # --with-engine used to select this and are kept as no-ops.
 NO_ENGINE=false
+WITH_GRAPHVIZ=true
+DIST_DIR="dist"
 for arg in "$@"; do
     case "$arg" in
         --no-install) SKIP_INSTALL=true ;;
         --no-engine) NO_ENGINE=true ;;
+        --no-graphviz) WITH_GRAPHVIZ=false; DIST_DIR="dist-platform" ;;
         --private|--with-engine) ;;
     esac
 done
@@ -36,16 +39,31 @@ done
 # Build
 # ---------------------------------------------------------------------------
 echo "=== SciGraphs Extension Build ==="
+if [ "$WITH_GRAPHVIZ" = true ]; then
+    echo "    variant: full (scigraphs-utils bundled)  ->  $DIST_DIR/"
+else
+    echo "    variant: platform (no scigraphs-utils)   ->  $DIST_DIR/"
+fi
 echo ""
 
 echo "[1/5] Preparing build directory..."
-rm -rf "$BUILD_DIR" dist
+rm -rf "$BUILD_DIR" "$DIST_DIR"
 mkdir -p "$BUILD_DIR"
 
 if [ ! -f "blender_manifest.toml" ]; then
     echo "  blender_manifest.toml not found"; exit 1
 fi
 cp blender_manifest.toml "$BUILD_DIR/"
+
+
+if [ "$WITH_GRAPHVIZ" = false ]; then
+    echo "  Dropping scigraphs-utils (--no-graphviz)"
+    sed -i '/scigraphs_utils/d' "$BUILD_DIR/blender_manifest.toml"
+    sed -i '/# SciGraphs native Graphviz layout utilities/d' "$BUILD_DIR/blender_manifest.toml"
+    if grep -q scigraphs_utils "$BUILD_DIR/blender_manifest.toml"; then
+        echo "  scigraphs-utils survived the strip"; exit 1
+    fi
+fi
 
 if [ ! -d "SciGraphs" ]; then
     echo "  SciGraphs/ directory not found"; exit 1
@@ -128,7 +146,7 @@ if [ -d "wheels" ] && [ "$(ls -A wheels 2>/dev/null)" ]; then
             echo "  WARNING: manifest references missing wheel: $wheel"
             MISSING_WHEELS=true
         fi
-    done < <(grep -oP '\./wheels/\K[^"]+\.whl' blender_manifest.toml)
+    done < <(grep -oP '\./wheels/\K[^"]+\.whl' "$BUILD_DIR/blender_manifest.toml")
 
     if [ "$MISSING_WHEELS" = true ]; then
         echo "  Some manifest wheels are missing. Run scripts/fetch_wheels.sh."; exit 1
@@ -166,16 +184,16 @@ fi
 # ---------------------------------------------------------------------------
 echo "[3/5] Building extension..."
 cd "$BUILD_DIR"
-mkdir -p ../dist
+mkdir -p "../$DIST_DIR"
 
 env -u LD_LIBRARY_PATH -u LD_PRELOAD \
-    "$BLENDER_CMD" --command extension build --source-dir . --output-dir ../dist --split-platforms
+    "$BLENDER_CMD" --command extension build --source-dir . --output-dir "../$DIST_DIR" --split-platforms
 
 cd ..
 
 echo ""
 echo "  Built artifacts:"
-ls -lh dist/
+ls -lh "$DIST_DIR/"
 
 # ---------------------------------------------------------------------------
 # Auto-install
@@ -233,7 +251,7 @@ case "$PLATFORM" in
 esac
 
 EXTENSION_VERSION=$(grep -oP '^version\s*=\s*"\K[^"]+' blender_manifest.toml 2>/dev/null || echo "1.0.1")
-ZIP_FILE="dist/${EXTENSION_ID}-${EXTENSION_VERSION}-${ZIP_SUFFIX}.zip"
+ZIP_FILE="${DIST_DIR}/${EXTENSION_ID}-${EXTENSION_VERSION}-${ZIP_SUFFIX}.zip"
 if [ ! -f "$ZIP_FILE" ]; then
     echo "  Expected zip not found: $ZIP_FILE"
     echo "  Skipping auto-install."
