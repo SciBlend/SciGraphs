@@ -8,6 +8,8 @@ import math
 import time
 
 import bpy
+import databpy as db
+from databpy import AttributeDomains, AttributeTypes
 
 from . import graphs
 
@@ -301,8 +303,9 @@ def buildings(source, ref, radius_m=None, default_height="auto",
 
     # Only write face attr if validate() did not drop faces (stale counts misalign).
     if len(mesh.polygons) == len(face_heights):
-        attribute = mesh.attributes.new(name="height", type='FLOAT', domain='FACE')
-        attribute.data.foreach_set("value", face_heights)
+        db.store_named_attribute(obj, face_heights, "height",
+                                 atype=AttributeTypes.FLOAT,
+                                 domain=AttributeDomains.FACE)
 
     center_lat, center_lon, _scale = frame(ref)
     obj["is_scigraphs_context"] = True

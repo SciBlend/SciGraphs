@@ -14,6 +14,9 @@ tzdata==2025.2
 # Scientific computing (universal)
 networkx==3.6
 
+# numpy access to mesh attributes (universal)
+databpy==0.11.0
+
 # Fast graph layout algorithms (universal)
 python-igraph==0.11.9
 

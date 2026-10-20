@@ -5,6 +5,7 @@ import bmesh
 import numpy as np
 from scigraphs_core import topology
 from ....core import geometry
+from ....utils.attributes import AttributeTypes, replace_attribute
 from scigraphs_core.mesh.mesh_utils import (
     parse_graph_data_filtered as _parse_graph_data,
     get_vertex_positions as _get_vertex_positions,
@@ -124,15 +125,10 @@ class SCIGRAPHS_OT_ComputeFaces(bpy.types.Operator):
         mesh = obj.data
         attr_name = "face_id"
         
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        
         # An OSMnx mesh carries curve vertices too, so pad out to mesh size.
         node_face_ids = face_result['node_face_ids']
         expanded_values = _expand_node_values_to_mesh(obj, node_face_ids, default_value=-1)
-        
-        attr = mesh.attributes.new(name=attr_name, type='INT', domain='POINT')
-        attr.data.foreach_set("value", expanded_values)
+        replace_attribute(obj, attr_name, expanded_values, AttributeTypes.INT)
         
         mesh.update()
         
@@ -282,11 +278,8 @@ class SCIGRAPHS_OT_VisualizeSurface(bpy.types.Operator):
             bpy.data.meshes.remove(old_mesh)
         
         mesh = obj.data
-        if "is_intersection" in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes["is_intersection"])
-        
-        attr = mesh.attributes.new(name="is_intersection", type='INT', domain='POINT')
-        attr.data.foreach_set("value", is_intersection_values)
+        replace_attribute(obj, "is_intersection", is_intersection_values,
+                          AttributeTypes.INT)
         
         obj["num_nodes"] = num_nodes
         obj["num_mesh_verts"] = len(vertex_list)

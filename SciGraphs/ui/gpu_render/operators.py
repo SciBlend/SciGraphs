@@ -1,5 +1,6 @@
 import bpy
-import numpy as np
+import databpy as db
+from databpy import AttributeDomains, AttributeTypes
 
 from . import draw, dynamic, playback
 from .attributes import scalar_attr_items
@@ -157,10 +158,8 @@ class SCIGRAPHS_OT_bake_edge_channel(bpy.types.Operator):
         if attr is not None and attr.domain != 'EDGE':
             self.report({'ERROR'}, f"'{name}' exists on another domain")
             return {'CANCELLED'}
-        if attr is None:
-            attr = mesh.attributes.new(name=name, type='FLOAT', domain='EDGE')
-        attr.data.foreach_set("value",
-                              np.asarray(values, dtype=np.float32).ravel())
+        db.store_named_attribute(obj, values, name, atype=AttributeTypes.FLOAT,
+                                 domain=AttributeDomains.EDGE)
         mesh.update()
 
         scene.scigraphs_preview_edge_attr_name = name
@@ -292,11 +291,10 @@ class SCIGRAPHS_OT_filter_seed(bpy.types.Operator):
 
         name = filters.SEED_ATTR
         if name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[name])
+            db.remove_named_attribute(obj, name)
         if mask.any():
-            attr = mesh.attributes.new(name=name, type='BOOLEAN',
-                                       domain='POINT')
-            attr.data.foreach_set("value", mask)
+            db.store_named_attribute(obj, mask, name, atype=AttributeTypes.BOOLEAN,
+                                     domain=AttributeDomains.POINT)
 
         # The only writer. The panel reads this count rather than every boolean.
         obj[filters.SEED_COUNT] = int(mask.sum())

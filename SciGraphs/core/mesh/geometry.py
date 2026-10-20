@@ -2,9 +2,13 @@ import math
 
 import bpy
 import bmesh
+import databpy as db
 import numpy as np
 import pandas as pd
+from databpy import AttributeDomains, AttributeTypes
 from scigraphs_core.logger import log
+
+from ...utils.attributes import fit, replace_attribute
 from scigraphs_core.mesh.mesh_utils import expand_node_values_to_mesh
 from scigraphs_core.repro.determinism import get_geometry_seed
 
@@ -389,7 +393,7 @@ def import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_
         log(f"Processing column '{col_name}': {col_data.dtype}")
         
         if pd.api.types.is_numeric_dtype(col_data):
-            _create_edge_attribute(mesh, col_name, col_data, edge_df_indices)
+            _create_edge_attribute(obj, col_name, col_data, edge_df_indices)
             
             _create_vertex_attributes_from_column(
                 mesh, obj, df, col_name, source_col, target_col, 
@@ -404,21 +408,20 @@ def import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_
             imported_count += 1
     
     if "node_id" not in mesh.attributes:
-        attr = mesh.attributes.new(name="node_id", type='INT', domain='POINT')
-        node_ids = list(range(num_vertices))
-        attr.data.foreach_set("value", node_ids)
+        db.store_named_attribute(obj, np.arange(num_vertices), "node_id",
+                                 atype=AttributeTypes.INT,
+                                 domain=AttributeDomains.POINT)
     
     obj["node_names"] = json.dumps([str(node) for node in graph_data.nodes])
     
     log(f"Imported {imported_count} attribute columns")
 
 
-def _create_edge_attribute(mesh, col_name, col_data, edge_df_indices):
+def _create_edge_attribute(obj, col_name, col_data, edge_df_indices):
+    mesh = obj.data
     attr_name = f"edge_{col_name}"
     if attr_name in mesh.attributes:
         return
-    
-    attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='EDGE')
     
     values = np.zeros(len(mesh.edges), dtype=np.float32)
     col_values = col_data.values
@@ -432,7 +435,8 @@ def _create_edge_attribute(mesh, col_name, col_data, edge_df_indices):
                 except (ValueError, TypeError):
                     pass
     
-    attr.data.foreach_set("value", values.tolist())
+    db.store_named_attribute(obj, values, attr_name, atype=AttributeTypes.FLOAT,
+                             domain=AttributeDomains.EDGE)
     log(f"  Created edge attribute '{attr_name}'")
 
 
@@ -474,17 +478,17 @@ def _create_vertex_attributes_from_column(mesh, obj, df, col_name, source_col, t
                              where=vertex_counts > 0)
     
     attr_configs = [
-        (f"vertex_{col_name}_sum", vertex_sums, 'FLOAT'),
-        (f"vertex_{col_name}_mean", vertex_means, 'FLOAT'),
-        (f"vertex_{col_name}_min", vertex_mins, 'FLOAT'),
-        (f"vertex_{col_name}_max", vertex_maxs, 'FLOAT'),
-        (f"vertex_{col_name}_count", vertex_counts, 'INT'),
+        (f"vertex_{col_name}_sum", vertex_sums, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_mean", vertex_means, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_min", vertex_mins, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_max", vertex_maxs, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_count", vertex_counts, AttributeTypes.INT),
     ]
     
-    for attr_name, values, attr_type in attr_configs:
+    for attr_name, values, atype in attr_configs:
         if attr_name not in mesh.attributes:
-            attr = mesh.attributes.new(name=attr_name, type=attr_type, domain='POINT')
-            attr.data.foreach_set("value", values.tolist())
+            db.store_named_attribute(obj, values, attr_name, atype=atype,
+                                     domain=AttributeDomains.POINT)
     
     log(f"  Created vertex attributes for '{col_name}': sum, mean, min, max, count")
 
@@ -534,10 +538,6 @@ def import_node_attributes_from_file(obj, filepath, delimiter='\t', has_header=F
 
         attr_name = str(col) if has_header else f"node_attr_{attrs_imported}"
 
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-
-        attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
         values = np.full(total_verts, float('nan'), dtype=np.float32)
 
         for row_idx in range(len(df)):
@@ -550,7 +550,7 @@ def import_node_attributes_from_file(obj, filepath, delimiter='\t', has_header=F
                         values[vert_idx] = float(val)
                         nodes_matched.add(node_key)
 
-        attr.data.foreach_set("value", values.tolist())
+        replace_attribute(obj, attr_name, values, AttributeTypes.FLOAT)
         attrs_imported += 1
         log(f"  Created POINT attribute '{attr_name}' ({len(nodes_matched)} nodes matched)")
 
@@ -1370,14 +1370,8 @@ def store_edge_spans(obj):
         u1[chain[-1]] = 1.0
 
     for name, values in zip(EDGE_SPAN_ATTRIBUTES, (u0, u1)):
-        layer = mesh.attributes.get(name)
-        if layer is not None and (layer.domain != 'EDGE'
-                                  or layer.data_type != 'FLOAT'):
-            mesh.attributes.remove(layer)
-            layer = None
-        if layer is None:
-            layer = mesh.attributes.new(name, 'FLOAT', 'EDGE')
-        layer.data.foreach_set("value", values)
+        replace_attribute(obj, name, values, AttributeTypes.FLOAT,
+                          AttributeDomains.EDGE)
 
     mesh.update()
     return chains
@@ -1426,11 +1420,13 @@ def update_node_positions_from_property(obj):
         return
     
     positions = np.array(obj["node_positions"]).reshape(-1, 3)
-    
-    for i, vert in enumerate(obj.data.vertices):
-        if i < len(positions):
-            vert.co = positions[i]
-    
+
+    # Node vertices come first; any vertices past them keep their positions.
+    # Only the rows that changed are written back to the mesh.
+    current = db.AttributeArray(obj, "position")
+    count = min(len(current), len(positions))
+    current[:count] = positions[:count]
+
     obj.data.update()
 
 
@@ -1451,9 +1447,9 @@ def store_packing_radii(obj):
     values = np.asarray(
         expand_node_values_to_mesh(obj, list(radii), default_value=0.0),
         dtype=np.float32)
-    if "circle_radius" not in mesh.attributes:
-        mesh.attributes.new(name="circle_radius", type='FLOAT', domain='POINT')
-    mesh.attributes["circle_radius"].data.foreach_set("value", values)
+    db.store_named_attribute(obj, values, "circle_radius",
+                             atype=AttributeTypes.FLOAT,
+                             domain=AttributeDomains.POINT)
     mesh.update()
     return values
 
@@ -1676,7 +1672,7 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
         attrs_added = 0
         for col in numeric_cols:
             try:
-                attribute = obj.data.attributes.new(name=col, type='FLOAT', domain='EDGE')
+                edge_values = np.zeros(len(obj.data.edges), dtype=np.float32)
                 
                 for row_idx, row in df.iterrows():
                     src = row[source_col_name]
@@ -1691,9 +1687,15 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
                             mesh_edge_indices = graph_edge_to_mesh_edges.get((src, tgt), [])
                             
                             for mesh_edge_idx in mesh_edge_indices:
-                                if mesh_edge_idx < len(attribute.data):
-                                    attribute.data[mesh_edge_idx].value = value
+                                if mesh_edge_idx < len(edge_values):
+                                    edge_values[mesh_edge_idx] = value
                 
+                # overwrite=False: a column that shares a name with an existing
+                # attribute gets a numbered name rather than overwriting it.
+                db.store_named_attribute(obj, edge_values, col,
+                                         atype=AttributeTypes.FLOAT,
+                                         domain=AttributeDomains.EDGE,
+                                         overwrite=False)
                 attrs_added += 1
                 log(f"    Added edge attribute '{col}' to {len(graph_edge_to_mesh_edges)} connections")
             except Exception as e:
@@ -1755,7 +1757,6 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
     if df is None or len(df) == 0:
         return
     
-    mesh = obj.data
     
     source_col_name = getattr(graph_data, 'source_column_name', df.columns[0])
     target_col_name = getattr(graph_data, 'target_column_name', df.columns[1])
@@ -1786,7 +1787,7 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
     for col_name in cols_to_process:
         try:
             _create_vertex_attr_for_geospatial(
-                mesh, df, col_name, source_col_name, target_col_name, 
+                obj, df, col_name, source_col_name, target_col_name, 
                 node_to_idx, num_real_nodes
             )
             attrs_created += 1
@@ -1799,9 +1800,10 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
         log(f"    Created vertex attributes for {attrs_created} columns")
 
 
-def _create_vertex_attr_for_geospatial(mesh, df, col_name, source_col_name, target_col_name,
+def _create_vertex_attr_for_geospatial(obj, df, col_name, source_col_name, target_col_name,
                                         node_to_idx, num_vertices):
     """Aggregate one column into the five vertex attributes, via pandas groupby."""
+    mesh = obj.data
     vertex_sums = np.zeros(num_vertices, dtype=np.float64)
     vertex_counts = np.zeros(num_vertices, dtype=np.int32)
     vertex_mins = np.full(num_vertices, np.inf, dtype=np.float64)
@@ -1836,26 +1838,20 @@ def _create_vertex_attr_for_geospatial(mesh, df, col_name, source_col_name, targ
                              where=vertex_counts > 0)
     
     attr_configs = [
-        (f"vertex_{col_name}_sum", vertex_sums, 'FLOAT'),
-        (f"vertex_{col_name}_mean", vertex_means, 'FLOAT'),
-        (f"vertex_{col_name}_min", vertex_mins, 'FLOAT'),
-        (f"vertex_{col_name}_max", vertex_maxs, 'FLOAT'),
-        (f"vertex_{col_name}_count", vertex_counts, 'INT'),
+        (f"vertex_{col_name}_sum", vertex_sums, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_mean", vertex_means, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_min", vertex_mins, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_max", vertex_maxs, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_count", vertex_counts, AttributeTypes.INT),
     ]
     
     total_mesh_verts = len(mesh.vertices)
     
-    for attr_name, values, attr_type in attr_configs:
+    for attr_name, values, atype in attr_configs:
         if attr_name not in mesh.attributes:
-            attr = mesh.attributes.new(name=attr_name, type=attr_type, domain='POINT')
-            
             # Pad to the full vertex count; the extra arc points get 0.
-            if len(values) < total_mesh_verts:
-                expanded = np.zeros(total_mesh_verts, dtype=values.dtype)
-                expanded[:len(values)] = values
-                values = expanded
-            
-            attr.data.foreach_set("value", values.tolist())
+            db.store_named_attribute(obj, fit(values, total_mesh_verts), attr_name,
+                                     atype=atype, domain=AttributeDomains.POINT)
 
 
 

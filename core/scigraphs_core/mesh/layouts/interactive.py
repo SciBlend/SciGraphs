@@ -341,9 +341,13 @@ def execute_layout_iteration(obj, algorithm='SPRING_3D', scale=5.0, current_fram
 
     mesh = obj.data
     if mesh and mesh.vertices:
-        for i, vert in enumerate(mesh.vertices):
-            if i < len(new_pos):
-                vert.co = new_pos[i]
+        # Node vertices come first; any vertices past them keep their positions.
+        co = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+        mesh.vertices.foreach_get("co", co)
+        co = co.reshape(-1, 3)
+        count = min(len(co), len(new_pos))
+        co[:count] = new_pos[:count]
+        mesh.vertices.foreach_set("co", co.ravel())
         mesh.update()
 
         if keyframe:

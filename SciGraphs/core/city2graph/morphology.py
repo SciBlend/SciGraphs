@@ -1,6 +1,8 @@
+from databpy import AttributeDomains
 from scigraphs_core.logger import log
 from scigraphs_core.city2graph.get_c2g import get_city2graph
 from . import utils
+from ..mesh.geo_mesh import _store_column
 
 
 def create_tessellation(buildings_obj, barriers_obj=None, shrink=0.4, segment_length=0.5):
@@ -556,8 +558,7 @@ def create_graph_from_networkx(G, name="NetworkX_Graph", use_positions=True, osm
     
     for key, values in edge_numeric_values.items():
         if len(values) == len(mesh.edges) and len(values) > 0:
-            attr = mesh.attributes.new(name=f"edge_{key}", type='FLOAT', domain='EDGE')
-            attr.data.foreach_set("value", values)
+            _store_column(obj, f"edge_{key}", values, AttributeDomains.EDGE)
     
     log(f"Created graph object: {G.number_of_nodes()} nodes, {edges_created} edges")
     return obj

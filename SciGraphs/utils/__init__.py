@@ -3,6 +3,7 @@
 # unimportable outside Blender. logger now lives in scigraphs_core.
 
 _LAZY = {
+    "attributes": ".attributes",
     "blender_helpers": ".blender_helpers",
     "dependencies": ".dependencies",
 }

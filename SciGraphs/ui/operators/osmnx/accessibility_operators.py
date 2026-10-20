@@ -10,6 +10,7 @@ from scigraphs_core.osmnx import (
 )
 from scigraphs_core.osmnx.metadata import get_graph_extent
 from .utils import _get_osmnx_graph, _get_unprojected_graph, _store_osmnx_graph
+from ....utils.attributes import AttributeTypes, fit, replace_attribute
 
 
 def _pick_routing_graph(obj):
@@ -279,15 +280,15 @@ class SCIGRAPHS_OT_OSMnxNetworkDBSCAN(bpy.types.Operator):
         try:
             mesh = obj.data
             attr_name = "dbscan_cluster"
-            if attr_name in mesh.attributes:
-                mesh.attributes.remove(mesh.attributes[attr_name])
-            attr = mesh.attributes.new(name=attr_name, type='INT', domain='POINT')
-            for i, nid in enumerate(node_ids[: len(mesh.vertices)]):
+            per_vertex = []
+            for nid in node_ids[: len(mesh.vertices)]:
                 try:
-                    lbl = labels.get(int(nid), -1)
+                    per_vertex.append(int(labels.get(int(nid), -1)))
                 except ValueError:
-                    lbl = -1
-                attr.data[i].value = int(lbl)
+                    per_vertex.append(-1)
+            # Vertices past the nodes keep 0, as a new attribute starts at 0.
+            replace_attribute(obj, attr_name, fit(per_vertex, len(mesh.vertices), 0),
+                              AttributeTypes.INT)
         except Exception:
             pass
 

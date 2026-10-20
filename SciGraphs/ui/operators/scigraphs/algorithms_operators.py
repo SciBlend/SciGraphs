@@ -1,10 +1,12 @@
 # Graph algorithms operators (traversal, pathfinding, spanning trees, network flow)
 
 import bpy
+import databpy as db
 import numpy as np
 from scigraphs_core import analysis, pathfinding, spanning, network_flow
 from scigraphs_core.mesh.mesh_utils import parse_graph_data, expand_node_values_to_mesh
 from scigraphs_core.visualization.animation import update_traversal_activation
+from ....utils.attributes import AttributeDomains, AttributeTypes
 
 
 class SCIGRAPHS_OT_AnimateTraversal(bpy.types.Operator):
@@ -65,16 +67,15 @@ class SCIGRAPHS_OT_AnimateTraversal(bpy.types.Operator):
         max_traversal_time = max_order + smoothness if mode == 'CONTINUOUS' else max_order
         
         mesh = obj.data
-        if "traversal_order" not in mesh.attributes:
-            mesh.attributes.new(name="traversal_order", type='FLOAT', domain='POINT')
-        
         expanded_order = expand_node_values_to_mesh(obj, order, default_value=-1)
-        
-        attr = mesh.attributes["traversal_order"]
-        attr.data.foreach_set("value", expanded_order)
+        db.store_named_attribute(obj, expanded_order, "traversal_order",
+                                 atype=AttributeTypes.FLOAT,
+                                 domain=AttributeDomains.POINT)
         
         if "traversal_activation" not in mesh.attributes:
-            mesh.attributes.new(name="traversal_activation", type='FLOAT', domain='POINT')
+            db.store_named_attribute(obj, np.zeros(len(mesh.vertices)), "traversal_activation",
+                                     atype=AttributeTypes.FLOAT,
+                                     domain=AttributeDomains.POINT)
         
         obj["traversal_time"] = 0.0
         if "_RNA_UI" not in obj:
@@ -160,17 +161,15 @@ class SCIGRAPHS_OT_FindShortestPath(bpy.types.Operator):
             result = pathfinding.dijkstra_shortest_path(graph_data, source, target)
         
         if result['exists']:
-            mesh = obj.data
             path_attr = np.zeros(len(graph_data.nodes), dtype=np.float32)
             for node_idx in result['path']:
                 path_attr[node_idx] = 1.0
             
             expanded_path = expand_node_values_to_mesh(obj, path_attr.tolist())
             
-            if "shortest_path" not in mesh.attributes:
-                mesh.attributes.new(name="shortest_path", type='FLOAT', domain='POINT')
-            attr = mesh.attributes["shortest_path"]
-            attr.data.foreach_set("value", expanded_path)
+            db.store_named_attribute(obj, expanded_path, "shortest_path",
+                                     atype=AttributeTypes.FLOAT,
+                                     domain=AttributeDomains.POINT)
 
             obj["shortest_path_source"] = source
             obj["shortest_path_target"] = target
@@ -278,17 +277,15 @@ class SCIGRAPHS_OT_ComputeMinCut(bpy.types.Operator):
         
         result = network_flow.minimum_cut(graph_data, source, sink)
         
-        mesh = obj.data
         partition_attr = np.zeros(len(graph_data.nodes), dtype=np.float32)
         for node_idx in result['reachable']:
             partition_attr[node_idx] = 1.0
         
         expanded_partition = expand_node_values_to_mesh(obj, partition_attr.tolist())
         
-        if "min_cut_partition" not in mesh.attributes:
-            mesh.attributes.new(name="min_cut_partition", type='FLOAT', domain='POINT')
-        attr = mesh.attributes["min_cut_partition"]
-        attr.data.foreach_set("value", expanded_partition)
+        db.store_named_attribute(obj, expanded_partition, "min_cut_partition",
+                                 atype=AttributeTypes.FLOAT,
+                                 domain=AttributeDomains.POINT)
         
         obj["min_cut_value"] = result['cut_value']
         
