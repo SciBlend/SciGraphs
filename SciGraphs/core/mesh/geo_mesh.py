@@ -2,6 +2,9 @@
 
 import bpy
 import bmesh
+import databpy as db
+import numpy as np
+from databpy import AttributeDomains, AttributeTypes
 from .geometry import _latlon_to_local_3d
 from scigraphs_core.logger import log
 
@@ -259,15 +262,14 @@ def _write_node_attributes(obj, nodes_gdf, skip=()):
     if n == 0:
         return
 
-    id_attr = mesh.attributes.new(name="node_id", type='INT', domain='POINT')
-    id_attr.data.foreach_set("value", list(range(n)))
+    db.store_named_attribute(obj, np.arange(n), "node_id", atype=AttributeTypes.INT,
+                             domain=AttributeDomains.POINT)
 
     for col in _numeric_columns(nodes_gdf, skip=skip):
         values = [float(v) if v is not None else 0.0 for v in nodes_gdf[col].tolist()]
         if len(values) != n:
             continue
-        attr = mesh.attributes.new(name=f"node_{col}", type='FLOAT', domain='POINT')
-        attr.data.foreach_set("value", values)
+        _store_column(obj, f"node_{col}", values, AttributeDomains.POINT)
 
 
 def _write_edge_attributes(obj, edges_gdf, created_edge_rows, skip=()):
@@ -282,8 +284,15 @@ def _write_edge_attributes(obj, edges_gdf, created_edge_rows, skip=()):
         for row_idx in created_edge_rows:
             v = series[row_idx]
             values.append(float(v) if v is not None else 0.0)
-        attr = mesh.attributes.new(name=f"edge_{col}", type='FLOAT', domain='EDGE')
-        attr.data.foreach_set("value", values)
+        _store_column(obj, f"edge_{col}", values, AttributeDomains.EDGE)
+
+
+def _store_column(obj, name, values, domain):
+    """Store a numeric data-frame column as a FLOAT attribute. A column whose name
+    is already taken, such as an ``id`` column against ``node_id``, gets a
+    numbered name rather than overwriting the existing attribute."""
+    db.store_named_attribute(obj, values, name, atype=AttributeTypes.FLOAT,
+                             domain=domain, overwrite=False)
 
 
 def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, markers=None):
@@ -413,25 +422,23 @@ def create_native_heterograph_from_dicts(nodes_dict, edges_dict, name, ref_obj, 
             obj[key] = value
 
     if len(mesh.vertices) == len(layer_ids):
-        attr = mesh.attributes.new(name="layer_id", type='INT', domain='POINT')
-        attr.data.foreach_set("value", layer_ids)
-        id_attr = mesh.attributes.new(name="node_id", type='INT', domain='POINT')
-        id_attr.data.foreach_set("value", list(range(len(layer_ids))))
+        db.store_named_attribute(obj, layer_ids, "layer_id", atype=AttributeTypes.INT,
+                                 domain=AttributeDomains.POINT)
+        db.store_named_attribute(obj, np.arange(len(layer_ids)), "node_id",
+                                 atype=AttributeTypes.INT,
+                                 domain=AttributeDomains.POINT)
         for col, values in node_values.items():
             if len(values) != len(layer_ids):
                 continue
-            col_attr = mesh.attributes.new(name=f"node_{col}", type='FLOAT',
-                                           domain='POINT')
-            col_attr.data.foreach_set("value", values)
+            _store_column(obj, f"node_{col}", values, AttributeDomains.POINT)
     if len(mesh.edges) == len(edge_type_ids):
-        eattr = mesh.attributes.new(name="edge_type_id", type='INT', domain='EDGE')
-        eattr.data.foreach_set("value", edge_type_ids)
+        db.store_named_attribute(obj, edge_type_ids, "edge_type_id",
+                                 atype=AttributeTypes.INT,
+                                 domain=AttributeDomains.EDGE)
         for col, values in edge_values.items():
             if len(values) != len(edge_type_ids):
                 continue
-            col_attr = mesh.attributes.new(name=f"edge_{col}", type='FLOAT',
-                                          domain='EDGE')
-            col_attr.data.foreach_set("value", values)
+            _store_column(obj, f"edge_{col}", values, AttributeDomains.EDGE)
 
     return obj
 

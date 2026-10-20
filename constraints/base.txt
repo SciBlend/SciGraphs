@@ -14,6 +14,12 @@ tzdata>=2022.0
 # Scientific computing (universal)
 networkx>=3.0,<4.0
 
+# numpy access to mesh attributes (universal)
+databpy>=0.11.0,<0.13.0
+
+# Node trees as Python (universal); 520.x targets Blender 5.2
+nodebpy>=520.39.0,<521
+
 # Fast graph layout algorithms (universal)
 python-igraph>=0.11.0,<1.0.0
 

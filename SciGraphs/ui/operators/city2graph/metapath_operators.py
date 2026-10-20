@@ -2,9 +2,13 @@
 
 import bpy
 import bmesh
+import databpy as db
+import numpy as np
+from databpy import AttributeDomains, AttributeTypes
 import time
 from scigraphs_core.city2graph import metapaths
 from ....core import importer
+from ....core.mesh.geo_mesh import _store_column
 from ....core.osmnx.graph_cache import get_osmnx_graph as _get_osmnx_graph, get_osmnx_graph_diagnostic as _get_osmnx_graph_diagnostic
 from ....utils.blender_helpers import get_or_create_collection as _get_or_create_collection
 
@@ -189,8 +193,7 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                     continue
                 values = [float(v) if v is not None else 0.0 for v in dual_nodes_gdf[col].tolist()]
                 if len(values) == len(mesh.vertices):
-                    attr = mesh.attributes.new(name=f"node_{col}", type='FLOAT', domain='POINT')
-                    attr.data.foreach_set("value", values)
+                    _store_column(dual_obj, f"node_{col}", values, AttributeDomains.POINT)
             
             for col in dual_edges_gdf.columns:
                 if col == "geometry":
@@ -203,8 +206,7 @@ class SCIGRAPHS_OT_CreateStreetDualGraph(bpy.types.Operator):
                 series = dual_edges_gdf[col].tolist()
                 values = [float(series[r]) if series[r] is not None else 0.0 for r in created_edge_rows]
                 if len(values) == len(mesh.edges):
-                    attr = mesh.attributes.new(name=f"edge_{col}", type='FLOAT', domain='EDGE')
-                    attr.data.foreach_set("value", values)
+                    _store_column(dual_obj, f"edge_{col}", values, AttributeDomains.EDGE)
             
             import pickle
             dual_obj["dual_nodes_gdf_pickle"] = pickle.dumps(dual_nodes_gdf)
@@ -514,8 +516,9 @@ class SCIGRAPHS_OT_ComputeMetapaths(bpy.types.Operator):
         # An EDGE scalar, so the coloring pipeline can shade connections by how
         # many raw paths they carry.
         if len(multiplicity_list) == len(mesh.edges) and multiplicity_list:
-            mult_attr = mesh.attributes.new(name="edge_multiplicity", type='FLOAT', domain='EDGE')
-            mult_attr.data.foreach_set("value", [float(m) for m in multiplicity_list])
+            db.store_named_attribute(metapath_obj, multiplicity_list, "edge_multiplicity",
+                                     atype=AttributeTypes.FLOAT,
+                                     domain=AttributeDomains.EDGE)
         
         metapath_obj["multiplicity_list"] = json.dumps(multiplicity_list)
         
@@ -681,10 +684,10 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         
         mesh = mesh_obj.data
         
-        if not mesh.attributes.get("multiplicity"):
-            attr = mesh.attributes.new(name="multiplicity", type='INT', domain='EDGE')
+        if "multiplicity" in mesh.attributes:
+            multiplicity = db.named_attribute(mesh_obj, "multiplicity")
         else:
-            attr = mesh.attributes["multiplicity"]
+            multiplicity = np.zeros(len(mesh.edges), dtype=np.int32)
         
         # Walk the original splines and hand each survivor its edges.
         edge_idx = 0
@@ -702,12 +705,14 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
             if num_points >= 2:
                 num_edges = num_points - 1
                 
-                for i in range(edge_idx, edge_idx + num_edges):
-                    if i < len(attr.data):
-                        attr.data[i].value = mult
+                multiplicity[edge_idx:edge_idx + num_edges] = mult
                 
                 edge_idx += num_edges
                 remaining_spline_idx += 1
+        
+        db.store_named_attribute(mesh_obj, multiplicity, "multiplicity",
+                                 atype=AttributeTypes.INT,
+                                 domain=AttributeDomains.EDGE)
         
         # Drop edges still below the threshold, including any the spline walk
         # failed to map.
@@ -725,10 +730,8 @@ class SCIGRAPHS_OT_ConvertMetapathsToMesh(bpy.types.Operator):
         
         edges_to_delete = []
         for i, edge in enumerate(bm.edges):
-            if i < len(attr.data):
-                mult = attr.data[i].value
-                if mult < self.min_multiplicity:
-                    edges_to_delete.append(edge)
+            if i < len(multiplicity) and multiplicity[i] < self.min_multiplicity:
+                edges_to_delete.append(edge)
         
         for edge in edges_to_delete:
             bm.edges.remove(edge)

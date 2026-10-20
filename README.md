@@ -100,8 +100,8 @@ Neither library imports `bpy`, and the compute half of the engine needs only num
 
 ## Requirements
 
-- **Blender 5.1.0+**
-- Bundled Python wheels target **Python 3.13** (the interpreter shipped with Blender 5.1.x)
+- **Blender 5.2.0+**
+- Bundled Python wheels target **Python 3.13** (the interpreter shipped with Blender 5.2.x)
 - Platforms: Linux x64, Windows x64, macOS ARM64 (Apple Silicon)
 - Internet access is required for geospatial features (geocoding, OSM networks, maps, DEM) and SQL database connections
 

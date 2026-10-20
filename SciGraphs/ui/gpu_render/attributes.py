@@ -5,6 +5,7 @@ import numpy as np
 from scigraphs_core.coloring.attributes import find_attribute, read_attribute_values
 from scigraphs_core.coloring.colormaps import colormap_exists, values_to_rgba
 from ...core.render.channels import scale_to_unit  # noqa: F401
+from ...utils.attributes import AttributeTypes, replace_attribute
 
 
 def active_point_color_attribute(mesh):
@@ -162,14 +163,8 @@ def compute_visible_mask(obj, scene=None):
 
 
 def write_visibility_attribute(obj, mask, name="scigraphs_visible"):
-    mesh = obj.data
-    if name in mesh.attributes:
-        try:
-            mesh.attributes.remove(mesh.attributes[name])
-        except RuntimeError:
-            pass
-    attr = mesh.attributes.new(name=name, type='BOOLEAN', domain='POINT')
-    attr.data.foreach_set("value", np.ascontiguousarray(mask, dtype=bool))
+    replace_attribute(obj, name, np.asarray(mask, dtype=bool),
+                      AttributeTypes.BOOLEAN)
     return name
 
 

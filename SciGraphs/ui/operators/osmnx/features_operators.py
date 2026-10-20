@@ -1,8 +1,10 @@
 import bpy
+import numpy as np
 from bpy.props import StringProperty, EnumProperty, FloatProperty, IntProperty, BoolProperty
 
 from scigraphs_core.feature_tags import FEATURE_TYPE_ITEMS, tags_from_preset
 from ....core.mesh.geo_mesh import create_feature_mesh_from_gdf as _create_feature_mesh_from_gdf
+from ....utils.attributes import AttributeTypes, replace_attribute
 from ....utils.online import OnlineOperator, online_ok, refuse_offline
 
 
@@ -680,9 +682,8 @@ class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
         mesh = obj.data
 
         attr_name = "nearest_node_id"
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        nattr = mesh.attributes.new(name=attr_name, type='INT', domain='POINT')
+        nearest = np.full(len(mesh.vertices), -1, dtype=np.int32)
+        int32 = np.iinfo(np.int32)
 
         snapped = 0
         node_positions = {}  # node_id -> (x, y, z)
@@ -702,12 +703,14 @@ class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
             lon, lat = blender_to_lonlat(v.co.x, v.co.y)
             nid = find_nearest_node(G, lon, lat, is_projected=False)
             if nid is None:
-                nattr.data[i].value = -1
                 continue
+            # An id that isn't an integer, or doesn't fit the INT attribute, as
+            # most OSM node ids no longer do, is stored as -1.
             try:
-                nattr.data[i].value = int(nid)
+                if int32.min <= int(nid) <= int32.max:
+                    nearest[i] = int(nid)
             except (TypeError, ValueError):
-                nattr.data[i].value = -1
+                pass
 
             if mode == 'MOVE_TO_NODE' and int(nid) in node_positions:
                 nx, ny, nz = node_positions[int(nid)]
@@ -717,6 +720,8 @@ class SCIGRAPHS_OT_SnapPOIsToNearestNodes(bpy.types.Operator):
                 connectors.append(((v.co.x, v.co.y, v.co.z), node_positions[int(nid)]))
 
             snapped += 1
+
+        replace_attribute(obj, attr_name, nearest, AttributeTypes.INT)
 
         if mode == 'ADD_CONNECTOR' and connectors:
             cmesh = bpy.data.meshes.new(f"{obj.name}_connectors")

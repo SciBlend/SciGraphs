@@ -1,9 +1,11 @@
 # Layout and positioning operators
 
 import bpy
+import databpy as db
 import numpy as np
 from scigraphs_core import layout
 from ....core import geometry
+from ....utils.attributes import AttributeDomains, AttributeTypes
 from scigraphs_core.mesh.mesh_utils import layout_edge_pairs
 from ....properties.layout_properties import LAYOUT_PROPERTIES
 
@@ -1004,13 +1006,13 @@ class SCIGRAPHS_OT_ImportGraphAnimation(bpy.types.Operator):
             numeric = all(isinstance(v, (int, float)) for v in values)
             if not numeric:
                 continue
-            kind = ('INT' if all(isinstance(v, int) for v in values)
-                    else 'FLOAT')
-            layer = obj.data.attributes.get(name)
-            if layer is None:
-                layer = obj.data.attributes.new(name, kind, 'POINT')
-            for i, value in enumerate(values):
-                layer.data[i].value = value
+            atype = (AttributeTypes.INT if all(isinstance(v, int) for v in values)
+                     else AttributeTypes.FLOAT)
+            if name not in obj.data.attributes:
+                db.store_named_attribute(obj, np.zeros(len(obj.data.vertices)), name,
+                                         atype=atype, domain=AttributeDomains.POINT)
+            # Node vertices come first; any vertices past them keep their values.
+            db.AttributeArray(obj, name)[:len(values)] = values
 
         keys = []
         for stage, frame in zip(data.stages,

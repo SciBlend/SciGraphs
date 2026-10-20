@@ -1,20 +1,18 @@
 # Analysis operators (centrality, clustering, community detection, directed analysis)
 
 import bpy
+import databpy as db
+import numpy as np
 from scigraphs_core import analysis
 from ....core import geometry
+from ....utils.attributes import (
+    AttributeDomains,
+    AttributeTypes,
+    fit,
+    replace_attribute,
+)
 from scigraphs_core.mesh.mesh_utils import parse_graph_data_filtered, expand_node_values_to_mesh
 from scigraphs_core.visualization.animation import update_flow_activation
-
-
-def _fit_attribute_values(values, target_length, default=0.0):
-    """Return exactly target_length values for Blender foreach_set."""
-    fitted = list(values)
-    if len(fitted) > target_length:
-        return fitted[:target_length]
-    if len(fitted) < target_length:
-        fitted.extend([default] * (target_length - len(fitted)))
-    return fitted
 
 
 class SCIGRAPHS_OT_CalculateCentrality(bpy.types.Operator):
@@ -55,11 +53,8 @@ class SCIGRAPHS_OT_CalculateCentrality(bpy.types.Operator):
         mesh = obj.data
         attr_name = f"centrality_{self.method}"
         
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        
-        attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
-        attr.data.foreach_set("value", _fit_attribute_values(expanded_values, len(attr.data)))
+        replace_attribute(obj, attr_name, fit(expanded_values, len(mesh.vertices)),
+                          AttributeTypes.FLOAT)
         
         obj["centrality"] = ",".join(str(v) for v in centrality_values)
 
@@ -89,11 +84,8 @@ class SCIGRAPHS_OT_CalculateClustering(bpy.types.Operator):
         mesh = obj.data
         attr_name = "clustering"
         
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        
-        attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
-        attr.data.foreach_set("value", _fit_attribute_values(expanded_values, len(attr.data)))
+        replace_attribute(obj, attr_name, fit(expanded_values, len(mesh.vertices)),
+                          AttributeTypes.FLOAT)
         
         obj["clustering"] = ",".join(str(v) for v in clustering_values)
 
@@ -211,13 +203,10 @@ class SCIGRAPHS_OT_CalculateDirectedCentrality(bpy.types.Operator):
         mesh = obj.data
         attr_name = f"directed_{props.directed_centrality_method}"
         
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        
         expanded_values = expand_node_values_to_mesh(obj, centrality_values)
         
-        attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
-        attr.data.foreach_set("value", _fit_attribute_values(expanded_values, len(attr.data)))
+        replace_attribute(obj, attr_name, fit(expanded_values, len(mesh.vertices)),
+                          AttributeTypes.FLOAT)
         
         geometry._rebuild_visualization_if_present(obj)
 
@@ -283,22 +272,16 @@ class SCIGRAPHS_OT_AnalyzeFlow(bpy.types.Operator):
         mesh = obj.data
         attr_name = "node_flow_type"
         
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        
         expanded_node_types = expand_node_values_to_mesh(obj, flow_info['node_types'], default_value=-1)
         
-        attr = mesh.attributes.new(name=attr_name, type='INT', domain='POINT')
-        attr.data.foreach_set("value", _fit_attribute_values(expanded_node_types, len(attr.data), -1))
+        replace_attribute(obj, attr_name, fit(expanded_node_types, len(mesh.vertices), -1),
+                          AttributeTypes.INT)
         
         attr_name2 = "flow_betweenness"
-        if attr_name2 in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name2])
-        
         expanded_betweenness = expand_node_values_to_mesh(obj, flow_info['betweenness'])
         
-        attr2 = mesh.attributes.new(name=attr_name2, type='FLOAT', domain='POINT')
-        attr2.data.foreach_set("value", _fit_attribute_values(expanded_betweenness, len(attr2.data)))
+        replace_attribute(obj, attr_name2, fit(expanded_betweenness, len(mesh.vertices)),
+                          AttributeTypes.FLOAT)
         
         obj["flow_sources"] = flow_info['num_sources']
         obj["flow_sinks"] = flow_info['num_sinks']
@@ -335,13 +318,10 @@ class SCIGRAPHS_OT_FindSCCs(bpy.types.Operator):
         mesh = obj.data
         attr_name = "scc_id"
         
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-        
         expanded_ids = expand_node_values_to_mesh(obj, scc_info['component_ids'], default_value=-1)
         
-        attr = mesh.attributes.new(name=attr_name, type='INT', domain='POINT')
-        attr.data.foreach_set("value", _fit_attribute_values(expanded_ids, len(attr.data), -1))
+        replace_attribute(obj, attr_name, fit(expanded_ids, len(mesh.vertices), -1),
+                          AttributeTypes.INT)
         
         obj["num_sccs"] = scc_info['num_components']
         obj["largest_scc"] = scc_info['largest_component_size']
@@ -395,16 +375,15 @@ class SCIGRAPHS_OT_AnimateFlow(bpy.types.Operator):
             max_flow_time = max_distance + smoothness
         
         mesh = obj.data
-        if "flow_distance" not in mesh.attributes:
-            mesh.attributes.new(name="flow_distance", type='FLOAT', domain='POINT')
-        
         expanded_distances = expand_node_values_to_mesh(obj, distances, default_value=-1)
-        
-        attr = mesh.attributes["flow_distance"]
-        attr.data.foreach_set("value", _fit_attribute_values(expanded_distances, len(attr.data), -1))
+        db.store_named_attribute(obj, fit(expanded_distances, len(mesh.vertices), -1),
+                                 "flow_distance", atype=AttributeTypes.FLOAT,
+                                 domain=AttributeDomains.POINT)
         
         if "flow_activation" not in mesh.attributes:
-            mesh.attributes.new(name="flow_activation", type='FLOAT', domain='POINT')
+            db.store_named_attribute(obj, np.zeros(len(mesh.vertices)), "flow_activation",
+                                     atype=AttributeTypes.FLOAT,
+                                     domain=AttributeDomains.POINT)
         
         obj["flow_time"] = 0.0
         

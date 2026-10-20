@@ -4,6 +4,7 @@ import bpy
 import bmesh
 import numpy as np
 from scigraphs_core.logger import log
+from ...utils.attributes import AttributeTypes, replace_attribute
 
 
 def fill_nodata(data, nodata_value=None, method='nearest'):
@@ -361,12 +362,7 @@ def raster_to_mesh(georaster, scale=0.001, subsample=1, name="DEM_RawMesh",
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
     
-    if "elevation" in mesh.attributes:
-        mesh.attributes.remove(mesh.attributes["elevation"])
-    
-    elev_attr = mesh.attributes.new(name="elevation", type='FLOAT', domain='POINT')
-    elevations = data.flatten().astype(np.float32)
-    elev_attr.data.foreach_set("value", elevations)
+    replace_attribute(obj, "elevation", data.ravel(), AttributeTypes.FLOAT)
     
     obj["is_dem_terrain"] = True
     obj["dem_method"] = "raw_mesh"
@@ -534,11 +530,7 @@ def apply_georaster_elevations_to_graph(osmnx_obj, georaster, vertical_scale=1.0
         )
 
     # Apply 3D, basemap and gradients all read this attribute back.
-    attr_name = "elevation"
-    if attr_name in mesh.attributes:
-        mesh.attributes.remove(mesh.attributes[attr_name])
-    elev_attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
-    elev_attr.data.foreach_set("value", vertex_elevations)
+    replace_attribute(osmnx_obj, "elevation", vertex_elevations, AttributeTypes.FLOAT)
 
     # Mirror back into the cached graph for grade calculations and GraphML export.
     nodes_str = osmnx_obj.get("nodes_data", "")

@@ -5,6 +5,7 @@ import bmesh
 import numpy as np
 import time
 from scigraphs_core.logger import log
+from ...utils.attributes import AttributeTypes, replace_attribute
 
 
 def load_dem_data(filepath, bounds=None):
@@ -554,21 +555,12 @@ def create_terrain_mesh(dem_data, scale=0.001, vertical_scale=1.0,
 def _add_elevation_attribute(obj, elevation, subsample):
     """Store raw meters per vertex in an "elevation" attribute for materials."""
     mesh = obj.data
-    height, width = elevation.shape
     
-    if "elevation" in mesh.attributes:
-        mesh.attributes.remove(mesh.attributes["elevation"])
-    
-    attr = mesh.attributes.new(name="elevation", type='FLOAT', domain='POINT')
-    
-    values = []
-    for i in range(height):
-        for j in range(width):
-            val = elevation[i, j]
-            values.append(float(val) if not np.isnan(val) else 0.0)
-    
-    if len(values) == len(mesh.vertices):
-        attr.data.foreach_set("value", values)
+    # Row by row, as the grid's vertices were created; NaN becomes 0.
+    values = np.where(np.isnan(elevation), 0.0, elevation).ravel()
+    if len(values) != len(mesh.vertices):
+        values = np.zeros(len(mesh.vertices))
+    replace_attribute(obj, "elevation", values, AttributeTypes.FLOAT)
 
 
 def apply_terrain_material(obj, style='ELEVATION'):
@@ -881,12 +873,7 @@ def apply_dem_elevations_to_graph(osmnx_obj, dem_data, vertical_scale=1.0, verti
 
     mesh.update()
     
-    attr_name = "elevation"
-    if attr_name in mesh.attributes:
-        mesh.attributes.remove(mesh.attributes[attr_name])
-    
-    elev_attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
-    elev_attr.data.foreach_set("value", vertex_elevations)
+    replace_attribute(osmnx_obj, "elevation", vertex_elevations, AttributeTypes.FLOAT)
     
     osmnx_obj["osmnx_has_elevation"] = True
     osmnx_obj["osmnx_3d_applied"] = True

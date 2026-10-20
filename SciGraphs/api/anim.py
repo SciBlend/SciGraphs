@@ -5,8 +5,11 @@ cannot keyframe.
 from __future__ import annotations
 
 import bpy
+import databpy as db
 import numpy as np
 from bpy.app.handlers import persistent
+
+from ..utils.attributes import AttributeDomains, AttributeTypes, domain_size
 
 _KEY_PREFIX = "scigraphs_anim_"
 
@@ -81,13 +84,18 @@ def _action_fcurves(action):
 
 
 
-def attribute(obj, name, keys, domain='POINT', data_type='FLOAT'):
-    """Animate a mesh attribute from `[(frame, values), ...]`."""
+def attribute(obj, name, keys, domain=AttributeDomains.POINT,
+              data_type=AttributeTypes.FLOAT):
+    """Animate a mesh attribute from `[(frame, values), ...]`. *domain* and
+    *data_type* take databpy's enums, or their names as strings."""
+    domain = AttributeDomains(domain)
+    if isinstance(data_type, str):
+        data_type = AttributeTypes[data_type]
     mesh = obj.data
-    attr = mesh.attributes.get(name)
-    if attr is None:
-        attr = mesh.attributes.new(name, data_type, domain)
-    size = len(attr.data)
+    if name not in mesh.attributes:
+        db.store_named_attribute(obj, np.zeros(domain_size(mesh, domain)), name,
+                                 atype=data_type, domain=domain)
+    size = len(mesh.attributes[name].data)
 
     frames, flat = [], []
     for frame, values in sorted(keys, key=lambda kv: kv[0]):
@@ -95,14 +103,14 @@ def attribute(obj, name, keys, domain='POINT', data_type='FLOAT'):
         if len(arr) != size:
             raise ValueError(
                 f"{obj.name}.{name}: key at frame {frame} has {len(arr)} "
-                f"values for {size} {domain.lower()} elements")
+                f"values for {size} {domain.value.lower()} elements")
         frames.append(int(frame))
         flat.extend(float(v) for v in arr)
 
     obj[f"{_KEY_PREFIX}{name}"] = {
         "frames": frames,
         "values": flat,
-        "domain": domain,
+        "domain": domain.value,
         "size": size,
     }
     apply_frame(obj, bpy.context.scene.frame_current)
@@ -144,8 +152,7 @@ def apply_frame(obj, frame):
         attr = mesh.attributes.get(name)
         if attr is None or len(attr.data) != size:
             continue
-        attr.data.foreach_set("value", np.ascontiguousarray(values,
-                                                            dtype=np.float32))
+        db.store_named_attribute(obj, values, name)
         written += 1
 
     if written:

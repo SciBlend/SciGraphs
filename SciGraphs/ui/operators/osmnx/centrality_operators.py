@@ -1,6 +1,15 @@
 """Centrality, orientation rose, and apply-attribute-to-vertex-colors operators."""
 
 import bpy
+import databpy as db
+import numpy as np
+
+from ....utils.attributes import (
+    AttributeDomains,
+    AttributeTypes,
+    fit,
+    replace_attribute,
+)
 
 from scigraphs_core.osmnx.centrality import (
     edge_betweenness_line,
@@ -101,23 +110,20 @@ class SCIGRAPHS_OT_OSMnxCentrality(bpy.types.Operator):
         mesh = obj.data
         try:
             if target == 'NODES':
-                if attr in mesh.attributes:
-                    mesh.attributes.remove(mesh.attributes[attr])
-                mattr = mesh.attributes.new(name=attr, type='FLOAT', domain='POINT')
                 nodes_str = obj.get("nodes_data", "")
                 node_ids = nodes_str.split(",") if nodes_str else []
-                for i, nid in enumerate(node_ids[: len(mesh.vertices)]):
+                per_vertex = []
+                for nid in node_ids[: len(mesh.vertices)]:
                     try:
-                        mattr.data[i].value = float(values.get(int(nid), 0.0))
+                        per_vertex.append(float(values.get(int(nid), 0.0)))
                     except (ValueError, TypeError):
-                        mattr.data[i].value = 0.0
+                        per_vertex.append(0.0)
+                replace_attribute(obj, attr, fit(per_vertex, len(mesh.vertices)),
+                                  AttributeTypes.FLOAT)
             else:
-                if attr in mesh.attributes:
-                    mesh.attributes.remove(mesh.attributes[attr])
-                mattr = mesh.attributes.new(name=attr, type='FLOAT', domain='EDGE')
                 # Without an edge-to-(u,v) mapping the values stay at zero.
-                for i in range(len(mattr.data)):
-                    mattr.data[i].value = 0.0
+                replace_attribute(obj, attr, np.zeros(len(mesh.edges)),
+                                  AttributeTypes.FLOAT, AttributeDomains.EDGE)
         except Exception as e:
             self.report({'WARNING'}, f"Could not write mesh attribute: {e}")
 
@@ -165,33 +171,23 @@ class SCIGRAPHS_OT_OSMnxAttrToColors(bpy.types.Operator):
             self.report({'ERROR'}, "Only FLOAT attributes are supported")
             return {'CANCELLED'}
 
-        values = [d.value for d in src.data]
+        values = db.named_attribute(obj, attr_name)
         rgba = get_colors_by_values(values, cmap_name=props.osmnx_colormap)
         if rgba is None:
             self.report({'ERROR'}, "matplotlib not available")
             return {'CANCELLED'}
 
         color_name = f"{attr_name}_color"
-        if color_name in mesh.color_attributes:
-            mesh.color_attributes.remove(mesh.color_attributes[color_name])
-
-        domain = 'POINT' if src.domain == 'POINT' else 'CORNER'
-        # POINT -> use POINT color attr; EDGE -> promote to CORNER by taking per-loop edge index.
-        try:
-            color = mesh.color_attributes.new(name=color_name, type='FLOAT_COLOR', domain=domain)
-        except Exception:
-            color = mesh.color_attributes.new(name=color_name, type='BYTE_COLOR', domain=domain)
-
-        if domain == 'POINT':
-            for i, c in enumerate(rgba):
-                if i >= len(color.data):
-                    break
-                color.data[i].color = (float(c[0]), float(c[1]), float(c[2]), float(c[3]))
+        if src.domain == 'POINT':
+            # rgba has one row per vertex, as it was computed from a POINT attribute.
+            replace_attribute(obj, color_name, rgba, AttributeTypes.FLOAT_COLOR)
         else:
-            # Loops belong to polygons, and an edge-only mesh has none, so
-            # every loop gets the same flat gray.
-            for i in range(len(color.data)):
-                color.data[i].color = (0.5, 0.5, 0.5, 1.0)
+            # EDGE values would need per-loop edge indices, and loops belong to
+            # polygons, which an edge-only mesh has none of, so every loop gets
+            # the same flat gray.
+            gray = np.full((len(mesh.loops), 4), (0.5, 0.5, 0.5, 1.0))
+            replace_attribute(obj, color_name, gray, AttributeTypes.FLOAT_COLOR,
+                              AttributeDomains.CORNER)
 
         self.report({'INFO'}, f"Applied {len(rgba)} colors to '{color_name}'")
         return {'FINISHED'}

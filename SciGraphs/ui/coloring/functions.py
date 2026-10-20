@@ -9,8 +9,16 @@ from __future__ import annotations
 from typing import Iterable, List, Optional, Sequence, Tuple
 
 import bpy
+import databpy as db
 import numpy as np
 
+from ...utils.attributes import (
+    AttributeDomains,
+    AttributeTypes,
+    domain_size,
+    fit,
+    replace_attribute,
+)
 from scigraphs_core.coloring.attributes import (
     SCALAR_DATA_TYPES,
     attribute_value_range,
@@ -148,34 +156,14 @@ def write_color_attribute(
     if rgba.size == 0:
         return False, "Attribute returned no values to color"
 
-    if color_name in mesh.color_attributes:
-        try:
-            mesh.color_attributes.remove(mesh.color_attributes[color_name])
-        except RuntimeError:
-            return False, f"Could not replace color attribute '{color_name}'"
-
+    domain = AttributeDomains[color_domain]
+    # Elements past the end of rgba get Blender's default for a new color layer.
+    values = fit(rgba, domain_size(mesh, domain), default=(1.0, 1.0, 1.0, 1.0))
     try:
-        color = mesh.color_attributes.new(
-            name=color_name,
-            type='FLOAT_COLOR',
-            domain=color_domain,
-        )
-    except RuntimeError:
-        try:
-            color = mesh.color_attributes.new(
-                name=color_name,
-                type='BYTE_COLOR',
-                domain=color_domain,
-            )
-        except RuntimeError as exc:
-            return False, f"Failed to create color attribute: {exc}"
-
-    count = min(len(color.data), rgba.shape[0])
-    for i in range(count):
-        c = rgba[i]
-        color.data[i].color = (
-            float(c[0]), float(c[1]), float(c[2]), float(c[3]),
-        )
+        replace_attribute(obj, color_name, values, AttributeTypes.FLOAT_COLOR, domain)
+    except (db.DatabpyError, RuntimeError) as exc:
+        return False, f"Failed to write color attribute '{color_name}': {exc}"
+    color = mesh.color_attributes[color_name]
 
     try:
         mesh.color_attributes.active_color = color
@@ -206,24 +194,14 @@ def write_normalized_attribute(
     if values.size == 0:
         return False, "No normalized values to bake"
 
-    existing = mesh.attributes.get(helper_name)
-    if existing is not None:
-        try:
-            mesh.attributes.remove(existing)
-        except RuntimeError:
-            return False, f"Could not replace helper attribute '{helper_name}'"
-
-    try:
-        attr = mesh.attributes.new(name=helper_name, type='FLOAT', domain=domain)
-    except RuntimeError as exc:
-        return False, f"Failed to create helper attribute: {exc}"
-
-    buffer = np.zeros(len(attr.data), dtype=np.float32)
-    count = min(buffer.size, values.size)
-    buffer[:count] = np.nan_to_num(
-        values[:count], nan=0.0, posinf=1.0, neginf=0.0
+    domain = AttributeDomains[domain]
+    buffer = np.nan_to_num(
+        fit(values, domain_size(mesh, domain)), nan=0.0, posinf=1.0, neginf=0.0
     )
-    attr.data.foreach_set("value", buffer)
+    try:
+        replace_attribute(obj, helper_name, buffer, AttributeTypes.FLOAT, domain)
+    except (db.DatabpyError, RuntimeError) as exc:
+        return False, f"Failed to write helper attribute '{helper_name}': {exc}"
 
     obj["scigraphs_norm_attribute"] = helper_name
     return True, helper_name

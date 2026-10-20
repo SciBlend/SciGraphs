@@ -2,9 +2,13 @@ import math
 
 import bpy
 import bmesh
+import databpy as db
 import numpy as np
 import pandas as pd
+from databpy import AttributeDomains, AttributeTypes
 from scigraphs_core.logger import log
+
+from ...utils.attributes import fit, replace_attribute
 from scigraphs_core.mesh.mesh_utils import expand_node_values_to_mesh
 from scigraphs_core.repro.determinism import get_geometry_seed
 
@@ -389,7 +393,7 @@ def import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_
         log(f"Processing column '{col_name}': {col_data.dtype}")
         
         if pd.api.types.is_numeric_dtype(col_data):
-            _create_edge_attribute(mesh, col_name, col_data, edge_df_indices)
+            _create_edge_attribute(obj, col_name, col_data, edge_df_indices)
             
             _create_vertex_attributes_from_column(
                 mesh, obj, df, col_name, source_col, target_col, 
@@ -404,21 +408,20 @@ def import_attributes_from_dataframe(obj, graph_data, edge_df_indices, selected_
             imported_count += 1
     
     if "node_id" not in mesh.attributes:
-        attr = mesh.attributes.new(name="node_id", type='INT', domain='POINT')
-        node_ids = list(range(num_vertices))
-        attr.data.foreach_set("value", node_ids)
+        db.store_named_attribute(obj, np.arange(num_vertices), "node_id",
+                                 atype=AttributeTypes.INT,
+                                 domain=AttributeDomains.POINT)
     
     obj["node_names"] = json.dumps([str(node) for node in graph_data.nodes])
     
     log(f"Imported {imported_count} attribute columns")
 
 
-def _create_edge_attribute(mesh, col_name, col_data, edge_df_indices):
+def _create_edge_attribute(obj, col_name, col_data, edge_df_indices):
+    mesh = obj.data
     attr_name = f"edge_{col_name}"
     if attr_name in mesh.attributes:
         return
-    
-    attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='EDGE')
     
     values = np.zeros(len(mesh.edges), dtype=np.float32)
     col_values = col_data.values
@@ -432,7 +435,8 @@ def _create_edge_attribute(mesh, col_name, col_data, edge_df_indices):
                 except (ValueError, TypeError):
                     pass
     
-    attr.data.foreach_set("value", values.tolist())
+    db.store_named_attribute(obj, values, attr_name, atype=AttributeTypes.FLOAT,
+                             domain=AttributeDomains.EDGE)
     log(f"  Created edge attribute '{attr_name}'")
 
 
@@ -474,17 +478,17 @@ def _create_vertex_attributes_from_column(mesh, obj, df, col_name, source_col, t
                              where=vertex_counts > 0)
     
     attr_configs = [
-        (f"vertex_{col_name}_sum", vertex_sums, 'FLOAT'),
-        (f"vertex_{col_name}_mean", vertex_means, 'FLOAT'),
-        (f"vertex_{col_name}_min", vertex_mins, 'FLOAT'),
-        (f"vertex_{col_name}_max", vertex_maxs, 'FLOAT'),
-        (f"vertex_{col_name}_count", vertex_counts, 'INT'),
+        (f"vertex_{col_name}_sum", vertex_sums, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_mean", vertex_means, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_min", vertex_mins, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_max", vertex_maxs, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_count", vertex_counts, AttributeTypes.INT),
     ]
     
-    for attr_name, values, attr_type in attr_configs:
+    for attr_name, values, atype in attr_configs:
         if attr_name not in mesh.attributes:
-            attr = mesh.attributes.new(name=attr_name, type=attr_type, domain='POINT')
-            attr.data.foreach_set("value", values.tolist())
+            db.store_named_attribute(obj, values, attr_name, atype=atype,
+                                     domain=AttributeDomains.POINT)
     
     log(f"  Created vertex attributes for '{col_name}': sum, mean, min, max, count")
 
@@ -534,10 +538,6 @@ def import_node_attributes_from_file(obj, filepath, delimiter='\t', has_header=F
 
         attr_name = str(col) if has_header else f"node_attr_{attrs_imported}"
 
-        if attr_name in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes[attr_name])
-
-        attr = mesh.attributes.new(name=attr_name, type='FLOAT', domain='POINT')
         values = np.full(total_verts, float('nan'), dtype=np.float32)
 
         for row_idx in range(len(df)):
@@ -550,7 +550,7 @@ def import_node_attributes_from_file(obj, filepath, delimiter='\t', has_header=F
                         values[vert_idx] = float(val)
                         nodes_matched.add(node_key)
 
-        attr.data.foreach_set("value", values.tolist())
+        replace_attribute(obj, attr_name, values, AttributeTypes.FLOAT)
         attrs_imported += 1
         log(f"  Created POINT attribute '{attr_name}' ({len(nodes_matched)} nodes matched)")
 
@@ -1370,14 +1370,8 @@ def store_edge_spans(obj):
         u1[chain[-1]] = 1.0
 
     for name, values in zip(EDGE_SPAN_ATTRIBUTES, (u0, u1)):
-        layer = mesh.attributes.get(name)
-        if layer is not None and (layer.domain != 'EDGE'
-                                  or layer.data_type != 'FLOAT'):
-            mesh.attributes.remove(layer)
-            layer = None
-        if layer is None:
-            layer = mesh.attributes.new(name, 'FLOAT', 'EDGE')
-        layer.data.foreach_set("value", values)
+        replace_attribute(obj, name, values, AttributeTypes.FLOAT,
+                          AttributeDomains.EDGE)
 
     mesh.update()
     return chains
@@ -1426,11 +1420,13 @@ def update_node_positions_from_property(obj):
         return
     
     positions = np.array(obj["node_positions"]).reshape(-1, 3)
-    
-    for i, vert in enumerate(obj.data.vertices):
-        if i < len(positions):
-            vert.co = positions[i]
-    
+
+    # Node vertices come first; any vertices past them keep their positions.
+    # Only the rows that changed are written back to the mesh.
+    current = db.AttributeArray(obj, "position")
+    count = min(len(current), len(positions))
+    current[:count] = positions[:count]
+
     obj.data.update()
 
 
@@ -1451,9 +1447,9 @@ def store_packing_radii(obj):
     values = np.asarray(
         expand_node_values_to_mesh(obj, list(radii), default_value=0.0),
         dtype=np.float32)
-    if "circle_radius" not in mesh.attributes:
-        mesh.attributes.new(name="circle_radius", type='FLOAT', domain='POINT')
-    mesh.attributes["circle_radius"].data.foreach_set("value", values)
+    db.store_named_attribute(obj, values, "circle_radius",
+                             atype=AttributeTypes.FLOAT,
+                             domain=AttributeDomains.POINT)
     mesh.update()
     return values
 
@@ -1676,7 +1672,7 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
         attrs_added = 0
         for col in numeric_cols:
             try:
-                attribute = obj.data.attributes.new(name=col, type='FLOAT', domain='EDGE')
+                edge_values = np.zeros(len(obj.data.edges), dtype=np.float32)
                 
                 for row_idx, row in df.iterrows():
                     src = row[source_col_name]
@@ -1691,9 +1687,15 @@ def create_geospatial_graph_object(graph_data, positions_3d, edge_style='GREAT_C
                             mesh_edge_indices = graph_edge_to_mesh_edges.get((src, tgt), [])
                             
                             for mesh_edge_idx in mesh_edge_indices:
-                                if mesh_edge_idx < len(attribute.data):
-                                    attribute.data[mesh_edge_idx].value = value
+                                if mesh_edge_idx < len(edge_values):
+                                    edge_values[mesh_edge_idx] = value
                 
+                # overwrite=False: a column that shares a name with an existing
+                # attribute gets a numbered name rather than overwriting it.
+                db.store_named_attribute(obj, edge_values, col,
+                                         atype=AttributeTypes.FLOAT,
+                                         domain=AttributeDomains.EDGE,
+                                         overwrite=False)
                 attrs_added += 1
                 log(f"    Added edge attribute '{col}' to {len(graph_edge_to_mesh_edges)} connections")
             except Exception as e:
@@ -1755,7 +1757,6 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
     if df is None or len(df) == 0:
         return
     
-    mesh = obj.data
     
     source_col_name = getattr(graph_data, 'source_column_name', df.columns[0])
     target_col_name = getattr(graph_data, 'target_column_name', df.columns[1])
@@ -1786,7 +1787,7 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
     for col_name in cols_to_process:
         try:
             _create_vertex_attr_for_geospatial(
-                mesh, df, col_name, source_col_name, target_col_name, 
+                obj, df, col_name, source_col_name, target_col_name, 
                 node_to_idx, num_real_nodes
             )
             attrs_created += 1
@@ -1799,9 +1800,10 @@ def _create_geospatial_vertex_attributes(obj, graph_data, numeric_cols):
         log(f"    Created vertex attributes for {attrs_created} columns")
 
 
-def _create_vertex_attr_for_geospatial(mesh, df, col_name, source_col_name, target_col_name,
+def _create_vertex_attr_for_geospatial(obj, df, col_name, source_col_name, target_col_name,
                                         node_to_idx, num_vertices):
     """Aggregate one column into the five vertex attributes, via pandas groupby."""
+    mesh = obj.data
     vertex_sums = np.zeros(num_vertices, dtype=np.float64)
     vertex_counts = np.zeros(num_vertices, dtype=np.int32)
     vertex_mins = np.full(num_vertices, np.inf, dtype=np.float64)
@@ -1836,26 +1838,20 @@ def _create_vertex_attr_for_geospatial(mesh, df, col_name, source_col_name, targ
                              where=vertex_counts > 0)
     
     attr_configs = [
-        (f"vertex_{col_name}_sum", vertex_sums, 'FLOAT'),
-        (f"vertex_{col_name}_mean", vertex_means, 'FLOAT'),
-        (f"vertex_{col_name}_min", vertex_mins, 'FLOAT'),
-        (f"vertex_{col_name}_max", vertex_maxs, 'FLOAT'),
-        (f"vertex_{col_name}_count", vertex_counts, 'INT'),
+        (f"vertex_{col_name}_sum", vertex_sums, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_mean", vertex_means, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_min", vertex_mins, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_max", vertex_maxs, AttributeTypes.FLOAT),
+        (f"vertex_{col_name}_count", vertex_counts, AttributeTypes.INT),
     ]
     
     total_mesh_verts = len(mesh.vertices)
     
-    for attr_name, values, attr_type in attr_configs:
+    for attr_name, values, atype in attr_configs:
         if attr_name not in mesh.attributes:
-            attr = mesh.attributes.new(name=attr_name, type=attr_type, domain='POINT')
-            
             # Pad to the full vertex count; the extra arc points get 0.
-            if len(values) < total_mesh_verts:
-                expanded = np.zeros(total_mesh_verts, dtype=values.dtype)
-                expanded[:len(values)] = values
-                values = expanded
-            
-            attr.data.foreach_set("value", values.tolist())
+            db.store_named_attribute(obj, fit(values, total_mesh_verts), attr_name,
+                                     atype=atype, domain=AttributeDomains.POINT)
 
 
 
@@ -2177,564 +2173,16 @@ def setup_interactive_geometry_nodes(obj):
     if mod is None:
         mod = obj.modifiers.new(name="SciGraphs_Viz", type='NODES')
     
-    tree_name = "SciGraphs_Interactive_Viz"
-    if mod.node_group is not None:
-        node_group = mod.node_group
-        node_group.nodes.clear()
-        node_group.interface.clear()
-    else:
-        node_group = bpy.data.node_groups.new(tree_name, 'GeometryNodeTree')
+    from .interactive_tree import TREE_NAME, build_interactive_tree
+
+    node_group = mod.node_group
+    if node_group is None:
+        node_group = bpy.data.node_groups.new(TREE_NAME, 'GeometryNodeTree')
         mod.node_group = node_group
-    
+
     obj["is_scigraph"] = True
-    
-    
-    node_group.interface.new_socket("Geometry", in_out='INPUT', socket_type='NodeSocketGeometry')
-    
-    s = node_group.interface.new_socket("Node Scale", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 0.1
-    s.min_value = 0.001
-    s.max_value = 5.0
-    
-    s = node_group.interface.new_socket("Node Resolution", in_out='INPUT', socket_type='NodeSocketInt')
-    s.default_value = 3
-    s.min_value = 1
-    s.max_value = 6
-    
-    s = node_group.interface.new_socket("Node Shape", in_out='INPUT', socket_type='NodeSocketInt')
-    s.default_value = 0
-    
-    node_group.interface.new_socket("Node Attr Name", in_out='INPUT', socket_type='NodeSocketString')
-    
-    s = node_group.interface.new_socket("Node Attr Mult", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 1.0
-    
-    s = node_group.interface.new_socket("Edge Thickness", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 0.02
-    s.min_value = 0.001
-    s.max_value = 1.0
-    
-    s = node_group.interface.new_socket("Edge Resolution", in_out='INPUT', socket_type='NodeSocketInt')
-    s.default_value = 4
-    s.min_value = 3
-    s.max_value = 32
-    
-    node_group.interface.new_socket("Edge Attr Name", in_out='INPUT', socket_type='NodeSocketString')
-    
-    s = node_group.interface.new_socket("Edge Attr Mult", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 1.0
-    
-    s = node_group.interface.new_socket("Show Arrows", in_out='INPUT', socket_type='NodeSocketBool')
-    s.default_value = False
-    
-    s = node_group.interface.new_socket("Arrow Size", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 0.15
-    
-    s = node_group.interface.new_socket("Arrow Resolution", in_out='INPUT', socket_type='NodeSocketInt')
-    s.default_value = 8
-    s.min_value = 3
-    s.max_value = 64
 
-    s = node_group.interface.new_socket("Arrow Sharpness", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 2.5
-    s.min_value = 0.5
-    s.max_value = 12.0
-
-    s = node_group.interface.new_socket("Arrow Position", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 0.7
-    s.min_value = 0.0
-    s.max_value = 1.0
-    
-    s = node_group.interface.new_socket("Filter Enable", in_out='INPUT', socket_type='NodeSocketBool')
-    s.default_value = False
-    
-    node_group.interface.new_socket("Filter Attr", in_out='INPUT', socket_type='NodeSocketString')
-    
-    s = node_group.interface.new_socket("Filter Min", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 0.0
-    
-    s = node_group.interface.new_socket("Filter Max", in_out='INPUT', socket_type='NodeSocketFloat')
-    s.default_value = 1.0
-    
-    node_group.interface.new_socket("Geometry", in_out='OUTPUT', socket_type='NodeSocketGeometry')
-    
-    
-    nodes = node_group.nodes
-    links = node_group.links
-    
-    group_in = nodes.new('NodeGroupInput')
-    group_in.location = (-1200, 0)
-    
-    group_out = nodes.new('NodeGroupOutput')
-    group_out.location = (1200, 0)
-    
-    prepared_geo = _promote_edge_attributes_to_point(
-        nodes, links, group_in.outputs['Geometry'], obj.data
-    )
-    
-    
-    is_osmnx = obj.get("is_osmnx", False)
-    has_intersection_attr = "is_intersection" in obj.data.attributes if obj.data else False
-    
-    mesh_to_points = nodes.new('GeometryNodeMeshToPoints')
-    mesh_to_points.location = (-900, 300)
-    links.new(prepared_geo, mesh_to_points.inputs['Mesh'])
-    
-    sphere = nodes.new('GeometryNodeMeshUVSphere')
-    sphere.name = "SciGraphs_NodeSphere"
-    sphere.location = (-900, 100)
-    sphere.inputs['Radius'].default_value = 1.0
-    links.new(group_in.outputs['Node Resolution'], sphere.inputs['Segments'])
-    links.new(group_in.outputs['Node Resolution'], sphere.inputs['Rings'])
-
-    ico_sphere = nodes.new('GeometryNodeMeshIcoSphere')
-    ico_sphere.name = "SciGraphs_NodeIcoSphere"
-    ico_sphere.location = (-900, -50)
-    ico_sphere.inputs['Radius'].default_value = 1.0
-    links.new(group_in.outputs['Node Resolution'], ico_sphere.inputs['Subdivisions'])
-
-    cube = nodes.new('GeometryNodeMeshCube')
-    cube.name = "SciGraphs_NodeCube"
-    cube.location = (-900, -200)
-    cube.inputs['Size'].default_value = (1.0, 1.0, 1.0)
-
-    cone = nodes.new('GeometryNodeMeshCone')
-    cone.name = "SciGraphs_NodeCone"
-    cone.location = (-900, -350)
-    cone.inputs['Radius Bottom'].default_value = 1.0
-    cone.inputs['Radius Top'].default_value = 0.0
-    cone.inputs['Depth'].default_value = 1.5
-    links.new(group_in.outputs['Node Resolution'], cone.inputs['Vertices'])
-
-    cylinder = nodes.new('GeometryNodeMeshCylinder')
-    cylinder.name = "SciGraphs_NodeCylinder"
-    cylinder.location = (-900, -500)
-    cylinder.inputs['Radius'].default_value = 1.0
-    cylinder.inputs['Depth'].default_value = 1.5
-    links.new(group_in.outputs['Node Resolution'], cylinder.inputs['Vertices'])
-
-    # Index Switch needs Blender 4.1 or newer.
-    shape_switch = nodes.new('GeometryNodeIndexSwitch')
-    shape_switch.name = "SciGraphs_NodeShapeSwitch"
-    shape_switch.data_type = 'GEOMETRY'
-    shape_switch.location = (-600, 0)
-
-    while len(shape_switch.index_switch_items) < 5:
-        shape_switch.index_switch_items.new()
-
-    links.new(group_in.outputs['Node Shape'], shape_switch.inputs['Index'])
-    links.new(sphere.outputs['Mesh'], shape_switch.inputs[1])
-    links.new(ico_sphere.outputs['Mesh'], shape_switch.inputs[2])
-    links.new(cube.outputs['Mesh'], shape_switch.inputs[3])
-    links.new(cone.outputs['Mesh'], shape_switch.inputs[4])
-    links.new(cylinder.outputs['Mesh'], shape_switch.inputs[5])
-
-    smooth_by_angle = _add_smooth_by_angle_node(nodes, location=(-420, 0))
-    links.new(shape_switch.outputs['Output'], smooth_by_angle.inputs['Geometry'])
-    
-    
-    attr_node = nodes.new('GeometryNodeInputNamedAttribute')
-    attr_node.data_type = 'FLOAT'
-    attr_node.location = (-600, 400)
-    links.new(group_in.outputs['Node Attr Name'], attr_node.inputs['Name'])
-    
-    # An empty attribute name means "no scaling"; string length detects it.
-    str_length = nodes.new('FunctionNodeStringLength')
-    str_length.location = (-600, 500)
-    links.new(group_in.outputs['Node Attr Name'], str_length.inputs['String'])
-    
-    compare_str = nodes.new('FunctionNodeCompare')
-    compare_str.data_type = 'INT'
-    compare_str.operation = 'GREATER_THAN'
-    compare_str.location = (-400, 500)
-    compare_str.inputs['B'].default_value = 0
-    links.new(str_length.outputs['Length'], compare_str.inputs['A'])
-    
-    attr_mult = nodes.new('ShaderNodeMath')
-    attr_mult.operation = 'MULTIPLY'
-    attr_mult.location = (-400, 350)
-    links.new(attr_node.outputs['Attribute'], attr_mult.inputs[0])
-    links.new(group_in.outputs['Node Attr Mult'], attr_mult.inputs[1])
-    
-    scale_switch = nodes.new('GeometryNodeSwitch')
-    scale_switch.input_type = 'FLOAT'
-    scale_switch.location = (-200, 400)
-    scale_switch.inputs['False'].default_value = 1.0
-    links.new(compare_str.outputs['Result'], scale_switch.inputs['Switch'])
-    links.new(attr_mult.outputs['Value'], scale_switch.inputs['True'])
-    
-    final_scale = nodes.new('ShaderNodeMath')
-    final_scale.operation = 'MULTIPLY'
-    final_scale.location = (0, 400)
-    links.new(scale_switch.outputs['Output'], final_scale.inputs[0])
-    links.new(group_in.outputs['Node Scale'], final_scale.inputs[1])
-    
-    
-    filter_attr = nodes.new('GeometryNodeInputNamedAttribute')
-    filter_attr.data_type = 'FLOAT'
-    filter_attr.location = (-600, 600)
-    links.new(group_in.outputs['Filter Attr'], filter_attr.inputs['Name'])
-    
-    compare_min = nodes.new('FunctionNodeCompare')
-    compare_min.data_type = 'FLOAT'
-    compare_min.operation = 'GREATER_EQUAL'
-    compare_min.location = (-400, 650)
-    links.new(filter_attr.outputs['Attribute'], compare_min.inputs['A'])
-    links.new(group_in.outputs['Filter Min'], compare_min.inputs['B'])
-    
-    compare_max = nodes.new('FunctionNodeCompare')
-    compare_max.data_type = 'FLOAT'
-    compare_max.operation = 'LESS_EQUAL'
-    compare_max.location = (-400, 750)
-    links.new(filter_attr.outputs['Attribute'], compare_max.inputs['A'])
-    links.new(group_in.outputs['Filter Max'], compare_max.inputs['B'])
-    
-    bool_and = nodes.new('FunctionNodeBooleanMath')
-    bool_and.operation = 'AND'
-    bool_and.location = (-200, 700)
-    links.new(compare_min.outputs['Result'], bool_and.inputs[0])
-    links.new(compare_max.outputs['Result'], bool_and.inputs[1])
-    
-    filter_switch = nodes.new('GeometryNodeSwitch')
-    filter_switch.input_type = 'BOOLEAN'
-    filter_switch.location = (0, 700)
-    filter_switch.inputs['False'].default_value = True
-    links.new(group_in.outputs['Filter Enable'], filter_switch.inputs['Switch'])
-    links.new(bool_and.outputs['Boolean'], filter_switch.inputs['True'])
-    
-    if is_osmnx or has_intersection_attr:
-        intersection_attr = nodes.new('GeometryNodeInputNamedAttribute')
-        intersection_attr.data_type = 'INT'
-        intersection_attr.location = (-600, 800)
-        intersection_attr.inputs['Name'].default_value = "is_intersection"
-        
-        compare_intersection = nodes.new('FunctionNodeCompare')
-        compare_intersection.data_type = 'INT'
-        compare_intersection.operation = 'EQUAL'
-        compare_intersection.location = (-400, 850)
-        compare_intersection.inputs['B'].default_value = 1
-        links.new(intersection_attr.outputs['Attribute'], compare_intersection.inputs['A'])
-        
-        combined_filter = nodes.new('FunctionNodeBooleanMath')
-        combined_filter.operation = 'AND'
-        combined_filter.location = (200, 750)
-        links.new(filter_switch.outputs['Output'], combined_filter.inputs[0])
-        links.new(compare_intersection.outputs['Result'], combined_filter.inputs[1])
-        
-        final_selection = combined_filter.outputs['Boolean']
-    else:
-        final_selection = filter_switch.outputs['Output']
-    
-    
-    instance_on_points = nodes.new('GeometryNodeInstanceOnPoints')
-    instance_on_points.location = (200, 300)
-    links.new(mesh_to_points.outputs['Points'], instance_on_points.inputs['Points'])
-    links.new(smooth_by_angle.outputs['Geometry'], instance_on_points.inputs['Instance'])
-    links.new(final_scale.outputs['Value'], instance_on_points.inputs['Scale'])
-    links.new(final_selection, instance_on_points.inputs['Selection'])
-    
-    realize_nodes = nodes.new('GeometryNodeRealizeInstances')
-    realize_nodes.location = (400, 300)
-    links.new(instance_on_points.outputs['Instances'], realize_nodes.inputs['Geometry'])
-    
-    
-    store_pass = nodes.new('GeometryNodeStoreNamedAttribute')
-    store_pass.data_type = 'FLOAT'
-    store_pass.domain = 'POINT'
-    store_pass.location = (-1500, -420)
-    store_pass.inputs['Name'].default_value = FILTER_PASS_ATTRIBUTE
-    links.new(prepared_geo, store_pass.inputs['Geometry'])
-    links.new(filter_switch.outputs['Output'], store_pass.inputs['Value'])
-
-    read_pass = nodes.new('GeometryNodeInputNamedAttribute')
-    read_pass.data_type = 'FLOAT'
-    read_pass.location = (-1380, -300)
-    read_pass.inputs['Name'].default_value = FILTER_PASS_ATTRIBUTE
-
-    edge_below = nodes.new('FunctionNodeCompare')
-    edge_below.data_type = 'FLOAT'
-    edge_below.operation = 'LESS_THAN'
-    edge_below.inputs['B'].default_value = 0.999
-    edge_below.location = (-1260, -300)
-    links.new(read_pass.outputs['Attribute'], edge_below.inputs['A'])
-
-    drop_edges = nodes.new('GeometryNodeDeleteGeometry')
-    drop_edges.domain = 'EDGE'
-    drop_edges.location = (-1160, -480)
-    links.new(store_pass.outputs['Geometry'], drop_edges.inputs['Geometry'])
-    links.new(edge_below.outputs['Result'], drop_edges.inputs['Selection'])
-    edge_input_geo = drop_edges.outputs['Geometry']
-
-    edge_geo = _split_edges_for_individual_curves(
-        nodes, links, edge_input_geo, (-1100, -500), mesh=obj.data
-    )
-
-    mesh_to_curve = nodes.new('GeometryNodeMeshToCurve')
-    mesh_to_curve.location = (-900, -500)
-    links.new(edge_geo, mesh_to_curve.inputs['Mesh'])
-    
-    edge_attr = nodes.new('GeometryNodeInputNamedAttribute')
-    edge_attr.data_type = 'FLOAT'
-    edge_attr.location = (-700, -400)
-    links.new(group_in.outputs['Edge Attr Name'], edge_attr.inputs['Name'])
-    
-    edge_str_len = nodes.new('FunctionNodeStringLength')
-    edge_str_len.location = (-700, -300)
-    links.new(group_in.outputs['Edge Attr Name'], edge_str_len.inputs['String'])
-    
-    compare_edge_str = nodes.new('FunctionNodeCompare')
-    compare_edge_str.data_type = 'INT'
-    compare_edge_str.operation = 'GREATER_THAN'
-    compare_edge_str.location = (-500, -300)
-    compare_edge_str.inputs['B'].default_value = 0
-    links.new(edge_str_len.outputs['Length'], compare_edge_str.inputs['A'])
-    
-    edge_attr_mult = nodes.new('ShaderNodeMath')
-    edge_attr_mult.operation = 'MULTIPLY'
-    edge_attr_mult.location = (-500, -450)
-    links.new(edge_attr.outputs['Attribute'], edge_attr_mult.inputs[0])
-    links.new(group_in.outputs['Edge Attr Mult'], edge_attr_mult.inputs[1])
-    
-    edge_scale_switch = nodes.new('GeometryNodeSwitch')
-    edge_scale_switch.input_type = 'FLOAT'
-    edge_scale_switch.location = (-300, -400)
-    edge_scale_switch.inputs['False'].default_value = 1.0
-    links.new(compare_edge_str.outputs['Result'], edge_scale_switch.inputs['Switch'])
-    links.new(edge_attr_mult.outputs['Value'], edge_scale_switch.inputs['True'])
-    
-    final_edge_thick = nodes.new('ShaderNodeMath')
-    final_edge_thick.operation = 'MULTIPLY'
-    final_edge_thick.location = (-100, -400)
-    links.new(edge_scale_switch.outputs['Output'], final_edge_thick.inputs[0])
-    links.new(group_in.outputs['Edge Thickness'], final_edge_thick.inputs[1])
-    
-    set_radius = nodes.new('GeometryNodeSetCurveRadius')
-    set_radius.location = (100, -500)
-    links.new(mesh_to_curve.outputs['Curve'], set_radius.inputs['Curve'])
-    links.new(final_edge_thick.outputs['Value'], set_radius.inputs['Radius'])
-    
-    curve_circle = nodes.new('GeometryNodeCurvePrimitiveCircle')
-    curve_circle.name = "SciGraphs_EdgeProfile"
-    curve_circle.mode = 'RADIUS'
-    curve_circle.location = (100, -700)
-    curve_circle.inputs['Radius'].default_value = 1.0
-    links.new(group_in.outputs['Edge Resolution'], curve_circle.inputs['Resolution'])
-    
-    curve_to_mesh = nodes.new('GeometryNodeCurveToMesh')
-    curve_to_mesh.location = (300, -500)
-    links.new(set_radius.outputs['Curve'], curve_to_mesh.inputs['Curve'])
-    links.new(curve_circle.outputs['Curve'], curve_to_mesh.inputs['Profile Curve'])
-
-    if 'Scale' in curve_to_mesh.inputs:
-        links.new(final_edge_thick.outputs['Value'],
-                  curve_to_mesh.inputs['Scale'])
-        set_radius.inputs['Radius'].default_value = 1.0
-        for link in list(links):
-            if (link.to_node == set_radius
-                    and link.to_socket.name == 'Radius'):
-                links.remove(link)
-    
-    
-    edge_verts = nodes.new('GeometryNodeInputMeshEdgeVertices')
-    edge_verts.location = (100, -820)
-
-    edge_dir = nodes.new('ShaderNodeVectorMath')
-    edge_dir.operation = 'SUBTRACT'
-    edge_dir.location = (280, -820)
-    links.new(edge_verts.outputs['Position 2'], edge_dir.inputs[0])
-    links.new(edge_verts.outputs['Position 1'], edge_dir.inputs[1])
-
-    span0 = nodes.new('GeometryNodeInputNamedAttribute')
-    span0.data_type = 'FLOAT'
-    span0.inputs['Name'].default_value = EDGE_SPAN_ATTRIBUTES[0]
-    span0.location = (100, -940)
-
-    span1 = nodes.new('GeometryNodeInputNamedAttribute')
-    span1.data_type = 'FLOAT'
-    span1.inputs['Name'].default_value = EDGE_SPAN_ATTRIBUTES[1]
-    span1.location = (100, -1060)
-
-    usable = nodes.new('FunctionNodeCompare')
-    usable.data_type = 'FLOAT'
-    usable.operation = 'GREATER_THAN'
-    usable.location = (620, -880)
-    links.new(span1.outputs['Attribute'], usable.inputs['A'])
-    links.new(span0.outputs['Attribute'], usable.inputs['B'])
-
-    spans_ok = nodes.new('FunctionNodeBooleanMath')
-    spans_ok.operation = 'AND'
-    spans_ok.location = (780, -880)
-    links.new(span1.outputs['Exists'], spans_ok.inputs[0])
-    links.new(usable.outputs['Result'], spans_ok.inputs[1])
-
-    clamped = nodes.new('ShaderNodeClamp')
-    clamped.location = (280, -940)
-    clamped.inputs['Min'].default_value = 0.0
-    clamped.inputs['Max'].default_value = 0.999999
-    links.new(group_in.outputs['Arrow Position'], clamped.inputs['Value'])
-
-    after_start = nodes.new('FunctionNodeCompare')
-    after_start.data_type = 'FLOAT'
-    after_start.operation = 'GREATER_EQUAL'
-    after_start.location = (460, -940)
-    links.new(clamped.outputs['Result'], after_start.inputs['A'])
-    links.new(span0.outputs['Attribute'], after_start.inputs['B'])
-
-    before_end = nodes.new('FunctionNodeCompare')
-    before_end.data_type = 'FLOAT'
-    before_end.operation = 'LESS_THAN'
-    before_end.location = (460, -1060)
-    links.new(clamped.outputs['Result'], before_end.inputs['A'])
-    links.new(span1.outputs['Attribute'], before_end.inputs['B'])
-
-    in_span = nodes.new('FunctionNodeBooleanMath')
-    in_span.operation = 'AND'
-    in_span.location = (620, -1000)
-    links.new(after_start.outputs['Result'], in_span.inputs[0])
-    links.new(before_end.outputs['Result'], in_span.inputs[1])
-
-    offset = nodes.new('ShaderNodeMath')
-    offset.operation = 'SUBTRACT'
-    offset.location = (620, -1140)
-    links.new(clamped.outputs['Result'], offset.inputs[0])
-    links.new(span0.outputs['Attribute'], offset.inputs[1])
-
-    width = nodes.new('ShaderNodeMath')
-    width.operation = 'SUBTRACT'
-    width.location = (620, -1260)
-    links.new(span1.outputs['Attribute'], width.inputs[0])
-    links.new(span0.outputs['Attribute'], width.inputs[1])
-
-    local = nodes.new('ShaderNodeMath')
-    local.operation = 'DIVIDE'
-    local.use_clamp = True
-    local.location = (780, -1200)
-    links.new(offset.outputs['Value'], local.inputs[0])
-    links.new(width.outputs['Value'], local.inputs[1])
-
-    factor = nodes.new('GeometryNodeSwitch')
-    factor.input_type = 'FLOAT'
-    factor.location = (940, -1140)
-    links.new(spans_ok.outputs['Boolean'], factor.inputs['Switch'])
-    links.new(group_in.outputs['Arrow Position'], factor.inputs['False'])
-    links.new(local.outputs['Value'], factor.inputs['True'])
-
-    along = nodes.new('ShaderNodeVectorMath')
-    along.operation = 'MULTIPLY_ADD'
-    along.location = (1100, -820)
-    links.new(edge_dir.outputs['Vector'], along.inputs[0])
-    links.new(factor.outputs['Output'], along.inputs[1])
-    links.new(edge_verts.outputs['Position 1'], along.inputs[2])
-
-    store_dir = nodes.new('GeometryNodeStoreNamedAttribute')
-    store_dir.data_type = 'FLOAT_VECTOR'
-    store_dir.domain = 'EDGE'
-    store_dir.location = (460, -700)
-    store_dir.inputs['Name'].default_value = EDGE_DIRECTION_ATTRIBUTE
-    links.new(edge_input_geo, store_dir.inputs['Geometry'])
-    links.new(edge_dir.outputs['Vector'], store_dir.inputs['Value'])
-
-    real_node = nodes.new('GeometryNodeInputNamedAttribute')
-    real_node.data_type = 'INT'
-    real_node.inputs['Name'].default_value = "is_intersection"
-    real_node.location = (100, -700)
-
-    at_target = nodes.new('GeometryNodeSampleIndex')
-    at_target.data_type = 'INT'
-    at_target.domain = 'POINT'
-    at_target.location = (280, -640)
-    links.new(edge_input_geo, at_target.inputs['Geometry'])
-    links.new(real_node.outputs['Attribute'], at_target.inputs['Value'])
-    links.new(edge_verts.outputs['Vertex Index 2'], at_target.inputs['Index'])
-
-    ends_at_node = nodes.new('FunctionNodeCompare')
-    ends_at_node.data_type = 'INT'
-    ends_at_node.operation = 'EQUAL'
-    ends_at_node.inputs['B'].default_value = 1
-    ends_at_node.location = (460, -640)
-    links.new(at_target.outputs['Value'], ends_at_node.inputs['A'])
-
-    one_per_edge = nodes.new('GeometryNodeSwitch')
-    one_per_edge.input_type = 'BOOLEAN'
-    one_per_edge.location = (620, -640)
-    one_per_edge.inputs['False'].default_value = True
-    links.new(real_node.outputs['Exists'], one_per_edge.inputs['Switch'])
-    links.new(ends_at_node.outputs['Result'], one_per_edge.inputs['True'])
-
-    carries = nodes.new('GeometryNodeSwitch')
-    carries.input_type = 'BOOLEAN'
-    carries.location = (940, -700)
-    links.new(spans_ok.outputs['Boolean'], carries.inputs['Switch'])
-    links.new(one_per_edge.outputs['Output'], carries.inputs['False'])
-    links.new(in_span.outputs['Boolean'], carries.inputs['True'])
-
-    arrow_points = nodes.new('GeometryNodeMeshToPoints')
-    arrow_points.mode = 'EDGES'
-    arrow_points.location = (800, -800)
-    links.new(store_dir.outputs['Geometry'], arrow_points.inputs['Mesh'])
-    links.new(along.outputs['Vector'], arrow_points.inputs['Position'])
-    links.new(carries.outputs['Output'], arrow_points.inputs['Selection'])
-
-    read_dir = nodes.new('GeometryNodeInputNamedAttribute')
-    read_dir.data_type = 'FLOAT_VECTOR'
-    read_dir.location = (640, -1000)
-    read_dir.inputs['Name'].default_value = EDGE_DIRECTION_ATTRIBUTE
-
-    arrow_cone = nodes.new('GeometryNodeMeshCone')
-    arrow_cone.location = (100, -1100)
-    arrow_cone.inputs['Radius Top'].default_value = 0.0
-    links.new(group_in.outputs['Arrow Resolution'], arrow_cone.inputs['Vertices'])
-    links.new(group_in.outputs['Arrow Size'], arrow_cone.inputs['Radius Bottom'])
-
-    arrow_len = nodes.new('ShaderNodeMath')
-    arrow_len.operation = 'MULTIPLY'
-    arrow_len.location = (280, -1100)
-    links.new(group_in.outputs['Arrow Size'], arrow_len.inputs[0])
-    links.new(group_in.outputs['Arrow Sharpness'], arrow_len.inputs[1])
-    links.new(arrow_len.outputs['Value'], arrow_cone.inputs['Depth'])
-
-    align_euler = nodes.new('FunctionNodeAlignEulerToVector')
-    align_euler.axis = 'Z'
-    align_euler.location = (640, -950)
-    links.new(read_dir.outputs['Attribute'], align_euler.inputs['Vector'])
-
-    instance_arrows = nodes.new('GeometryNodeInstanceOnPoints')
-    instance_arrows.location = (820, -900)
-    links.new(arrow_points.outputs['Points'], instance_arrows.inputs['Points'])
-    links.new(arrow_cone.outputs['Mesh'], instance_arrows.inputs['Instance'])
-    links.new(align_euler.outputs['Rotation'], instance_arrows.inputs['Rotation'])
-    links.new(group_in.outputs['Show Arrows'], instance_arrows.inputs['Selection'])
-    
-    realize_arrows = nodes.new('GeometryNodeRealizeInstances')
-    realize_arrows.location = (700, -900)
-    links.new(instance_arrows.outputs['Instances'], realize_arrows.inputs['Geometry'])
-    
-    
-    edge_geo_output = _strip_custom_attributes_from_geo(
-        nodes, links, curve_to_mesh.outputs['Mesh'], obj.data, (500, -500)
-    )
-    arrow_geo_output = _strip_custom_attributes_from_geo(
-        nodes, links, realize_arrows.outputs['Geometry'], obj.data, (900, -900)
-    )
-    
-    join_geo = nodes.new('GeometryNodeJoinGeometry')
-    join_geo.location = (1100, 0)
-    links.new(realize_nodes.outputs['Geometry'], join_geo.inputs['Geometry'])
-    links.new(edge_geo_output, join_geo.inputs['Geometry'])
-    links.new(arrow_geo_output, join_geo.inputs['Geometry'])
-    
-    set_material = nodes.new('GeometryNodeSetMaterial')
-    set_material.location = (group_out.location.x - 200, group_out.location.y)
-    links.new(join_geo.outputs['Geometry'], set_material.inputs['Geometry'])
-
-    existing_material = _get_slot0_material(obj)
-    if existing_material is not None:
-        set_material.inputs['Material'].default_value = existing_material
-
-    links.new(set_material.outputs['Geometry'], group_out.inputs['Geometry'])
-
-    arrange_node_tree(node_group, bands=branch_membership(node_group))
-    frame_node_tree(node_group)
+    build_interactive_tree(obj, node_group, material=_get_slot0_material(obj))
 
     seeded = 0
     for item in node_group.interface.items_tree:

@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import bpy
 import bmesh
+import databpy as db
+from databpy import AttributeDomains, AttributeTypes
 from typing import Tuple, List, Dict, Optional
 import os
 import json
@@ -762,16 +764,17 @@ def _compute_land_ocean_attribute(globe_obj: bpy.types.Object, radius: float, ma
             
             if world is None:
                 print(f"    Using final fallback: all vertices as ocean")
-                attr = globe_obj.data.attributes.new(name='is_land', type='FLOAT', domain='POINT')
+                db.store_named_attribute(globe_obj, np.zeros(len(globe_obj.data.vertices)),
+                                         'is_land', atype=AttributeTypes.FLOAT,
+                                         domain=AttributeDomains.POINT)
                 return
 
     # One union beats testing each vertex against every polygon.
     land_union = world.geometry.unary_union
     
-    attr = globe_obj.data.attributes.new(name='is_land', type='FLOAT', domain='POINT')
-    
     mesh = globe_obj.data
     total_verts = len(mesh.vertices)
+    is_land_values = np.zeros(total_verts)
     print(f"    Checking {total_verts} vertices...")
     
     for vert_idx, vert in enumerate(mesh.vertices):
@@ -786,10 +789,13 @@ def _compute_land_ocean_attribute(globe_obj: bpy.types.Object, radius: float, ma
 
         is_land = land_union.contains(point)
 
-        attr.data[vert_idx].value = 1.0 if is_land else 0.0
+        is_land_values[vert_idx] = 1.0 if is_land else 0.0
 
         if (vert_idx + 1) % 500 == 0:
             print(f"      Processed {vert_idx + 1}/{total_verts} vertices...")
     
+    db.store_named_attribute(globe_obj, is_land_values, 'is_land',
+                             atype=AttributeTypes.FLOAT,
+                             domain=AttributeDomains.POINT)
     print(f"    Land/ocean attribute computed for {total_verts} vertices")
 
